@@ -1,0 +1,1827 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{8aa384e1-7a1d-40ac-8927-8129e578dd35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{ef5ce8de-490f-4d44-8551-6a3183847d2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\asn1">
+      <UniqueIdentifier>{792bf4da-ea15-4533-a363-1eba8f8d287f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\struct">
+      <UniqueIdentifier>{a2281eaf-45b0-4f50-974b-ce5d2c799ca5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\AccessDescription.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Accuracy.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AdministrationDomainName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AlgorithmIdentifiers.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ANY.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_application.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_codecs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_codecs_prim.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_SEQUENCE_OF.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_SET_OF.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn_system.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn1-errors.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn1-module.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\asn1-utils.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttCertIssuer.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttCertValidityPeriod.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttCertVersion.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttCertVersionV1.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Attribute.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeCertificate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeCertificateInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeCertificateInfoV1.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeCertificateV1.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeCertificateV2.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Attributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeType.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeTypeAndValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AttributeValueAssertion.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AuthenticatedSafe.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AuthorityInfoAccessSyntax.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AuthorityKeyIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BasicConstraints.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BasicOCSPResponse.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ber_decoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ber_tlv_length.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ber_tlv_tag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BinaryField.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BIT_STRING.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BMPString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BOOLEAN.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BuiltInDomainDefinedAttribute.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BuiltInDomainDefinedAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BuiltInStandardAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertBag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Certificate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificateChoices.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificateList.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificateLists.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificatePolicies.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Certificates.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificateSerialNumber.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificateSet.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificationRequest.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertificationRequestInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertPolicyId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertStatus.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CMSVersion.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CompleteCertificateRefs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CompleteRevocationRefs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_CHOICE.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_SEQUENCE.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_SEQUENCE_OF.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_SET.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_SET_OF.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constr_TYPE.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\constraints.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ContentEncryptionAlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ContentInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ContentType.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CountryName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CRLDistributionPoints.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CrlID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CrlIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CRLListID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CRLNumber.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CrlOcspRef.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CRLReason.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CrlValidatedID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\der_encoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Digest.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DigestAlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DigestAlgorithmIdentifiers.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DigestedData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DigestInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DirectoryString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DisplayText.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DistributionPoint.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DistributionPointName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DSTU4145Params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DSTUEllipticCurve.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ECBinary.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ECDSA-Sig-Value.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ECParameters.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ECPrivateKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EDIPartyName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncapsulatedContentInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedContent.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedContentInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedPrivateKeyInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ENUMERATED.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EnvelopedData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ESSCertIDv2.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ESSCertIDv2s.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtendedCertificate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtendedCertificateInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtendedKeyUsage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Extension.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Extensions.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\FreshestCRL.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GeneralizedTime.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GeneralName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GeneralNames.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GeneralString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GOST28147Params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GOST28147ParamsOptionalDke.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Gost34310Params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GOST34310Sign.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GraphicString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Hash.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Holder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\IA5String.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\IITParams.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\INTEGER.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ISO646String.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Iso4217CurrencyCode.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\IssuerAltName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\IssuerAndSerialNumber.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\IssuerSerial.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KEKIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KEKRecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KepDSTU4145Params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KepGost28147Params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyAgreeRecipientIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyAgreeRecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyBag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyDerivationAlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyEncryptionAlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyHash.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyPurposeId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyTransRecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KeyUsage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\MacData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\MessageAuthenticationCodeAlgorithm.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\MessageImprint.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\MonetaryValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Name.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NativeEnumerated.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NativeInteger.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NetworkAddress.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NoticeReference.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NULL.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NumericString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NumericUserIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OBJECT_IDENTIFIER.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ObjectDescriptor.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ObjectDigestInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OcspIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OcspListID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OCSPRequest.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OCSPResponse.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OcspResponsesID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OCSPResponseStatus.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OCTET_STRING.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ORAddress.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OrganizationalUnitName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OrganizationalUnitNames.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OrganizationName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OriginatorIdentifierOrKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OriginatorInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OriginatorPublicKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherCertID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherCertificateFormat.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherHash.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherHashAlgAndValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherHashValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherKeyAttribute.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherPrimeInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherPrimeInfos.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRevocationInfoFormat.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRevRefs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRevRefType.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRevVals.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OtherRevValType.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PasswordRecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PBES2-KDFs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PBES2-params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PBKDF2-params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PBKDF2-Salt.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Pentanomial.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\per_decoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\per_encoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\per_opentype.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\per_support.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PersonalName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PFX.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKCS8ShroudedKeyBag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIFailureInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIFreeText.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIStatus.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIStatusInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIXTime.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PolicyInformation.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PolicyInformations.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PolicyQualifierId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PolicyQualifierInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PolicyQualifiers.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PrintableString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PrivateDomainName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PrivateKeyInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PrivateKeyUsagePeriod.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\QcEuLimitValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\QCStatement.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\QCStatements.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RDNSequence.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ReasonFlags.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientEncryptedKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientEncryptedKeys.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientInfos.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RecipientKeyIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RelativeDistinguishedName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RELATIVE-OID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Request.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ResponderID.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ResponseBytes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ResponseData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevocationInfoChoice.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevocationInfoChoices.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevocationValues.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevokedCertificate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevokedCertificates.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevokedInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RSAPrivateKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RSAPublicKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SafeBag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SafeContents.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SecretBag.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SeqAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Signature.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignatureAlgorithmIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignaturePolicyId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignaturePolicyIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignedAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignedData.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerIdentifierEx.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerIdentifierIm.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerInfos.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SigningCertificateV2.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SigPolicyHash.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SigPolicyId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SigPolicyQualifierId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SigPolicyQualifierInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SingleResponse.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SPUserNotice.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SubjectAltName.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SubjectDirectoryAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SubjectInfoAccess.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SubjectKeyIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SubjectPublicKeyInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\T61String.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TBSCertificate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TBSCertList.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TBSRequest.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TeletexString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TerminalIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TimeStampReq.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TimeStampResp.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TimeStampToken.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TSAPolicyId.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TSTInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\TSVersion.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\uapkif.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UnauthAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UniqueIdentifier.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UniversalString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UnknownInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UnprotectedAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UnsignedAttributes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UserKeyingMaterial.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UTCTime.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UTF8String.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\V2Form.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Validity.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Version.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VisibleString.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\X121Address.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\xer_decoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\xer_encoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\xer_support.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\uapkif-export.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\asn1\asn_internal.h">
+      <Filter>src\asn1</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SharedInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\X509Tbs.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SignerInfoEx.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\struct\AccessDescription.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Accuracy.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AdministrationDomainName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AlgorithmIdentifiers.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttCertIssuer.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttCertValidityPeriod.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttCertVersion.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttCertVersionV1.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Attribute.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeCertificate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeCertificateInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeCertificateInfoV1.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeCertificateV1.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeCertificateV2.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Attributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeType.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeTypeAndValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AttributeValueAssertion.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AuthenticatedSafe.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AuthorityInfoAccessSyntax.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\AuthorityKeyIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BasicConstraints.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BasicOCSPResponse.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BinaryField.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BuiltInDomainDefinedAttribute.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BuiltInDomainDefinedAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\BuiltInStandardAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertBag.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Certificate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificateChoices.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificateList.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificateLists.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificatePolicies.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Certificates.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificateSerialNumber.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificateSet.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificationRequest.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertificationRequestInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertPolicyId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertStatus.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CMSVersion.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CompleteCertificateRefs.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CompleteRevocationRefs.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ContentEncryptionAlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ContentInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ContentType.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CountryName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CRLDistributionPoints.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CrlID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CrlIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CRLListID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CRLNumber.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CrlOcspRef.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CRLReason.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CrlValidatedID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Digest.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DigestAlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DigestAlgorithmIdentifiers.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DigestedData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DigestInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DirectoryString.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DisplayText.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DistributionPoint.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DistributionPointName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DSTU4145Params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DSTUEllipticCurve.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ECBinary.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ECDSA-Sig-Value.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ECParameters.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ECPrivateKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EDIPartyName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncapsulatedContentInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedContent.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedContentInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedPrivateKeyInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EnvelopedData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ESSCertIDv2.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ESSCertIDv2s.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ExtendedCertificate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ExtendedCertificateInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ExtendedKeyUsage.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Extension.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Extensions.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\FreshestCRL.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\GeneralName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\GeneralNames.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\GOST28147Params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\GOST28147ParamsOptionalDke.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Gost34310Params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\GOST34310Sign.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Hash.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Holder.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\IITParams.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Iso4217CurrencyCode.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\IssuerAltName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\IssuerAndSerialNumber.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\IssuerSerial.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KEKIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KEKRecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KepDSTU4145Params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KepGost28147Params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyAgreeRecipientIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyAgreeRecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyBag.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyDerivationAlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyEncryptionAlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyHash.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyPurposeId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyTransRecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\KeyUsage.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\MacData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\MessageAuthenticationCodeAlgorithm.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\MessageImprint.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\MonetaryValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Name.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\NetworkAddress.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\NoticeReference.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\NumericUserIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ObjectDigestInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OcspIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OcspListID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OCSPRequest.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OCSPResponse.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OcspResponsesID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OCSPResponseStatus.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ORAddress.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OrganizationalUnitName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OrganizationalUnitNames.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OrganizationName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OriginatorIdentifierOrKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OriginatorInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OriginatorPublicKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherCertID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherCertificateFormat.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherHash.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherHashAlgAndValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherHashValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherKeyAttribute.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherPrimeInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherPrimeInfos.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRevocationInfoFormat.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRevRefs.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRevRefType.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRevVals.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OtherRevValType.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PasswordRecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PBES2-KDFs.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PBES2-params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PBKDF2-params.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PBKDF2-Salt.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Pentanomial.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PersonalName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PFX.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKCS8ShroudedKeyBag.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIFailureInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIFreeText.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIStatus.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIStatusInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIXTime.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PolicyInformation.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PolicyInformations.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PolicyQualifierId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PolicyQualifierInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PolicyQualifiers.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PrivateDomainName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PrivateKeyInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PrivateKeyUsagePeriod.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\QcEuLimitValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\QCStatement.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\QCStatements.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RDNSequence.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ReasonFlags.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientEncryptedKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientEncryptedKeys.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientInfos.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RecipientKeyIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RelativeDistinguishedName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Request.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ResponderID.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ResponseBytes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ResponseData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevocationInfoChoice.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevocationInfoChoices.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevocationValues.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevokedCertificate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevokedCertificates.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevokedInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RSAPrivateKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RSAPublicKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SafeBag.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SafeContents.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SecretBag.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SeqAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Signature.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignatureAlgorithmIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignaturePolicyId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignaturePolicyIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignedAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignedData.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerIdentifierEx.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerIdentifierIm.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerInfos.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SigningCertificateV2.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SigPolicyHash.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SigPolicyId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SigPolicyQualifierId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SigPolicyQualifierInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SingleResponse.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SPUserNotice.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SubjectAltName.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SubjectDirectoryAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SubjectInfoAccess.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SubjectKeyIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SubjectPublicKeyInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TBSCertificate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TBSCertList.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TBSRequest.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TerminalIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TimeStampReq.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TimeStampResp.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TimeStampToken.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TSAPolicyId.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TSTInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TSVersion.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UnauthAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UniqueIdentifier.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UnknownInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UnprotectedAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UnsignedAttributes.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\UserKeyingMaterial.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\V2Form.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Validity.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\Version.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\X121Address.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ANY.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\asn_codecs_prim.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\asn_SEQUENCE_OF.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\asn_SET_OF.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\asn1-utils.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ber_decoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ber_tlv_length.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ber_tlv_tag.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\BIT_STRING.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\BMPString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\BOOLEAN.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_CHOICE.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_SEQUENCE.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_SEQUENCE_OF.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_SET.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_SET_OF.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constr_TYPE.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\constraints.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\der_encoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ENUMERATED.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\GeneralizedTime.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\GeneralString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\GraphicString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\IA5String.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\INTEGER.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ISO646String.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\NativeEnumerated.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\NativeInteger.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\NULL.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\NumericString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\OBJECT_IDENTIFIER.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\ObjectDescriptor.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\OCTET_STRING.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\per_decoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\per_encoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\per_opentype.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\per_support.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\PrintableString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\RELATIVE-OID.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\T61String.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\TeletexString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\UniversalString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\UTCTime.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\UTF8String.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\VisibleString.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\xer_decoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\xer_encoder.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\xer_support.c">
+      <Filter>src\asn1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SharedInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\X509Tbs.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SignerInfoEx.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

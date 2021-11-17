@@ -1,0 +1,345 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{e9034ae4-7dc8-437a-aae5-4e3727f41beb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{4488543c-a9ba-4bed-988e-6fe8a5c083dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{be3c4889-d4e1-47e4-a32c-b57c8bada158}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\pkix">
+      <UniqueIdentifier>{419faacb-f3e7-4c8d-9c55-060e738f0848}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\json">
+      <UniqueIdentifier>{7a850942-4450-4c93-b91f-9d6119023196}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\loaders">
+      <UniqueIdentifier>{8befabba-9d9d-4f32-9aa1-8d959781de6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\api">
+      <UniqueIdentifier>{671d587e-5318-495e-8606-c2e011610086}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\cm-api">
+      <UniqueIdentifier>{a9a492b7-3e5c-4cab-823d-1fa3b274faac}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\verify-signer-info.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\doc-signflow.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\verify-status.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cms-utils.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ocsp-helper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crl-store.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dirent-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cm-providers.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\time-utils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cer-store.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\store-utils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\global-objects.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\str-utils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\aid.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\asn1-ba-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\attribute-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\ba-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\content-info.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\dstu4145-params.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\extension-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\http-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\iconv-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\ocsp-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\oid-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\oids.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\tsp-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\uapki-errors.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\verify-utils.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\parson.c">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\parson-ba-utils.c">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\parson-helper.cpp">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\strtod-no-locale.c">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\add-cert.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\add-crl.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\api-json.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\asn1-decode.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\asn1-encode.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\cert-info.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\crl-info.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\digest.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\get-cert.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\key-get-csr.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\key-init-usage.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\library-deinit.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\library-init.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\library-list-providers.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\library-version.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\list-certs.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\provider-list-storages.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\provider-storage-info.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\remove-cert.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\session-key-create.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\session-key-delete.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\session-list-keys.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\session_select_key.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\sign.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\storage-change-password.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\storage-close.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\storage-open.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\verify.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\verify-cert.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\loaders\cm-loader.cpp">
+      <Filter>common\loaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\extension-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\uapki-export.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\verify-signer-info.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\doc-signflow.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\verify-status.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cms-utils.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ocsp-helper.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\crl-store.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\global-objects.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dirent-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cm-providers.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\time-utils.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cer-store.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\store-utils.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\library-config.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\str-utils.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\aid.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\asn1-ba-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\attribute-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\ba-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\common.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\content-info.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\dstu4145-params.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\extension-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\http-helper.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\iconv-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\ocsp-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\oid-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\oids.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\tsp-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\uapki-errors.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\verify-utils.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\json\parson.h">
+      <Filter>common\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\json\parson-ba-utils.h">
+      <Filter>common\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\json\parson-helper.h">
+      <Filter>common\json</Filter>
+    </ClInclude>
+    <ClInclude Include="src\api\api-json-internal.h">
+      <Filter>src\api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\loaders\cm-loader.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\loaders\dl-macros.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cm-api\cm-export.h">
+      <Filter>common\cm-api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cm-api\cm-errors.h">
+      <Filter>common\cm-api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\cm-api\cm-api.h">
+      <Filter>common\cm-api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\extension-helper.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

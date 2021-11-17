@@ -1,0 +1,315 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\aes.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\byte-array.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\byte-array-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\byte-utils-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\des.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\drbg.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dstu4145.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dstu7564.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dstu7624.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dstu8845.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ec.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ec-cache.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ec-default-params.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ec-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ecdsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ecgdsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\eckcdsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ecrdsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\entropy.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gost28147.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gost34311.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gostr3411-2012.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\hash.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\hmac.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\jitterentropy.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\keywrap.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-ec-point-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-ec-precomp-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-ec2m-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-ecp-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-gf2m-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-gfp-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\math-int-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\md5.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\paddings.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pbkdf.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pthread-impl.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ripemd.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sha1.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sha2.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sha3.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sm2dsa.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sm3.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stacktrace.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\uapkic.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\whirlpool.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\word-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\aes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\byte-array.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\des.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\drbg.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\dstu4145.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\dstu7564.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\dstu7624.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ec-cache.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecdsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecgdsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecrdsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\gost28147.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\gost34311.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hmac.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\md5.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\paddings.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ripemd.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sha1.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sha2.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\stacktrace.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ec-default-params.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\uapkic.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ec.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\eckcdsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sm3.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\whirlpool.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sha3.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\uapkic-errors.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\uapkic-export.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\dstu8845.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\gostr3411-2012.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hash.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\entropy.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sm2dsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pbkdf.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\keywrap.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\byte-array-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\byte-utils-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ec-cache-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ec-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\entropy-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\jitterentropy-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-ec-point-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-ec-precomp-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-ec2m-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-ecp-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-gf2m-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-gfp-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\math-int-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pthread-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\word-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{40984509-b454-45b4-a225-7d3fbe086f3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{1dd77be1-a027-420e-8796-6d44992a9f42}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

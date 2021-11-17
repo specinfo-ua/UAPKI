@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\cm-api\cm-api.h" />
+    <ClInclude Include="..\common\cm-api\cm-errors.h" />
+    <ClInclude Include="..\common\cm-api\cm-export.h" />
+    <ClInclude Include="..\common\pkix\aid.h" />
+    <ClInclude Include="..\common\pkix\asn1-ba-utils.h" />
+    <ClInclude Include="..\common\pkix\ba-utils.h" />
+    <ClInclude Include="..\common\pkix\dstu4145-params.h" />
+    <ClInclude Include="..\common\pkix\iconv-utils.h" />
+    <ClInclude Include="..\common\pkix\oids.h" />
+    <ClInclude Include="..\common\pkix\oid-utils.h" />
+    <ClInclude Include="..\common\pkix\uapki-errors.h" />
+    <ClInclude Include="..\common\json\parson-ba-utils.h" />
+    <ClInclude Include="..\common\json\parson-helper.h" />
+    <ClInclude Include="..\common\json\parson.h" />
+    <ClInclude Include="src\crypto\iso15946.h" />
+    <ClInclude Include="src\crypto\key-wrap.h" />
+    <ClInclude Include="src\crypto\private-key.h" />
+    <ClInclude Include="src\crypto\pkcs5.h" />
+    <ClInclude Include="src\cm-pkcs12-ctx.h" />
+    <ClInclude Include="src\cm-pkcs12.h" />
+    <ClInclude Include="src\storage\content-info.h" />
+    <ClInclude Include="src\storage\jks-buffer.h" />
+    <ClInclude Include="src\storage\file-storage.h" />
+    <ClInclude Include="src\storage\jks-entry.h" />
+    <ClInclude Include="src\storage\jks-utils.h" />
+    <ClInclude Include="src\storage\pkcs12-utils.h" />
+    <ClInclude Include="src\storage\store-bag.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\pkix\aid.c" />
+    <ClCompile Include="..\common\pkix\asn1-ba-utils.c" />
+    <ClCompile Include="..\common\pkix\ba-utils.c" />
+    <ClCompile Include="..\common\pkix\dstu4145-params.c" />
+    <ClCompile Include="..\common\pkix\iconv-utils.c" />
+    <ClCompile Include="..\common\pkix\oids.c" />
+    <ClCompile Include="..\common\pkix\oid-utils.c" />
+    <ClCompile Include="..\common\json\parson-ba-utils.c" />
+    <ClCompile Include="..\common\json\parson-helper.cpp" />
+    <ClCompile Include="..\common\json\parson.c" />
+    <ClCompile Include="..\common\json\strtod-no-locale.c" />
+    <ClCompile Include="src\crypto\iso15946.c" />
+    <ClCompile Include="src\crypto\key-wrap.c" />
+    <ClCompile Include="src\crypto\private-key.c" />
+    <ClCompile Include="src\crypto\pkcs5.c" />
+    <ClCompile Include="src\main-cm-pkcs12.cpp" />
+    <ClCompile Include="src\cm-pkcs12-ctx.cpp" />
+    <ClCompile Include="src\cm-pkcs12-key.cpp" />
+    <ClCompile Include="src\cm-pkcs12-json.cpp" />
+    <ClCompile Include="src\cm-pkcs12-session.cpp" />
+    <ClCompile Include="src\cm-pkcs12.cpp" />
+    <ClCompile Include="src\storage\content-info.c" />
+    <ClCompile Include="src\storage\jks-buffer.c" />
+    <ClCompile Include="src\storage\file-storage.cpp" />
+    <ClCompile Include="src\storage\jks-entry.c" />
+    <ClCompile Include="src\storage\jks-utils.c" />
+    <ClCompile Include="src\storage\pkcs12-utils.c" />
+    <ClCompile Include="src\storage\store-bag.cpp" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{35abf2a9-7a49-4d8d-9f4e-14f1da5b9d24}</ProjectGuid>
+    <RootNamespace>cmpkcs12</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>CM_LIBRARY;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;EDEBUG;_DEBUG;_USRDLL;_WINDOWS;WIN32;</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\json;$(ProjectDir)src\crypto;$(ProjectDir)src;$(ProjectDir)src\storage</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>CM_LIBRARY;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;NDEBUG;_USRDLL;_WINDOWS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\json;$(ProjectDir)src\crypto;$(ProjectDir)src;$(ProjectDir)src\storage</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>CM_LIBRARY;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;EDEBUG;_DEBUG;_USRDLL;_WINDOWS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\json;$(ProjectDir)src\crypto;$(ProjectDir)src;$(ProjectDir)src\storage</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>CM_LIBRARY;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;NDEBUG;_USRDLL;_WINDOWS;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\json;$(ProjectDir)src\crypto;$(ProjectDir)src;$(ProjectDir)src\storage</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

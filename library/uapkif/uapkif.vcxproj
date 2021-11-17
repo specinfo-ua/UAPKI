@@ -1,0 +1,794 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\AccessDescription.h" />
+    <ClInclude Include="include\Accuracy.h" />
+    <ClInclude Include="include\AdministrationDomainName.h" />
+    <ClInclude Include="include\AlgorithmIdentifier.h" />
+    <ClInclude Include="include\AlgorithmIdentifiers.h" />
+    <ClInclude Include="include\ANY.h" />
+    <ClInclude Include="include\asn1-errors.h" />
+    <ClInclude Include="include\asn1-module.h" />
+    <ClInclude Include="include\asn1-utils.h" />
+    <ClInclude Include="include\asn_application.h" />
+    <ClInclude Include="include\asn_codecs.h" />
+    <ClInclude Include="include\asn_codecs_prim.h" />
+    <ClInclude Include="include\asn_SEQUENCE_OF.h" />
+    <ClInclude Include="include\asn_SET_OF.h" />
+    <ClInclude Include="include\asn_system.h" />
+    <ClInclude Include="include\AttCertIssuer.h" />
+    <ClInclude Include="include\AttCertValidityPeriod.h" />
+    <ClInclude Include="include\AttCertVersion.h" />
+    <ClInclude Include="include\AttCertVersionV1.h" />
+    <ClInclude Include="include\Attribute.h" />
+    <ClInclude Include="include\AttributeCertificate.h" />
+    <ClInclude Include="include\AttributeCertificateInfo.h" />
+    <ClInclude Include="include\AttributeCertificateInfoV1.h" />
+    <ClInclude Include="include\AttributeCertificateV1.h" />
+    <ClInclude Include="include\AttributeCertificateV2.h" />
+    <ClInclude Include="include\Attributes.h" />
+    <ClInclude Include="include\AttributeType.h" />
+    <ClInclude Include="include\AttributeTypeAndValue.h" />
+    <ClInclude Include="include\AttributeValue.h" />
+    <ClInclude Include="include\AttributeValueAssertion.h" />
+    <ClInclude Include="include\AuthenticatedSafe.h" />
+    <ClInclude Include="include\AuthorityInfoAccessSyntax.h" />
+    <ClInclude Include="include\AuthorityKeyIdentifier.h" />
+    <ClInclude Include="include\BasicConstraints.h" />
+    <ClInclude Include="include\BasicOCSPResponse.h" />
+    <ClInclude Include="include\ber_decoder.h" />
+    <ClInclude Include="include\ber_tlv_length.h" />
+    <ClInclude Include="include\ber_tlv_tag.h" />
+    <ClInclude Include="include\BinaryField.h" />
+    <ClInclude Include="include\BIT_STRING.h" />
+    <ClInclude Include="include\BMPString.h" />
+    <ClInclude Include="include\BOOLEAN.h" />
+    <ClInclude Include="include\BuiltInDomainDefinedAttribute.h" />
+    <ClInclude Include="include\BuiltInDomainDefinedAttributes.h" />
+    <ClInclude Include="include\BuiltInStandardAttributes.h" />
+    <ClInclude Include="include\CertBag.h" />
+    <ClInclude Include="include\CertID.h" />
+    <ClInclude Include="include\Certificate.h" />
+    <ClInclude Include="include\CertificateChoices.h" />
+    <ClInclude Include="include\CertificateList.h" />
+    <ClInclude Include="include\CertificateLists.h" />
+    <ClInclude Include="include\CertificatePolicies.h" />
+    <ClInclude Include="include\Certificates.h" />
+    <ClInclude Include="include\CertificateSerialNumber.h" />
+    <ClInclude Include="include\CertificateSet.h" />
+    <ClInclude Include="include\CertificationRequest.h" />
+    <ClInclude Include="include\CertificationRequestInfo.h" />
+    <ClInclude Include="include\CertPolicyId.h" />
+    <ClInclude Include="include\CertStatus.h" />
+    <ClInclude Include="include\CMSVersion.h" />
+    <ClInclude Include="include\CompleteCertificateRefs.h" />
+    <ClInclude Include="include\CompleteRevocationRefs.h" />
+    <ClInclude Include="include\constraints.h" />
+    <ClInclude Include="include\constr_CHOICE.h" />
+    <ClInclude Include="include\constr_SEQUENCE.h" />
+    <ClInclude Include="include\constr_SEQUENCE_OF.h" />
+    <ClInclude Include="include\constr_SET.h" />
+    <ClInclude Include="include\constr_SET_OF.h" />
+    <ClInclude Include="include\constr_TYPE.h" />
+    <ClInclude Include="include\ContentEncryptionAlgorithmIdentifier.h" />
+    <ClInclude Include="include\ContentInfo.h" />
+    <ClInclude Include="include\ContentType.h" />
+    <ClInclude Include="include\CountryName.h" />
+    <ClInclude Include="include\CRLDistributionPoints.h" />
+    <ClInclude Include="include\CrlID.h" />
+    <ClInclude Include="include\CrlIdentifier.h" />
+    <ClInclude Include="include\CRLListID.h" />
+    <ClInclude Include="include\CRLNumber.h" />
+    <ClInclude Include="include\CrlOcspRef.h" />
+    <ClInclude Include="include\CRLReason.h" />
+    <ClInclude Include="include\CrlValidatedID.h" />
+    <ClInclude Include="include\der_encoder.h" />
+    <ClInclude Include="include\Digest.h" />
+    <ClInclude Include="include\DigestAlgorithmIdentifier.h" />
+    <ClInclude Include="include\DigestAlgorithmIdentifiers.h" />
+    <ClInclude Include="include\DigestedData.h" />
+    <ClInclude Include="include\DigestInfo.h" />
+    <ClInclude Include="include\DirectoryString.h" />
+    <ClInclude Include="include\DisplayText.h" />
+    <ClInclude Include="include\DistributionPoint.h" />
+    <ClInclude Include="include\DistributionPointName.h" />
+    <ClInclude Include="include\DSTU4145Params.h" />
+    <ClInclude Include="include\DSTUEllipticCurve.h" />
+    <ClInclude Include="include\ECBinary.h" />
+    <ClInclude Include="include\ECDSA-Sig-Value.h" />
+    <ClInclude Include="include\ECParameters.h" />
+    <ClInclude Include="include\ECPrivateKey.h" />
+    <ClInclude Include="include\EDIPartyName.h" />
+    <ClInclude Include="include\EncapsulatedContentInfo.h" />
+    <ClInclude Include="include\EncryptedContent.h" />
+    <ClInclude Include="include\EncryptedContentInfo.h" />
+    <ClInclude Include="include\EncryptedData.h" />
+    <ClInclude Include="include\EncryptedKey.h" />
+    <ClInclude Include="include\EncryptedPrivateKeyInfo.h" />
+    <ClInclude Include="include\ENUMERATED.h" />
+    <ClInclude Include="include\EnvelopedData.h" />
+    <ClInclude Include="include\ESSCertIDv2.h" />
+    <ClInclude Include="include\ESSCertIDv2s.h" />
+    <ClInclude Include="include\ExtendedCertificate.h" />
+    <ClInclude Include="include\ExtendedCertificateInfo.h" />
+    <ClInclude Include="include\ExtendedKeyUsage.h" />
+    <ClInclude Include="include\Extension.h" />
+    <ClInclude Include="include\Extensions.h" />
+    <ClInclude Include="include\FreshestCRL.h" />
+    <ClInclude Include="include\GeneralizedTime.h" />
+    <ClInclude Include="include\GeneralName.h" />
+    <ClInclude Include="include\GeneralNames.h" />
+    <ClInclude Include="include\GeneralString.h" />
+    <ClInclude Include="include\GOST28147Params.h" />
+    <ClInclude Include="include\GOST28147ParamsOptionalDke.h" />
+    <ClInclude Include="include\Gost34310Params.h" />
+    <ClInclude Include="include\GOST34310Sign.h" />
+    <ClInclude Include="include\GraphicString.h" />
+    <ClInclude Include="include\Hash.h" />
+    <ClInclude Include="include\Holder.h" />
+    <ClInclude Include="include\IA5String.h" />
+    <ClInclude Include="include\IITParams.h" />
+    <ClInclude Include="include\INTEGER.h" />
+    <ClInclude Include="include\Iso4217CurrencyCode.h" />
+    <ClInclude Include="include\ISO646String.h" />
+    <ClInclude Include="include\IssuerAltName.h" />
+    <ClInclude Include="include\IssuerAndSerialNumber.h" />
+    <ClInclude Include="include\IssuerSerial.h" />
+    <ClInclude Include="include\KEKIdentifier.h" />
+    <ClInclude Include="include\KEKRecipientInfo.h" />
+    <ClInclude Include="include\KepDSTU4145Params.h" />
+    <ClInclude Include="include\KepGost28147Params.h" />
+    <ClInclude Include="include\KeyAgreeRecipientIdentifier.h" />
+    <ClInclude Include="include\KeyAgreeRecipientInfo.h" />
+    <ClInclude Include="include\KeyBag.h" />
+    <ClInclude Include="include\KeyDerivationAlgorithmIdentifier.h" />
+    <ClInclude Include="include\KeyEncryptionAlgorithmIdentifier.h" />
+    <ClInclude Include="include\KeyHash.h" />
+    <ClInclude Include="include\KeyIdentifier.h" />
+    <ClInclude Include="include\KeyPurposeId.h" />
+    <ClInclude Include="include\KeyTransRecipientInfo.h" />
+    <ClInclude Include="include\KeyUsage.h" />
+    <ClInclude Include="include\MacData.h" />
+    <ClInclude Include="include\MessageAuthenticationCodeAlgorithm.h" />
+    <ClInclude Include="include\MessageImprint.h" />
+    <ClInclude Include="include\MonetaryValue.h" />
+    <ClInclude Include="include\Name.h" />
+    <ClInclude Include="include\NativeEnumerated.h" />
+    <ClInclude Include="include\NativeInteger.h" />
+    <ClInclude Include="include\NetworkAddress.h" />
+    <ClInclude Include="include\NoticeReference.h" />
+    <ClInclude Include="include\NULL.h" />
+    <ClInclude Include="include\NumericString.h" />
+    <ClInclude Include="include\NumericUserIdentifier.h" />
+    <ClInclude Include="include\ObjectDescriptor.h" />
+    <ClInclude Include="include\ObjectDigestInfo.h" />
+    <ClInclude Include="include\OBJECT_IDENTIFIER.h" />
+    <ClInclude Include="include\OcspIdentifier.h" />
+    <ClInclude Include="include\OcspListID.h" />
+    <ClInclude Include="include\OCSPRequest.h" />
+    <ClInclude Include="include\OCSPResponse.h" />
+    <ClInclude Include="include\OcspResponsesID.h" />
+    <ClInclude Include="include\OCSPResponseStatus.h" />
+    <ClInclude Include="include\OCTET_STRING.h" />
+    <ClInclude Include="include\ORAddress.h" />
+    <ClInclude Include="include\OrganizationalUnitName.h" />
+    <ClInclude Include="include\OrganizationalUnitNames.h" />
+    <ClInclude Include="include\OrganizationName.h" />
+    <ClInclude Include="include\OriginatorIdentifierOrKey.h" />
+    <ClInclude Include="include\OriginatorInfo.h" />
+    <ClInclude Include="include\OriginatorPublicKey.h" />
+    <ClInclude Include="include\OtherCertID.h" />
+    <ClInclude Include="include\OtherCertificateFormat.h" />
+    <ClInclude Include="include\OtherHash.h" />
+    <ClInclude Include="include\OtherHashAlgAndValue.h" />
+    <ClInclude Include="include\OtherHashValue.h" />
+    <ClInclude Include="include\OtherKeyAttribute.h" />
+    <ClInclude Include="include\OtherName.h" />
+    <ClInclude Include="include\OtherPrimeInfo.h" />
+    <ClInclude Include="include\OtherPrimeInfos.h" />
+    <ClInclude Include="include\OtherRecipientInfo.h" />
+    <ClInclude Include="include\OtherRevocationInfoFormat.h" />
+    <ClInclude Include="include\OtherRevRefs.h" />
+    <ClInclude Include="include\OtherRevRefType.h" />
+    <ClInclude Include="include\OtherRevVals.h" />
+    <ClInclude Include="include\OtherRevValType.h" />
+    <ClInclude Include="include\PasswordRecipientInfo.h" />
+    <ClInclude Include="include\PBES2-KDFs.h" />
+    <ClInclude Include="include\PBES2-params.h" />
+    <ClInclude Include="include\PBKDF2-params.h" />
+    <ClInclude Include="include\PBKDF2-Salt.h" />
+    <ClInclude Include="include\Pentanomial.h" />
+    <ClInclude Include="include\PersonalName.h" />
+    <ClInclude Include="include\per_decoder.h" />
+    <ClInclude Include="include\per_encoder.h" />
+    <ClInclude Include="include\per_opentype.h" />
+    <ClInclude Include="include\per_support.h" />
+    <ClInclude Include="include\PFX.h" />
+    <ClInclude Include="include\PKCS8ShroudedKeyBag.h" />
+    <ClInclude Include="include\PKIFailureInfo.h" />
+    <ClInclude Include="include\PKIFreeText.h" />
+    <ClInclude Include="include\PKIStatus.h" />
+    <ClInclude Include="include\PKIStatusInfo.h" />
+    <ClInclude Include="include\PKIXTime.h" />
+    <ClInclude Include="include\PolicyInformation.h" />
+    <ClInclude Include="include\PolicyInformations.h" />
+    <ClInclude Include="include\PolicyQualifierId.h" />
+    <ClInclude Include="include\PolicyQualifierInfo.h" />
+    <ClInclude Include="include\PolicyQualifiers.h" />
+    <ClInclude Include="include\PrintableString.h" />
+    <ClInclude Include="include\PrivateDomainName.h" />
+    <ClInclude Include="include\PrivateKeyInfo.h" />
+    <ClInclude Include="include\PrivateKeyUsagePeriod.h" />
+    <ClInclude Include="include\QcEuLimitValue.h" />
+    <ClInclude Include="include\QCStatement.h" />
+    <ClInclude Include="include\QCStatements.h" />
+    <ClInclude Include="include\RDNSequence.h" />
+    <ClInclude Include="include\ReasonFlags.h" />
+    <ClInclude Include="include\RecipientEncryptedKey.h" />
+    <ClInclude Include="include\RecipientEncryptedKeys.h" />
+    <ClInclude Include="include\RecipientIdentifier.h" />
+    <ClInclude Include="include\RecipientInfo.h" />
+    <ClInclude Include="include\RecipientInfos.h" />
+    <ClInclude Include="include\RecipientKeyIdentifier.h" />
+    <ClInclude Include="include\RELATIVE-OID.h" />
+    <ClInclude Include="include\RelativeDistinguishedName.h" />
+    <ClInclude Include="include\Request.h" />
+    <ClInclude Include="include\ResponderID.h" />
+    <ClInclude Include="include\ResponseBytes.h" />
+    <ClInclude Include="include\ResponseData.h" />
+    <ClInclude Include="include\RevocationInfoChoice.h" />
+    <ClInclude Include="include\RevocationInfoChoices.h" />
+    <ClInclude Include="include\RevocationValues.h" />
+    <ClInclude Include="include\RevokedCertificate.h" />
+    <ClInclude Include="include\RevokedCertificates.h" />
+    <ClInclude Include="include\RevokedInfo.h" />
+    <ClInclude Include="include\RSAPrivateKey.h" />
+    <ClInclude Include="include\RSAPublicKey.h" />
+    <ClInclude Include="include\SafeBag.h" />
+    <ClInclude Include="include\SafeContents.h" />
+    <ClInclude Include="include\SecretBag.h" />
+    <ClInclude Include="include\SeqAttributes.h" />
+    <ClInclude Include="include\SharedInfo.h" />
+    <ClInclude Include="include\Signature.h" />
+    <ClInclude Include="include\SignatureAlgorithmIdentifier.h" />
+    <ClInclude Include="include\SignaturePolicyId.h" />
+    <ClInclude Include="include\SignaturePolicyIdentifier.h" />
+    <ClInclude Include="include\SignedAttributes.h" />
+    <ClInclude Include="include\SignedData.h" />
+    <ClInclude Include="include\SignerIdentifier.h" />
+    <ClInclude Include="include\SignerIdentifierEx.h" />
+    <ClInclude Include="include\SignerIdentifierIm.h" />
+    <ClInclude Include="include\SignerInfo.h" />
+    <ClInclude Include="include\SignerInfoEx.h" />
+    <ClInclude Include="include\SignerInfos.h" />
+    <ClInclude Include="include\SigningCertificateV2.h" />
+    <ClInclude Include="include\SigPolicyHash.h" />
+    <ClInclude Include="include\SigPolicyId.h" />
+    <ClInclude Include="include\SigPolicyQualifierId.h" />
+    <ClInclude Include="include\SigPolicyQualifierInfo.h" />
+    <ClInclude Include="include\SingleResponse.h" />
+    <ClInclude Include="include\SPUserNotice.h" />
+    <ClInclude Include="include\SubjectAltName.h" />
+    <ClInclude Include="include\SubjectDirectoryAttributes.h" />
+    <ClInclude Include="include\SubjectInfoAccess.h" />
+    <ClInclude Include="include\SubjectKeyIdentifier.h" />
+    <ClInclude Include="include\SubjectPublicKeyInfo.h" />
+    <ClInclude Include="include\T61String.h" />
+    <ClInclude Include="include\TBSCertificate.h" />
+    <ClInclude Include="include\TBSCertList.h" />
+    <ClInclude Include="include\TBSRequest.h" />
+    <ClInclude Include="include\TeletexString.h" />
+    <ClInclude Include="include\TerminalIdentifier.h" />
+    <ClInclude Include="include\TimeStampReq.h" />
+    <ClInclude Include="include\TimeStampResp.h" />
+    <ClInclude Include="include\TimeStampToken.h" />
+    <ClInclude Include="include\TSAPolicyId.h" />
+    <ClInclude Include="include\TSTInfo.h" />
+    <ClInclude Include="include\TSVersion.h" />
+    <ClInclude Include="include\uapkif.h" />
+    <ClInclude Include="include\uapkif-export.h" />
+    <ClInclude Include="include\UnauthAttributes.h" />
+    <ClInclude Include="include\UniqueIdentifier.h" />
+    <ClInclude Include="include\UniversalString.h" />
+    <ClInclude Include="include\UnknownInfo.h" />
+    <ClInclude Include="include\UnprotectedAttributes.h" />
+    <ClInclude Include="include\UnsignedAttributes.h" />
+    <ClInclude Include="include\UserKeyingMaterial.h" />
+    <ClInclude Include="include\UTCTime.h" />
+    <ClInclude Include="include\UTF8String.h" />
+    <ClInclude Include="include\V2Form.h" />
+    <ClInclude Include="include\Validity.h" />
+    <ClInclude Include="include\Version.h" />
+    <ClInclude Include="include\VisibleString.h" />
+    <ClInclude Include="include\X121Address.h" />
+    <ClInclude Include="include\X509Tbs.h" />
+    <ClInclude Include="include\xer_decoder.h" />
+    <ClInclude Include="include\xer_encoder.h" />
+    <ClInclude Include="include\xer_support.h" />
+    <ClInclude Include="src\asn1\asn_internal.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\asn1\ANY.c" />
+    <ClCompile Include="src\asn1\asn1-utils.c" />
+    <ClCompile Include="src\asn1\asn_codecs_prim.c" />
+    <ClCompile Include="src\asn1\asn_SEQUENCE_OF.c" />
+    <ClCompile Include="src\asn1\asn_SET_OF.c" />
+    <ClCompile Include="src\asn1\ber_decoder.c" />
+    <ClCompile Include="src\asn1\ber_tlv_length.c" />
+    <ClCompile Include="src\asn1\ber_tlv_tag.c" />
+    <ClCompile Include="src\asn1\BIT_STRING.c" />
+    <ClCompile Include="src\asn1\BMPString.c" />
+    <ClCompile Include="src\asn1\BOOLEAN.c" />
+    <ClCompile Include="src\asn1\constraints.c" />
+    <ClCompile Include="src\asn1\constr_CHOICE.c" />
+    <ClCompile Include="src\asn1\constr_SEQUENCE.c" />
+    <ClCompile Include="src\asn1\constr_SEQUENCE_OF.c" />
+    <ClCompile Include="src\asn1\constr_SET.c" />
+    <ClCompile Include="src\asn1\constr_SET_OF.c" />
+    <ClCompile Include="src\asn1\constr_TYPE.c" />
+    <ClCompile Include="src\asn1\der_encoder.c" />
+    <ClCompile Include="src\asn1\ENUMERATED.c" />
+    <ClCompile Include="src\asn1\GeneralizedTime.c" />
+    <ClCompile Include="src\asn1\GeneralString.c" />
+    <ClCompile Include="src\asn1\GraphicString.c" />
+    <ClCompile Include="src\asn1\IA5String.c" />
+    <ClCompile Include="src\asn1\INTEGER.c" />
+    <ClCompile Include="src\asn1\ISO646String.c" />
+    <ClCompile Include="src\asn1\NativeEnumerated.c" />
+    <ClCompile Include="src\asn1\NativeInteger.c" />
+    <ClCompile Include="src\asn1\NULL.c" />
+    <ClCompile Include="src\asn1\NumericString.c" />
+    <ClCompile Include="src\asn1\ObjectDescriptor.c" />
+    <ClCompile Include="src\asn1\OBJECT_IDENTIFIER.c" />
+    <ClCompile Include="src\asn1\OCTET_STRING.c" />
+    <ClCompile Include="src\asn1\per_decoder.c" />
+    <ClCompile Include="src\asn1\per_encoder.c" />
+    <ClCompile Include="src\asn1\per_opentype.c" />
+    <ClCompile Include="src\asn1\per_support.c" />
+    <ClCompile Include="src\asn1\PrintableString.c" />
+    <ClCompile Include="src\asn1\RELATIVE-OID.c" />
+    <ClCompile Include="src\asn1\T61String.c" />
+    <ClCompile Include="src\asn1\TeletexString.c" />
+    <ClCompile Include="src\asn1\UniversalString.c" />
+    <ClCompile Include="src\asn1\UTCTime.c" />
+    <ClCompile Include="src\asn1\UTF8String.c" />
+    <ClCompile Include="src\asn1\VisibleString.c" />
+    <ClCompile Include="src\asn1\xer_decoder.c" />
+    <ClCompile Include="src\asn1\xer_encoder.c" />
+    <ClCompile Include="src\asn1\xer_support.c" />
+    <ClCompile Include="src\struct\AccessDescription.c" />
+    <ClCompile Include="src\struct\Accuracy.c" />
+    <ClCompile Include="src\struct\AdministrationDomainName.c" />
+    <ClCompile Include="src\struct\AlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\AlgorithmIdentifiers.c" />
+    <ClCompile Include="src\struct\AttCertIssuer.c" />
+    <ClCompile Include="src\struct\AttCertValidityPeriod.c" />
+    <ClCompile Include="src\struct\AttCertVersion.c" />
+    <ClCompile Include="src\struct\AttCertVersionV1.c" />
+    <ClCompile Include="src\struct\Attribute.c" />
+    <ClCompile Include="src\struct\AttributeCertificate.c" />
+    <ClCompile Include="src\struct\AttributeCertificateInfo.c" />
+    <ClCompile Include="src\struct\AttributeCertificateInfoV1.c" />
+    <ClCompile Include="src\struct\AttributeCertificateV1.c" />
+    <ClCompile Include="src\struct\AttributeCertificateV2.c" />
+    <ClCompile Include="src\struct\Attributes.c" />
+    <ClCompile Include="src\struct\AttributeType.c" />
+    <ClCompile Include="src\struct\AttributeTypeAndValue.c" />
+    <ClCompile Include="src\struct\AttributeValue.c" />
+    <ClCompile Include="src\struct\AttributeValueAssertion.c" />
+    <ClCompile Include="src\struct\AuthenticatedSafe.c" />
+    <ClCompile Include="src\struct\AuthorityInfoAccessSyntax.c" />
+    <ClCompile Include="src\struct\AuthorityKeyIdentifier.c" />
+    <ClCompile Include="src\struct\BasicConstraints.c" />
+    <ClCompile Include="src\struct\BasicOCSPResponse.c" />
+    <ClCompile Include="src\struct\BinaryField.c" />
+    <ClCompile Include="src\struct\BuiltInDomainDefinedAttribute.c" />
+    <ClCompile Include="src\struct\BuiltInDomainDefinedAttributes.c" />
+    <ClCompile Include="src\struct\BuiltInStandardAttributes.c" />
+    <ClCompile Include="src\struct\CertBag.c" />
+    <ClCompile Include="src\struct\CertID.c" />
+    <ClCompile Include="src\struct\Certificate.c" />
+    <ClCompile Include="src\struct\CertificateChoices.c" />
+    <ClCompile Include="src\struct\CertificateList.c" />
+    <ClCompile Include="src\struct\CertificateLists.c" />
+    <ClCompile Include="src\struct\CertificatePolicies.c" />
+    <ClCompile Include="src\struct\Certificates.c" />
+    <ClCompile Include="src\struct\CertificateSerialNumber.c" />
+    <ClCompile Include="src\struct\CertificateSet.c" />
+    <ClCompile Include="src\struct\CertificationRequest.c" />
+    <ClCompile Include="src\struct\CertificationRequestInfo.c" />
+    <ClCompile Include="src\struct\CertPolicyId.c" />
+    <ClCompile Include="src\struct\CertStatus.c" />
+    <ClCompile Include="src\struct\CMSVersion.c" />
+    <ClCompile Include="src\struct\CompleteCertificateRefs.c" />
+    <ClCompile Include="src\struct\CompleteRevocationRefs.c" />
+    <ClCompile Include="src\struct\ContentEncryptionAlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\ContentInfo.c" />
+    <ClCompile Include="src\struct\ContentType.c" />
+    <ClCompile Include="src\struct\CountryName.c" />
+    <ClCompile Include="src\struct\CRLDistributionPoints.c" />
+    <ClCompile Include="src\struct\CrlID.c" />
+    <ClCompile Include="src\struct\CrlIdentifier.c" />
+    <ClCompile Include="src\struct\CRLListID.c" />
+    <ClCompile Include="src\struct\CRLNumber.c" />
+    <ClCompile Include="src\struct\CrlOcspRef.c" />
+    <ClCompile Include="src\struct\CRLReason.c" />
+    <ClCompile Include="src\struct\CrlValidatedID.c" />
+    <ClCompile Include="src\struct\Digest.c" />
+    <ClCompile Include="src\struct\DigestAlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\DigestAlgorithmIdentifiers.c" />
+    <ClCompile Include="src\struct\DigestedData.c" />
+    <ClCompile Include="src\struct\DigestInfo.c" />
+    <ClCompile Include="src\struct\DirectoryString.c" />
+    <ClCompile Include="src\struct\DisplayText.c" />
+    <ClCompile Include="src\struct\DistributionPoint.c" />
+    <ClCompile Include="src\struct\DistributionPointName.c" />
+    <ClCompile Include="src\struct\DSTU4145Params.c" />
+    <ClCompile Include="src\struct\DSTUEllipticCurve.c" />
+    <ClCompile Include="src\struct\ECBinary.c" />
+    <ClCompile Include="src\struct\ECDSA-Sig-Value.c" />
+    <ClCompile Include="src\struct\ECParameters.c" />
+    <ClCompile Include="src\struct\ECPrivateKey.c" />
+    <ClCompile Include="src\struct\EDIPartyName.c" />
+    <ClCompile Include="src\struct\EncapsulatedContentInfo.c" />
+    <ClCompile Include="src\struct\EncryptedContent.c" />
+    <ClCompile Include="src\struct\EncryptedContentInfo.c" />
+    <ClCompile Include="src\struct\EncryptedData.c" />
+    <ClCompile Include="src\struct\EncryptedKey.c" />
+    <ClCompile Include="src\struct\EncryptedPrivateKeyInfo.c" />
+    <ClCompile Include="src\struct\EnvelopedData.c" />
+    <ClCompile Include="src\struct\ESSCertIDv2.c" />
+    <ClCompile Include="src\struct\ESSCertIDv2s.c" />
+    <ClCompile Include="src\struct\ExtendedCertificate.c" />
+    <ClCompile Include="src\struct\ExtendedCertificateInfo.c" />
+    <ClCompile Include="src\struct\ExtendedKeyUsage.c" />
+    <ClCompile Include="src\struct\Extension.c" />
+    <ClCompile Include="src\struct\Extensions.c" />
+    <ClCompile Include="src\struct\FreshestCRL.c" />
+    <ClCompile Include="src\struct\GeneralName.c" />
+    <ClCompile Include="src\struct\GeneralNames.c" />
+    <ClCompile Include="src\struct\GOST28147Params.c" />
+    <ClCompile Include="src\struct\GOST28147ParamsOptionalDke.c" />
+    <ClCompile Include="src\struct\Gost34310Params.c" />
+    <ClCompile Include="src\struct\GOST34310Sign.c" />
+    <ClCompile Include="src\struct\Hash.c" />
+    <ClCompile Include="src\struct\Holder.c" />
+    <ClCompile Include="src\struct\IITParams.c" />
+    <ClCompile Include="src\struct\Iso4217CurrencyCode.c" />
+    <ClCompile Include="src\struct\IssuerAltName.c" />
+    <ClCompile Include="src\struct\IssuerAndSerialNumber.c" />
+    <ClCompile Include="src\struct\IssuerSerial.c" />
+    <ClCompile Include="src\struct\KEKIdentifier.c" />
+    <ClCompile Include="src\struct\KEKRecipientInfo.c" />
+    <ClCompile Include="src\struct\KepDSTU4145Params.c" />
+    <ClCompile Include="src\struct\KepGost28147Params.c" />
+    <ClCompile Include="src\struct\KeyAgreeRecipientIdentifier.c" />
+    <ClCompile Include="src\struct\KeyAgreeRecipientInfo.c" />
+    <ClCompile Include="src\struct\KeyBag.c" />
+    <ClCompile Include="src\struct\KeyDerivationAlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\KeyEncryptionAlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\KeyHash.c" />
+    <ClCompile Include="src\struct\KeyIdentifier.c" />
+    <ClCompile Include="src\struct\KeyPurposeId.c" />
+    <ClCompile Include="src\struct\KeyTransRecipientInfo.c" />
+    <ClCompile Include="src\struct\KeyUsage.c" />
+    <ClCompile Include="src\struct\MacData.c" />
+    <ClCompile Include="src\struct\MessageAuthenticationCodeAlgorithm.c" />
+    <ClCompile Include="src\struct\MessageImprint.c" />
+    <ClCompile Include="src\struct\MonetaryValue.c" />
+    <ClCompile Include="src\struct\Name.c" />
+    <ClCompile Include="src\struct\NetworkAddress.c" />
+    <ClCompile Include="src\struct\NoticeReference.c" />
+    <ClCompile Include="src\struct\NumericUserIdentifier.c" />
+    <ClCompile Include="src\struct\ObjectDigestInfo.c" />
+    <ClCompile Include="src\struct\OcspIdentifier.c" />
+    <ClCompile Include="src\struct\OcspListID.c" />
+    <ClCompile Include="src\struct\OCSPRequest.c" />
+    <ClCompile Include="src\struct\OCSPResponse.c" />
+    <ClCompile Include="src\struct\OcspResponsesID.c" />
+    <ClCompile Include="src\struct\OCSPResponseStatus.c" />
+    <ClCompile Include="src\struct\ORAddress.c" />
+    <ClCompile Include="src\struct\OrganizationalUnitName.c" />
+    <ClCompile Include="src\struct\OrganizationalUnitNames.c" />
+    <ClCompile Include="src\struct\OrganizationName.c" />
+    <ClCompile Include="src\struct\OriginatorIdentifierOrKey.c" />
+    <ClCompile Include="src\struct\OriginatorInfo.c" />
+    <ClCompile Include="src\struct\OriginatorPublicKey.c" />
+    <ClCompile Include="src\struct\OtherCertID.c" />
+    <ClCompile Include="src\struct\OtherCertificateFormat.c" />
+    <ClCompile Include="src\struct\OtherHash.c" />
+    <ClCompile Include="src\struct\OtherHashAlgAndValue.c" />
+    <ClCompile Include="src\struct\OtherHashValue.c" />
+    <ClCompile Include="src\struct\OtherKeyAttribute.c" />
+    <ClCompile Include="src\struct\OtherName.c" />
+    <ClCompile Include="src\struct\OtherPrimeInfo.c" />
+    <ClCompile Include="src\struct\OtherPrimeInfos.c" />
+    <ClCompile Include="src\struct\OtherRecipientInfo.c" />
+    <ClCompile Include="src\struct\OtherRevocationInfoFormat.c" />
+    <ClCompile Include="src\struct\OtherRevRefs.c" />
+    <ClCompile Include="src\struct\OtherRevRefType.c" />
+    <ClCompile Include="src\struct\OtherRevVals.c" />
+    <ClCompile Include="src\struct\OtherRevValType.c" />
+    <ClCompile Include="src\struct\PasswordRecipientInfo.c" />
+    <ClCompile Include="src\struct\PBES2-KDFs.c" />
+    <ClCompile Include="src\struct\PBES2-params.c" />
+    <ClCompile Include="src\struct\PBKDF2-params.c" />
+    <ClCompile Include="src\struct\PBKDF2-Salt.c" />
+    <ClCompile Include="src\struct\Pentanomial.c" />
+    <ClCompile Include="src\struct\PersonalName.c" />
+    <ClCompile Include="src\struct\PFX.c" />
+    <ClCompile Include="src\struct\PKCS8ShroudedKeyBag.c" />
+    <ClCompile Include="src\struct\PKIFailureInfo.c" />
+    <ClCompile Include="src\struct\PKIFreeText.c" />
+    <ClCompile Include="src\struct\PKIStatus.c" />
+    <ClCompile Include="src\struct\PKIStatusInfo.c" />
+    <ClCompile Include="src\struct\PKIXTime.c" />
+    <ClCompile Include="src\struct\PolicyInformation.c" />
+    <ClCompile Include="src\struct\PolicyInformations.c" />
+    <ClCompile Include="src\struct\PolicyQualifierId.c" />
+    <ClCompile Include="src\struct\PolicyQualifierInfo.c" />
+    <ClCompile Include="src\struct\PolicyQualifiers.c" />
+    <ClCompile Include="src\struct\PrivateDomainName.c" />
+    <ClCompile Include="src\struct\PrivateKeyInfo.c" />
+    <ClCompile Include="src\struct\PrivateKeyUsagePeriod.c" />
+    <ClCompile Include="src\struct\QcEuLimitValue.c" />
+    <ClCompile Include="src\struct\QCStatement.c" />
+    <ClCompile Include="src\struct\QCStatements.c" />
+    <ClCompile Include="src\struct\RDNSequence.c" />
+    <ClCompile Include="src\struct\ReasonFlags.c" />
+    <ClCompile Include="src\struct\RecipientEncryptedKey.c" />
+    <ClCompile Include="src\struct\RecipientEncryptedKeys.c" />
+    <ClCompile Include="src\struct\RecipientIdentifier.c" />
+    <ClCompile Include="src\struct\RecipientInfo.c" />
+    <ClCompile Include="src\struct\RecipientInfos.c" />
+    <ClCompile Include="src\struct\RecipientKeyIdentifier.c" />
+    <ClCompile Include="src\struct\RelativeDistinguishedName.c" />
+    <ClCompile Include="src\struct\Request.c" />
+    <ClCompile Include="src\struct\ResponderID.c" />
+    <ClCompile Include="src\struct\ResponseBytes.c" />
+    <ClCompile Include="src\struct\ResponseData.c" />
+    <ClCompile Include="src\struct\RevocationInfoChoice.c" />
+    <ClCompile Include="src\struct\RevocationInfoChoices.c" />
+    <ClCompile Include="src\struct\RevocationValues.c" />
+    <ClCompile Include="src\struct\RevokedCertificate.c" />
+    <ClCompile Include="src\struct\RevokedCertificates.c" />
+    <ClCompile Include="src\struct\RevokedInfo.c" />
+    <ClCompile Include="src\struct\RSAPrivateKey.c" />
+    <ClCompile Include="src\struct\RSAPublicKey.c" />
+    <ClCompile Include="src\struct\SafeBag.c" />
+    <ClCompile Include="src\struct\SafeContents.c" />
+    <ClCompile Include="src\struct\SecretBag.c" />
+    <ClCompile Include="src\struct\SeqAttributes.c" />
+    <ClCompile Include="src\struct\SharedInfo.c" />
+    <ClCompile Include="src\struct\Signature.c" />
+    <ClCompile Include="src\struct\SignatureAlgorithmIdentifier.c" />
+    <ClCompile Include="src\struct\SignaturePolicyId.c" />
+    <ClCompile Include="src\struct\SignaturePolicyIdentifier.c" />
+    <ClCompile Include="src\struct\SignedAttributes.c" />
+    <ClCompile Include="src\struct\SignedData.c" />
+    <ClCompile Include="src\struct\SignerIdentifier.c" />
+    <ClCompile Include="src\struct\SignerIdentifierEx.c" />
+    <ClCompile Include="src\struct\SignerIdentifierIm.c" />
+    <ClCompile Include="src\struct\SignerInfo.c" />
+    <ClCompile Include="src\struct\SignerInfoEx.c" />
+    <ClCompile Include="src\struct\SignerInfos.c" />
+    <ClCompile Include="src\struct\SigningCertificateV2.c" />
+    <ClCompile Include="src\struct\SigPolicyHash.c" />
+    <ClCompile Include="src\struct\SigPolicyId.c" />
+    <ClCompile Include="src\struct\SigPolicyQualifierId.c" />
+    <ClCompile Include="src\struct\SigPolicyQualifierInfo.c" />
+    <ClCompile Include="src\struct\SingleResponse.c" />
+    <ClCompile Include="src\struct\SPUserNotice.c" />
+    <ClCompile Include="src\struct\SubjectAltName.c" />
+    <ClCompile Include="src\struct\SubjectDirectoryAttributes.c" />
+    <ClCompile Include="src\struct\SubjectInfoAccess.c" />
+    <ClCompile Include="src\struct\SubjectKeyIdentifier.c" />
+    <ClCompile Include="src\struct\SubjectPublicKeyInfo.c" />
+    <ClCompile Include="src\struct\TBSCertificate.c" />
+    <ClCompile Include="src\struct\TBSCertList.c" />
+    <ClCompile Include="src\struct\TBSRequest.c" />
+    <ClCompile Include="src\struct\TerminalIdentifier.c" />
+    <ClCompile Include="src\struct\TimeStampReq.c" />
+    <ClCompile Include="src\struct\TimeStampResp.c" />
+    <ClCompile Include="src\struct\TimeStampToken.c" />
+    <ClCompile Include="src\struct\TSAPolicyId.c" />
+    <ClCompile Include="src\struct\TSTInfo.c" />
+    <ClCompile Include="src\struct\TSVersion.c" />
+    <ClCompile Include="src\struct\UnauthAttributes.c" />
+    <ClCompile Include="src\struct\UniqueIdentifier.c" />
+    <ClCompile Include="src\struct\UnknownInfo.c" />
+    <ClCompile Include="src\struct\UnprotectedAttributes.c" />
+    <ClCompile Include="src\struct\UnsignedAttributes.c" />
+    <ClCompile Include="src\struct\UserKeyingMaterial.c" />
+    <ClCompile Include="src\struct\V2Form.c" />
+    <ClCompile Include="src\struct\Validity.c" />
+    <ClCompile Include="src\struct\Version.c" />
+    <ClCompile Include="src\struct\X121Address.c" />
+    <ClCompile Include="src\struct\X509Tbs.c" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{246343b7-4d20-4797-9ca9-471692bb441a}</ProjectGuid>
+    <RootNamespace>uapkif</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKIF_LIBRARY;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..\common\macros;$(ProjectDir)src\asn1;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4127</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKIF_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..\common\macros;$(ProjectDir)src\asn1;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4127</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKIF_LIBRARY;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..\common\macros;$(ProjectDir)src\asn1;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4127</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKIF_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)..\common\macros;$(ProjectDir)src\asn1;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4127</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

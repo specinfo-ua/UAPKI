@@ -1,0 +1,41 @@
+apply plugin: 'java'
+apply plugin: 'jacoco'
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+description = 'UAPKI for Java'
+group = 'com.sit'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+mainClassName = 'com.sit.uapki.Library'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.8'
+    implementation 'net.java.dev.jna:jna:5.9.0'
+    implementation group: 'commons-io', name: 'commons-io', version: '2.6' //NOTE: 2.6 - last release for Java7, 2.7-2.11.x - required Java8
+    testImplementation 'junit:junit:4.13'
+}
+
+jar {
+    baseName = 'uapki'
+    version = findProperty('version')
+}
+
+buildscript {
+    repositories {
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0'
+    }
+}
+
+//task generateJavadocs(type: Javadoc) {
+//    source = sourceSets.main.allJava
+//}

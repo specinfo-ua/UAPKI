@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\loaders\cm-loader.cpp" />
+    <ClCompile Include="..\common\pkix\aid.c" />
+    <ClCompile Include="..\common\pkix\asn1-ba-utils.c" />
+    <ClCompile Include="..\common\pkix\attribute-utils.c" />
+    <ClCompile Include="..\common\pkix\ba-utils.c" />
+    <ClCompile Include="..\common\pkix\content-info.c" />
+    <ClCompile Include="..\common\pkix\dstu4145-params.c" />
+    <ClCompile Include="..\common\pkix\extension-helper.cpp" />
+    <ClCompile Include="..\common\pkix\extension-utils.c" />
+    <ClCompile Include="..\common\pkix\http-helper.cpp" />
+    <ClCompile Include="..\common\pkix\iconv-utils.c" />
+    <ClCompile Include="..\common\pkix\ocsp-utils.c" />
+    <ClCompile Include="..\common\pkix\oids.c" />
+    <ClCompile Include="..\common\pkix\oid-utils.c" />
+    <ClCompile Include="..\common\pkix\tsp-utils.c" />
+    <ClCompile Include="..\common\pkix\uapki-errors.c" />
+    <ClCompile Include="..\common\pkix\verify-utils.c" />
+    <ClCompile Include="..\common\json\parson-ba-utils.c" />
+    <ClCompile Include="..\common\json\parson-helper.cpp" />
+    <ClCompile Include="..\common\json\parson.c" />
+    <ClCompile Include="..\common\json\strtod-no-locale.c" />
+    <ClCompile Include="src\api\add-cert.cpp" />
+    <ClCompile Include="src\api\add-crl.cpp" />
+    <ClCompile Include="src\api\api-json.cpp" />
+    <ClCompile Include="src\api\asn1-decode.cpp" />
+    <ClCompile Include="src\api\asn1-encode.cpp" />
+    <ClCompile Include="src\api\cert-info.cpp" />
+    <ClCompile Include="src\api\crl-info.cpp" />
+    <ClCompile Include="src\api\digest.cpp" />
+    <ClCompile Include="src\api\get-cert.cpp" />
+    <ClCompile Include="src\api\list-certs.cpp" />
+    <ClCompile Include="src\api\remove-cert.cpp" />
+    <ClCompile Include="src\api\verify-cert.cpp" />
+    <ClCompile Include="src\api\key-get-csr.cpp" />
+    <ClCompile Include="src\api\key-init-usage.cpp" />
+    <ClCompile Include="src\api\session-key-create.cpp" />
+    <ClCompile Include="src\api\session-key-delete.cpp" />
+    <ClCompile Include="src\api\library-deinit.cpp" />
+    <ClCompile Include="src\api\library-list-providers.cpp" />
+    <ClCompile Include="src\api\library-init.cpp" />
+    <ClCompile Include="src\api\library-version.cpp" />
+    <ClCompile Include="src\api\provider-list-storages.cpp" />
+    <ClCompile Include="src\api\provider-storage-info.cpp" />
+    <ClCompile Include="src\api\sign.cpp" />
+    <ClCompile Include="src\api\storage-change-password.cpp" />
+    <ClCompile Include="src\api\storage-close.cpp" />
+    <ClCompile Include="src\api\session-list-keys.cpp" />
+    <ClCompile Include="src\api\storage-open.cpp" />
+    <ClCompile Include="src\api\session_select_key.cpp" />
+    <ClCompile Include="src\api\verify.cpp" />
+    <ClCompile Include="src\global-objects.cpp" />
+    <ClCompile Include="src\store-utils.cpp" />
+    <ClCompile Include="src\cer-store.cpp" />
+    <ClCompile Include="src\cm-providers.cpp" />
+    <ClCompile Include="src\cms-utils.c" />
+    <ClCompile Include="src\crl-store.cpp" />
+    <ClCompile Include="src\dirent-internal.c" />
+    <ClCompile Include="src\doc-signflow.cpp" />
+    <ClCompile Include="src\ocsp-helper.cpp" />
+    <ClCompile Include="src\str-utils.cpp" />
+    <ClCompile Include="src\time-utils.cpp" />
+    <ClCompile Include="src\verify-signer-info.cpp" />
+    <ClCompile Include="src\verify-status.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\cm-api\cm-api.h" />
+    <ClInclude Include="..\common\cm-api\cm-errors.h" />
+    <ClInclude Include="..\common\cm-api\cm-export.h" />
+    <ClInclude Include="..\common\loaders\cm-loader.h" />
+    <ClInclude Include="..\common\loaders\dl-macros.h" />
+    <ClInclude Include="..\common\pkix\aid.h" />
+    <ClInclude Include="..\common\pkix\asn1-ba-utils.h" />
+    <ClInclude Include="..\common\pkix\attribute-utils.h" />
+    <ClInclude Include="..\common\pkix\ba-utils.h" />
+    <ClInclude Include="..\common\pkix\common.h" />
+    <ClInclude Include="..\common\pkix\content-info.h" />
+    <ClInclude Include="..\common\pkix\dstu4145-params.h" />
+    <ClInclude Include="..\common\pkix\extension-helper.h" />
+    <ClInclude Include="..\common\pkix\extension-utils.h" />
+    <ClInclude Include="..\common\pkix\http-helper.h" />
+    <ClInclude Include="..\common\pkix\iconv-utils.h" />
+    <ClInclude Include="..\common\pkix\ocsp-utils.h" />
+    <ClInclude Include="..\common\pkix\oids.h" />
+    <ClInclude Include="..\common\pkix\oid-utils.h" />
+    <ClInclude Include="..\common\pkix\tsp-utils.h" />
+    <ClInclude Include="..\common\pkix\uapki-errors.h" />
+    <ClInclude Include="..\common\pkix\verify-utils.h" />
+    <ClInclude Include="..\common\json\parson-ba-utils.h" />
+    <ClInclude Include="..\common\json\parson-helper.h" />
+    <ClInclude Include="..\common\json\parson.h" />
+    <ClInclude Include="include\uapki-export.h" />
+    <ClInclude Include="src\api\api-json-internal.h" />
+    <ClInclude Include="src\library-config.h" />
+    <ClInclude Include="src\store-utils.h" />
+    <ClInclude Include="src\cer-store.h" />
+    <ClInclude Include="src\cm-providers.h" />
+    <ClInclude Include="src\cms-utils.h" />
+    <ClInclude Include="src\crl-store.h" />
+    <ClInclude Include="src\dirent-internal.h" />
+    <ClInclude Include="src\global-objects.h" />
+    <ClInclude Include="src\ocsp-helper.h" />
+    <ClInclude Include="src\str-utils.h" />
+    <ClInclude Include="src\time-utils.h" />
+    <ClInclude Include="src\verify-signer-info.h" />
+    <ClInclude Include="src\doc-signflow.h" />
+    <ClInclude Include="src\verify-status.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{d4cb6a66-694d-4b3e-8c85-8f3965af0361}</ProjectGuid>
+    <RootNamespace>uapki</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\build\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;WIN32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src\api;$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\json;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)include;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Wldap32.lib;crypt32.lib;ws2_32.lib;..\common\curl\builds\windows_x86\libcurl.lib;uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src\api;$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\json;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)include;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Wldap32.lib;crypt32.lib;ws2_32.lib;..\common\curl\builds\windows_x86\libcurl.lib;uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src\api;$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\json;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)include;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Wldap32.lib;crypt32.lib;ws2_32.lib;..\common\curl\builds\windows_x86-64\libcurl.lib;uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src\api;$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\json;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)include;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>Wldap32.lib;crypt32.lib;ws2_32.lib;..\common\curl\builds\windows_x86-64\libcurl.lib;uapkic.lib;uapkif.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
