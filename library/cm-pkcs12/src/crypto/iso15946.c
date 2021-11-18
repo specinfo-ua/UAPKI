@@ -44,13 +44,13 @@
 
 
 /**
-* ��������������� 32 ������ ����� � ������ ����. ��� ������������ ������������
-* ������� "������� ���� �� ������ ���������� �� ��������
-* �������" (big-endian).
+* Преобразовывает 32 битное целое в массив байт. При формировании используется
+* правило "младший байт из целого помещается по старшему
+* индексу" (big-endian).
 *
-* @param src    �����
-* @param dst    ������ ����
-* @param dstOff �������� � ������� ����
+* @param src    целое
+* @param dst    массив байт
+* @param dstOff смещение в массиве байт
 */
 static void iso15946_int2be(int src, void *dst)
 {
@@ -63,10 +63,10 @@ static void iso15946_int2be(int src, void *dst)
 
 
 /**
-* ������� ����������� SharedInfo. (rfc3278, $8.2)
+* Повертає енкодований SharedInfo. (rfc3278, $8.2)
 *
-* @param oid ������������� ���������
-* @param baEntityInfo 64-������� ������ ��������� ����
+* @param oid идентификатор алгоритма
+* @param baEntityInfo 64-байтный массив случайных числ
 * @param keySize
 * @param baEncoded
 */
@@ -148,13 +148,13 @@ int iso15946_generate_secretc (const HashAlg hashAlgo, const char* oidWrapAlgo,
     DO(hash_update(ctx, ba_hashdata));
     ba_free(ba_hashdata);
 
-    // ��� ������������ �������� ����������� ������� �������������� ����������. ������� ���
+    // Про затвердження Технічних специфікацій форматів криптографічних повідомлень. Захищені дані
     //
-    // 5.6.3. KDF-������� � ������� ���� ����
+    // 5.6.3. KDF-функція у циклічній групі поля
     //   ...
-    //   5) �������� ���������� ����� ���:
+    //   5) Алгоритм формування ключа КШК:
     //     ...
-    //     �)  ���� ������� �� ������� ������ ���, �� �� ��� ��������� ��;
+    //     б)  якщо довжина КМ дорівнює довжині КШК, то за КШК приймають КМ;
     //
     CHECK_NOT_NULL(ba_hashdata = ba_alloc_from_uint8(COUNTER, sizeof(COUNTER)));
     DEBUG_OUTCON( printf("iso15946_generate_secretc(), COUNTER: ");ba_print(stdout, ba_hashdata); )
@@ -169,4 +169,3 @@ cleanup:
     ba_free(ba_sharedinfo);
     return ret;
 }
-
