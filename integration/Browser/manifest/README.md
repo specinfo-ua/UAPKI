@@ -1,12 +1,12 @@
 Change "path" to actual absolute path to uapki-hostapp.
 
 On WINDOWS add path to manifest to registry (system-wide):
-Google Chrome: HKLM\Software\Google\Chrome\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-chrome.json";
-Firefox: HKLM\Software\Mozilla\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-firefox.json";
+Google Chrome: HKLM\Software\Google\Chrome\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-chrome.json"
+Firefox: HKLM\Software\Mozilla\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-firefox.json"
 
 On WINDOWS add path to manifest to registry (user-specific):
-Google Chrome: HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-chrome.json";
-Firefox: HKCU\Software\Mozilla\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-firefox.json";
+Google Chrome: HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-chrome.json"
+Firefox: HKCU\Software\Mozilla\NativeMessagingHosts\com.sit.uapki.hostapp"; ValueType: string; ValueData: "{path}\uapki-hostapp-firefox.json"
 
 On Linux (system-wide):
 Google Chrome: /etc/opt/chrome/native-messaging-hosts/uapki-hostapp-chrome.json
@@ -27,4 +27,4 @@ Firefox: /Library/Application Support/Mozilla/NativeMessagingHosts/uapki-hostapp
 On macOS (user-specific, default path):
 Google Chrome: ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/uapki-hostapp-chrome.json
 Chromium: ~/Library/Application Support/Chromium/NativeMessagingHosts/uapki-hostapp-chrome.json
-Firefox: ~/Library/Application Support/Mozilla/NativeMessagingHosts/uapki-hostapp-firefox.json 
+Firefox: ~/Library/Application Support/Mozilla/NativeMessagingHosts/uapki-hostapp-firefox.json
