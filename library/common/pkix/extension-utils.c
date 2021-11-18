@@ -381,6 +381,8 @@ int extns_get_key_usage (const Extensions_t* extns, uint32_t* keyUsage)
         }
     }
 
+    *keyUsage = u32_keyusage;
+
 cleanup:
     asn_free(get_KeyUsage_desc(), key_usage);
     ba_free(ba_encoded);
