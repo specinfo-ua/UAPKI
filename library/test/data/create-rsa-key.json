@@ -1,0 +1,103 @@
+{
+  "comment": "Test create key-storage (OPENSSL compatible) and ECDSA-keys",
+  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
+  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
+  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
+  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Ініціалізація бібліотеки",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "", // full path
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12",
+              "config": { // optional parameters
+                "createPfx": { // specific cm-provider parameters
+                  "bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
+                  "bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
+                  "iterations": 10000,
+                  "macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "comment": "Отримання переліку провайдерів підпису (типів носіів ключів: файли, токени, смарт-картки, хмарні криптомодулі та ін.)",
+      "method": "PROVIDERS"
+    },
+    {
+      "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
+      "method": "STORAGES",
+      "parameters": {
+        "provider": "PKCS12" // Обов'язкове (ідентифікатор провайдера зі списку що повертає метод PROVIDERS)
+      }
+    },
+    {
+      "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
+      "method": "STORAGE_INFO",
+      "parameters": {
+        "provider": "PKCS12", // Опціональне, по замовчанню PKCS12
+        "storage": "storage-id" // Для PKCS12-provider обов'язкове, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
+      }
+    },
+    {
+      "comment": "Створення нового сховища ключів (OPENSSL сумісний варіант)",
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12",
+        "storage": "new-rsa.p12",
+        "password": "testpassword",
+        "openParams": {
+          "createPfx": { // specific cm-provider parameters
+            "bagCipher": "2.16.840.1.101.3.4.1.22", // aes192-CBC
+            "bagKdf": "1.2.840.113549.2.10", // hmacWithSHA384
+            "iterations": 5555,
+            "macAlgo": "2.16.840.1.101.3.4.2.2" // sha-384
+            //"bagCipher": "2.16.840.1.101.3.4.1.2", // aes128-CBC
+            //"bagKdf": "1.2.840.113549.2.9", // hmacWithSHA256
+            //"iterations": 777,
+            //"macAlgo": "2.16.840.1.101.3.4.2.1" // sha-256
+            //"bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
+            //"bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
+            //"iterations": 1234,
+            //"macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
+          }
+        },
+        "mode": "CREATE"
+      }
+    },
+    {
+      "comment": "Створення нового ключа за алгоритмом RSA з параметом 2048 bits",
+      "method": "CREATE_KEY",
+      "parameters": {
+        "mechanismId": "1.2.840.113549.1.1.1",
+        "parameterId": "2048",
+        "label": "RSA key, 2048 bits"
+      }
+    },
+    {
+      "method": "GET_CSR",
+      "parameters": {}
+    },
+    {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS"
+    },
+    {
+      "comment": "Для перевірки новостворенного сховища ключів можно використувати OPENSSL",
+      "method": "CLOSE"
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}

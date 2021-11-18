@@ -125,12 +125,18 @@ int main(int argc, char *argv[])
             if (!runTask(uapki, method, json_object_get_object(jo_task, "parameters"))) break;
         }
         else {
+            char s_hex[3] = { 0, 0, 0 };
             JSON_Object* jo_param = json_object_get_object(jo_task, "parameters");
             string str = ParsonHelper::jsonObjectGetString(jo_param, "text");
+            uint64_t ptr64 = (uint64_t)(str.data());
             string str_ptr;
+            str_ptr.resize(2 * sizeof(void*));
+            for (size_t i = 0,  j = str_ptr.size(); i < sizeof(void*); i++, j -= 2) {
+                sprintf(s_hex, "%02X", (uint8_t)(ptr64 >> (i * 8)));
+                str_ptr[j - 2] = s_hex[0];
+                str_ptr[j - 1] = s_hex[1];
+            }
 
-            str_ptr.resize(64);
-            sprintf((char*)str_ptr.data(), "%p", (void*)str.data());
             json_object_set_string(jo_param, "ptr", str_ptr.c_str());
             ParsonHelper::jsonObjectSetUint64(jo_param, "size", str.length());
             if (!runTask(uapki, "DIGEST", jo_param)) break;

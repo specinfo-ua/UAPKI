@@ -39,5 +39,37 @@
     <Filter Include="common\loaders">
       <UniqueIdentifier>{24b3b3af-cbf9-4935-a994-0dc030597323}</UniqueIdentifier>
     </Filter>
+    <Filter Include="data">
+      <UniqueIdentifier>{9e1ab374-09d3-4fda-8e40-ba00284f0239}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="data\create-dstu-key.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\create-ecdsa-key.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\create-rsa-key.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\digest.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\get-csr.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\sign-pkcs12-file-dstu.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\sign-pkcs12-memory.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\verify-dstu.json">
+      <Filter>data</Filter>
+    </None>
+    <None Include="data\verify-cert.json">
+      <Filter>data</Filter>
+    </None>
   </ItemGroup>
 </Project>

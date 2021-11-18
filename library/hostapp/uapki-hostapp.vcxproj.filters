@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="uapki-hostapp.cpp" />
+    <ClCompile Include="..\common\loaders\uapki-loader.cpp">
+      <Filter>common\loaders</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{da660d79-ba38-481e-9540-82e0a296a035}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\loaders">
+      <UniqueIdentifier>{b336d2c5-3fc6-4f9f-8188-87cb414485c0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\loaders\dl-macros.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\loaders\uapki-loader.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
