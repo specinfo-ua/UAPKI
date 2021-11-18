@@ -1,0 +1,7 @@
+{
+  "name": "com.sit.uapki.hostapp",
+  "description": "UAPKI HostApp",
+  "path": "D:/uapki/library/build/uapki-hostapp.exe",
+  "type": "stdio",
+  "allowed_extensions": [ "sign@sit.company" ]
+}
