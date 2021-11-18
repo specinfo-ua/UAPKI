@@ -23,6 +23,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "uapki", "uapki\uapki.vcxpro
 		{246343B7-4D20-4797-9CA9-471692BB441A} = {246343B7-4D20-4797-9CA9-471692BB441A}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{85D73A8D-4573-44D7-A4E7-236AD436B30A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D4CB6A66-694D-4B3E-8C85-8F3965AF0361} = {D4CB6A66-694D-4B3E-8C85-8F3965AF0361}
+		{35ABF2A9-7A49-4D8D-9F4E-14F1DA5B9D24} = {35ABF2A9-7A49-4D8D-9F4E-14F1DA5B9D24}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -63,6 +69,14 @@ Global
 		{D4CB6A66-694D-4B3E-8C85-8F3965AF0361}.Release|x64.Build.0 = Release|x64
 		{D4CB6A66-694D-4B3E-8C85-8F3965AF0361}.Release|x86.ActiveCfg = Release|Win32
 		{D4CB6A66-694D-4B3E-8C85-8F3965AF0361}.Release|x86.Build.0 = Release|Win32
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Debug|x64.ActiveCfg = Debug|x64
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Debug|x64.Build.0 = Debug|x64
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Debug|x86.ActiveCfg = Debug|Win32
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Debug|x86.Build.0 = Debug|Win32
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Release|x64.ActiveCfg = Release|x64
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Release|x64.Build.0 = Release|x64
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Release|x86.ActiveCfg = Release|Win32
+		{85D73A8D-4573-44D7-A4E7-236AD436B30A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

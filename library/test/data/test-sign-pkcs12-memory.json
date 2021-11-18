@@ -1,0 +1,92 @@
+{
+  "comment": "Generate PKCS7/CAdES-signature",
+  "comment2": "Для коректного відображення utf8 тексту под ОС Windows",
+  "comment3": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
+  "comment4": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
+  "comment5": "Updated 2021-11-04",
+  //"locale": "", // Встановити локаль за замовчуванням
+  //"locale": "C", // Встановити мінімальну C-локаль
+  //"locale": "Ukrainian_Ukraine.utf8", // Увага! В різних ОС мовна локаль може мати різні назви
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Ініціалізація бібліотеки",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "", // full path
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12",
+              "config": { // optional parameters
+                "createPfx": { // specific parameters
+                  "bagCipher": "2.16.840.1.101.3.4.1.22",
+                  "bagKdf": "1.2.840.113549.2.10",
+                  "iterations": 2000,
+                  "macAlgo": "2.16.840.1.101.3.4.2.2"
+                }
+              }
+            }
+          ]
+        },
+        "certCache": {
+          "path": "certs/", // full path
+          "trustedCerts": []
+        }
+      }
+    },
+    {
+      "comment": "Відкриття носія ключів",
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
+        "storage": "", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо пуста строка, то контейнер ключів зберігається у пам'яті
+        "password": "testpassword", // Для PKCS12 обов'язковий, пароль
+        "mode": "RO", // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
+        "openParams": {
+          "bytes": "MIICTQIBAzCCAeoGCSqGSIb3DQEHAaCCAdsEggHXMIIB0zCCAc8GCSqGSIb3DQEHAaCCAcAEggG8MIIBuDCCAbQGCyqGSIb3DQEMCgECoIIBejCCAXYwgbAGCSqGSIb3DQEFDTCBojBDBgkqhkiG9w0BBQwwNgQgU3w9ZkIGbJpSSd23QVQlMWh9P3E3FfXPaTItnAErzy8CAicQMA4GCiqGJAIBAQEBAQIFADBbBgsqhiQCAQEBAQEBAzBMBAgHkIMudZLpPgRAqdbrRfE8cIKAxJZ7Ix9erfZY66TANykdONlr8CXKThf46XINxhW0OiiXXwvB3qNkOLVk6iwXn9ASPm24+sV5BASBwK9QMpi5ARNqJB6qJo+RDLJem0NsZMPTG+fqvC/rPH1XbMSiouqSpAhv/RBWt1mj6YdVTOs/7uvlQChG6OnQcfoosso74ioRGagVU9krwykGD/o47hlwIFWlj99ZdH2AzwNroa6plclANJwAMcUVRSxkRKvC05gwh5FvMbmpPUorUZ6KIhWoGC2r+izdAE+rz99OV6zU/AFxQ1yKCEDUw81BGmDjmHvX5pdBjNyW+lxXZ99cMZaL/EMG0qo/P9NXJjEnMCUGCSqGSIb3DQEJFDEYHhYAdABlAHMAdAAgAGsAZQB5ACAAMQAAMFowMjAOBgoqhiQCAQEBAQIBBQAEIOTzKBa2xWlbdRxh1w5MhWXsTxFyJKJYJmANq0nTk4s4BCAzHs8/IvJwuvExCPhJzt2h2LHUelUyYoJfUcaJNkRzKgICJxA="
+        }
+      }
+    },
+    {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS"
+    },
+    {
+      "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
+      "method": "SELECT_KEY",
+      "parameters": {
+        "id": "BCB3BE7274D075DD52252B67D74AA281D568B8A05B0DF8F3D5C7F69D00BC1370" // обов'язковий, ідентифікатор ключа
+      }
+    },
+    {
+      "comment": "формування підпису. Параметри наступні: CMS, attached data",
+      "method": "SIGN",
+      "parameters": {
+        "signParams": {
+          "signatureFormat": "CAdES-BES",
+          "signAlgo": "1.2.804.2.1.1.1.1.3.1.1", // Опціональний, якщо не вказаний, то використовується перший алгоритм підпису із списку signAlgo для ключа
+          //"digestAlgo": "1.2.804.2.1.1.1.1.2.1", // Опціональний
+          "detachedData": false, // Опціональний, по замовчанню true (дані не інкапсулюються)
+          "includeCert": true, // Опціональний, по замовчанню false (додати до підпису сертифікат)
+          "includeTime": true, // Опціональний, по замовчанню false (додати до підпису час хосту (не довірений))
+          "includeContentTS": false // Опціональний, по замовчанню false (додати до підпису TSP від даних)
+        },
+        "dataTbs": [
+          {
+            "id": "doc-0", // Обов'язковий, ідентифікатор даних
+            "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i" // обов'язковий, дані для підпису у кодировці base64
+          }
+        ]
+      }
+    },
+    {
+      "method": "CLOSE"
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}

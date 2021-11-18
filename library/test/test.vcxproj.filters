@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="test.cpp" />
+    <ClCompile Include="..\common\json\parson.c">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\strtod-no-locale.c">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\json\parson-helper.cpp">
+      <Filter>common\json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\loaders\uapki-loader.cpp">
+      <Filter>common\loaders</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\json\parson.h">
+      <Filter>common\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\json\parson-helper.h">
+      <Filter>common\json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\loaders\dl-macros.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\loaders\uapki-loader.h">
+      <Filter>common\loaders</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{dad6e04d-63a1-484a-b5d1-1555e2933253}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\json">
+      <UniqueIdentifier>{c12f3e03-1da4-44a9-975e-53ae99c0d272}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="common\loaders">
+      <UniqueIdentifier>{24b3b3af-cbf9-4935-a994-0dc030597323}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
