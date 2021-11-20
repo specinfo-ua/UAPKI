@@ -296,7 +296,7 @@ static int verify_cms (const ByteArray* baSignature, const ByteArray* baContent,
         if (!verify_info) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
         }
-        DO(verify_signer_info(sdata->signerInfos.list.array[0], dgst_algos, ref_content, isDigest, verify_info));
+        DO(verify_signer_info(sdata->signerInfos.list.array[i], dgst_algos, ref_content, isDigest, verify_info));
         verify_infos.push_back(verify_info);
     }
 
