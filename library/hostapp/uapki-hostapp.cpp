@@ -56,6 +56,7 @@ using namespace std;
 
 static const string NAME_HOSTAPP = "UAPKI-HOSTAPP";
 static const string VERSION_HOSTAPP = "2.0.2";
+static const string UAPKI_LIB_NAME = "uapki";
 static const string JSON_REQ_HOSTAPP_VERSION = "{\"method\":\"HOSTAPP_VERSION\"}";
 static const string JSON_RESULT_HOSTAPP_VERSION = "{\"hostName\":\"" + NAME_HOSTAPP + "\",\"hostVersion\":\"" + VERSION_HOSTAPP + "\"}";
 
@@ -109,7 +110,7 @@ static void set_work_dir(void)
 
     DBG_LOG("uapki-hostapp.log", "path: " + string(s_path.c_str()));
     s_path.resize(strlen(s_path.c_str()), 0);
-    const size_t len = strlen(uapki.filename());
+    const size_t len = uapki.getLibName(UAPKI_LIB_NAME).length();
     if (s_path.size() >= len) {
         s_path.resize(s_path.size() - len, 0);
     }
@@ -138,7 +139,7 @@ int main (void)
     DBG_LOG("uapki-hostapp.log", "START");
     string s_req, s_resp;
 
-    if (uapki.load()) {
+    if (uapki.load(UAPKI_LIB_NAME)) {
         DBG_LOG("uapki-hostapp.log", "IS_LOADED");
         set_work_dir();
 
@@ -187,7 +188,7 @@ int main (void)
         DBG_LOG("uapki-hostapp.log", "JSON-req: '" + s_req + "'");
 
         s_resp = (s_req == JSON_REQ_HOSTAPP_VERSION) ? JSON_RESULT_HOSTAPP_VERSION : "";
-        s_resp = json_stringify(-21, "Library UAPKI is not loaded. Expected name '" + string(UapkiLoader::filename()) + "'.", s_resp);
+        s_resp = json_stringify(-21, "Library UAPKI is not loaded. Expected name '" + UapkiLoader::getLibName(UAPKI_LIB_NAME) + "'.", s_resp);
         DBG_LOG("uapki-hostapp.log", "IS_NOT_LOADED, JSON-resp: '" + s_resp + "'");
 
         send_browser_msg(s_resp);

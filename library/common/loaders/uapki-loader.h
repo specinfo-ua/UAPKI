@@ -32,7 +32,11 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string>
 #include "dl-macros.h"
+
+
+using namespace std;
 
 
 class UapkiLoader
@@ -48,11 +52,11 @@ public:
     UapkiLoader (void);
     ~UapkiLoader (void);
 
-    static const char* filename (void);
+    static string getLibName (const string& libName);
 
     HANDLE_DLIB getHandle (void) const { return m_HandleDLib; }
     bool isLoaded (void) const { return (m_HandleDLib != nullptr); }
-    bool load (void);
+    bool load (const string& libName = string("uapki"));
     void unload (void);
 
     char* process (const char* jsonRequest);

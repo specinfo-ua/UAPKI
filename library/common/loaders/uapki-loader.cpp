@@ -28,9 +28,6 @@
 #include "uapki-loader.h"
 
 
-static const char* FN_UAPKI_LIB = LIBNAME_PREFIX "uapki." LIBNAME_EXT;
-
-
 UapkiLoader::UapkiLoader (void)
     : m_HandleDLib(nullptr), m_Process(nullptr), m_JsonFree(nullptr)
 {
@@ -41,17 +38,18 @@ UapkiLoader::~UapkiLoader (void)
     unload();
 }
 
-const char* UapkiLoader::filename(void)
+string UapkiLoader::getLibName (const string& libName)
 {
-    return FN_UAPKI_LIB;
+    return string(LIBNAME_PREFIX) + libName + "." + string(LIBNAME_EXT);
 }
 
-bool UapkiLoader::load (void)
+bool UapkiLoader::load (const string& libName)
 {
-    bool ok = false;
     unload();
 
-    m_HandleDLib = DL_LOAD_LIBRARY(filename());
+    bool ok = false;
+    const string lib_name = getLibName(libName);
+    m_HandleDLib = DL_LOAD_LIBRARY(lib_name.c_str());
     if (m_HandleDLib) {
         m_Process = (f_process)DL_GET_PROC_ADDRESS(m_HandleDLib, "process");
         m_JsonFree = (f_json_free)DL_GET_PROC_ADDRESS(m_HandleDLib, "json_free");
