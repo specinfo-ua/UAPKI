@@ -36,7 +36,7 @@ namespace UapkiLibrary
             var KEYS = new { method = "KEYS" };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(KEYS)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -53,7 +53,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(SELECT_KEY)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }

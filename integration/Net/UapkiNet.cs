@@ -38,7 +38,6 @@ namespace UapkiNet
         static string selectedKeyId = null;
 
         static dynamic providersList = null;
-        static dynamic storagesList = null;
         static dynamic keysList = null;
 
         static bool printShortCertInfo(dynamic certInfo)
@@ -110,8 +109,8 @@ namespace UapkiNet
                 Console.Write("Введiть iм'я сховища ключiв: ");
                 var storageId = Console.ReadLine();
                 string newMode = mode;
-                
-                if (!File.Exists(storageId)) 
+
+                if (!File.Exists(storageId))
                 {
                     if (newMode == "RO")
                     {
@@ -121,7 +120,7 @@ namespace UapkiNet
                     else
                         newMode = "CREATE";
                 }
-                
+
                 Console.Write("Введiть пароль до сховища ключiв: ");
                 string pass = ReadPassword();
                 Console.WriteLine("");
@@ -184,7 +183,7 @@ namespace UapkiNet
                 int i = 1;
                 foreach (dynamic key in keysList)
                 {
-                    Console.WriteLine(i.ToString() + ": Назва: " + (key.label != null ? key.label : "відсутня") + 
+                    Console.WriteLine(i.ToString() + ": Назва: " + (key.label != null ? key.label : "відсутня") +
                         ", алгоритм: " + OidToAlgName((string)key.mechanismId) + " iдентифiкатор (HEX): " + key.id);
                     i++;
                 }
@@ -259,7 +258,7 @@ namespace UapkiNet
                 cert = null;
 
                 bool selfSigned = printShortCertInfo(certId);
-                
+
                 var result = Uapki.CertVerify(certId, useOCSP && !selfSigned);
 
                 if (result.expired == true)
@@ -423,22 +422,29 @@ namespace UapkiNet
 
         static void CertsList()
         {
-            var certs = Uapki.CertsInCache();
-            Console.WriteLine("Всього сертифікатів: " + certs.certIds.Count);
-            foreach (var certId in certs.certIds)
+            try
             {
-                Console.WriteLine("-------------------------------------------------------------------------------------------------");
-                printShortCertInfo((string)certId);
+                var certs = Uapki.CertsInCache();
+                Console.WriteLine("Всього сертифікатів: " + certs.certIds.Count);
+                foreach (var certId in certs.certIds)
+                {
+                    Console.WriteLine("-------------------------------------------------------------------------------------------------");
+                    printShortCertInfo((string)certId);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Помилка отримання переліку сертифікатів: " + e.Message);
             }
         }
 
         static void Help()
         {
-            Console.WriteLine("new-key      - генерацiя нового ключа та додавання його до існуючого або нового контенер PKCS#12");
+            Console.WriteLine("new-key      - генерацiя нового ключа та додавання його до існуючого або нового контейнера PKCS#12");
             Console.WriteLine("               для згенерованого ключа автоматично формується запит на сертифiкат, згененований ключ");
             Console.WriteLine("               автоматично доступний для подальшої роботи (не потребує виконання select-key)");
-            Console.WriteLine("open-storage - відкриття сховища ключів (контенера PKCS#12, PKCS#8, JKS)");
-            Console.WriteLine("select-key   - вибiр ключа з контенера PKCS#12, PKCS#8, JKS");
+            Console.WriteLine("open-storage - відкриття сховища ключів (контейнера PKCS#12, PKCS#8, JKS)");
+            Console.WriteLine("select-key   - вибiр ключа з контейнера PKCS#12, PKCS#8, JKS");
             Console.WriteLine("sign-cms     - пiдписати файл на вибраному ключi");
             Console.WriteLine("verify-cms   - перевiрити пiдпис");
             Console.WriteLine("verify-cert  - перевiрити сертифiкат");
@@ -467,46 +473,53 @@ namespace UapkiNet
                 dir_data = args[0];
             }
 
-            var version = Uapki.Version();
-            var result = Uapki.Init(dir_data + "certs/", dir_data + "certs/crls/", "http://acskidd.gov.ua/services/tsp/", null);
-            Console.WriteLine("Бiблiотку iнiцiалiзовано. Завантажено в кеш " + result.certCache.countCerts + " сертифiкатiв. Версiя: " + version);
-
-            providersList = Uapki.Providers().providers;
-            if (providersList != null && providersList.Count > 0)
+            try
             {
-                string s = "Перелік завантажених провайдерів сховищ ключів:\n";
-                for (int i = 0; i < providersList.Count; i++)
-                {
-                    s += (i + 1).ToString() + ": " + providersList[i].id + "\n";
-                }
-                Console.WriteLine(s);
-            }
+                var version = Uapki.Version();
+                var result = Uapki.Init(dir_data + "certs/", dir_data + "certs/crls/", "http://acskidd.gov.ua/services/tsp/", null);
+                Console.WriteLine("Бiблiотку iнiцiалiзовано. Завантажено в кеш " + result.certCache.countCerts + " сертифiкатiв. Версiя: " + version);
 
-            while (true)
+                providersList = Uapki.Providers().providers;
+                if (providersList != null && providersList.Count > 0)
+                {
+                    string s = "Перелік завантажених провайдерів сховищ ключів:\n";
+                    for (int i = 0; i < providersList.Count; i++)
+                    {
+                        s += (i + 1).ToString() + ": " + providersList[i].id + "\n";
+                    }
+                    Console.WriteLine(s);
+                }
+
+                while (true)
+                {
+                    Console.WriteLine("\n=================================================================================================");
+                    Console.WriteLine("Введiть команду <new-key, get-csr, open-storage, select-key, sign, verify, verify-cert, ");
+                    Console.WriteLine("                 certs-list, help, exit> та натиснiть Enter");
+                    Console.Write("> ");
+                    string cmd = Console.ReadLine().ToLower();
+                    if (cmd == "exit") break;
+
+                    switch (cmd)
+                    {
+                        case "open-storage": { StorageOpen(); continue; }
+                        case "new-key": { KeyGenerate(); continue; }
+                        case "select-key": { KeySelect(); continue; }
+                        case "sign": { SignCms(); continue; }
+                        case "verify": { VerifyCms(); continue; }
+                        case "verify-cert": { CertVerify(); continue; }
+                        case "get-csr": { GetCsr(); continue; }
+                        case "certs-list": { CertsList(); continue; }
+                        case "help": { Help(); continue; }
+                    }
+                    Console.WriteLine("Помилка: невiдома команда");
+                }
+
+                Uapki.Deinit();
+            }
+            catch (Exception e)
             {
-                Console.WriteLine("\n=================================================================================================");
-                Console.WriteLine("Введiть команду <new-key, get-csr, open-storage, select-key, sign, verify, verify-cert, ");
-                Console.WriteLine("                 certs-list, help, exit> та натиснiть Enter");
-                Console.Write("> ");
-                string cmd = Console.ReadLine().ToLower();
-                if (cmd == "exit") break;
-
-                switch (cmd)
-                {
-                    case "open-storage": { StorageOpen(); continue; }
-                    case "new-key": { KeyGenerate(); continue; }
-                    case "select-key": { KeySelect(); continue; }
-                    case "sign": { SignCms(); continue; }
-                    case "verify": { VerifyCms(); continue; }
-                    case "verify-cert": { CertVerify(); continue; }
-                    case "get-csr": { GetCsr(); continue; }
-                    case "certs-list": { CertsList(); continue; }
-                    case "help": { Help(); continue; }
-                }
-                Console.WriteLine("Помилка: невiдома команда");
+                Console.WriteLine("Помилка отримання переліку сертифікатів: " + e.Message);
             }
-
-            Uapki.Deinit();
         }
     }
 }

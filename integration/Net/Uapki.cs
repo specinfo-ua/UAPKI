@@ -60,9 +60,8 @@ namespace UapkiLibrary
             var VERSION = new { method = "VERSION" };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERSION)));
             if (ret.errorCode != 0)
-            {
-                throw new UapkiException(ret.errorCode);
-            }
+                throw new UapkiException((int)ret.errorCode);
+
             return ret.result.version;
         }
 
@@ -123,7 +122,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(INIT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -133,7 +132,7 @@ namespace UapkiLibrary
             var DEINIT = new { method = "DEINIT" };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(DEINIT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
         }
 
         public static dynamic Providers()
@@ -141,7 +140,7 @@ namespace UapkiLibrary
             var PROVIDERS = new { method = "PROVIDERS" };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(PROVIDERS)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -161,7 +160,7 @@ namespace UapkiLibrary
             };
             dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERIFY)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }

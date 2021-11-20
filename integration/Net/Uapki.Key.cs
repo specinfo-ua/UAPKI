@@ -44,7 +44,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(GET_CSR)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -82,7 +82,7 @@ namespace UapkiLibrary
 
             dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(SIGN)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return Convert.FromBase64String((string)ret.result.signatures[0].bytes);
         }
@@ -101,7 +101,7 @@ namespace UapkiLibrary
             };
             dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(NEW_DSTU_KEY)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result.id;
         }

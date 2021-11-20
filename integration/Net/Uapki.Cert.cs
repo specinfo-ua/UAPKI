@@ -44,7 +44,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(CERT_INFO)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -61,7 +61,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(CERT_INFO)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -90,7 +90,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERIFY_CERT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -119,7 +119,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERIFY_CERT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -137,7 +137,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(ADD_CERT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result.added[0].certId;
         }
@@ -154,7 +154,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(REMOVE_CERT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
         }
 
         public static dynamic CertsInCache(int offset = 0, int? pageSize = null)
@@ -170,7 +170,7 @@ namespace UapkiLibrary
             };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(LIST_CERTS)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }

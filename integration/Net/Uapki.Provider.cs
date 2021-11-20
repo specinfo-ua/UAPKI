@@ -57,7 +57,7 @@ namespace UapkiLibrary
 
             dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(OPEN_P12)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
 
             return ret.result;
         }
@@ -67,7 +67,7 @@ namespace UapkiLibrary
             var DEINIT = new { method = "CLOSE" };
             var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(DEINIT)));
             if (ret.errorCode != 0)
-                throw new UapkiException(ret.errorCode);
+                throw new UapkiException((int)ret.errorCode);
         }
     }
 }
