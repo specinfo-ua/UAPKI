@@ -61,7 +61,7 @@ static int check_signature_to_json (JSON_Object* joResult, const CerStore::Item*
     status = (ret == RET_OK) ? CERTIFICATE_VERIFY::STATUS::VALID
         : ((ret == RET_VERIFY_FAILED) ? CERTIFICATE_VERIFY::STATUS::INVALID : CERTIFICATE_VERIFY::STATUS::FAILED);
     if (status == CERTIFICATE_VERIFY::STATUS::VALID) {
-        DO(cerIssuer->keyUsageByBit(KeyUsage_digitalSignature, is_digitalsign));
+        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
         status = (is_digitalsign) ? CERTIFICATE_VERIFY::STATUS::VALID : CERTIFICATE_VERIFY::STATUS::VALID_WITHOUT_KEYUSAGE;
     }
 
@@ -118,7 +118,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
         DEBUG_OUTCON(printf("process_crl(), url: '%s',  size: %d\n", s_url, (int)ba_get_len(ba_crl)));
         DEBUG_OUTCON(if (ba_get_len(ba_crl) < 1024) { ba_print(stdout, ba_crl); });
 
-        bool is_unique;//a5
+        bool is_unique;
         DO(crlStore.addCrl(ba_crl, false, is_unique, nullptr));
         ba_crl = nullptr;
 
@@ -234,13 +234,34 @@ cleanup:
     return ret;
 }
 
+static int responderid_to_json (JSON_Object* joResult, const OcspClientHelper::ResponderIdType responderIdType, const ByteArray* baResponderId)
+{
+    int ret = RET_OK;
+    Name_t* name = nullptr;
+
+    switch (responderIdType) {
+    case OcspClientHelper::ResponderIdType::BY_NAME:
+        CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baResponderId));
+        DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
+        DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), *name));
+        break;
+    case OcspClientHelper::ResponderIdType::BY_KEY:
+        DO_JSON(json_object_set_hex(joResult, "responderId", baResponderId));
+        break;
+    }
+
+cleanup:
+    asn_free(get_Name_desc(), name);
+    return ret;
+}
+
 static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
     vector<ByteArray*> certs;
     OcspClientHelper::ResponderIdType responder_idtype = OcspClientHelper::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
-    ByteArray* ba_keyid = nullptr;
+    ByteArray* ba_responderid = nullptr;
     const CerStore::Item* cer_responder = nullptr;
 
     DO(ocspClient.getCerts(certs));
@@ -250,15 +271,18 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
         it = nullptr;
     }
 
-    DO(ocspClient.getResponderId(responder_idtype, &ba_keyid));
-    if (responder_idtype == OcspClientHelper::ResponderIdType::BY_KEY) {
-        DO(cerStore.getCertByKeyId(ba_keyid, &cer_responder));
+    DO(ocspClient.getResponderId(responder_idtype, &ba_responderid));
+    DO(responderid_to_json(joResult, responder_idtype, ba_responderid));
+    switch (responder_idtype) {
+    case OcspClientHelper::ResponderIdType::BY_NAME:
+        DO(cerStore.getCertBySubject(ba_responderid, &cer_responder));
+        break;
+    case OcspClientHelper::ResponderIdType::BY_KEY:
+        DO(cerStore.getCertByKeyId(ba_responderid, &cer_responder));
+        break;
     }
 
     ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
-    if ((ret == RET_OK) && cer_responder) {
-        DO_JSON(json_object_set_hex(joResult, "responderId", cer_responder->baKeyId));
-    }
     DO_JSON(json_object_set_string(joResult, "statusSignature", SIGNATURE_VERIFY::toStr(status_sign)));
     if (ret == RET_VERIFY_FAILED) {
         SET_ERROR(RET_UAPKI_OCSP_VERIFY_RESPONSE_FAILED);
@@ -271,7 +295,7 @@ cleanup:
     for (auto& it : certs) {
         ba_free(it);
     }
-    ba_free(ba_keyid);
+    ba_free(ba_responderid);
     return ret;
 }
 

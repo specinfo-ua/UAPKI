@@ -78,7 +78,8 @@ cleanup:
 
 CerStore::Item::Item (void)
     : baEncoded(nullptr), cert(nullptr), baCertId(nullptr)
-    , keyAlgo(nullptr), baSerialNumber(nullptr), baKeyId(nullptr), baSPKI(nullptr)
+    , keyAlgo(nullptr), baSerialNumber(nullptr), baKeyId(nullptr)
+    , baIssuer(nullptr), baSubject(nullptr), baSPKI(nullptr)
     , algoKeyId(HashAlg::HASH_ALG_UNDEFINED), notBefore(0), notAfter(0), keyUsage(0), trusted(false)
     //, statusSign(SIGNATURE_VERIFY::STATUS::UNDEFINED)
 {}
@@ -90,6 +91,8 @@ CerStore::Item::~Item (void)
     ba_free((ByteArray*)baCertId);
     ba_free((ByteArray*)baSerialNumber);
     ba_free((ByteArray*)baKeyId);
+    ba_free((ByteArray*)baIssuer);
+    ba_free((ByteArray*)baSubject);
     ba_free((ByteArray*)baSPKI);
     ::free((char*)keyAlgo);
     algoKeyId = HashAlg::HASH_ALG_UNDEFINED;
@@ -321,8 +324,7 @@ int CerStore::getCertBySID (const ByteArray* baSID, const Item** cerStoreItem)
     ret = RET_UAPKI_CERT_NOT_FOUND;
     mtx.lock();
     for (auto& it : m_Items) {
-        if (ba_cmp(ba_serialnum, it->baSerialNumber) == RET_OK) {
-            //TODO: check issuer
+        if ((ba_cmp(ba_serialnum, it->baSerialNumber) == RET_OK) && (ba_cmp(ba_issuer, it->baIssuer) == RET_OK)) {
             *cerStoreItem = it;
             ret = RET_OK;
             break;
@@ -343,6 +345,24 @@ int CerStore::getCertBySPKI (const ByteArray* baSPKI, const Item** cerStoreItem)
 
     for (auto& it : m_Items) {
         if (ba_cmp(baSPKI, it->baSPKI) == RET_OK) {
+            *cerStoreItem = it;
+            ret = RET_OK;
+            break;
+        }
+    }
+
+    mtx.unlock();
+    return ret;
+}
+
+int CerStore::getCertBySubject (const ByteArray* baSubject, const Item** cerStoreItem)
+{
+    mutex mtx;
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
+    mtx.lock();
+
+    for (auto& it : m_Items) {
+        if (ba_cmp(baSubject, it->baSubject) == RET_OK) {
             *cerStoreItem = it;
             ret = RET_OK;
             break;
@@ -467,10 +487,12 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
     int ret = RET_OK;
     Certificate_t* cert = nullptr;
     ByteArray* ba_certid = nullptr;
+    ByteArray* ba_issuer = nullptr;
     ByteArray* ba_keyid = nullptr;
     ByteArray* ba_pubkey = nullptr;
     ByteArray* ba_serialnum = nullptr;
     ByteArray* ba_spki = nullptr;
+    ByteArray* ba_subject = nullptr;
     Item* cer_item = nullptr;
     HashAlg algo_keyid = HASH_ALG_SHA1;
     uint64_t not_after = 0, not_before = 0;
@@ -483,14 +505,16 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
     CHECK_NOT_NULL(cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), baEncoded));
 
     DO(asn_INTEGER2ba(&cert->tbsCertificate.serialNumber, &ba_serialnum));
+    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.issuer, &ba_issuer));
     DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notBefore, &not_before));
     DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notAfter, &not_after));
+    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &ba_subject));
     DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &ba_spki));
     DO(asn_oid_to_text(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, &s_keyalgo));
     if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_keyalgo) || oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_keyalgo)) {
         algo_keyid = HASH_ALG_GOST34311;
-        DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
         //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
+        DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
     }
     else {
         DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
@@ -517,6 +541,8 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
         cer_item->keyAlgo = s_keyalgo;
         cer_item->baSerialNumber = ba_serialnum;
         cer_item->baKeyId = ba_keyid;
+        cer_item->baIssuer = ba_issuer;
+        cer_item->baSubject = ba_subject;
         cer_item->baSPKI = ba_spki;
         cer_item->algoKeyId = algo_keyid;
         cer_item->notBefore = not_before;
@@ -526,8 +552,10 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
         cert = nullptr;
         ba_certid = nullptr;
         ba_serialnum = nullptr;
+        ba_issuer = nullptr;
         ba_keyid = nullptr;
         ba_spki = nullptr;
+        ba_subject = nullptr;
         s_keyalgo = nullptr;
         *item = cer_item;
         cer_item = nullptr;
@@ -536,10 +564,12 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
 cleanup:
     asn_free(get_Certificate_desc(), cert);
     ba_free(ba_certid);
+    ba_free(ba_issuer);
     ba_free(ba_keyid);
     ba_free(ba_pubkey);
     ba_free(ba_serialnum);
     ba_free(ba_spki);
+    ba_free(ba_subject);
     ::free(s_keyalgo);
     delete cer_item;
     return ret;

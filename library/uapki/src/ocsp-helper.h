@@ -98,7 +98,6 @@ public:
     int addSN (const CerStore::Item* cerIssuer, const ByteArray* baSerialNumber);
     int setNonce (size_t nonceLen);
     int setNonce (const ByteArray* baNonce);
-    //int sign(void);//TODO: need def args, need impl
     int encodeRequest (ByteArray** baEncoded);
 
     const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
@@ -108,7 +107,7 @@ public:
 
     int parseResponse (const ByteArray* baEncoded, ResponseStatus& responseStatus);
     int getCerts (vector<ByteArray*>& certs);
-    int getResponderId (ResponderIdType &responderIdType, ByteArray** baData);
+    int getResponderId (ResponderIdType &responderIdType, ByteArray** baResponderId);
     int verifyTbsResponseData (const CerStore::Item* cerResponder, SIGNATURE_VERIFY::STATUS& statusSign);
     int checkNonce (void);
     int scanSingleResponses (void);

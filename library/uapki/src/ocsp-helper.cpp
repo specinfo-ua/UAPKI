@@ -192,20 +192,6 @@ const OcspClientHelper::OcspRecord* OcspClientHelper::getOcspRecord (const size_
     return rv_record;
 }
 
-//int OcspClientHelper::sign (void)//TODO: need def args, need impl
-//{
-//    int ret = RET_OK;
-//    TODO: cm_providers_
-//    DO(ocsp_request_encode_tbsrequest(m_OcspRequest, baEncoded));
-//    sign_params.algo = oid;
-//    sign_params.algoParams = NULL;// ba_alloc_from_hex("0500");
-//    sign_params.value = ba
-//    DO(ocsp_request_set_signature(ocsp_req, &sign_params, ba_cert));
-//    DO(ocspreq_signature_add_cert(ocsp_req, ba_cert));
-//cleanup:
-//    return ret;
-//}
-
 int OcspClientHelper::parseResponse (const ByteArray* baEncoded, ResponseStatus& responseStatus)
 {
     int ret = RET_OK;
@@ -247,7 +233,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::getResponderId (ResponderIdType& responderIdType, ByteArray** baData)
+int OcspClientHelper::getResponderId (ResponderIdType& responderIdType, ByteArray** baResponderId)
 {
     int ret = RET_OK;
 
@@ -257,14 +243,12 @@ int OcspClientHelper::getResponderId (ResponderIdType& responderIdType, ByteArra
     const ResponderID_t* responder_id = &m_BasicOcspResp->tbsResponseData.responderID;
     switch (responder_id->present) {
     case ResponderID_PR_byName:
-        //TODO
-        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+        DO(asn_encode_ba(get_Name_desc(), &responder_id->choice.byName, baResponderId));
         responderIdType = ResponderIdType::BY_NAME;
         break;
     case ResponderID_PR_byKey:
-        DO(asn_OCTSTRING2ba(&responder_id->choice.byKey, baData));
+        DO(asn_OCTSTRING2ba(&responder_id->choice.byKey, baResponderId));
         responderIdType = ResponderIdType::BY_KEY;
-        //DO(cerstore_get_cert_by_keyid(ba_keyid, cerResponder));//a
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);

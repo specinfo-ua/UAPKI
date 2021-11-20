@@ -55,6 +55,10 @@ public:
         const ByteArray*
                     baKeyId;
         const ByteArray*
+                    baIssuer;
+        const ByteArray*
+                    baSubject;
+        const ByteArray*
                     baSPKI;
         HashAlg     algoKeyId;
         uint64_t    notBefore;
@@ -91,6 +95,7 @@ public:
     int getCertByKeyId (const ByteArray* baKeyId, const Item** cerStoreItem);
     int getCertBySID (const ByteArray* baSID, const Item** cerStoreItem);
     int getCertBySPKI (const ByteArray* baSPKI, const Item** cerStoreItem);
+    int getCertBySubject (const ByteArray* baSubject, const Item** cerStoreItem);
     int getIssuerCert (const Item* cerSubject, const Item** cerIssuer, bool& isSelfSigned);
     int load (const char* path);
     int reload (void);
