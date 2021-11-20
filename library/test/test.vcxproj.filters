@@ -71,5 +71,8 @@
     <None Include="data\verify-cert.json">
       <Filter>data</Filter>
     </None>
+    <None Include="data\cert-info.json">
+      <Filter>data</Filter>
+    </None>
   </ItemGroup>
 </Project>

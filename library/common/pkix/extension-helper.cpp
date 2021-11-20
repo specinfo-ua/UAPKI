@@ -110,6 +110,85 @@ cleanup:
     return ret;
 }
 
+static int decode_other_name_to_json (const OtherName_t* otherName, JSON_Object* joResult)
+{
+    int ret = RET_OK;
+    ByteArray* ba_value = nullptr;
+    char* s_typeid = nullptr;
+
+    DO(asn_oid_to_text(&otherName->type_id, &s_typeid));
+    DO_JSON(json_object_set_string(joResult, "typeId", s_typeid));
+
+    CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(otherName->value.buf, otherName->value.size));
+    DO(json_object_set_base64(joResult, "value", ba_value));
+
+cleanup:
+    ba_free(ba_value);
+    ::free(s_typeid);
+    return ret;
+}
+
+static int decode_general_name_to_json (const GeneralName_t* generalName, JSON_Object* joResult)
+{
+    int ret = RET_OK;
+    ByteArray* ba_value = nullptr;
+    char* s_value = nullptr;
+    string s_name;
+
+    switch (generalName->present) {
+    case GeneralName_PR_otherName:
+        DO_JSON(json_object_set_value(joResult, "otherName", json_value_init_object()));
+        DO(decode_other_name_to_json(&generalName->choice.otherName, json_object_get_object(joResult, "otherName")));
+        break;
+    case GeneralName_PR_rfc822Name:
+        DO(uint8_to_str_with_alloc(generalName->choice.rfc822Name.buf, generalName->choice.rfc822Name.size, &s_value));
+        DO_JSON(json_object_set_string(joResult, "email", s_value));
+        break;
+    case GeneralName_PR_dNSName:
+        DO(uint8_to_str_with_alloc(generalName->choice.dNSName.buf, generalName->choice.dNSName.size, &s_value));
+        DO_JSON(json_object_set_string(joResult, "dns", s_value));
+        break;
+    case GeneralName_PR_uniformResourceIdentifier:
+        DO(uint8_to_str_with_alloc(generalName->choice.uniformResourceIdentifier.buf, generalName->choice.uniformResourceIdentifier.size, &s_value));
+        DO_JSON(json_object_set_string(joResult, "uri", s_value));
+        break;
+    default:
+        // GeneralName_PR_x400Address, GeneralName_PR_directoryName, GeneralName_PR_ediPartyName, GeneralName_PR_iPAddress, GeneralName_PR_registeredID
+        CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(generalName->choice.iPAddress.buf, generalName->choice.iPAddress.size));
+        s_name = "[" + to_string((int)generalName->present - (int)GeneralName_PR_otherName) + "]";
+        DO_JSON(json_object_set_base64(joResult, s_name.c_str(), ba_value));
+        break;
+    }
+
+cleanup:
+    ba_free(ba_value);
+    ::free(s_value);
+    return ret;
+}
+
+int ExtensionHelper::DecodeToJsonObject::alternativeName (const ByteArray* baEncoded, JSON_Object* joResult)
+{
+    int ret = RET_OK;
+    //  typedef GeneralNames_t IssuerAltName_t;
+    //  typedef GeneralNames_t SubjectAltName_t;
+    GeneralNames_t* general_names = nullptr;
+    JSON_Array* ja_generalnames = nullptr;
+
+    CHECK_NOT_NULL(general_names = (GeneralNames_t*)asn_decode_ba_with_alloc(get_GeneralNames_desc(), baEncoded));
+
+    DO_JSON(json_object_set_value(joResult, "generalNames", json_value_init_array()));
+    ja_generalnames = json_object_get_array(joResult, "generalNames");
+
+    for (int i = 0; i < general_names->list.count; i++) {
+        DO_JSON(json_array_append_value(ja_generalnames, json_value_init_object()));
+        DO(decode_general_name_to_json(general_names->list.array[i], json_array_get_object(ja_generalnames, i)));
+    }
+
+cleanup:
+    asn_free(get_GeneralNames_desc(), general_names);
+    return ret;
+}
+
 int ExtensionHelper::DecodeToJsonObject::authorityKeyIdentifier (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId)
 {
     int ret = RET_OK;

@@ -50,13 +50,6 @@ using namespace std;
 using namespace ExtensionHelper;
 
 
-static const char* KEY_USAGE_TO_STR[9] = {
-    "digitalSignature", "nonRepudiation", "keyEncipherment", "dataEncipherment",
-    "keyAgreement", "keyCertSign", "crlSign", "encipherOnly", "decipherOnly"
-};
-
-
-
 int CerStoreUtils::detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
 {
     int ret = RET_OK;
@@ -139,7 +132,7 @@ cleanup:
     return json_object_get_object(jo_decoded, "value");
 }
 
-int CerStoreUtils::extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned)//a222
+int CerStoreUtils::extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned)
 {
     int ret = RET_OK;
     const Extensions_t* extns = cerStoreItem->cert->tbsCertificate.extensions;
@@ -201,6 +194,12 @@ int CerStoreUtils::extensionsToJson (JSON_Array* jaResult, const CerStore::Item*
         else if (oid_is_equal(s_extnid, OID_PKIX_SubjectInfoAccess)) {
             DO(DecodeToJsonObject::accessDescriptions(ba_value, extn_json_add_decoded(jo_extn, "subjectInfoAccess")));
         }
+        else if (oid_is_equal(s_extnid, OID_X509v3_SubjectAlternativeName)) {
+            DO(DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "subjectAltName")));
+        }
+        else if (oid_is_equal(s_extnid, OID_X509v3_IssuerAlternativeName)) {
+            DO(DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "issuerAltName")));
+        }
 
         ::free(s_extnid);
         s_extnid = nullptr;
@@ -217,47 +216,8 @@ cleanup:
     ba_free(ba_value);
     ::free(s_extnid);
     return ret;
-/*
-    //  Set authorityInfoAccess.ocsp
-    ret = extns_get_authority_infoaccess(extns, &str);
-    if (ret == RET_OK) {
-        DO_JSON(json_object_dotset_string(jo_extns, "authorityInfoAccess.ocsp", str));
-        ::free(str);
-        str = nullptr;
-    }
-
-    //  Set subjectInfoAccess.timeStamping
-    ret = extns_get_tsp_url(extns, &str);
-    if (ret == RET_OK) {
-        DO_JSON(json_object_dotset_string(jo_extns, "subjectInfoAccess.timeStamping", str));
-        ::free(str);
-        str = nullptr;
-    }
-
-    ret = RET_OK;
-
-cleanup:
-    //ba_free(ba_data);
-    //::free(str);
-    return ret;*/
 }
 
-int CerStoreUtils::keyUsageToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
-{
-    if (!cerStoreItem) return RET_UAPKI_GENERAL_ERROR;
-
-    int ret = RET_OK;
-    for (uint32_t i = 0; i < 9; i++) {
-        bool flag;
-        DO(cerStoreItem->keyUsageByBit(i, flag));
-        if (flag) {
-            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, KEY_USAGE_TO_STR[i], true));
-        }
-    }
-
-cleanup:
-    return ret;
-}
 
 int CerStoreUtils::nameToJson (JSON_Object* joResult, const Name_t& name)
 {

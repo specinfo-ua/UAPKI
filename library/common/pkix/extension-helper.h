@@ -34,6 +34,7 @@ namespace ExtensionHelper {
     namespace DecodeToJsonObject {
 
         int accessDescriptions          (const ByteArray* baEncoded, JSON_Object* joResult);
+        int alternativeName             (const ByteArray* baEncoded, JSON_Object* joResult);
         int authorityKeyIdentifier      (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId);
         int basicConstraints            (const ByteArray* baEncoded, JSON_Object* joResult);
         int certificatePolicies         (const ByteArray* baEncoded, JSON_Object* joResult);

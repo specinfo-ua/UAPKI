@@ -40,7 +40,6 @@ namespace CerStoreUtils {
 
     int detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
     int extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned);
-    int keyUsageToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
     int nameToJson (JSON_Object* joResult, const Name_t& name);
     int signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
     int spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded);
