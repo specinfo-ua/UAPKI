@@ -216,10 +216,9 @@ cleanup:
     return ret;
 }
 
-static int tsp_process (MessageImprintParams& msgimParams, TspRequestParams& tspParams, ByteArray** baTsToken)
+static int tsp_process (const LibraryConfig::TspParams& tspConfig, MessageImprintParams& msgimParams, TspRequestParams& tspParams, ByteArray** baTsToken)
 {
     int ret = RET_OK;
-    const LibraryConfig::TspParams& tsp_config = get_config()->getTsp();
     ByteArray* ba_req = nullptr;
     ByteArray* ba_resp = nullptr;
     ByteArray* ba_tstinfo = nullptr;
@@ -238,7 +237,7 @@ static int tsp_process (MessageImprintParams& msgimParams, TspRequestParams& tsp
     DO(tsp_request_encode(&msgimParams, &tspParams, &ba_req));
     DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, ba_req));
 
-    ret = HttpHelper::post(tsp_config.url.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, ba_req, &ba_resp);
+    ret = HttpHelper::post(tspConfig.url.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, ba_req, &ba_resp);
     if (ret != RET_OK) {
         SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
     }
@@ -286,6 +285,7 @@ cleanup:
 static int sattr_add_content_ts (SigningDoc& sdoc)
 {
     int ret = RET_OK;
+    const LibraryConfig::TspParams& tsp_config = get_config()->getTsp();
     MessageImprintParams msgim_params;
     TspRequestParams tsp_params;
     ByteArray* ba_tstoken = nullptr;
@@ -295,9 +295,9 @@ static int sattr_add_content_ts (SigningDoc& sdoc)
     msgim_params.hashedMessage = sdoc.baMessageDigest;
     CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
     tsp_params.certReq = false;
-    tsp_params.reqPolicy = nullptr;
+    tsp_params.reqPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
 
-    DO(tsp_process(msgim_params, tsp_params, &ba_tstoken));
+    DO(tsp_process(tsp_config, msgim_params, tsp_params, &ba_tstoken));
 
     docattr_add(OID_PKCS9_CONTENT_TIMESTAMP, ba_tstoken, sdoc.signedAttrs);
     ba_tstoken = nullptr;
@@ -310,6 +310,7 @@ cleanup:
 static int unsattr_add_signature_ts (SigningDoc& sdoc)
 {
     int ret = RET_OK;
+    const LibraryConfig::TspParams& tsp_config = get_config()->getTsp();
     MessageImprintParams msgim_params;
     TspRequestParams tsp_params;
     ByteArray* ba_hash = nullptr;
@@ -318,13 +319,13 @@ static int unsattr_add_signature_ts (SigningDoc& sdoc)
     DO(sdoc.digestSignature(&ba_hash));
 
     msgim_params.hashAlgo = sdoc.signParams->digestAlgo.c_str();
-    msgim_params.hashAlgoParam_isNULL = false;//reserved, get from settings
+    msgim_params.hashAlgoParam_isNULL = false;
     msgim_params.hashedMessage = ba_hash;
-    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));//now always nonce, get from settings
-    tsp_params.certReq = false;//reserved, get from settings
-    tsp_params.reqPolicy = nullptr;//reserved, get from settings
+    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
+    tsp_params.certReq = false;
+    tsp_params.reqPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
 
-    DO(tsp_process(msgim_params, tsp_params, &ba_tstoken));
+    DO(tsp_process(tsp_config, msgim_params, tsp_params, &ba_tstoken));
 
     docattr_add(OID_PKCS9_TIMESTAMP_TOKEN, ba_tstoken, sdoc.unsignedAttrs);
     ba_tstoken = nullptr;
