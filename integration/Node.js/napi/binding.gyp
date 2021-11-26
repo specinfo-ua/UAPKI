@@ -7,7 +7,7 @@
         "<!@(node -p \"require('node-addon-api').include\")"
       ],
       "target_name": "uapki",
-      "sources": [ "uapki.cc" ],
+      "sources": [ "uapki.cc", "uapki-loader.cpp" ],
       'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ]
     }
   ]

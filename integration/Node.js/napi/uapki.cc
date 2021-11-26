@@ -31,7 +31,7 @@
 #include "dl-macros.h"
 #include "uapki-loader.h"
 
-static const char* VERSION_ADDON = "1.0.0";
+static const char* VERSION_ADDON = "1.0.1";
 
 
 UapkiLoader uapki;
@@ -44,19 +44,28 @@ Napi::String Version (const Napi::CallbackInfo& info) {
 
 Napi::Boolean Load (const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    const bool rv = uapki.load();
+    std::string s_libname = "uapki";
+    if ((info.Length() > 0) && info[0].IsString()) {
+        Napi::String ns_param = info[0].As<Napi::String>();
+        s_libname = std::string(ns_param);
+    }
+    const bool rv = uapki.load(s_libname);
     return Napi::Boolean::New(env, rv);
 }   //  Load
 
 Napi::String Process(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
-    if (info.Length() < 1) throw Napi::TypeError::New(info.Env(), "Argument expected (string of JSON).");
+    if ((info.Length() < 1) || !info[0].IsString()) {
+        throw Napi::TypeError::New(info.Env(), "Argument expected (string of JSON).");
+    }
 
-    if (!uapki.isLoaded()) throw Napi::TypeError::New(info.Env(), "Library 'UAPKI' not loaded.");
+    if (!uapki.isLoaded()) {
+        throw Napi::TypeError::New(info.Env(), "Library 'UAPKI' not loaded.");
+    }
 
-    Napi::String ns_param = info[0].As<Napi::String>();
     std::string rv_s;
+    Napi::String ns_param = info[0].As<Napi::String>();
     std::string s_param = std::string(ns_param);
     char* s_resp = uapki.process(s_param.c_str());
     if (s_resp) {
