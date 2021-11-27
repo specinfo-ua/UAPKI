@@ -391,13 +391,20 @@ DEFINE_OID(OID_PKCS5_PBKDF2,            "1.2.840.113549.1.5.12");
 DEFINE_OID(OID_PKCS5_PBES2,             "1.2.840.113549.1.5.13");
 DEFINE_OID(OID_PBE_WITH_SHA1_TDES_CBC,  "1.2.840.113549.1.12.1.3");
 
-DEFINE_OID(OID_MEDOC_DIGEST,                "1.32.113549.1.7.1.524545");  // OID алгоритма хеширования MacData хранилища MEDOC PKCS12
-DEFINE_OID(OID_IIT_KEYSTORE,                "1.3.6.1.4.1.19398.1.1.1.2"); // OID хранилища закрытого ключа ИИТа KEY 6 DAT
-DEFINE_OID(OID_IIT_KEYSTORE_SIGN_KEYID,     "1.3.6.1.4.1.19398.1.1.2.1");
-DEFINE_OID(OID_IIT_KEYSTORE_KEP_SPKI,       "1.3.6.1.4.1.19398.1.1.2.2");
-DEFINE_OID(OID_IIT_KEYSTORE_KEP_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.2.3");
-DEFINE_OID(OID_IIT_KEYSTORE_KEP_KEYID,      "1.3.6.1.4.1.19398.1.1.2.5");
-DEFINE_OID(OID_IIT_KEYSTORE_KEP_ENC_KEYID,  "1.3.6.1.4.1.19398.1.1.2.6");
+//-----------------------------------------------------------------------------------------
+//MEDOC
+DEFINE_OID(OID_MEDOC_DIGEST,            "1.32.113549.1.7.1.524545");  // OID алгоритма хеширования MacData хранилища MEDOC PKCS12
+
+//-----------------------------------------------------------------------------------------
+//IIT
+DEFINE_OID(OID_IIT_KEYSTORE,                     "1.3.6.1.4.1.19398.1.1.1.2"); // OID хранилища закрытого ключа IIT Key-6.dat
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.1.5"); // RSA ключ ("почти" RSAPrivateKey из RFC 8017)
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_SIGN_KEYID,     "1.3.6.1.4.1.19398.1.1.2.1"); // Subject Key Identifier
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_SPKI,       "1.3.6.1.4.1.19398.1.1.2.2"); // Параметры KEP ключа
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.2.3"); // KEP ключ
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_KEYID,      "1.3.6.1.4.1.19398.1.1.2.5"); // KEP Subject Key Identifier
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_HMAC_GOST34311, "1.3.6.1.4.1.19398.1.1.2.6"); // sbox (64 byte), key (8 byte), hash (32 byte)
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_KEYID,      "1.3.6.1.4.1.19398.1.1.2.7"); // RSA Subject Key Identifier
 
 //-----------------------------------------------------------------------------------------
 //PKCS7

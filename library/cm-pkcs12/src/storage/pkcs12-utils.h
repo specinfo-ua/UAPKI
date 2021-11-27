@@ -51,7 +51,7 @@ int pkcs12_add_p7encrypteddata (AuthenticatedSafe_t * authentSafe, const ByteArr
 int pkcs12_gen_macdata (const char * password, const char * hash, const size_t iterations,
         const ByteArray * baData, MacData_t ** macData);
 int pkcs12_write_pfx (const ByteArray * baAuthsafe, const MacData_t * macData, ByteArray ** baEncoded);
-int pkcs12_get_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPrivkey);
+int pkcs12_iit_read_kep_key(const ByteArray* baPrivkey, ByteArray** baKepPrivkey);
 
 
 #ifdef __cplusplus

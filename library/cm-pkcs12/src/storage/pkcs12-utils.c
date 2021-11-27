@@ -390,7 +390,40 @@ cleanup:
     return ret;
 }
 
-int pkcs12_get_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPrivkey)
+static int os_swap_bits (OCTET_STRING_t* os)
+{
+    int ret = RET_OK;
+    uint8_t byte;
+    uint8_t swapped_byte;
+
+    CHECK_PARAM(os != NULL);
+
+    for (size_t i = 0; i < os->size; i++) {
+        byte = os->buf[i];
+        swapped_byte = 0;
+        for (uint8_t j = 0; j < 8; j++) {
+            swapped_byte |= ((byte >> j) & 0x01) << (7 - j);
+        }
+        os->buf[i] = swapped_byte;
+    }
+
+cleanup:
+    return ret;
+}
+
+static const Attribute_t* pkcs12_attrs_get_attr_by_oid(const Attributes_t* attrs, const char* oidType)
+{
+    if ((attrs != NULL) && (oidType != NULL)) {
+        for (int i = 0; i < attrs->list.count; i++) {
+            const Attribute_t* attr = attrs->list.array[i];
+            if (OID_is_equal_oid(&attr->type, oidType))
+                return attr;
+        }
+    }
+    return NULL;
+}
+
+int pkcs12_iit_read_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPrivkey)
 {
     int ret = RET_OK;
     PrivateKeyInfo_t* src_privkey = NULL;
@@ -399,32 +432,20 @@ int pkcs12_get_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPrivkey)
     DSTU4145Params_t* dstu4145_params = NULL;
     DSTUEllipticCurve_t* dstu_ecparam = NULL;
     BIT_STRING_t* bs_kep_privkey = NULL;
-    ByteArray* ba_kep_spki = NULL;
-    ByteArray* ba_kep_key = NULL;
+    const Attribute_t* attr = NULL;
 
     CHECK_PARAM(baPrivkey != NULL);
     CHECK_PARAM(baKepPrivkey != NULL);
 
     CHECK_NOT_NULL(src_privkey = (PrivateKeyInfo_t*)asn_decode_ba_with_alloc(get_PrivateKeyInfo_desc(), baPrivkey));
-    for (int i = 0; i < src_privkey->attributes->list.count; i++) {
-        const Attribute_t* attr = src_privkey->attributes->list.array[i];
-        CHECK_NOT_NULL(attr);
-        if (OID_is_equal_oid(&attr->type, OID_IIT_KEYSTORE_KEP_SPKI)) {
-            if (attr->value.list.count > 0) {
-                DO(asn_encode_ba(get_ANY_desc(), attr->value.list.array[0], &ba_kep_spki));
-            }
-        }
-        else if (OID_is_equal_oid(&attr->type, OID_IIT_KEYSTORE_KEP_PRIVKEY)) {
-            if (attr->value.list.count > 0) {
-                CHECK_NOT_NULL(bs_kep_privkey = asn_any2type(attr->value.list.array[0], get_BIT_STRING_desc()));
-                DO(asn_BITSTRING2ba(bs_kep_privkey, &ba_kep_key));
-                DO(ba_swap(ba_kep_key));
-            }
-        }
-    }
+
+    CHECK_NOT_NULL(attr = pkcs12_attrs_get_attr_by_oid(src_privkey->attributes, OID_IIT_KEYSTORE_ATTR_KEP_PRIVKEY));
+    CHECK_NOT_NULL(bs_kep_privkey = asn_any2type(attr->value.list.array[0], get_BIT_STRING_desc()));
+
+    CHECK_NOT_NULL(attr = pkcs12_attrs_get_attr_by_oid(src_privkey->attributes, OID_IIT_KEYSTORE_ATTR_KEP_SPKI));
+    CHECK_NOT_NULL(kep_dstu4145params = asn_any2type(attr->value.list.array[0], get_KepDSTU4145Params_desc()));
 
     ASN_ALLOC(dstu4145_params);
-    CHECK_NOT_NULL(kep_dstu4145params = asn_decode_ba_with_alloc(get_KepDSTU4145Params_desc(), ba_kep_spki));
     CHECK_NOT_NULL(dstu_ecparam = asn_any2type(&kep_dstu4145params->params, get_DSTUEllipticCurve_desc()));
     DO(asn_copy(get_DSTUEllipticCurve_desc(), dstu_ecparam, &dstu4145_params->ellipticCurve));
     CHECK_NOT_NULL(dstu4145_params->dke = asn_copy_with_alloc(get_OCTET_STRING_desc(), &kep_dstu4145params->kekDke));
@@ -444,9 +465,10 @@ int pkcs12_get_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPrivkey)
     }
 
     ASN_ALLOC(dst_privkey);
-    DO(asn_copy(get_OBJECT_IDENTIFIER_desc(), &src_privkey->privateKeyAlgorithm.algorithm, &dst_privkey->privateKeyAlgorithm.algorithm));   
-    DO(asn_create_any(get_DSTU4145Params_desc(), dstu4145_params, &dst_privkey->privateKeyAlgorithm.parameters));   
-    DO(asn_ba2OCTSTRING(ba_kep_key, &dst_privkey->privateKey));
+    DO(asn_copy(get_OBJECT_IDENTIFIER_desc(), &src_privkey->privateKeyAlgorithm.algorithm, &dst_privkey->privateKeyAlgorithm.algorithm));
+    DO(asn_create_any(get_DSTU4145Params_desc(), dstu4145_params, &dst_privkey->privateKeyAlgorithm.parameters));
+    DO(asn_bytes2OCTSTRING(&dst_privkey->privateKey, bs_kep_privkey->buf, bs_kep_privkey->size));
+    DO(os_swap_bits(&dst_privkey->privateKey));
 
     DO(asn_encode_ba(get_PrivateKeyInfo_desc(), dst_privkey, baKepPrivkey));
 
@@ -457,8 +479,7 @@ cleanup:
     asn_free(get_DSTU4145Params_desc(), dstu4145_params);
     asn_free(get_DSTUEllipticCurve_desc(), dstu_ecparam);
     asn_free(get_BIT_STRING_desc(), bs_kep_privkey);
-    ba_free(ba_kep_spki);
-    ba_free(ba_kep_key);
+
     return ret;
-}   //  pkcs12_get_kep_key
+}   //  pkcs12_iit_read_kep_key
 
