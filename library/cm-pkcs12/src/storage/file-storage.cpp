@@ -267,14 +267,18 @@ int FileStorage::decodeIit (const char* password)
     StoreBag* store_bag = nullptr;
 
     DO(pkcs8_decrypt(m_Buffer, password, &ba_privkeys[0], nullptr, nullptr));
-    DEBUG_OUTCON(printf("pkcs8_decrypt(iit), ba_privkey: ");ba_print(stdout, ba_privkeys[0]));
-
-    DO(pkcs12_get_kep_key(ba_privkeys[0], &ba_privkeys[1]));
+    DO(pkcs12_iit_read_kep_key(ba_privkeys[0], &ba_privkeys[1]));
 
     for (size_t i = 0; i < 2; i++) {
+        if (!ba_privkeys[i])
+            continue;
+
+        DEBUG_OUTCON(printf("pkcs8_decrypt(iit), ba_privkey[%d]: ", (int)i); ba_print(stdout, ba_privkeys[i]));
+
         CHECK_NOT_NULL(store_bag = new StoreBag());
         store_bag->setBagId(OID_PKCS12_P8_SHROUDED_KEY_BAG);
         store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkeys[i]);
+
         ba_privkeys[i] = nullptr;
         addBag(store_bag);
         store_bag = nullptr;
