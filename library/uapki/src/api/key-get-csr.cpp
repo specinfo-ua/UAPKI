@@ -204,8 +204,14 @@ int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
         (CM_BYTEARRAY*)ba_attributes,
         &cmba_csr
     );
-    if (ret == RET_UAPKI_NOT_SUPPORTED) {
+    switch (ret) {
+    case RET_OK:
+        break;
+    case RET_UAPKI_NOT_SUPPORTED:
         DO(build_csr(s_signalgo.c_str(), ba_signalgoparams, ba_subject, ba_attributes, &ba_csr));
+        break;
+    default:
+        SET_ERROR(ret);
     }
 
     DO_JSON(json_object_set_base64(jo_result, "bytes", (cmba_csr != NULL) ? (ByteArray*)cmba_csr : ba_csr));
