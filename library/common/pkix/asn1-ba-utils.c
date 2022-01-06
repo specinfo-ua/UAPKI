@@ -401,17 +401,17 @@ cleanup:
     return ret;
 }
 
-int ba_encode_bmpstring (const char* utf8, ByteArray** baEncoded)
+int ba_encode_bmpstring (const char* strUtf8, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     ByteArray* ba_utf16be = NULL;
     uint8_t* utf16 = NULL;
     size_t utf16_len = 0;
 
-    CHECK_PARAM(utf8 != NULL);
+    CHECK_PARAM(strUtf8 != NULL);
     CHECK_PARAM(baEncoded != NULL);
 
-    DO(utf8_to_utf16be(utf8, &utf16, &utf16_len));
+    DO(utf8_to_utf16be(strUtf8, &utf16, &utf16_len));
     CHECK_NOT_NULL(ba_utf16be = ba_alloc_from_uint8(utf16, utf16_len));
     DO(ba_encode_octetstring(ba_utf16be, baEncoded));
     DO(ba_set_byte(*baEncoded, 0, 0x1E));
@@ -419,6 +419,25 @@ int ba_encode_bmpstring (const char* utf8, ByteArray** baEncoded)
 cleanup:
     ba_free(ba_utf16be);
     free(utf16);
+    return ret;
+}
+
+int ba_encode_ia5string (const char* strLatin, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    IA5String_t* ia5_str = NULL;
+
+    CHECK_PARAM(strLatin != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC(ia5_str);
+    if (strLatin) {
+        DO(asn_bytes2OCTSTRING(ia5_str, (const uint8_t*)strLatin, strlen(strLatin)));
+    }
+    DO(asn_encode_ba(get_IA5String_desc(), ia5_str, baEncoded));
+
+cleanup:
+    asn_free(get_IA5String_desc(), ia5_str);
     return ret;
 }
 
@@ -521,6 +540,45 @@ cleanup:
     asn_free(get_UTCTime_desc(), utc_time);
     return ret;
 }
+
+int ba_encode_printablestring (const char* strLatin, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    PrintableString_t* printable_str = NULL;
+
+    CHECK_PARAM(strLatin != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC(printable_str);
+    if (strLatin) {
+        DO(asn_bytes2OCTSTRING(printable_str, (const uint8_t*)strLatin, strlen(strLatin)));
+    }
+    DO(asn_encode_ba(get_PrintableString_desc(), printable_str, baEncoded));
+
+cleanup:
+    asn_free(get_PrintableString_desc(), printable_str);
+    return ret;
+}
+
+int ba_encode_utf8string (const char* strUtf8, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    UTF8String_t* utf8_str = NULL;
+
+    CHECK_PARAM(strUtf8 != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC(utf8_str);
+    if (strUtf8) {
+        DO(asn_bytes2OCTSTRING(utf8_str, (const uint8_t*)strUtf8, strlen(strUtf8)));
+    }
+    DO(asn_encode_ba(get_UTF8String_desc(), utf8_str, baEncoded));
+
+cleanup:
+    asn_free(get_UTF8String_desc(), utf8_str);
+    return ret;
+}
+
 
 int uint8_to_str_with_alloc (const uint8_t* buf, const size_t len, char** str)
 {

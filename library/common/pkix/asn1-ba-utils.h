@@ -60,12 +60,15 @@ int ba_decode_oid (const ByteArray* baEncoded, char** oid);
 int ba_decode_pkixtime (const ByteArray* baEncoded, uint64_t* unixTime);
 int ba_decode_time (const ByteArray* baEncoded, uint64_t* unixTime, char** stime);
 
-int ba_encode_bmpstring (const char* utf8, ByteArray** baEncoded);
+int ba_encode_bmpstring (const char* strUtf8, ByteArray** baEncoded);
+int ba_encode_ia5string (const char* strLatin, ByteArray** baEncoded);
 int ba_encode_integer (const ByteArray* baData, ByteArray** baEncoded);
 int ba_encode_integer_int32 (const int32_t value, ByteArray** baEncoded);
 int ba_encode_octetstring (const ByteArray* baData, ByteArray** baEncoded);
 int ba_encode_oid (const char* oid, ByteArray** baEncoded);
 int ba_encode_pkixtime (const PKIXTime_PR frmTime, const uint64_t msTime, ByteArray** baEncoded);
+int ba_encode_printablestring (const char* strLatin, ByteArray** baEncoded);
+int ba_encode_utf8string (const char* strUtf8, ByteArray** baEncoded);
 
 int uint8_to_str_with_alloc (const uint8_t* buf, const size_t len, char** str);
 
