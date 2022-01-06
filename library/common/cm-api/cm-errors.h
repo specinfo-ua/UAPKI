@@ -87,6 +87,7 @@
 #define RET_CM_FILE_DELETE_ERROR                     (CM_ERROR_NAME_CODE | 0x00000033)
 #define RET_CM_DECODE_ASN1_ERROR                     (CM_ERROR_NAME_CODE | 0x00000034)
 #define RET_CM_ENCODE_ASN1_ERROR                     (CM_ERROR_NAME_CODE | 0x00000035)
+#define RET_CM_PASSWORD_NOT_SET                      (CM_ERROR_NAME_CODE | 0x00000036)
 
 
 #endif

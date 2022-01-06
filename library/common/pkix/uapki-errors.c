@@ -25,13 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-10-13
+//  Last update: 2021-12-28
 
 #include <stddef.h>
 
 #define COUNT_UAPKIC_ERRORS 34
 #define COUNT_ASN1_ERRORS   4
-#define COUNT_CM_ERRORS     54
+#define COUNT_CM_ERRORS     55
 #define COUNT_UAPKI_ERRORS  128
 #define OFFSET_ASN1_ERRORS  100
 
@@ -142,7 +142,8 @@ static const char* STR_CM_ERRORS[COUNT_CM_ERRORS] = {
     "FILE_WRITE_ERROR",             //  (CM_ERROR_NAME_CODE | 0x00000032)
     "FILE_DELETE_ERROR",            //  (CM_ERROR_NAME_CODE | 0x00000033)
     "DECODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0x00000034)
-    "ENCODE_ASN1_ERROR"             //  (CM_ERROR_NAME_CODE | 0X00000035)
+    "ENCODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0X00000035)
+    "PASSWORD_NOT_SET"              //  (CM_ERROR_NAME_CODE | 0x00000036)
 };
 
 static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {

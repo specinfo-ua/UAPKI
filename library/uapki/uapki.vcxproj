@@ -25,6 +25,7 @@
     <ClCompile Include="..\common\pkix\attribute-utils.c" />
     <ClCompile Include="..\common\pkix\ba-utils.c" />
     <ClCompile Include="..\common\pkix\content-info.c" />
+    <ClCompile Include="..\common\pkix\dstu-ns.cpp" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
     <ClCompile Include="..\common\pkix\extension-helper.cpp" />
     <ClCompile Include="..\common\pkix\extension-utils.c" />
@@ -95,6 +96,7 @@
     <ClInclude Include="..\common\pkix\ba-utils.h" />
     <ClInclude Include="..\common\pkix\common.h" />
     <ClInclude Include="..\common\pkix\content-info.h" />
+    <ClInclude Include="..\common\pkix\dstu-ns.h" />
     <ClInclude Include="..\common\pkix\dstu4145-params.h" />
     <ClInclude Include="..\common\pkix\extension-helper.h" />
     <ClInclude Include="..\common\pkix\extension-utils.h" />
