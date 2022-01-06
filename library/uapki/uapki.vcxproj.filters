@@ -219,6 +219,9 @@
     <ClCompile Include="..\common\pkix\dstu-ns.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\certreq-builder.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -345,6 +348,9 @@
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\dstu-ns.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\certreq-builder.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>

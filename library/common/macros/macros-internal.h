@@ -151,3 +151,17 @@
         goto cleanup;
 
 #endif
+
+/**
+ * У тілі функції обов'язково повинна бути
+ * int ret = RET_OK;
+ * ...
+ * cleanup:
+ * ...
+ * return ret;
+ */
+#define ASN_ALLOC_TYPE(obj, typ) ((obj) = (typ*) calloc(1, sizeof(typ)));   \
+    if ((obj) == NULL) { ret = RET_MEMORY_ALLOC_ERROR;                      \
+                         ERROR_CREATE(ret);                                 \
+                         goto cleanup; }
+

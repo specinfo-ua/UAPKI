@@ -27,6 +27,7 @@
 
 #include "api-json-internal.h"
 #include "asn1-ba-utils.h"
+#include "certreq-builder.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "uapkif.h"
@@ -35,125 +36,33 @@
 #define FILE_MARKER "api/key-get-csr.c"
 
 
-static int encode_csr_info (const ByteArray* baAidKey, const ByteArray* baPubkey,
-        const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsrInfo)
+static int build_csr (const UapkiNS::AlgorithmIdentifier& aidSignAlgo,
+                    const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr)
 {
     int ret = RET_OK;
-    const ByteArray* ref_ba;
-    INTEGER_t* version = NULL;
-    Name_t* subject = NULL;
-    RDNSequence_t* rdn_sequence = NULL;
-    CertificationRequestInfo_t* csr_info = NULL;
-    ByteArray* ba_pubkey = NULL;
-    char* s_keyalgo = NULL;
+    UapkiNS::CertReqBuilder certreq_builder;
+    UapkiNS::SmartBA sba_keyalgo, sba_pubkey, sba_signvalue;
+    //vector<UapkiNS::Extension> extns;
 
-    CHECK_PARAM(baAidKey != NULL);
-    CHECK_PARAM(baPubkey != NULL);
-    CHECK_PARAM(baCsrInfo != NULL);
+    DO(certreq_builder.init(1));
 
-    ASN_ALLOC_TYPE(csr_info, CertificationRequestInfo_t);
-    ASN_ALLOC_TYPE(rdn_sequence, RDNSequence_t);
+    DO(CmProviders::keyGetPublickey((CM_BYTEARRAY**)&sba_keyalgo, (CM_BYTEARRAY**)&sba_pubkey));//TODO: need use next-gen CmProvider (coming soon)
+    DO(certreq_builder.setSubjectPublicKeyInfo(sba_keyalgo.get(), sba_pubkey.get()));
 
-    // Set version
-    DO(asn_create_integer_from_long(0, &version));
-    DO(asn_copy(get_INTEGER_desc(), version, &csr_info->version));
+    //DO(certreq_builder.addExtensions(extns));
 
-    // Set subject
-    csr_info->subject.present = Name_PR_rdnSequence;
-    DO(asn_copy(get_RDNSequence_desc(), rdn_sequence, &csr_info->subject.choice.rdnSequence));
-    //TODO: if present baSubject
+    DO(certreq_builder.encodeTbs());
+    DO(CmProviders::keySignData(
+        (const CM_UTF8_CHAR*)aidSignAlgo.algorithm.c_str(),
+        (const CM_BYTEARRAY*)aidSignAlgo.baParameters,
+        (const CM_BYTEARRAY*)certreq_builder.getTbsEncoded(),
+        (CM_BYTEARRAY**)&sba_signvalue
+    ));//TODO: need use next-gen CmProvider (coming soon)
 
-    // Set subjectPKInfo
-    DO(asn_decode_ba(get_AlgorithmIdentifier_desc(), &csr_info->subjectPKInfo.algorithm, baAidKey));
-    DO(asn_oid_to_text(&csr_info->subjectPKInfo.algorithm.algorithm, &s_keyalgo));
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_keyalgo)
-     || oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_keyalgo)) {
-        DO(ba_encode_octetstring(baPubkey, &ba_pubkey));
-        ref_ba = ba_pubkey;
-    }
-    else {
-        ref_ba = baPubkey;
-    }
-
-    DO(asn_ba2BITSTRING(ref_ba, &csr_info->subjectPKInfo.subjectPublicKey));
-
-    //  Set attributes
-    //TODO: if present baAttributes csr_info->attributes
-
-    DO(asn_encode_ba(get_CertificationRequestInfo_desc(), csr_info, baCsrInfo));
+    DO(certreq_builder.encodeCertRequest(aidSignAlgo, sba_signvalue.get()));
+    *baCsr = certreq_builder.getCsrEncoded(true);
 
 cleanup:
-    asn_free(get_CertificationRequestInfo_desc(), csr_info);
-    asn_free(get_RDNSequence_desc(), rdn_sequence);
-    asn_free(get_Name_desc(), subject);
-    asn_free(get_INTEGER_desc(), version);
-    ba_free(ba_pubkey);
-    free(s_keyalgo);
-    return ret;
-}
-
-static int encode_csr (const ByteArray* baCsrInfo, const char* signAlgo, const ByteArray* baSignAlgoParams,
-        const ByteArray* baSignature, ByteArray** baCsr)
-{
-    int ret = RET_OK;
-    const ByteArray* ref_ba;
-    X509Tbs_t* x509_csr = NULL;
-    ByteArray* ba_signvalue = NULL;
-
-    CHECK_PARAM(baCsrInfo != NULL);
-    CHECK_PARAM(signAlgo != NULL);
-    CHECK_PARAM(baSignature != NULL);
-    CHECK_PARAM(baCsr != NULL);
-
-    ASN_ALLOC_TYPE(x509_csr, X509Tbs_t);
-
-    //  Set certificationRequestInfo
-    DO(asn_ba2OCTSTRING(baCsrInfo, (OCTET_STRING_t*)&x509_csr->tbsData));
-
-    //  Set signatureAlgorithm
-    DO(asn_set_oid_from_text(signAlgo, &x509_csr->signAlgo.algorithm));
-    if (baSignAlgoParams) {
-        CHECK_NOT_NULL(x509_csr->signAlgo.parameters = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baSignAlgoParams));
-    }
-
-    //  Set signature
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, signAlgo)
-     || oid_is_parent(OID_DSTU4145_WITH_GOST3411, signAlgo)) {
-        DO(ba_encode_octetstring(baSignature, &ba_signvalue));
-        ref_ba = ba_signvalue;
-    }
-    else {
-        ref_ba = baSignature;
-    }
-    DO(asn_ba2BITSTRING(ref_ba, &x509_csr->signValue));
-
-    DO(asn_encode_ba(get_X509Tbs_desc(), x509_csr, baCsr));
-
-cleanup:
-    asn_free(get_X509Tbs_desc(), x509_csr);
-    ba_free(ba_signvalue);
-    return ret;
-}
-
-static int build_csr (const char* signAlgo, const ByteArray* baSignAlgoParams,
-        const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr)
-{
-    int ret = RET_OK;
-    CM_BYTEARRAY* cmba_pubkey = NULL;
-    CM_BYTEARRAY* cmba_signature = NULL;
-    ByteArray* ba_aidkey = NULL;
-    ByteArray* ba_encoded = NULL;
-
-    DO(CmProviders::keyGetPublickey((CM_BYTEARRAY**)&ba_aidkey, &cmba_pubkey));
-    DO(encode_csr_info(ba_aidkey, (ByteArray*)cmba_pubkey, baSubject, baAttributes, &ba_encoded));
-    DO(CmProviders::keySignData((const CM_UTF8_CHAR*)signAlgo, (const CM_BYTEARRAY*)baSignAlgoParams, (const CM_BYTEARRAY*)ba_encoded, &cmba_signature));
-    DO(encode_csr(ba_encoded, signAlgo, baSignAlgoParams, (ByteArray*)cmba_signature, baCsr));
-
-cleanup:
-    CmProviders::baFree(cmba_pubkey);
-    CmProviders::baFree(cmba_signature);
-    ba_free(ba_aidkey);
-    ba_free(ba_encoded);
     return ret;
 }
 
@@ -179,48 +88,42 @@ static int get_default_signalgo (string& signAlgo)
 int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
 {
     int ret = RET_OK;
-    CM_BYTEARRAY* cmba_csr = NULL;
-    ByteArray* ba_csr = NULL;
-    ByteArray* ba_subject = NULL;
-    ByteArray* ba_attributes = NULL;
-    ByteArray* ba_signalgoparams = NULL;
-    string s_signalgo;
+    CM_BYTEARRAY* cmba_csr = NULL;//TODO: deprecated, waiting next-gen CmProvider (coming soon)
+    UapkiNS::AlgorithmIdentifier aid_signalgo;
+    UapkiNS::SmartBA sba_attrs, sba_csr, sba_subject;
+    UapkiNS::CertReqBuilder certreq_builder;
 
     if (jo_parameters) {
-        s_signalgo = ParsonHelper::jsonObjectGetString(jo_parameters, "signAlgo");
-        ba_signalgoparams = json_object_get_base64(jo_parameters, "signAlgoParams");
-        ba_subject = json_object_get_base64(jo_parameters, "subject");
-        ba_attributes = json_object_get_base64(jo_parameters, "attributes");
+        aid_signalgo.algorithm = ParsonHelper::jsonObjectGetString(jo_parameters, "signAlgo");
+        aid_signalgo.baParameters = json_object_get_base64(jo_parameters, "signAlgoParams");
+        sba_subject.set(json_object_get_base64(jo_parameters, "subject"));
+        sba_attrs.set(json_object_get_base64(jo_parameters, "attributes"));
     }
 
-    if (s_signalgo.empty()) {
-        DO(get_default_signalgo(s_signalgo));
+    if (!aid_signalgo.isPresent()) {
+        DO(get_default_signalgo(aid_signalgo.algorithm));
     }
 
     ret = CmProviders::keyGetCsr(
-        (const CM_UTF8_CHAR*)s_signalgo.c_str(),
-        (CM_BYTEARRAY*)ba_signalgoparams,
-        (CM_BYTEARRAY*)ba_subject,
-        (CM_BYTEARRAY*)ba_attributes,
+        (const CM_UTF8_CHAR*)aid_signalgo.algorithm.c_str(),
+        (CM_BYTEARRAY*)aid_signalgo.baParameters,
+        (CM_BYTEARRAY*)sba_subject.get(),
+        (CM_BYTEARRAY*)sba_attrs.get(),
         &cmba_csr
     );
     switch (ret) {
     case RET_OK:
         break;
     case RET_UAPKI_NOT_SUPPORTED:
-        DO(build_csr(s_signalgo.c_str(), ba_signalgoparams, ba_subject, ba_attributes, &ba_csr));
+        DO(build_csr(aid_signalgo, sba_subject.get(), sba_attrs.get(), &sba_csr));
         break;
     default:
         SET_ERROR(ret);
     }
 
-    DO_JSON(json_object_set_base64(jo_result, "bytes", (cmba_csr != NULL) ? (ByteArray*)cmba_csr : ba_csr));
+    DO_JSON(json_object_set_base64(jo_result, "bytes", (cmba_csr != NULL) ? (ByteArray*)cmba_csr : sba_csr.get()));
 
 cleanup:
     CmProviders::baFree(cmba_csr);
-    ba_free(ba_csr);
-    ba_free(ba_subject);
-    ba_free(ba_attributes);
-    ba_free(ba_signalgoparams);
     return ret;
 }

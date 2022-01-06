@@ -37,6 +37,7 @@
 #include "parson-ba-utils.h"
 #include "uapki-errors.h"
 #include "uapki-export.h"
+#include "uapki-ns.h"
 #include <string.h>
 
 

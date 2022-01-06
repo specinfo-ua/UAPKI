@@ -24,6 +24,7 @@
     <ClCompile Include="..\common\pkix\asn1-ba-utils.c" />
     <ClCompile Include="..\common\pkix\attribute-utils.c" />
     <ClCompile Include="..\common\pkix\ba-utils.c" />
+    <ClCompile Include="..\common\pkix\certreq-builder.cpp" />
     <ClCompile Include="..\common\pkix\content-info.c" />
     <ClCompile Include="..\common\pkix\dstu-ns.cpp" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
@@ -94,6 +95,7 @@
     <ClInclude Include="..\common\pkix\asn1-ba-utils.h" />
     <ClInclude Include="..\common\pkix\attribute-utils.h" />
     <ClInclude Include="..\common\pkix\ba-utils.h" />
+    <ClInclude Include="..\common\pkix\certreq-builder.h" />
     <ClInclude Include="..\common\pkix\common.h" />
     <ClInclude Include="..\common\pkix\content-info.h" />
     <ClInclude Include="..\common\pkix\dstu-ns.h" />
