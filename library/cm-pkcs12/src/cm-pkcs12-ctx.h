@@ -32,6 +32,7 @@
 #include <string>
 #include "cm-api.h"
 #include "file-storage.h"
+#include "uapki-ns.h"
 #include "uapkic.h"
 
 
@@ -45,8 +46,8 @@ struct SessionPkcs12Context {
     StoreBag*   activeBag;
     HashCtx*    ctxHash;
     HashAlg     hashAlgo;
-    string      signAlgo;
-    ByteArray*  signAlgoParam;
+    UapkiNS::AlgorithmIdentifier
+                aidSignAlgo;
 
     SessionPkcs12Context (void);
     ~SessionPkcs12Context (void);

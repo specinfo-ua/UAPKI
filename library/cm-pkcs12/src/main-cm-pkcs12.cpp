@@ -38,9 +38,9 @@
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS12\","                               //  required
     "\"apiVersion\": \"1.0.0\","                        //  required
-    "\"libVersion\": \"1.0.0\","                        //  required
+    "\"libVersion\": \"1.0.1\","                        //  required
     "\"description\": \"PKCS12-provider\","             //  required
-    "\"manufacturer\": \"2021 SPECINFOSYSTEMS LLC\","   //  required
+    "\"manufacturer\": \"2022 SPECINFOSYSTEMS LLC\","   //  required
     "\"supportListStorages\": false,"                   //  optional
     "\"flags\": 0"                                      //  optional
 "}";

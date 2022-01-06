@@ -96,13 +96,8 @@ static CM_ERROR cm_session_logout (CM_SESSION_API* session)
     SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
-    //TODO
-    //if (ctx_ss->storage) {
-    //    ctx_ss->selectedKey.unselect();
-    //    storage_free(ctx_ss->storage);
-    //    ctx_ss->storage = nullptr;
-    //}
-
+    ss_ctx->fileStorage.selectKey(nullptr);
+    //TODO: fileStorage.reset()
     return RET_OK;
 }   //  cm_session_logout
 
@@ -123,7 +118,7 @@ static CM_ERROR cm_session_list_keys (CM_SESSION_API* session,
     if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
 
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON( printf("cm_session_list_keys(), count keys: %d\n", (int)list_keys.size()); )
+    DEBUG_OUTCON(printf("cm_session_list_keys(), count keys: %d\n", (int)list_keys.size()));
 
     if (list_keys.empty()) return RET_OK;
 
@@ -182,7 +177,7 @@ static CM_ERROR cm_session_select_key (CM_SESSION_API* session,
 
     storage.selectKey(nullptr);
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON( printf("cm_session_select_key(), count keys: %d\n", (int)list_keys.size()); )
+    DEBUG_OUTCON(printf("cm_session_select_key(), count keys: %d\n", (int)list_keys.size()));
     for (size_t i = 0; i < list_keys.size(); i++) {
         if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
             storage.selectKey(list_keys[i]);
@@ -231,9 +226,9 @@ static CM_ERROR cm_session_get_certificates (CM_SESSION_API* session,
     if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
 
     vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-    DEBUG_OUTCON(printf("cm_session_get_certificates(), count certs: %d\n", (int)list_certs.size()); )
+    DEBUG_OUTCON(printf("cm_session_get_certificates(), count certs: %d\n", (int)list_certs.size()));
 
-        ByteArray** aba_certs = (ByteArray**)calloc(list_certs.size(), sizeof(ByteArray*));
+    ByteArray** aba_certs = (ByteArray**)calloc(list_certs.size(), sizeof(ByteArray*));
     if (!aba_certs) return RET_CM_GENERAL_ERROR;
 
     for (size_t i = 0; i < list_certs.size(); i++) {
@@ -311,7 +306,7 @@ static CM_ERROR cm_session_delete_certificate (CM_SESSION_API* session,
 
     bool flag_found = false;
     vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-    DEBUG_OUTCON( printf("cm_session_delete_certificate(), count certs: %d\n", (int)list_certs.size()); )
+    DEBUG_OUTCON(printf("cm_session_delete_certificate(), count certs: %d\n", (int)list_certs.size()));
     for (size_t i = 0; i < list_certs.size(); i++) {
         ByteArray *ba_keyid = nullptr;
         int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
@@ -405,7 +400,7 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
 
     StoreBag* bag_to_del = nullptr;
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON( printf("cm_session_delete_key(), count keys: %d\n", (int)list_keys.size()); )
+    DEBUG_OUTCON(printf("cm_session_delete_key(), count keys: %d\n", (int)list_keys.size()));
     for (size_t i = 0; i < list_keys.size(); i++) {
         if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
             bag_to_del = list_keys[i];
@@ -422,7 +417,7 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
 
     if (deleteRelatedObjects) {
         vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-        DEBUG_OUTCON( printf("cm_session_delete_key(), count certs: %d\n", (int)list_certs.size()); )
+        DEBUG_OUTCON(printf("cm_session_delete_key(), count certs: %d\n", (int)list_certs.size()));
         for (size_t i = 0; i < list_certs.size(); i++) {
             ByteArray *ba_keyid = nullptr;
             int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
@@ -437,7 +432,8 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
     return ret;
 }   //  cm_session_delete_key
 
-static CM_ERROR cm_session_change_password (CM_SESSION_API* session, const CM_UTF8_CHAR* newPassword)
+static CM_ERROR cm_session_change_password (CM_SESSION_API* session,
+                    const CM_UTF8_CHAR* newPassword)
 {
     DEBUG_OUTCON(puts("cm_session_change_password()"));
     if (!session) return RET_CM_NO_SESSION;

@@ -105,6 +105,9 @@
     <ClInclude Include="..\common\pkix\dstu4145-params.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\pkix\uapki-ns.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\crypto\pkcs5.c">

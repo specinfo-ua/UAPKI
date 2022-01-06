@@ -39,15 +39,14 @@ SessionPkcs12Context::SessionPkcs12Context (void)
     : activeBag(nullptr)
     , ctxHash(nullptr)
     , hashAlgo(HASH_ALG_UNDEFINED)
-    , signAlgoParam(nullptr)
 {
-    DEBUG_OUTCON( printf("SessionPkcs12Context::SessionPkcs12Context()\n"); )
+    DEBUG_OUTCON(puts("SessionPkcs12Context::SessionPkcs12Context()"));
     memset(&keyApi, 0, sizeof(CM_KEY_API));
 }
 
 SessionPkcs12Context::~SessionPkcs12Context (void)
 {
-    DEBUG_OUTCON( printf("SessionPkcs12Context::~SessionPkcs12Context()\n"); )
+    DEBUG_OUTCON(puts("SessionPkcs12Context::~SessionPkcs12Context()"));
     resetSignLong();
 }
 
@@ -59,7 +58,5 @@ void SessionPkcs12Context::resetSignLong (void)
         ctxHash = nullptr;
     }
     hashAlgo = HASH_ALG_UNDEFINED;
-    signAlgo.clear();
-    ba_free(signAlgoParam);
-    signAlgoParam = nullptr;
+    aidSignAlgo.clear();
 }

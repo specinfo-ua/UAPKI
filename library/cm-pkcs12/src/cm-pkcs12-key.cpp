@@ -146,8 +146,8 @@ static CM_ERROR cm_key_sign_init (CM_SESSION_API* session,
     if (!ss_ctx->ctxHash) return RET_UNSUPPORTED;
 
     ss_ctx->hashAlgo = hash_algo;
-    ss_ctx->signAlgo = string((const char*)signAlgo);
-    ss_ctx->signAlgoParam = ba_copy_with_alloc((const ByteArray*) baSignAlgoParams, 0, 0);
+    ss_ctx->aidSignAlgo.algorithm = string((const char*)signAlgo);
+    ss_ctx->aidSignAlgo.baParameters = ba_copy_with_alloc((const ByteArray*) baSignAlgoParams, 0, 0);
     ss_ctx->activeBag = selected_key;
     return RET_OK;
 }   //  cm_key_sign_init
@@ -190,8 +190,13 @@ static CM_ERROR cm_key_sign_final (CM_SESSION_API* session, CM_BYTEARRAY** baSig
     int ret = hash_final(ss_ctx->ctxHash, &ba_hash);
     if (ret == RET_OK) {
         DEBUG_OUTCON(printf("cm_key_sign_final(), ba_hash: "); ba_print(stdout, ba_hash));
-        ret = private_key_sign_single(ss_ctx->activeBag->bagValue(), (const char*)ss_ctx->signAlgo.c_str(), ss_ctx->signAlgoParam,
-            ba_hash, (ByteArray**) baSignature);
+        ret = private_key_sign_single(
+            ss_ctx->activeBag->bagValue(),
+            (const char*)ss_ctx->aidSignAlgo.algorithm.c_str(),
+            ss_ctx->aidSignAlgo.baParameters,
+            ba_hash,
+            (ByteArray**) baSignature
+        );
         ba_free(ba_hash);
     }
     ss_ctx->resetSignLong();
