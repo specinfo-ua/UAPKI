@@ -27,7 +27,6 @@
 
 #include "api-json-internal.h"
 #include "cm-loader.h"
-#include "dl-macros.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include <string>
@@ -84,11 +83,6 @@ static struct {
 } lib_cmproviders;
 
 
-static string build_libpath (const string& dir, const string& name)
-{
-    return dir + string(LIBNAME_PREFIX) + name + string(".") + string(LIBNAME_EXT);
-}   //  build_libpath
-
 static int get_providerid_from_info (CmLoader& provider, string& id)
 {
     int ret = RET_OK;
@@ -111,12 +105,11 @@ cleanup:
 int CmProviders::loadProvider (const string& dir, const string& libName, const char* jsonParams)
 {
     int ret = RET_OK;
-    const string s_path = build_libpath(dir, libName);
     CmLoader* cmloader = new CmLoader();
     if (!cmloader) return RET_UAPKI_GENERAL_ERROR;
 
-    DEBUG_OUTCON(printf("CmProviders::loadProvider(), path: '%s'\n", s_path.c_str()));
-    if (cmloader->load(s_path.c_str())) {
+    DEBUG_OUTCON(printf("CmProviders::loadProvider(name: '%s', dir: '%s')\n", libName.c_str(), dir.c_str()));
+    if (cmloader->load(libName, dir)) {
         string s_id;
         const CM_ERROR cm_err = cmloader->init((CM_JSON_PCHAR)jsonParams);
         DEBUG_OUTCON(printf("cmloader->init(), cm_err: %d\n", cm_err));

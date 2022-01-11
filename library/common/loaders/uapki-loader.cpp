@@ -26,15 +26,24 @@
  */
 
 #include "uapki-loader.h"
+#include <stdio.h>
+
+
+#define DEBUG_OUTCON(expression)
+#ifndef DEBUG_OUTCON
+#define DEBUG_OUTCON(expression) expression
+#endif
 
 
 UapkiLoader::UapkiLoader (void)
     : m_HandleDLib(nullptr), m_Process(nullptr), m_JsonFree(nullptr)
 {
+    DEBUG_OUTCON(puts("UapkiLoader::UapkiLoader"));
 }
 
 UapkiLoader::~UapkiLoader (void)
 {
+    DEBUG_OUTCON(puts("UapkiLoader::~UapkiLoader"));
     unload();
 }
 
@@ -49,16 +58,23 @@ bool UapkiLoader::load (const string& libName)
 
     bool ok = false;
     const string lib_name = getLibName(libName);
+    DEBUG_OUTCON(printf("UapkiLoader.load('%s'), lib_name: '%s'\n", libName.c_str(), lib_name.c_str()));
+
     m_HandleDLib = DL_LOAD_LIBRARY(lib_name.c_str());
+    DEBUG_OUTCON(printf("UapkiLoader.load(), m_HandleDLib: %p\n", m_HandleDLib));
+
     if (m_HandleDLib) {
         m_Process = (f_process)DL_GET_PROC_ADDRESS(m_HandleDLib, "process");
         m_JsonFree = (f_json_free)DL_GET_PROC_ADDRESS(m_HandleDLib, "json_free");
+        DEBUG_OUTCON(printf("UapkiLoader.load(), m_Process: %p\n", m_Process));
+
         ok = (m_Process && m_JsonFree);
         if (!ok) {
             unload();
         }
     }
 
+    DEBUG_OUTCON(printf("UapkiLoader.load(), ok: %d\n", ok));
     return ok;
 }
 

@@ -25,27 +25,46 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
+
 #include "cm-loader.h"
-#include "dl-macros.h"
+#include <stdio.h>
+#include <string.h>
+
+
+#define DEBUG_OUTCON(expression)
+#ifndef DEBUG_OUTCON
+#define DEBUG_OUTCON(expression) expression
+#endif
 
 
 CmLoader::CmLoader (void)
 {
+    DEBUG_OUTCON(puts("CmLoader::CmLoader"));
     memset(&m_Api, 0, sizeof(CM_PROVIDER_API));
 }
 
 CmLoader::~CmLoader (void)
 {
+    DEBUG_OUTCON(puts("CmLoader::~CmLoader"));
     unload();
 }
 
-bool CmLoader::load (const char* path)
+string CmLoader::getLibName (const string& libName)
 {
-    bool ok = false;
+    return string(LIBNAME_PREFIX) + libName + "." + string(LIBNAME_EXT);
+}
+
+bool CmLoader::load (const string& libName, const string& dir)
+{
     unload();
 
-    m_Api.hlib = DL_LOAD_LIBRARY(path);
+    bool ok = false;
+    const string lib_name = dir + getLibName(libName);
+    DEBUG_OUTCON(printf("CmLoader.load('%s'), lib_name: '%s'\n", libName.c_str(), lib_name.c_str()));
+
+    m_Api.hlib = DL_LOAD_LIBRARY(lib_name.c_str());
+    DEBUG_OUTCON(printf("CmLoader.load(), m_Api.hlib: %p\n", m_Api.hlib));
+
     if (m_Api.hlib) {
         m_Api.info              = (cm_provider_info_f)          DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_info");          //  required API
         m_Api.init              = (cm_provider_init_f)          DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_init");          //  required API
@@ -57,6 +76,8 @@ bool CmLoader::load (const char* path)
         m_Api.format            = (cm_provider_format_f)        DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_format");        //  optional API
         m_Api.block_free        = (cm_block_free_f)             DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "block_free");             //  required API
         m_Api.bytearray_free    = (cm_bytearray_free_f)         DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "bytearray_free");         //  required API
+        DEBUG_OUTCON(printf("CmLoader.load(), m_Api.info: %p\n", m_Api.info));
+
         ok = (m_Api.info && m_Api.init && m_Api.deinit && m_Api.open && m_Api.close
             && m_Api.block_free && m_Api.bytearray_free);
         if (!ok) {
@@ -64,6 +85,7 @@ bool CmLoader::load (const char* path)
         }
     }
 
+    DEBUG_OUTCON(printf("CmLoader.load(), ok: %d\n", ok));
     return ok;
 }
 
@@ -125,4 +147,3 @@ void CmLoader::baFree (CM_BYTEARRAY* ba)
 {
     if (m_Api.bytearray_free) m_Api.bytearray_free(ba);
 }
-

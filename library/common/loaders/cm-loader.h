@@ -29,8 +29,16 @@
 #define CM_LOADER_H
 
 
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string>
 #include "cm-api.h"
 #include "cm-errors.h"
+#include "dl-macros.h"
+
+
+using namespace std;
 
 
 class CmLoader
@@ -41,7 +49,11 @@ public:
     CmLoader (void);
     ~CmLoader (void);
 
-    bool load (const char* path);
+    static string getLibName (const string& libName);
+
+    HANDLE_DLIB getHandle (void) const { return (HANDLE_DLIB)m_Api.hlib; }
+    bool isLoaded (void) const { return (m_Api.hlib != nullptr); }
+    bool load (const string& libName, const string& dir = string());
     void unload (void);
 
     const CM_PROVIDER_API* getApi (void) const { return &m_Api; }
