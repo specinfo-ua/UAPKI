@@ -189,7 +189,7 @@
     <ClCompile Include="src\api\session-list-keys.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
-    <ClCompile Include="src\api\session_select_key.cpp">
+    <ClCompile Include="src\api\session-select-key.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
     <ClCompile Include="src\api\sign.cpp">
@@ -221,6 +221,9 @@
     </ClCompile>
     <ClCompile Include="..\common\pkix\certreq-builder.cpp">
       <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cm-storage-proxy.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -352,6 +355,9 @@
     </ClInclude>
     <ClInclude Include="..\common\pkix\certreq-builder.h">
       <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cm-storage-proxy.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

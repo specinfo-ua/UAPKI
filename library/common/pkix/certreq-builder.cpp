@@ -1,5 +1,29 @@
-//  Last update: 2022-01-06
-
+/*
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "certreq-builder.h"
 #include "asn1-ba-utils.h"
@@ -165,12 +189,12 @@ int CertReqBuilder::encodeTbs (void)
     return asn_encode_ba(get_CertificationRequestInfo_desc(), m_TbsCsrInfo, &m_BaTbsEncoded);
 }
 
-int CertReqBuilder::encodeCertRequest (const UapkiNS::AlgorithmIdentifier& aidSignature, const ByteArray* baSignature)
+int CertReqBuilder::encodeCertRequest (const char* signAlgo, const ByteArray* baSignAlgoParam, const ByteArray* baSignature)
 {
     int ret = RET_OK;
     X509Tbs_t* csr = nullptr;
 
-    if (!m_BaTbsEncoded || !aidSignature.isPresent() || !baSignature) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_BaTbsEncoded || !signAlgo || !baSignature) return RET_UAPKI_INVALID_PARAMETER;
 
     ASN_ALLOC_TYPE(csr, X509Tbs);
 
@@ -178,14 +202,14 @@ int CertReqBuilder::encodeCertRequest (const UapkiNS::AlgorithmIdentifier& aidSi
     DO(asn_decode_ba(get_ANY_desc(), &csr->tbsData, m_BaTbsEncoded));
 
     //  Set signature(algorithm,parameters)
-    DO(asn_set_oid_from_text(aidSignature.algorithm.c_str(), &csr->signAlgo.algorithm));
-    if (aidSignature.baParameters) {
+    DO(asn_set_oid_from_text(signAlgo, &csr->signAlgo.algorithm));
+    if (baSignAlgoParam) {
         CHECK_NOT_NULL(csr->signAlgo.parameters =
-            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), aidSignature.baParameters));
+            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baSignAlgoParam));
     }
 
     //  Set signature(value)
-    if (DstuNS::isDstu4145family(aidSignature.algorithm.c_str())) {
+    if (DstuNS::isDstu4145family(signAlgo)) {
         DO(DstuNS::ba2BitStringEncapOctet(baSignature, &csr->signValue));
     }
     else {
@@ -198,6 +222,13 @@ int CertReqBuilder::encodeCertRequest (const UapkiNS::AlgorithmIdentifier& aidSi
 cleanup:
     asn_free(get_X509Tbs_desc(), csr);
     return ret;
+}
+
+int CertReqBuilder::encodeCertRequest (const UapkiNS::AlgorithmIdentifier& aidSignature, const ByteArray* baSignature)
+{
+    if (!aidSignature.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
+    return encodeCertRequest(aidSignature.algorithm.c_str(), aidSignature.baParameters, baSignature);
 }
 
 ByteArray* CertReqBuilder::getCsrEncoded (const bool move)

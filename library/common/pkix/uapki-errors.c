@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-12-28
+//  Last update: 2022-01-18
 
 #include <stddef.h>
 
@@ -172,9 +172,9 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "NOT_SUPPORTED",            //  (UAPKI_ERROR_NAME_CODE | 0x00000016)
     "NOT_ALLOWED",              //  (UAPKI_ERROR_NAME_CODE | 0x00000017)
     "OFFLINE_MODE",             //  (UAPKI_ERROR_NAME_CODE | 0x00000018)
-    "",
-    "",
-    "",
+    "STORAGE_NOT_OPEN",         //  (UAPKI_ERROR_NAME_CODE | 0x00000019)
+    "PROVIDER_NOT_LOADED",      //  (UAPKI_ERROR_NAME_CODE | 0x0000001A)
+    "UNSUPPORTED_CM_API",       //  (UAPKI_ERROR_NAME_CODE | 0x0000001B)
     "",
     "",
     "",

@@ -69,8 +69,9 @@
     <ClCompile Include="src\api\storage-close.cpp" />
     <ClCompile Include="src\api\session-list-keys.cpp" />
     <ClCompile Include="src\api\storage-open.cpp" />
-    <ClCompile Include="src\api\session_select_key.cpp" />
+    <ClCompile Include="src\api\session-select-key.cpp" />
     <ClCompile Include="src\api\verify.cpp" />
+    <ClCompile Include="src\cm-storage-proxy.cpp" />
     <ClCompile Include="src\global-objects.cpp" />
     <ClCompile Include="src\store-utils.cpp" />
     <ClCompile Include="src\cer-store.cpp" />
@@ -115,6 +116,7 @@
     <ClInclude Include="..\common\json\parson.h" />
     <ClInclude Include="include\uapki-export.h" />
     <ClInclude Include="src\api\api-json-internal.h" />
+    <ClInclude Include="src\cm-storage-proxy.h" />
     <ClInclude Include="src\library-config.h" />
     <ClInclude Include="src\store-utils.h" />
     <ClInclude Include="src\cer-store.h" />

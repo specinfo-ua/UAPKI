@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -80,6 +80,11 @@
 #define RET_UAPKI_NOT_ALLOWED                                         (UAPKI_ERROR_NAME_CODE | 0x00000017)
 
 #define RET_UAPKI_OFFLINE_MODE                                        (UAPKI_ERROR_NAME_CODE | 0x00000018)
+
+#define RET_UAPKI_STORAGE_NOT_OPEN                                    (UAPKI_ERROR_NAME_CODE | 0x00000019)
+
+#define RET_UAPKI_PROVIDER_NOT_LOADED                                 (UAPKI_ERROR_NAME_CODE | 0x0000001A)
+#define RET_UAPKI_UNSUPPORTED_CMAPI                                   (UAPKI_ERROR_NAME_CODE | 0x0000001B)
 
 
 #define RET_UAPKI_FILE_OPEN_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000020)

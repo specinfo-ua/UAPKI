@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -61,12 +61,12 @@ typedef struct CM_BYTEARRAY {
 typedef CM_ERROR (*cm_provider_info_f) (CM_JSON_PCHAR* providerInfo);
 typedef CM_ERROR (*cm_provider_init_f) (CM_JSON_PCHAR providerParams);
 typedef CM_ERROR (*cm_provider_deinit_f) (void);
-typedef CM_ERROR (*cm_provider_list_storages_f) (CM_JSON_PCHAR* listUrls);
-typedef CM_ERROR (*cm_provider_storage_info_f) (const char* url, CM_JSON_PCHAR* storageInfo);
-// url(Uniform Resource Locator): filename, token, url-path
-typedef CM_ERROR (*cm_provider_open_f) (const char* url, const uint32_t mode, const CM_JSON_PCHAR params, struct CM_SESSION_API_ST** session);
+typedef CM_ERROR (*cm_provider_list_storages_f) (CM_JSON_PCHAR* listUris);
+typedef CM_ERROR (*cm_provider_storage_info_f) (const char* uri, CM_JSON_PCHAR* storageInfo);
+// uri(Uniform Resource Identificator): filename, token, url-path
+typedef CM_ERROR (*cm_provider_open_f) (const char* uri, const uint32_t mode, const CM_JSON_PCHAR params, struct CM_SESSION_API_ST** session);
 typedef CM_ERROR (*cm_provider_close_f) (struct CM_SESSION_API_ST* session);
-typedef CM_ERROR (*cm_provider_format_f) (const char* url, const char* soPassword, const char* newUserPassword);
+typedef CM_ERROR (*cm_provider_format_f) (const char* uri, const char* soPassword, const char* newUserPassword);
 typedef void (*cm_block_free_f) (void* ptr);
 typedef void (*cm_bytearray_free_f) (CM_BYTEARRAY* ba);
 
@@ -108,7 +108,7 @@ typedef CM_ERROR (*cm_session_get_selected_key_f) (struct CM_SESSION_API_ST* ses
 typedef CM_ERROR (*cm_session_get_certificates_f) (struct CM_SESSION_API_ST* session,
         uint32_t* count, CM_BYTEARRAY*** abaCertificates);
 typedef CM_ERROR (*cm_session_add_certificate_f) (struct CM_SESSION_API_ST* session,
-        const CM_BYTEARRAY* baCertificate);
+        const CM_BYTEARRAY* baCertEncoded);
 typedef CM_ERROR (*cm_session_delete_certificate_f) (struct CM_SESSION_API_ST* session,
         const CM_BYTEARRAY* baKeyId);
 typedef CM_ERROR (*cm_session_change_password_f) (struct CM_SESSION_API_ST* session,
@@ -138,43 +138,45 @@ typedef struct CM_SESSION_API_ST {
 } CM_SESSION_API;
 
 typedef CM_ERROR (*cm_key_get_info_f) (struct CM_SESSION_API_ST* session,
-    CM_JSON_PCHAR* keyInfo, CM_BYTEARRAY** baKeyId);
+        CM_JSON_PCHAR* keyInfo, CM_BYTEARRAY** baKeyId);
 typedef CM_ERROR (*cm_key_get_publickey_f) (struct CM_SESSION_API_ST* session,
-    CM_BYTEARRAY** baAlgorithmIdentifier, CM_BYTEARRAY** baPublicKey);
+        CM_BYTEARRAY** baAlgorithmIdentifier, CM_BYTEARRAY** baPublicKey);
 typedef CM_ERROR (*cm_key_init_key_usage_f) (struct CM_SESSION_API_ST* session,
-    void* reserved);
+        void* reserved);
 typedef CM_ERROR (*cm_key_set_otp_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* otp);
+        const CM_UTF8_CHAR* otp);
 typedef CM_ERROR (*cm_key_sign_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams,
-    const uint32_t count, const CM_BYTEARRAY** abaHashes, CM_BYTEARRAY*** abaSignatures);
+        const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams,
+        const uint32_t count, const CM_BYTEARRAY** abaHashes, CM_BYTEARRAY*** abaSignatures);
 typedef CM_ERROR (*cm_key_sign_init_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams);
+        const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams);
 typedef CM_ERROR (*cm_key_sign_update_f) (struct CM_SESSION_API_ST* session, const CM_BYTEARRAY* baData);
 typedef CM_ERROR (*cm_key_sign_final_f) (struct CM_SESSION_API_ST* session, CM_BYTEARRAY** baSignature);
 typedef CM_ERROR (*cm_key_get_certificates_f) (struct CM_SESSION_API_ST* session,
-    uint32_t* count, CM_BYTEARRAY*** abaCertificates);
-typedef CM_ERROR (*cm_key_add_certificate_f) (struct CM_SESSION_API_ST* session, const CM_BYTEARRAY* baCertificate);
+        uint32_t* count, CM_BYTEARRAY*** abaCertificates);
+typedef CM_ERROR (*cm_key_add_certificate_f) (struct CM_SESSION_API_ST* session,
+        const CM_BYTEARRAY* baCertEncoded);
 typedef CM_ERROR (*cm_key_get_csr_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams, const CM_BYTEARRAY* baSubject, const CM_BYTEARRAY* baAttributes, CM_BYTEARRAY** baCsr);
+        const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams,
+        const CM_BYTEARRAY* baSubject, const CM_BYTEARRAY* baAttributes, CM_BYTEARRAY** baCsrEncoded);
 typedef CM_ERROR (*cm_key_dh_f) (struct CM_SESSION_API_ST* session,
-    const uint32_t count, const CM_BYTEARRAY** abaPubkeys, CM_BYTEARRAY*** abaSecrets);
+        const uint32_t count, const CM_BYTEARRAY** abaPubkeys, CM_BYTEARRAY*** abaSecrets);
 typedef CM_ERROR (*cm_key_dh_wrap_key_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
-    const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSessionKeys,
-    CM_BYTEARRAY*** abaSalts, CM_BYTEARRAY*** abaWrappedKeys);
+        const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
+        const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSessionKeys,
+        CM_BYTEARRAY*** abaSalts, CM_BYTEARRAY*** abaWrappedKeys);
 typedef CM_ERROR (*cm_key_dh_unwrap_key_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
-    const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSalts, const CM_BYTEARRAY** abaWrappedKeys,
-    CM_BYTEARRAY*** abaSessionKeys);
+        const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
+        const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSalts, const CM_BYTEARRAY** abaWrappedKeys,
+        CM_BYTEARRAY*** abaSessionKeys);
 typedef CM_ERROR (*cm_key_decrypt_f) (struct CM_SESSION_API_ST* session,
-    const CM_BYTEARRAY* baAlgorithmIdentifier, const CM_BYTEARRAY* baSource, CM_BYTEARRAY** baDest);
+        const CM_BYTEARRAY* baAlgorithmIdentifier, const CM_BYTEARRAY* baSource, CM_BYTEARRAY** baDest);
 typedef CM_ERROR (*cm_key_encrypt_f) (struct CM_SESSION_API_ST* session,
-    const CM_BYTEARRAY* baAlgorithmIdentifier, const CM_BYTEARRAY* baSource, CM_BYTEARRAY** baDest);
+        const CM_BYTEARRAY* baAlgorithmIdentifier, const CM_BYTEARRAY* baSource, CM_BYTEARRAY** baDest);
 typedef CM_ERROR (*cm_key_set_info_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* label);
+        const CM_UTF8_CHAR* label);
 typedef CM_ERROR (*cm_key_export_f) (struct CM_SESSION_API_ST* session,
-    const CM_UTF8_CHAR* password, CM_BYTEARRAY** baP8container);
+        const CM_UTF8_CHAR* password, CM_BYTEARRAY** baP8container);
 
 
 typedef struct CM_KEY_API_ST {

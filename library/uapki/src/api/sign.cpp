@@ -1,31 +1,32 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "api-json-internal.h"
+#include "cm-providers.h"
 #include "cms-utils.h"
 #include "doc-signflow.h"
 #include "global-objects.h"
@@ -35,6 +36,7 @@
 #include "store-utils.h"
 #include "time-utils.h"
 #include "tsp-utils.h"
+#include "uapki-ns.h"
 
 
 #undef FILE_MARKER
@@ -113,25 +115,21 @@ cleanup:
     return RET_OK;
 }
 
-static int get_info_signalgo_and_keyid (string& signAlgo, ByteArray** baKeyId)
+static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
 {
-    int ret = RET_OK;
+    string s_keyinfo;
+    UapkiNS::SmartBA sba_keyid;
+
+    int ret = storage.keyGetInfo(s_keyinfo, &sba_keyid);
+    if (ret != RET_OK) return ret;
+
     ParsonHelper json;
-    CM_JSON_PCHAR cmjs_keyinfo = nullptr;
-    CM_BYTEARRAY* cmba_keyid = nullptr;
+    if (!json.parse(s_keyinfo.c_str(), false)) return RET_UAPKI_INVALID_JSON_FORMAT;
+
     JSON_Array* ja_signalgos = nullptr;
     bool is_found = false;
-
-    DO(CmProviders::keyGetInfo(&cmjs_keyinfo, &cmba_keyid));
-
-    if (json.parse((const char*)cmjs_keyinfo, false) == nullptr) {
-        SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
-    }
-
     ja_signalgos = json.getArray("signAlgo");
-    if (json_array_get_count(ja_signalgos) == 0) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
+    if (json_array_get_count(ja_signalgos) == 0) return RET_UAPKI_UNSUPPORTED_ALG;
 
     if (signAlgo.empty()) {
         //  Set first signAlgo from list
@@ -146,18 +144,12 @@ static int get_info_signalgo_and_keyid (string& signAlgo, ByteArray** baKeyId)
             if (is_found) break;
         }
     }
-    if (!is_found) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
+    if (!is_found) return RET_UAPKI_UNSUPPORTED_ALG;
 
-    *baKeyId = ba_alloc_from_uint8(cmba_keyid->buf, cmba_keyid->len);
-    if (*baKeyId == nullptr) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
+    *baKeyId = sba_keyid.get();
+    sba_keyid.set(nullptr);
 
-cleanup:
-    CmProviders::free(cmjs_keyinfo);
-    CmProviders::baFree(cmba_keyid);
+    ret = (*baKeyId) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
     return ret;
 }
 
@@ -347,17 +339,18 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     JSON_Array* ja_results = nullptr;
     JSON_Array* ja_sources = nullptr;
     vector<SigningDoc> signing_docs;
-    vector<const CM_BYTEARRAY*> refcmba_hashes;
-    CM_BYTEARRAY** cmba_signatures = nullptr;
+    vector<ByteArray*> refba_hashes;
+    UapkiNS::VectorBA vba_signatures;
+
+    CmStorageProxy* storage = CmProviders::openedStorage();
+    if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
     config = get_config();
     cer_store = get_cerstore();
     if (!config || !cer_store) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
-
-    ret = CmProviders::keyIsSelected();
-    if (ret != RET_OK) return ret;
 
     DO(parse_sign_params(json_object_get_object(joParams, "signParams"), sign_params));
     DO(parse_sigpolicy_and_encode_attrvalue(json_object_dotget_object(joParams, "signParams.signaturePolicy"), &sign_params.baSignPolicy));
@@ -378,7 +371,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO(get_info_signalgo_and_keyid(sign_params.signAlgo, &sign_params.baKeyId));
+    DO(get_info_signalgo_and_keyid(*storage, sign_params.signAlgo, &sign_params.baKeyId));
     sign_params.signHashAlgo = hash_from_oid(sign_params.signAlgo.c_str());
     if (sign_params.signHashAlgo == HashAlg::HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -437,15 +430,15 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
             DO(sdoc.buildSignedAttributes());
             DO(sdoc.digestSignedAttributes());
-            refcmba_hashes.push_back((const CM_BYTEARRAY*)sdoc.baHashSignedAttrs);
+            refba_hashes.push_back(sdoc.baHashSignedAttrs);
         }
 
-        DO(CmProviders::keySign((const CM_UTF8_CHAR*)sign_params.signAlgo.c_str(), nullptr, (uint32_t)refcmba_hashes.size(),
-            (const CM_BYTEARRAY**)refcmba_hashes.data(), &cmba_signatures));
+        DO(storage->keySign(sign_params.signAlgo, nullptr, refba_hashes, vba_signatures));
 
         for (size_t i = 0; i < signing_docs.size(); i++) {
             SigningDoc& sdoc = signing_docs[i];
-            signing_docs[i].baSignature = ba_copy_with_alloc((const ByteArray*)cmba_signatures[i], 0, 0);
+            signing_docs[i].baSignature = vba_signatures[i];
+            vba_signatures[i] = nullptr;
             //  Add unsigned attrs before call buildSignedData
             if (sign_params.includeSignatureTS) {
                 DO(unsattr_add_signature_ts(sdoc));
@@ -458,14 +451,14 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         for (size_t i = 0; i < signing_docs.size(); i++) {
             SigningDoc& sdoc = signing_docs[i];
             DO(sdoc.digestMessage());
-            refcmba_hashes.push_back((const CM_BYTEARRAY*)sdoc.baMessageDigest);
+            refba_hashes.push_back(sdoc.baMessageDigest);
         }
 
-        DO(CmProviders::keySign((const CM_UTF8_CHAR*)sign_params.signAlgo.c_str(), nullptr, (uint32_t)refcmba_hashes.size(),
-            (const CM_BYTEARRAY**)refcmba_hashes.data(), &cmba_signatures));
+        DO(storage->keySign(sign_params.signAlgo, nullptr, refba_hashes, vba_signatures));
 
         for (size_t i = 0; i < signing_docs.size(); i++) {
-            signing_docs[i].baEncoded = ba_copy_with_alloc((const ByteArray*)cmba_signatures[i], 0, 0);
+            signing_docs[i].baEncoded = vba_signatures[i];
+            vba_signatures[i] = nullptr;
         }
     }
 
@@ -483,8 +476,5 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
 
 cleanup:
-    if (cmba_signatures != nullptr) {
-        CmProviders::arrayBaFree((uint32_t)refcmba_hashes.size(), cmba_signatures);
-    }
     return ret;
 }
