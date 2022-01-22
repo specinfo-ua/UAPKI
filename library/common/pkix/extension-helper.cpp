@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,6 +47,73 @@ static const char* KEY_USAGE_NAMES[9] = {   //  KeyUsage ::= BIT STRING -- rfc52
     "encipherOnly",      // (7),
     "decipherOnly"       // (8)
 };
+
+
+int ExtensionHelper::Decode::accessDescriptions (const ByteArray* baEncoded, const char* oidAccessMethod, vector<string>& uris)
+{
+    int ret = RET_OK;
+    SubjectInfoAccess_t* subject_infoaccess = nullptr;
+    char* s_accessmethod = nullptr;
+    char* s_uri = nullptr;
+
+    CHECK_NOT_NULL(subject_infoaccess = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), baEncoded));
+
+    for (int i = 0; i < subject_infoaccess->list.count; i++) {
+        const AccessDescription_t* access_descr = subject_infoaccess->list.array[i];
+
+        DO(asn_oid_to_text(&access_descr->accessMethod, &s_accessmethod));
+
+        if (oid_is_equal(s_accessmethod, oidAccessMethod)
+        && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)
+        && (access_descr->accessLocation.choice.uniformResourceIdentifier.size > 0)) {
+            DO(uint8_to_str_with_alloc(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
+            uris.push_back(string(s_uri));
+            ::free(s_uri);
+            s_uri = nullptr;
+        }
+
+        ::free(s_accessmethod);
+        s_accessmethod = nullptr;
+    }
+
+cleanup:
+    asn_free(get_SubjectInfoAccess_desc(), subject_infoaccess);
+    ::free(s_accessmethod);
+    ::free(s_uri);
+    return ret;
+}
+
+int ExtensionHelper::Decode::distributionPoints (const ByteArray* baEncoded, vector<string>& uris)
+{
+    int ret = RET_OK;
+    CRLDistributionPoints_t* distrib_points = nullptr;
+    char* s_uri = nullptr;
+
+    CHECK_NOT_NULL(distrib_points = (CRLDistributionPoints_t*)asn_decode_ba_with_alloc(get_CRLDistributionPoints_desc(), baEncoded));
+
+    for (int i = 0; i < distrib_points->list.count; i++) {
+        const DistributionPoint_t* distrib_point = distrib_points->list.array[i];
+        if (distrib_point->distributionPoint
+        && (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName)
+        && (distrib_point->distributionPoint->choice.fullName.list.count > 0)) {
+            const GeneralName_t* general_name = distrib_point->distributionPoint->choice.fullName.list.array[0];
+            if ((general_name->present == GeneralName_PR_uniformResourceIdentifier)
+            && (general_name->choice.uniformResourceIdentifier.size > 0)) {
+                DO(uint8_to_str_with_alloc(general_name->choice.uniformResourceIdentifier.buf,
+                    general_name->choice.uniformResourceIdentifier.size, &s_uri));
+                uris.push_back(string(s_uri));
+                ::free(s_uri);
+                s_uri = nullptr;
+            }
+        }
+    }
+
+cleanup:
+    asn_free(get_CRLDistributionPoints_desc(), distrib_points);
+    ::free(s_uri);
+    return ret;
+}
 
 
 int ExtensionHelper::DecodeToJsonObject::accessDescriptions (const ByteArray* baEncoded, JSON_Object* joResult)
@@ -309,34 +376,19 @@ cleanup:
 int ExtensionHelper::DecodeToJsonObject::distributionPoints (const ByteArray* baEncoded, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    CRLDistributionPoints_t* distrib_points = nullptr;
+    vector<string> uris;
     JSON_Array* ja_distribpoints = nullptr;
-    char* s_uri = nullptr;
 
-    CHECK_NOT_NULL(distrib_points = (CRLDistributionPoints_t*)asn_decode_ba_with_alloc(get_CRLDistributionPoints_desc(), baEncoded));
+    DO(Decode::distributionPoints(baEncoded, uris));
 
     DO_JSON(json_object_set_value(joResult, "distributionPoints", json_value_init_array()));
     ja_distribpoints = json_object_get_array(joResult, "distributionPoints");
 
-    for (int i = 0; i < distrib_points->list.count; i++) {
-        const DistributionPoint_t* distrib_point = distrib_points->list.array[i];
-        if (distrib_point->distributionPoint
-            && (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName)
-            && (distrib_point->distributionPoint->choice.fullName.list.count > 0)) {
-            const GeneralName_t* general_name = distrib_point->distributionPoint->choice.fullName.list.array[0];
-            if (general_name->present == GeneralName_PR_uniformResourceIdentifier) {
-                DO(uint8_to_str_with_alloc(general_name->choice.uniformResourceIdentifier.buf, general_name->choice.uniformResourceIdentifier.size, &s_uri));
-
-                DO_JSON(json_array_append_string(ja_distribpoints, s_uri));
-                ::free(s_uri);
-                s_uri = nullptr;
-            }
-        }
+    for (auto& it : uris) {
+        DO_JSON(json_array_append_string(ja_distribpoints, it.c_str()));
     }
 
 cleanup:
-    asn_free(get_CRLDistributionPoints_desc(), distrib_points);
-    ::free(s_uri);
     return ret;
 }
 

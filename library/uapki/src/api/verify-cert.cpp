@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -36,6 +36,7 @@
 #include "store-utils.h"
 #include "time-utils.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 #include "verify-signer-info.h"
 #include "verify-status.h"
 #include "verify-utils.h"
@@ -78,22 +79,42 @@ static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore
     return (issuer_is_expired || subject_is_expired);
 }
 
+static vector<string> rand_uris (const vector<string>& uris)
+{
+    if (uris.size() < 2) return uris;
+
+    UapkiNS::SmartBA sba_randoms;
+    if (!sba_randoms.set(ba_alloc_by_len(uris.size() - 1))) return uris;
+
+    if (drbg_random(sba_randoms.get()) != RET_OK) return uris;
+
+    vector<string> rv_uris, src = uris;
+    const uint8_t* buf = sba_randoms.buf();
+    for (size_t i = 0; i < uris.size() - 1; i++) {
+        const size_t rnd = buf[i] % src.size();
+        rv_uris.push_back(src[rnd]);
+        src.erase(src.begin() + rnd);
+    }
+    rv_uris.push_back(src[0]);
+    return rv_uris;
+}
+
 static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, CrlStore& crlStore,
         const ByteArray** baCrlNumber, const uint64_t validateTime, vector<const CrlStore::RevokedCertItem*>& revokedItems)
 {
     int ret = RET_OK;
     const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
     CrlStore::Item* crl = nullptr;
-    ByteArray* ba_crl = nullptr;
-    char* s_url = nullptr;
+    UapkiNS::SmartBA sba_crl;
+    vector<string> uris;
 
-    ret = (crl_type == CrlStore::CrlType::FULL) ? cerSubject->getCrlFull(&s_url) : cerSubject->getCrlDelta(&s_url);
+    ret = cerSubject->getCrlUris((crl_type == CrlStore::CrlType::FULL), uris);
     if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
         SET_ERROR(ret);
     }
 
-    if (s_url) {
-        DO_JSON(json_object_set_string(joResult, "url", s_url));
+    if (!uris.empty()) {
+        DO_JSON(json_object_set_string(joResult, "url", uris[0].c_str()));//TODO: need added support array uris
     }
 
     crl = crlStore.getCrl(cerIssuer->baKeyId, crl_type);
@@ -103,24 +124,33 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
             crl = nullptr;
         }
     }
-    
+
     if (!crl) {
-        if (!s_url) {
+        if (HttpHelper::isOfflineMode()) {
+            SET_ERROR(RET_UAPKI_OFFLINE_MODE);
+        }
+        if (uris.empty()) {
             SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
         }
 
-        DEBUG_OUTCON(printf("process_crl(CrlType: %i), download CRL", crl_type));
-        ret = HttpHelper::get(s_url, &ba_crl);
+        const vector<string> shuffled_uris = rand_uris(uris);
+        DEBUG_OUTCON(printf("process_crl(CrlType: %d), download CRL", crl_type));
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTCON(printf("process_crl(), HttpHelper::get('%s')\n", it.c_str()));
+            ret = HttpHelper::get(it.c_str(), &sba_crl);
+            if (ret == RET_OK) {
+                DEBUG_OUTCON(printf("process_crl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+                DEBUG_OUTCON(if (sba_crl.size() < 1024) { ba_print(stdout, sba_crl.get()); });
+                break;
+            }
+        }
         if (ret != RET_OK) {
-            SET_ERROR((ret == RET_UAPKI_OFFLINE_MODE) ? RET_UAPKI_OFFLINE_MODE : RET_UAPKI_CRL_NOT_DOWNLOADED);
+            SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
         }
 
-        DEBUG_OUTCON(printf("process_crl(), url: '%s',  size: %d\n", s_url, (int)ba_get_len(ba_crl)));
-        DEBUG_OUTCON(if (ba_get_len(ba_crl) < 1024) { ba_print(stdout, ba_crl); });
-
         bool is_unique;
-        DO(crlStore.addCrl(ba_crl, false, is_unique, nullptr));
-        ba_crl = nullptr;
+        DO(crlStore.addCrl(sba_crl.get(), false, is_unique, nullptr));
+        sba_crl.set(nullptr);
 
         crl = crlStore.getCrl(cerIssuer->baKeyId, crl_type);
         if (!crl) {
@@ -157,8 +187,6 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
     DO(crl->revokedCerts(cerSubject, revokedItems));
 
 cleanup:
-    ba_free(ba_crl);
-    ::free(s_url);
     return ret;
 }
 
@@ -305,30 +333,44 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     OcspClientHelper ocsp_client;
     OcspClientHelper::ResponseStatus resp_status = OcspClientHelper::ResponseStatus::UNDEFINED;
     const OcspClientHelper::OcspRecord* ocsp_record = nullptr;
-    ByteArray* ba_req = nullptr;
-    ByteArray* ba_resp = nullptr;
-    char* s_url = nullptr;
+    UapkiNS::SmartBA sba_req, sba_resp;
+    vector<string> shuffled_uris, uris;
     string s_time;
 
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(CrlStore::CertStatus::UNDEFINED)));
 
-    DO(cerSubject->getOcsp(&s_url));
+    if (HttpHelper::isOfflineMode()) {
+        SET_ERROR(RET_UAPKI_OFFLINE_MODE);
+    }
+    ret = cerSubject->getOcspUris(uris);
+    if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
+        SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
+    }
+    shuffled_uris = rand_uris(uris);
 
     DO(ocsp_client.createRequest());
     DO(ocsp_client.addCert(cerIssuer, cerSubject));
     DO(ocsp_client.setNonce(20));
-    DO(ocsp_client.encodeRequest(&ba_req));
+    DO(ocsp_client.encodeRequest(&sba_req));
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ba_req));
+    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, sba_req.get()));
 
-    ret = HttpHelper::post(s_url, HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ba_req, &ba_resp);
+    for (auto& it : shuffled_uris) {
+        DEBUG_OUTCON(printf("validate_by_ocsp(), HttpHelper::post('%s')\n", it.c_str()));
+        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, sba_req.get(), &sba_resp);
+        if (ret == RET_OK) {
+            DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
+            DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
+            break;
+        }
+    }
     if (ret != RET_OK) {
         SET_ERROR(ret);
     }
 
-    DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, ba_resp));
+    DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
 
-    ret = ocsp_client.parseResponse(ba_resp, resp_status);
+    ret = ocsp_client.parseResponse(sba_resp.get(), resp_status);
     DO_JSON(json_object_set_string(joResult, "responseStatus", OcspClientHelper::responseStatusToStr(resp_status)));
 
     if ((ret == RET_OK) && (resp_status == OcspClientHelper::ResponseStatus::SUCCESSFUL)) {
@@ -358,12 +400,9 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     }
 
 cleanup:
-    if (ret == RET_UAPKI_CONNECTION_ERROR) {
-        ret = RET_UAPKI_OCSP_NOT_RESPONDING;
-    }
-    ba_free(ba_req);
-    ba_free(ba_resp);
-    ::free(s_url);
+    //if ((ret == RET_UAPKI_CONNECTION_ERROR) || (ret == RET_UAPKI_HTTP_STATUS_NOT_OK)) {
+    //    ret = RET_UAPKI_OCSP_NOT_RESPONDING;
+    //}
     return ret;
 }
 

@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -30,6 +30,7 @@
 #include "global-objects.h"
 #include "http-helper.h"
 #include "parson-helper.h"
+#include "uapki-ns.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -39,6 +40,10 @@
 
 
 using namespace std;
+
+
+//static const char* DEFAULT_TSP_POLICYID = "1.2.804.2.1.1.1.2.3.1";  //  TSPpolicyDstu4145WithGost34311PB, z1399-12
+//static const char* DEFAULT_TSP_URL      = "http://csk.uss.gov.ua/services/tsp/";
 
 
 static int load_config (ParsonHelper& json, const char* configFile, JSON_Object** joResult)
@@ -141,21 +146,35 @@ cleanup:
 static int setup_tsp (JSON_Object* joParams, LibraryConfig& libConfig)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = nullptr;
     LibraryConfig::TspParams params;
 
-    params.url = ParsonHelper::jsonObjectGetString(joParams, "url");
+    //  =forced=
+    params.forced = ParsonHelper::jsonObjectGetBoolean(joParams, "forced", false);
 
+    //  =policyId=
     params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");
     if (!params.policyId.empty()) {
-        if (ba_encode_oid(params.policyId.c_str(), &ba_encoded) != RET_OK) {
+        UapkiNS::SmartBA sba_encoded;
+        if (ba_encode_oid(params.policyId.c_str(), &sba_encoded) != RET_OK) {
             params.policyId.clear();
         }
     }
 
-    libConfig.setTsp(params);
+    //  =url=
+    if (ParsonHelper::jsonObjectHasValue(joParams, "url", JSONString)) {
+        const string s_uri = ParsonHelper::jsonObjectGetString(joParams, "url");
+        params.uris.push_back(s_uri);
+    }
+    else if (ParsonHelper::jsonObjectHasValue(joParams, "url", JSONArray)) {
+        JSON_Array* ja_uris = json_object_get_array(joParams, "url");
+        const size_t cnt = json_array_get_count(ja_uris);
+        for (size_t i = 0; i < cnt; i++) {
+            const string s_uri = ParsonHelper::jsonArrayGetString(ja_uris, i);
+            params.uris.push_back(s_uri);
+        }
+    }
 
-    ba_free(ba_encoded);
+    libConfig.setTsp(params);
     return ret;
 }   //  setup_tsp
 
@@ -168,8 +187,8 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     CerStore* lib_cerstore = nullptr;
     CrlStore* lib_crlstore = nullptr;
     JSON_Object* jo_params = joParams;
-    JSON_Object* jo_subresult = nullptr;
-    size_t count;
+    JSON_Object* jo_cat = nullptr;
+    size_t cnt;
     bool offline;
 
     lib_config = get_config();
@@ -209,18 +228,18 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
     //  Out info subsystems
     DO_JSON(json_object_set_value(joResult, "certCache", json_value_init_object()));
-    jo_subresult = json_object_get_object(joResult, "certCache");
-    if (lib_cerstore->getCount(count) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_subresult, "countCerts", (uint32_t)count));
+    jo_cat = json_object_get_object(joResult, "certCache");
+    if (lib_cerstore->getCount(cnt) == RET_OK) {
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countCerts", (uint32_t)cnt));
     }
-    if (lib_cerstore->getCountTrusted(count) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_subresult, "countTrustedCerts", (uint32_t)count));
+    if (lib_cerstore->getCountTrusted(cnt) == RET_OK) {
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countTrustedCerts", (uint32_t)cnt));
     }
 
     DO_JSON(json_object_set_value(joResult, "crlCache", json_value_init_object()));
-    jo_subresult = json_object_get_object(joResult, "crlCache");
-    if (lib_crlstore->getCount(count) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_subresult, "countCrls", (uint32_t)count));
+    jo_cat = json_object_get_object(joResult, "crlCache");
+    if (lib_crlstore->getCount(cnt) == RET_OK) {
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countCrls", (uint32_t)cnt));
     }
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)CmProviders::count()));
@@ -228,9 +247,20 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline);
 
     DO_JSON(json_object_set_value(joResult, "tsp", json_value_init_object()));
-    jo_subresult = json_object_get_object(joResult, "tsp");
-    DO_JSON(json_object_set_string(jo_subresult, "url", lib_config->getTsp().url.c_str()));
-    DO_JSON(json_object_set_string(jo_subresult, "policyId", lib_config->getTsp().policyId.c_str()));
+    jo_cat = json_object_get_object(joResult, "tsp");
+    if (jo_cat) {
+        const LibraryConfig::TspParams& tsp_params = lib_config->getTsp();
+        string s_url;
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_cat, "forced", tsp_params.forced));
+        DO_JSON(json_object_set_string(jo_cat, "policyId", tsp_params.policyId.c_str()));
+        for (auto& it : tsp_params.uris) {
+            s_url += it + ";";
+        }
+        if (!s_url.empty()) {
+            s_url.pop_back();
+        }
+        DO_JSON(json_object_set_string(jo_cat, "url", s_url.c_str()));
+    }
 
 cleanup:
     if (ret != RET_OK) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,11 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
+#include <vector>
 #include "byte-array.h"
 #include "parson.h"
 
 
 namespace ExtensionHelper {
+
+    namespace Decode {
+
+        int accessDescriptions          (const ByteArray* baEncoded, const char* oidAccessMethod, vector<string>& uris);
+        int distributionPoints          (const ByteArray* baEncoded, vector<string>& uris);
+
+    }   //  end namespace Decode
 
     namespace DecodeToJsonObject {
 

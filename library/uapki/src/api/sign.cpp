@@ -208,49 +208,76 @@ cleanup:
     return ret;
 }
 
-static int tsp_process (const LibraryConfig::TspParams& tspConfig, MessageImprintParams& msgimParams, TspRequestParams& tspParams, ByteArray** baTsToken)
+static vector<string> rand_uris (const vector<string>& uris)
+{
+    if (uris.size() < 2) return uris;
+
+    UapkiNS::SmartBA sba_randoms;
+    if (!sba_randoms.set(ba_alloc_by_len(uris.size() - 1))) return uris;
+
+    if (drbg_random(sba_randoms.get()) != RET_OK) return uris;
+
+    vector<string> rv_uris, src = uris;
+    const uint8_t* buf = sba_randoms.buf();
+    for (size_t i = 0; i < uris.size() - 1; i++) {
+        const size_t rnd = buf[i] % src.size();
+        rv_uris.push_back(src[rnd]);
+        src.erase(src.begin() + rnd);
+    }
+    rv_uris.push_back(src[0]);
+    return rv_uris;
+}
+
+static int tsp_process (SigningDoc& sdoc, MessageImprintParams& msgimParams, ByteArray **baTsToken)
 {
     int ret = RET_OK;
-    ByteArray* ba_req = nullptr;
-    ByteArray* ba_resp = nullptr;
-    ByteArray* ba_tstinfo = nullptr;
-    ByteArray* ba_tstoken = nullptr;
-    uint8_t byte = 0;
+    TspRequestParams tsp_params;
+    UapkiNS::SmartBA sba_req, sba_resp, sba_tstinfo, sba_tstoken;
     uint32_t status = 0;
+    uint8_t byte = 0;
 
     CHECK_PARAM(baTsToken != nullptr);
 
-    if (tspParams.nonce != nullptr) {
-        DO(drbg_random(tspParams.nonce));
-        DO(ba_get_byte(tspParams.nonce, 0, &byte));
-        DO(ba_set_byte(tspParams.nonce, 0, byte & 0x7F));  //  Integer must be a positive number
+    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
+    DO(drbg_random(tsp_params.nonce));
+    DO(ba_get_byte(tsp_params.nonce, 0, &byte));
+    DO(ba_set_byte(tsp_params.nonce, 0, byte & 0x7F));  //  Integer must be a positive number
+    tsp_params.certReq = false;
+    tsp_params.reqPolicy = sdoc.signParams->tspPolicy;
+
+    DO(tsp_request_encode(&msgimParams, &tsp_params, &sba_req));
+    DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, sba_req.get()));
+
+    if (sdoc.tspUri.empty()) {
+        const vector<string> shuffled_uris = rand_uris(sdoc.signParams->tspUris);
+        for (auto& it : shuffled_uris) {
+            ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, sba_req.get(), &sba_resp);
+            if (ret == RET_OK) {
+                sdoc.tspUri = it.c_str();
+                break;
+            }
+        }
     }
-
-    DO(tsp_request_encode(&msgimParams, &tspParams, &ba_req));
-    DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, ba_req));
-
-    ret = HttpHelper::post(tspConfig.url.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, ba_req, &ba_resp);
+    else {
+        ret = HttpHelper::post(sdoc.tspUri.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, sba_req.get(), &sba_resp);
+    }
     if (ret != RET_OK) {
         SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
     }
 
-    DEBUG_OUTCON(printf("tsp_process(), response: "); ba_print(stdout, ba_resp));
-    DO(tsp_response_parse(ba_resp, &status, &ba_tstoken, &ba_tstinfo));
+    DEBUG_OUTCON(printf("tsp_process(), response: "); ba_print(stdout, sba_resp.get()));
+    DO(tsp_response_parse(sba_resp.get(), &status, &sba_tstoken, &sba_tstinfo));
     if ((status != PKIStatus_granted) && (status != PKIStatus_grantedWithMods)) {
         //ret = parse_tsp_response_statusinfo(ba_tsr, &status, &s_statusString, &failInfo);
         SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
     }
 
-    DO(tsp_tstinfo_is_equal_request(ba_req, ba_tstinfo));
+    DO(tsp_tstinfo_is_equal_request(sba_req.get(), sba_tstinfo.get()));
 
-    *baTsToken = ba_tstoken;
-    ba_tstoken = nullptr;
+    *baTsToken = sba_tstoken.get();
+    sba_tstoken.set(nullptr);
 
 cleanup:
-    ba_free(ba_req);
-    ba_free(ba_resp);
-    ba_free(ba_tstinfo);
-    ba_free(ba_tstoken);
     return ret;
 }
 
@@ -277,54 +304,40 @@ cleanup:
 static int sattr_add_content_ts (SigningDoc& sdoc)
 {
     int ret = RET_OK;
-    const LibraryConfig::TspParams& tsp_config = get_config()->getTsp();
     MessageImprintParams msgim_params;
-    TspRequestParams tsp_params;
-    ByteArray* ba_tstoken = nullptr;
+    UapkiNS::SmartBA sba_tstoken;
 
     msgim_params.hashAlgo = sdoc.signParams->digestAlgo.c_str();
     msgim_params.hashAlgoParam_isNULL = false;
     msgim_params.hashedMessage = sdoc.baMessageDigest;
-    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
-    tsp_params.certReq = false;
-    tsp_params.reqPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
 
-    DO(tsp_process(tsp_config, msgim_params, tsp_params, &ba_tstoken));
+    DO(tsp_process(sdoc, msgim_params, &sba_tstoken));
 
-    docattr_add(OID_PKCS9_CONTENT_TIMESTAMP, ba_tstoken, sdoc.signedAttrs);
-    ba_tstoken = nullptr;
+    docattr_add(OID_PKCS9_CONTENT_TIMESTAMP, sba_tstoken.get(), sdoc.signedAttrs);
+    sba_tstoken.set(nullptr);
 
 cleanup:
-    ba_free(ba_tstoken);
     return ret;
 }
 
 static int unsattr_add_signature_ts (SigningDoc& sdoc)
 {
     int ret = RET_OK;
-    const LibraryConfig::TspParams& tsp_config = get_config()->getTsp();
     MessageImprintParams msgim_params;
-    TspRequestParams tsp_params;
-    ByteArray* ba_hash = nullptr;
-    ByteArray* ba_tstoken = nullptr;
+    UapkiNS::SmartBA sba_hash, sba_tstoken;
 
-    DO(sdoc.digestSignature(&ba_hash));
+    DO(sdoc.digestSignature(&sba_hash));
 
     msgim_params.hashAlgo = sdoc.signParams->digestAlgo.c_str();
     msgim_params.hashAlgoParam_isNULL = false;
-    msgim_params.hashedMessage = ba_hash;
-    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
-    tsp_params.certReq = false;
-    tsp_params.reqPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
+    msgim_params.hashedMessage = sba_hash.get();
 
-    DO(tsp_process(tsp_config, msgim_params, tsp_params, &ba_tstoken));
+    DO(tsp_process(sdoc, msgim_params, &sba_tstoken));
 
-    docattr_add(OID_PKCS9_TIMESTAMP_TOKEN, ba_tstoken, sdoc.unsignedAttrs);
-    ba_tstoken = nullptr;
+    docattr_add(OID_PKCS9_TIMESTAMP_TOKEN, sba_tstoken.get(), sdoc.unsignedAttrs);
+    sba_tstoken.set(nullptr);
 
 cleanup:
-    ba_free(ba_hash);
-    ba_free(ba_tstoken);
     return ret;
 }
 
@@ -359,10 +372,6 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         if (config->getOffline()) {
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
         }
-        DEBUG_OUTCON(printf("config->getTsp().url: '%s'\n", config->getTsp().url.c_str()));
-        if (config->getTsp().url.empty()) {
-            SET_ERROR(RET_UAPKI_TSP_URL_NOT_PRESENT);
-        }
     }
 
     ja_sources = json_object_get_array(joParams, "dataTbs");
@@ -390,6 +399,30 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
     if ((sign_params.signatureFormat != SIGNATURE_FORMAT::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
         DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerStoreItem));
+    }
+
+    if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
+        const LibraryConfig::TspParams& tsp_config = config->getTsp();
+        sign_params.tspPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
+        if (sign_params.cerStoreItem) {
+            if (tsp_config.forced && !tsp_config.uris.empty()) {
+                sign_params.tspUris = tsp_config.uris;
+            }
+            else {
+                ret = sign_params.cerStoreItem->getTspUris(sign_params.tspUris);
+                if (ret != RET_OK) {
+                    sign_params.tspUris = tsp_config.uris;
+                    ret = RET_OK;
+                }
+            }
+        }
+        else {
+            sign_params.tspUris = tsp_config.uris;
+        }
+
+        if (sign_params.tspUris.empty()) {
+            SET_ERROR(RET_UAPKI_TSP_URL_NOT_PRESENT);
+        }
     }
 
     if ((sign_params.signatureFormat >= SIGNATURE_FORMAT::CADES_BES) && (sign_params.signatureFormat <= SIGNATURE_FORMAT::CADES_Av3)) {

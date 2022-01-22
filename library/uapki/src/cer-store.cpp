@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -31,11 +31,14 @@
 #include "asn1-ba-utils.h"
 #include "ba-utils.h"
 #include "dirent-internal.h"
+#include "dstu-ns.h"
+#include "extension-helper.h"
 #include "extension-utils.h"
 #include "macros-internal.h"
 #include "oids.h"
 #include "str-utils.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 #include "verify-utils.h"
 
 
@@ -113,25 +116,15 @@ int CerStore::Item::checkValidity (const uint64_t validateTime) const
     return RET_OK;
 }
 
-int CerStore::Item::getCrlDelta (char** urlDelta) const
+int CerStore::Item::getCrlUris (const bool isFull, vector<string>& uris) const
 {
     int ret = RET_OK;
+    const char* oid_extnid = isFull ? OID_X509v3_CRLDistributionPoints : OID_X509v3_FreshestCRL;
+    UapkiNS::SmartBA sba_extnvalue;
 
-    CHECK_PARAM(urlDelta != nullptr);
+    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, oid_extnid, nullptr, &sba_extnvalue));
 
-    DO(extns_get_freshest_crl(cert->tbsCertificate.extensions, urlDelta));
-
-cleanup:
-    return ret;
-}
-
-int CerStore::Item::getCrlFull (char** urlFull) const
-{
-    int ret = RET_OK;
-
-    CHECK_PARAM(urlFull != nullptr);
-
-    DO(extns_get_crl_distribution_points(cert->tbsCertificate.extensions, urlFull));
+    DO(ExtensionHelper::Decode::distributionPoints(sba_extnvalue.get(), uris));
 
 cleanup:
     return ret;
@@ -143,13 +136,27 @@ int CerStore::Item::getIssuerAndSN (ByteArray** baIssuerAndSN) const
     return ret;
 }
 
-int CerStore::Item::getOcsp (char** urlOcsp) const
+int CerStore::Item::getOcspUris (vector<string>& uris) const
 {
     int ret = RET_OK;
+    UapkiNS::SmartBA sba_extnvalue;
 
-    CHECK_PARAM(urlOcsp != nullptr);
+    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, OID_PKIX_AuthorityInfoAccess, nullptr, &sba_extnvalue));
 
-    DO(extns_get_authority_infoaccess(cert->tbsCertificate.extensions, urlOcsp));
+    DO(ExtensionHelper::Decode::accessDescriptions(sba_extnvalue.get(), OID_PKIX_OCSP, uris));
+
+cleanup:
+    return ret;
+}
+
+int CerStore::Item::getTspUris (vector<string>& uris) const
+{
+    int ret = RET_OK;
+    UapkiNS::SmartBA sba_extnvalue;
+
+    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, OID_PKIX_SubjectInfoAccess, nullptr, &sba_extnvalue));
+
+    DO(ExtensionHelper::Decode::accessDescriptions(sba_extnvalue.get(), OID_PKIX_TimeStamping, uris));
 
 cleanup:
     return ret;
@@ -511,7 +518,7 @@ int CerStore::parseCert (const ByteArray* baEncoded, Item** item)
     DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &ba_subject));
     DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &ba_spki));
     DO(asn_oid_to_text(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, &s_keyalgo));
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_keyalgo) || oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_keyalgo)) {
+    if (DstuNS::isDstu4145family(s_keyalgo)) {
         algo_keyid = HASH_ALG_GOST34311;
         //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
         DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
