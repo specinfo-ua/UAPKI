@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -66,8 +66,9 @@ static CM_ERROR cm_session_mechanism_parameters (CM_SESSION_API* session,
 }   //  cm_session_mechanism_parameters
 
 static CM_ERROR cm_session_login (CM_SESSION_API* session,
-                    const CM_UTF8_CHAR* password, const void* reserved)
+                    const CM_UTF8_CHAR* password, const CM_JSON_PCHAR* loginParams)
 {
+    (void)loginParams;
     DEBUG_OUTCON(puts("cm_session_login()"));
     if (!session) return RET_CM_NO_SESSION;
     if (!password || (strlen((const char*)password) == 0)) return RET_CM_INVALID_PARAMETER;
@@ -248,11 +249,11 @@ static CM_ERROR cm_session_get_certificates (CM_SESSION_API* session,
 }   //  cm_session_get_certificates
 
 static CM_ERROR cm_session_add_certificate (CM_SESSION_API* session,
-                    const CM_BYTEARRAY* baCertificate)
+                    const CM_BYTEARRAY* baCertEncoded)
 {
     DEBUG_OUTCON(puts("cm_session_add_certificate()"));
     if (!session) return RET_CM_NO_SESSION;
-    if (!baCertificate) return RET_CM_INVALID_PARAMETER;
+    if (!baCertEncoded) return RET_CM_INVALID_PARAMETER;
 
     SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
@@ -262,11 +263,11 @@ static CM_ERROR cm_session_add_certificate (CM_SESSION_API* session,
     if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
 
     ByteArray* ba_cert = nullptr;
-    int ret = keyid_by_cert((ByteArray*)baCertificate, &ba_cert);
+    int ret = keyid_by_cert((ByteArray*)baCertEncoded, &ba_cert);
     ba_free(ba_cert);
     ba_cert = nullptr;
     //  Make copy for store
-    ba_cert = ba_alloc_from_uint8(baCertificate->buf, baCertificate->len);
+    ba_cert = ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0);
     if (!ba_cert) return RET_CM_GENERAL_ERROR;
 
     StoreBag *store_bag = new StoreBag();
