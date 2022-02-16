@@ -31,41 +31,35 @@ import com.sit.uapki.crl.*;
 import com.sit.uapki.key.*;
 import com.sit.uapki.method.*;
 import com.google.gson.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import com.sit.uapki.*;
-import java.util.*;
-import org.junit.Assert;
-import org.junit.Test;
-//import org.ietf.jgss.PkiOid;
+import org.junit.*;
+import org.junit.runners.MethodSorters;
 
-
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestLibrary {
-    final String WORK_DIR = "D:/uapki/data/";
-    final String INIT_TSP_URL = "http://ca.iit.ua/services/tsp/dstu/";
-    final String INIT_TSP_POLICY = null;//l"1.2.804.2.1.1.1.2.3.1";
+    static final String WORK_DIR = "./../../library/test/data/";
+    static final String INIT_TSP_URL = "http://ca.iit.ua/services/tsp/dstu/";
+    static final String INIT_TSP_POLICY = null;//l"1.2.804.2.1.1.1.2.3.1";
 
-    Library lib;
-    String testDir = WORK_DIR;
-    List<String> listProviders;
+    static Library lib;
+    static String testDir = WORK_DIR;
+    static List<String> listProviders;
 
-    @Test
-    public void testLoad () throws Exception {
-        // Завантажуємо бібліотеку
+
+    @BeforeClass
+    public static void setup() throws Exception  {
         lib = new Library(true);
         Assert.assertNotNull(lib);
         System.out.println("Library loaded. Name: " + lib.getName() + ", Version: " + lib.getVersion());
         System.out.println("Бібліотека завантажена (тест utf-8). Назва: " + lib.getName() + ", Версія: " + lib.getVersion());
         Assert.assertEquals(lib.getName(), "UAPKI");
-    }
-    
-    @Test
-    public void testInit () throws Exception {
-        // Ініціалізуємо бібліотеку: встановлюємо шлях до каталогів кешу сертифікатів та CRL, та інше..
-        if (lib == null) {
-            testLoad();
-        }
+
 
         final String INIT_DIR_CERTS = testDir + "certs/";
-        final String INIT_DIR_CRLS = testDir + "crls/";
+        final String INIT_DIR_CRLS = testDir + "certs/crls/";
 
         final boolean ADD_PKCS12 = true;
         final String[] ADD_CM_PROVIDERS = new String[] {
@@ -128,22 +122,15 @@ public class TestLibrary {
             }
         }
     }
-    
-    @Test
-    public void testDeinit () throws Exception {
-        testLoad();
-        testInit();
+
+    @AfterClass
+    public static void tearDown()  throws Exception {
         lib.deinit();
     }
 
     @Test
     public void testProviders () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
-        final List<String> list_providernames = new LinkedList<>();
+         final List<String> list_providernames = new LinkedList<>();
         final List<Providers.CmProviderInfo> list_providerinfos = lib.getProviders();
         for (Providers.CmProviderInfo provider : list_providerinfos) {
             System.out.println("Key provider info: id = " + provider.getId() + "; version = " + provider.getVersion()
@@ -168,11 +155,6 @@ public class TestLibrary {
 
     @Test
     public void testP12CreateKey () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         final boolean CREATE_DSTU = true;
         final boolean CREATE_ECDSA = true;
         final boolean CREATE_RSA = true;
@@ -253,11 +235,6 @@ public class TestLibrary {
     
     @Test
     public void testCertAPI () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         final boolean ADD_CERTS = true;
         final boolean ADD_BUNDLE_CERTS = false;
         final boolean CERT_INFO_BY_BYTES = false;
@@ -366,11 +343,6 @@ public class TestLibrary {
     
     @Test
     public void testCertInfo () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
         CertInfo.Result cert_info = lib.certInfo(cert_bytes);
         showCert(cert_info);
@@ -386,10 +358,6 @@ public class TestLibrary {
 
     @Test
     public void testVerifyCert () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
 
         TestVerifyCert test = TestVerifyCert.FROM_CACHE;
         test = TestVerifyCert.VALIDATY_BY_CRL;
@@ -478,10 +446,6 @@ public class TestLibrary {
     
     @Test
     public void testCrlAPI () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
         
         final boolean ADD_CRL = true;
         final boolean CRL_INFO_BY_BYTES = true;
@@ -602,10 +566,6 @@ public class TestLibrary {
     @Test
     public void testSign () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
 
         final String PROVIDER_ID = "PKCS12";        
         final String PASSWORD = "testpassword";
@@ -660,10 +620,6 @@ public class TestLibrary {
     @Test
     public void testSignP12 () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
 
         final String PROVIDER_ID = "PKCS12";
         final String PASSWORD = "testpassword";
@@ -815,10 +771,6 @@ public class TestLibrary {
     @Test
     public void testVerify () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
 
         final boolean USE_DETACHED_DATA = false;
 
@@ -838,9 +790,6 @@ public class TestLibrary {
     
     @Test
     public void testDigest () throws Exception {
-        if (lib == null) {
-            testLoad();
-        }
 
         String file = WORK_DIR + "test-fox.txt";
         PkiOid hashalgo = Oids.HashAlgo.Sha2.SHA256;
