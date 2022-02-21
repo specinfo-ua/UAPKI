@@ -31,50 +31,51 @@ import com.sit.uapki.crl.*;
 import com.sit.uapki.key.*;
 import com.sit.uapki.method.*;
 import com.google.gson.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import com.sit.uapki.*;
-import java.util.*;
-import org.junit.Assert;
-import org.junit.Test;
-//import org.ietf.jgss.PkiOid;
+import org.junit.*;
+import org.junit.runners.MethodSorters;
 
-
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestLibrary {
-    final String WORK_DIR = "D:/uapki/data/";
-    final String INIT_TSP_URL = "http://ca.iit.ua/services/tsp/dstu/";
-    final String INIT_TSP_POLICY = null;//l"1.2.804.2.1.1.1.2.3.1";
+    static final String WORK_DIR = "./../../library/test/data/";
+    static final String INIT_TSP_URL = "http://ca.iit.ua/services/tsp/dstu/";
+    static final String INIT_TSP_POLICY = null;//l"1.2.804.2.1.1.1.2.3.1";
 
-    Library lib;
-    String testDir = WORK_DIR;
-    List<String> listProviders;
+    static Library lib;
+    static String testDir = WORK_DIR;
+    static List<String> listProviders;
 
-    @Test
-    public void testLoad () throws Exception {
-        // Завантажуємо бібліотеку
+
+    @BeforeClass
+    public static void setup() throws Exception  {
         lib = new Library(true);
         Assert.assertNotNull(lib);
         System.out.println("Library loaded. Name: " + lib.getName() + ", Version: " + lib.getVersion());
         System.out.println("Бібліотека завантажена (тест utf-8). Назва: " + lib.getName() + ", Версія: " + lib.getVersion());
         Assert.assertEquals(lib.getName(), "UAPKI");
     }
-    
-    @Test
-    public void testInit () throws Exception {
-        // Ініціалізуємо бібліотеку: встановлюємо шлях до каталогів кешу сертифікатів та CRL, та інше..
-        if (lib == null) {
-            testLoad();
-        }
 
+    @AfterClass
+    public static void tearDown() throws Exception {
+        lib.deinit();
+    }
+
+    @Before
+    public void setupTest() throws Exception {
         final String INIT_DIR_CERTS = testDir + "certs/";
-        final String INIT_DIR_CRLS = testDir + "crls/";
+        final String INIT_DIR_CRLS = testDir + "certs/crls/";
 
         final boolean ADD_PKCS12 = true;
         final String[] ADD_CM_PROVIDERS = new String[] {
-            //"cm-example"
+                //"cm-example"
         };
-        final boolean ADD_TRUSTED_CERTS = false;
-        
+        final boolean ADD_TRUSTED_CERTS = true;
+
         int expected_cnt_cmproviders = 0;
-        
+
         Init.Parameters init_params = new Init.Parameters();
         Assert.assertNotNull(init_params);
 
@@ -109,7 +110,7 @@ public class TestLibrary {
         Assert.assertNotNull(init_result.getCertCacheInfo());
         Assert.assertNotNull(init_result.getCrlCacheInfo());
         Assert.assertNotNull(init_result.getTspInfo());
-        
+
         System.out.println("getCertCacheInfo().getCountCerts(): " + init_result.getCertCacheInfo().getCountCerts());
         System.out.println("getCertCacheInfo().getCountTrustedCerts(): " + init_result.getCertCacheInfo().getCountTrustedCerts());
         System.out.println("getCrlCacheInfo().getCountCrls(): " + init_result.getCrlCacheInfo().getCountCrls());
@@ -118,7 +119,7 @@ public class TestLibrary {
         System.out.println("getTspInfo().getUrl(): " + init_result.getTspInfo().getUrl());
         System.out.println("getTspInfo().getPolicy(): " + init_result.getTspInfo().getPolicy());
         System.out.println("");
-        
+
         Assert.assertEquals(init_result.getCertCacheInfo().getCountTrustedCerts(), list_trustedcerts.size());
         Assert.assertEquals(init_result.getCountCmProviders(), expected_cnt_cmproviders);
         if (INIT_TSP_URL != null) {
@@ -128,21 +129,14 @@ public class TestLibrary {
             }
         }
     }
-    
-    @Test
-    public void testDeinit () throws Exception {
-        testLoad();
-        testInit();
+
+    @After
+    public void tearDownTest() throws Exception {
         lib.deinit();
     }
 
     @Test
     public void testProviders () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         final List<String> list_providernames = new LinkedList<>();
         final List<Providers.CmProviderInfo> list_providerinfos = lib.getProviders();
         for (Providers.CmProviderInfo provider : list_providerinfos) {
@@ -168,11 +162,6 @@ public class TestLibrary {
 
     @Test
     public void testP12CreateKey () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         final boolean CREATE_DSTU = true;
         final boolean CREATE_ECDSA = true;
         final boolean CREATE_RSA = true;
@@ -253,18 +242,13 @@ public class TestLibrary {
     
     @Test
     public void testCertAPI () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         final boolean ADD_CERTS = true;
-        final boolean ADD_BUNDLE_CERTS = false;
-        final boolean CERT_INFO_BY_BYTES = false;
+        final boolean ADD_BUNDLE_CERTS = true;
+        final boolean CERT_INFO_BY_BYTES = true;
         final boolean CERT_INFO_BY_CERTID = true;
-        final boolean GET_CERT = false;
-        final boolean LIST_CERTS = false;
-        final boolean REMOVE_CERT = false;
+        final boolean GET_CERT = true;
+        final boolean LIST_CERTS = true;
+        final boolean REMOVE_CERT = true;
 
         CertId certid = null;
         
@@ -341,6 +325,7 @@ public class TestLibrary {
     
     public void showCert (CertInfo.Result certInfo) throws Exception {
         System.out.println(" getSerialNumber(): '" + certInfo.getSerialNumber() + "'");
+        System.out.println(" getIssuer().getSERIALNUMBER(): '" + certInfo.getIssuer().getSERIALNUMBER() + "'");
         System.out.println(" getIssuer().getCN(): '" + certInfo.getIssuer().getCN() + "'");
         System.out.println(" getIssuer().getO(): '" + certInfo.getIssuer().getO() + "'");
         System.out.println(" getValidity().getNotBefore(): '" + certInfo.getValidity().getNotBefore() + "'");
@@ -366,11 +351,6 @@ public class TestLibrary {
     
     @Test
     public void testCertInfo () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
-        
         PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
         CertInfo.Result cert_info = lib.certInfo(cert_bytes);
         showCert(cert_info);
@@ -386,106 +366,102 @@ public class TestLibrary {
 
     @Test
     public void testVerifyCert () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
+        for (TestVerifyCert test: new TestVerifyCert[]{
+                TestVerifyCert.FROM_CACHE,
+                TestVerifyCert.VALIDATY_BY_CRL,
+                TestVerifyCert.VALIDATY_BY_CRL_AND_TIME,
+                TestVerifyCert.VALIDATY_BY_ISSUERONLY,
+                TestVerifyCert.VALIDATY_BY_OCSP}) {
 
-        TestVerifyCert test = TestVerifyCert.FROM_CACHE;
-        test = TestVerifyCert.VALIDATY_BY_CRL;
-        //test = TestVerifyCert.VALIDATY_BY_CRL_AND_TIME;
-        //test = TestVerifyCert.VALIDATY_BY_ISSUERONLY;
-        //test = TestVerifyCert.VALIDATY_BY_OCSP;
-        VerifyCert.Result report = null;
-        
-        System.out.println("testVerifyCert, test: " + test);
+            VerifyCert.Result report = null;
 
-        if (test == TestVerifyCert.FROM_CACHE) {
-            ArrayList<PkiData> list_certs = new ArrayList<>();
-            list_certs.add(new PkiData(TestData.B64_CERT_1));
-            final ArrayList<AddCert.AddedCertInfo> added_certs = lib.addCert(list_certs, false);
-            CertId certid = added_certs.get(0).getCertId();
-            report = lib.verifyCert(certid, VerifyCert.ValidationType.ISSUER_AND_CRL);
-            System.out.println("\nVerifyCert");
-        }
-        
-        if (test == TestVerifyCert.VALIDATY_BY_ISSUERONLY) {
-            PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
-            report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_ONLY);
-            System.out.println("\nVerifyCert");
-        }
-        
-        if (test == TestVerifyCert.VALIDATY_BY_CRL) {
-            PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
-            report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_AND_CRL);
-            System.out.println("\nVerifyCert");
-        }
-        
-        if (test == TestVerifyCert.VALIDATY_BY_CRL_AND_TIME) {
-            PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
-            PkiTime validate_time;
-            //validate_time = new PkiTime("2020-08-26 20:28:37");
-            validate_time = new PkiTime("2020-08-26 20:32:18");
-            //validate_time = new PkiTime("2020-08-31 15:59:59");
-            //validate_time = new PkiTime("2020-08-31 16:01:09");
-            report = lib.verifyCert(cert_bytes, validate_time);
-            System.out.println("\nVerifyCert");
-        }
+            System.out.println("testVerifyCert, test: " + test);
 
-        if (test == TestVerifyCert.VALIDATY_BY_OCSP) {
-            PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
-            report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_AND_OCSP);
-            System.out.println("\nVerifyCert");
-        }
-
-        if (report != null) {
-            System.out.println("Certificate Verification Report");
-            System.out.println(" getValidateTime(): '" + report.getValidateTime() + "'");
-            System.out.println(" getSubjectCertId(): '" + report.getSubjectCertId() + "'");
-            System.out.println(" getValidity().getNotBefore(): '" + report.getValidity().getNotBefore() + "'");
-            System.out.println(" getValidity().getNotAfter(): '" + report.getValidity().getNotAfter() + "'");
-            System.out.println(" isExpired(): " + report.isExpired());
-            System.out.println(" isSelfSigned(): " + report.isSelfSigned());
-            System.out.println(" getStatusSignature(): '" + report.getStatusSignature() + "'");
-            System.out.println(" getIssuerCertId()): '" + report.getIssuerCertId() + "'");
-            if (report.getValidateByCrl() != null) {
-                ValidateRevocation.ValidateByCrl validate_by_crl = report.getValidateByCrl();
-                System.out.println(" getStatus(): '" + validate_by_crl.getStatus() + "'");
-                System.out.println(" getRevocationReason(): '" + validate_by_crl.getRevocationReason() + "'");
-                System.out.println(" getRevocationTime(): '" + validate_by_crl.getRevocationTime() + "'");
-                System.out.println(" getFull().getUrl(): '" + validate_by_crl.getFull().getUrl() + "'");
-                System.out.println(" getFull().getCrlId(): '" + validate_by_crl.getFull().getCrlId() + "'");
-                System.out.println(" getFull().getStatusSignature(): '" + validate_by_crl.getFull().getStatusSignature()+ "'");
-                System.out.println(" getDelta().getUrl(): '" + validate_by_crl.getDelta().getUrl() + "'");
-                System.out.println(" getDelta().getCrlId(): '" + validate_by_crl.getDelta().getCrlId() + "'");
-                System.out.println(" getDelta().getStatusSignature(): '" + validate_by_crl.getDelta().getStatusSignature()+ "'");
+            if (test == TestVerifyCert.FROM_CACHE) {
+                ArrayList<PkiData> list_certs = new ArrayList<>();
+                list_certs.add(new PkiData(TestData.B64_CERT_1));
+                final ArrayList<AddCert.AddedCertInfo> added_certs = lib.addCert(list_certs, false);
+                CertId certid = added_certs.get(0).getCertId();
+                report = lib.verifyCert(certid, VerifyCert.ValidationType.ISSUER_AND_CRL);
+                System.out.println("\nVerifyCert");
             }
-            if (report.getValidateByOcsp() != null) {
-                ValidateRevocation.ValidateByOcsp validate_by_ocsp = report.getValidateByOcsp();
-                System.out.println(" getStatus(): '" + validate_by_ocsp.getStatus() + "'");
-                System.out.println(" getRevocationReason(): '" + validate_by_ocsp.getRevocationReason() + "'");
-                System.out.println(" getRevocationTime(): '" + validate_by_ocsp.getRevocationTime() + "'");
-                System.out.println(" getResponseStatus(): '" + validate_by_ocsp.getResponseStatus() + "'");
-                System.out.println(" getResponderId(): '" + validate_by_ocsp.getResponderId() + "'");
-                System.out.println(" getStatusSignature(): '" + validate_by_ocsp.getStatusSignature() + "'");
-                System.out.println(" getProducedAt(): '" + validate_by_ocsp.getProducedAt() + "'");
-                System.out.println(" getThisUpdate(): '" + validate_by_ocsp.getThisUpdate() + "'");
-                System.out.println(" getNextUpdate(): '" + validate_by_ocsp.getNextUpdate() + "'");
+
+            if (test == TestVerifyCert.VALIDATY_BY_ISSUERONLY) {
+                PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
+                report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_ONLY);
+                System.out.println("\nVerifyCert");
             }
-            System.out.println(" getReportTime(): '" + report.getReportTime() + "'");
+
+            if (test == TestVerifyCert.VALIDATY_BY_CRL) {
+                PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
+                showCert(lib.certInfo(cert_bytes));
+                report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_AND_CRL);
+                System.out.println("\nVerifyCert");
+            }
+
+            if (test == TestVerifyCert.VALIDATY_BY_CRL_AND_TIME) {
+                PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
+                PkiTime validate_time;
+                //validate_time = new PkiTime("2020-08-26 20:28:37");
+                validate_time = new PkiTime("2020-08-26 20:32:18");
+                //validate_time = new PkiTime("2020-08-31 15:59:59");
+                //validate_time = new PkiTime("2020-08-31 16:01:09");
+                report = lib.verifyCert(cert_bytes, validate_time);
+                System.out.println("\nVerifyCert");
+            }
+
+            if (test == TestVerifyCert.VALIDATY_BY_OCSP) {
+                PkiData cert_bytes = new PkiData(TestData.B64_CERT_1);
+                report = lib.verifyCert(cert_bytes, VerifyCert.ValidationType.ISSUER_AND_OCSP);
+                System.out.println("\nVerifyCert");
+            }
+
+            if (report != null) {
+                System.out.println("Certificate Verification Report");
+                System.out.println(" getValidateTime(): '" + report.getValidateTime() + "'");
+                System.out.println(" getSubjectCertId(): '" + report.getSubjectCertId() + "'");
+                System.out.println(" getValidity().getNotBefore(): '" + report.getValidity().getNotBefore() + "'");
+                System.out.println(" getValidity().getNotAfter(): '" + report.getValidity().getNotAfter() + "'");
+                System.out.println(" isExpired(): " + report.isExpired());
+                System.out.println(" isSelfSigned(): " + report.isSelfSigned());
+                System.out.println(" getStatusSignature(): '" + report.getStatusSignature() + "'");
+                System.out.println(" getIssuerCertId()): '" + report.getIssuerCertId() + "'");
+                if (report.getValidateByCrl() != null) {
+                    ValidateRevocation.ValidateByCrl validate_by_crl = report.getValidateByCrl();
+                    System.out.println(" getStatus(): '" + validate_by_crl.getStatus() + "'");
+                    System.out.println(" getRevocationReason(): '" + validate_by_crl.getRevocationReason() + "'");
+                    System.out.println(" getRevocationTime(): '" + validate_by_crl.getRevocationTime() + "'");
+                    System.out.println(" getFull().getUrl(): '" + validate_by_crl.getFull().getUrl() + "'");
+                    System.out.println(" getFull().getCrlId(): '" + validate_by_crl.getFull().getCrlId() + "'");
+                    System.out.println(" getFull().getStatusSignature(): '" + validate_by_crl.getFull().getStatusSignature() + "'");
+                    System.out.println(" getDelta().getUrl(): '" + validate_by_crl.getDelta().getUrl() + "'");
+                    System.out.println(" getDelta().getCrlId(): '" + validate_by_crl.getDelta().getCrlId() + "'");
+                    System.out.println(" getDelta().getStatusSignature(): '" + validate_by_crl.getDelta().getStatusSignature() + "'");
+                }
+                if (report.getValidateByOcsp() != null) {
+                    ValidateRevocation.ValidateByOcsp validate_by_ocsp = report.getValidateByOcsp();
+                    System.out.println(" getStatus(): '" + validate_by_ocsp.getStatus() + "'");
+                    System.out.println(" getRevocationReason(): '" + validate_by_ocsp.getRevocationReason() + "'");
+                    System.out.println(" getRevocationTime(): '" + validate_by_ocsp.getRevocationTime() + "'");
+                    System.out.println(" getResponseStatus(): '" + validate_by_ocsp.getResponseStatus() + "'");
+                    System.out.println(" getResponderId(): '" + validate_by_ocsp.getResponderId() + "'");
+                    System.out.println(" getStatusSignature(): '" + validate_by_ocsp.getStatusSignature() + "'");
+                    System.out.println(" getProducedAt(): '" + validate_by_ocsp.getProducedAt() + "'");
+                    System.out.println(" getThisUpdate(): '" + validate_by_ocsp.getThisUpdate() + "'");
+                    System.out.println(" getNextUpdate(): '" + validate_by_ocsp.getNextUpdate() + "'");
+                }
+                System.out.println(" getReportTime(): '" + report.getReportTime() + "'");
+                System.out.println("\n\n\n");
+            }
         }
     }
     
     @Test
     public void testCrlAPI () throws Exception {
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
         
         final boolean ADD_CRL = true;
         final boolean CRL_INFO_BY_BYTES = true;
-        final boolean CRL_INFO_BY_CRLID = false;
+        final boolean CRL_INFO_BY_CRLID = true;
         
         CrlId crlid = null;
         
@@ -602,10 +578,10 @@ public class TestLibrary {
     @Test
     public void testSign () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
+
+        ArrayList<PkiData> b64_certs = new ArrayList<>();
+        b64_certs.add(new PkiData(TestData.B64_CERT_1));
+        lib.addCert(b64_certs, false);
 
         final String PROVIDER_ID = "PKCS12";        
         final String PASSWORD = "testpassword";
@@ -660,10 +636,10 @@ public class TestLibrary {
     @Test
     public void testSignP12 () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
+
+        ArrayList<PkiData> b64_certs = new ArrayList<>();
+        b64_certs.add(new PkiData(TestData.B64_CERT_1));
+        lib.addCert(b64_certs, false);
 
         final String PROVIDER_ID = "PKCS12";
         final String PASSWORD = "testpassword";
@@ -808,17 +784,11 @@ public class TestLibrary {
         // Закриваємо сховище ключів
         lib.closeStorage();
 
-        // Деініціалізуємо бібліотеку
-        lib.deinit();
     }
    
     @Test
     public void testVerify () throws Exception {
         Gson gson = new Gson();
-        if (lib == null) {
-            testLoad();
-            testInit();
-        }
 
         final boolean USE_DETACHED_DATA = false;
 
@@ -838,9 +808,6 @@ public class TestLibrary {
     
     @Test
     public void testDigest () throws Exception {
-        if (lib == null) {
-            testLoad();
-        }
 
         String file = WORK_DIR + "test-fox.txt";
         PkiOid hashalgo = Oids.HashAlgo.Sha2.SHA256;

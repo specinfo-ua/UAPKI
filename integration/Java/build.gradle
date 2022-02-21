@@ -2,9 +2,13 @@ apply plugin: 'java'
 apply plugin: 'jacoco'
 apply plugin: 'application'
 apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'maven-publish'
 
 description = 'UAPKI for Java'
+
 group = 'com.sit'
+archivesBaseName = 'uapki'
+version = findProperty('version')
 
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
@@ -23,8 +27,16 @@ dependencies {
 }
 
 jar {
-    baseName = 'uapki'
-    version = findProperty('version')
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier = 'javadoc'
+    from javadoc.destinationDir
 }
 
 buildscript {
@@ -36,6 +48,22 @@ buildscript {
     }
 }
 
-//task generateJavadocs(type: Javadoc) {
-//    source = sourceSets.main.allJava
-//}
+// You can publish with
+// ./gradlew -Pversion=$VERSION publish  -Pmaven_repo=$MVN_URL -PrepoUsername=$MVN_USER -PrepoPassword=$MVN_PASS
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+    repositories {
+        maven {
+            name = "repo"
+            url = findProperty("maven_repo")
+            credentials(PasswordCredentials)
+        }
+    }
+}
+
