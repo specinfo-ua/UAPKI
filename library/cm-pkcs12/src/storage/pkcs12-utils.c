@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -201,7 +201,7 @@ cleanup:
     asn_free(get_OCTET_STRING_desc(), octet_string);
     asn_free(get_CertBag_desc(), cert_bag);
     return ret;
-}   //  pkcs12_write_cert_bag 
+}   //  pkcs12_write_cert_bag
 
 int pkcs12_write_safecontents (const ByteArray ** baEncodedBags, const size_t count, ByteArray ** baEncoded)
 {
@@ -379,7 +379,7 @@ static int os_swap (OCTET_STRING_t* os)
     uint8_t tmp;
 
     CHECK_PARAM(os != NULL);
-    
+
     for (int i = 0, j = os->size - 1; i < j; i++, j--) {
         tmp = os->buf[i];
         os->buf[i] = os->buf[j];
@@ -398,7 +398,7 @@ static int os_swap_bits (OCTET_STRING_t* os)
 
     CHECK_PARAM(os != NULL);
 
-    for (size_t i = 0; i < os->size; i++) {
+    for (int i = 0; i < os->size; i++) {
         byte = os->buf[i];
         swapped_byte = 0;
         for (uint8_t j = 0; j < 8; j++) {
@@ -449,7 +449,7 @@ int pkcs12_iit_read_kep_key (const ByteArray * baPrivkey, ByteArray ** baKepPriv
     CHECK_NOT_NULL(dstu_ecparam = asn_any2type(&kep_dstu4145params->params, get_DSTUEllipticCurve_desc()));
     DO(asn_copy(get_DSTUEllipticCurve_desc(), dstu_ecparam, &dstu4145_params->ellipticCurve));
     CHECK_NOT_NULL(dstu4145_params->dke = asn_copy_with_alloc(get_OCTET_STRING_desc(), &kep_dstu4145params->kekDke));
-    
+
     if (dstu4145_params->ellipticCurve.present == DSTUEllipticCurve_PR_ecbinary) {
         ECBinary_t* ec_binary = &dstu4145_params->ellipticCurve.choice.ecbinary;
         if (ec_binary->f.member->present == member_PR_pentanomial) {
@@ -482,4 +482,3 @@ cleanup:
 
     return ret;
 }   //  pkcs12_iit_read_kep_key
-

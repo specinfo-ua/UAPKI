@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//  Last update: 2022-03-31
+
 #include <string.h>
 #include "ba-utils.h"
 #include "http-helper.h"
@@ -48,7 +50,7 @@ typedef struct HTTP_HELPER_ST {
     bool isInitialized;
     bool offlineMode;
 
-    HTTP_HELPER_ST(void)
+    HTTP_HELPER_ST (void)
         : isInitialized(false), offlineMode(false)
     {}
 } HTTP_HELPER;
@@ -220,6 +222,10 @@ int HttpHelper::post (const char* url, const char* httpContentType,
     if (userPwd) {
         curl_easy_setopt(curl, CURLOPT_USERPWD, userPwd);
     }
+
+#ifdef HTTP_HELPER_DISABLE_VERIFYSSL
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+#endif
 
     struct curl_slist* chunk = NULL;
 

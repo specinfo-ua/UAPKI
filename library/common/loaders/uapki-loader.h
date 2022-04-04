@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,9 +36,6 @@
 #include "dl-macros.h"
 
 
-using namespace std;
-
-
 class UapkiLoader
 {
     typedef char* (*f_process)(const char* request);
@@ -52,11 +49,11 @@ public:
     UapkiLoader (void);
     ~UapkiLoader (void);
 
-    static string getLibName (const string& libName);
+    static std::string getLibName (const std::string& libName);
 
     HANDLE_DLIB getHandle (void) const { return m_HandleDLib; }
     bool isLoaded (void) const { return (m_HandleDLib != nullptr); }
-    bool load (const string& libName = string("uapki"));
+    bool load (const std::string& libName = std::string("uapki"));
     void unload (void);
 
     char* process (const char* jsonRequest);
