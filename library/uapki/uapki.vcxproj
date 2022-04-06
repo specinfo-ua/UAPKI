@@ -28,6 +28,7 @@
     <ClCompile Include="..\common\pkix\content-info.c" />
     <ClCompile Include="..\common\pkix\dstu-ns.cpp" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
+    <ClCompile Include="..\common\pkix\envelopeddata-helper.cpp" />
     <ClCompile Include="..\common\pkix\extension-helper.cpp" />
     <ClCompile Include="..\common\pkix\extension-utils.c" />
     <ClCompile Include="..\common\pkix\http-helper.cpp" />
@@ -49,7 +50,9 @@
     <ClCompile Include="src\api\asn1-encode.cpp" />
     <ClCompile Include="src\api\cert-info.cpp" />
     <ClCompile Include="src\api\crl-info.cpp" />
+    <ClCompile Include="src\api\decrypt.cpp" />
     <ClCompile Include="src\api\digest.cpp" />
+    <ClCompile Include="src\api\encrypt.cpp" />
     <ClCompile Include="src\api\get-cert.cpp" />
     <ClCompile Include="src\api\list-certs.cpp" />
     <ClCompile Include="src\api\remove-cert.cpp" />
@@ -101,6 +104,7 @@
     <ClInclude Include="..\common\pkix\content-info.h" />
     <ClInclude Include="..\common\pkix\dstu-ns.h" />
     <ClInclude Include="..\common\pkix\dstu4145-params.h" />
+    <ClInclude Include="..\common\pkix\envelopeddata-helper.h" />
     <ClInclude Include="..\common\pkix\extension-helper.h" />
     <ClInclude Include="..\common\pkix\extension-utils.h" />
     <ClInclude Include="..\common\pkix\http-helper.h" />

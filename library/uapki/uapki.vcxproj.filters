@@ -225,6 +225,15 @@
     <ClCompile Include="src\cm-storage-proxy.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\api\decrypt.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\encrypt.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\envelopeddata-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -358,6 +367,9 @@
     </ClInclude>
     <ClInclude Include="src\cm-storage-proxy.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\envelopeddata-helper.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
