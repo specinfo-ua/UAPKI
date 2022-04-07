@@ -27,6 +27,9 @@
 
 package com.sit.uapki.common;
 
+import java.lang.reflect.Type;
+
+import com.google.gson.*;
 import com.sit.uapki.crl.CrlId;
 
 /**
@@ -85,7 +88,7 @@ public interface ValidateRevocation {
 
     class ValidateByOcsp extends ValidateByBase {
         String responseStatus;
-        String responderId;
+        ResponderId responderId;
         String statusSignature;
         String producedAt;
         String thisUpdate;
@@ -95,10 +98,10 @@ public interface ValidateRevocation {
             return OcspResponseStatus.fromString(responseStatus);
         }
 
-        public PkiNumber getResponderId () {
-            return new PkiNumber(responderId);
+        public ResponderId getResponderId () {
+            return responderId;
         }
-        
+
         public VerificationStatus getStatusSignature () {
             return VerificationStatus.fromString(statusSignature);
         }
@@ -115,5 +118,41 @@ public interface ValidateRevocation {
             return new PkiTime(nextUpdate);
         }
     }   //  end class ValidateByOcsp
+
+    class ResponderId {
+        String responderId;
+        DistinguishedName name;
+
+        public ResponderId(String responderId) {
+            this.responderId = responderId;
+        }
+
+        public ResponderId(DistinguishedName name) {
+            this.name = name;
+        }
+
+        public PkiNumber getResponderId () {
+            return new PkiNumber(responderId);
+        }
+
+        public DistinguishedName getName () {
+            return name;
+        }
+    }   //  end class ResponderId
+
+
+    public class ResponderIdDeserializer implements JsonDeserializer<ResponderId> {
+        @Override
+        public ResponderId deserialize(JsonElement jElement, Type typeOfT, JsonDeserializationContext context)
+                throws JsonParseException {
+            if (jElement.isJsonObject()) {
+                JsonObject jObject = jElement.getAsJsonObject();
+                Gson gson = new Gson();
+                return new ResponderId(gson.fromJson(jObject, DistinguishedName.class));
+            } else {
+                return new ResponderId(jElement.getAsString());
+            }
+        }
+    }   //  end class ResponderIdDeserializer
 
 }
