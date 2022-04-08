@@ -364,4 +364,8 @@ public final class Library {
     public Digest.Result digest (String file, PkiOid signAlgo) throws UapkiException {
         return gson.fromJson(processGson(Digest.METHOD, gson.toJsonTree(new Digest.Parameters(null, file, signAlgo))), Digest.Result.class);
     }
+    
+    public Decrypt.Result decrypt (PkiData envelopedData) throws UapkiException {
+        return gson.fromJson(processGson(Decrypt.METHOD, gson.toJsonTree(new Decrypt.Parameters(envelopedData))), Decrypt.Result.class);
+    }
 }
