@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-06
+//  Last update: 2022-04-08
 
 
 #include "envelopeddata-helper.h"
@@ -178,7 +178,83 @@ cleanup:
 
 
 
-EnvelopedDataParser::KeyAgreeRecipientInfo::KeyAgreeRecipientInfo(void)
+EnvelopedDataParser::KeyAgreeRecipientIdentifier::KeyAgreeRecipientIdentifier (void)
+    : m_KarId(nullptr)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataParser::KeyAgreeRecipientIdentifier::KeyAgreeRecipientIdentifier()"));
+}
+
+EnvelopedDataParser::KeyAgreeRecipientIdentifier::~KeyAgreeRecipientIdentifier (void)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataParser::KeyAgreeRecipientIdentifier::~KeyAgreeRecipientIdentifier()"));
+    asn_free(get_KeyAgreeRecipientIdentifier_desc(), m_KarId);
+}
+
+KeyAgreeRecipientIdentifier_PR EnvelopedDataParser::KeyAgreeRecipientIdentifier::getType (void) const
+{
+    if (!m_KarId) return KeyAgreeRecipientIdentifier_PR_NOTHING;
+    return m_KarId->present;
+}
+
+int EnvelopedDataParser::KeyAgreeRecipientIdentifier::parse (const ByteArray* baEncoded)
+{
+    m_KarId = (KeyAgreeRecipientIdentifier_t*)asn_decode_ba_with_alloc(get_KeyAgreeRecipientIdentifier_desc(), baEncoded);
+    return (m_KarId) ? RET_OK : RET_INVALID_PARAM;
+}
+
+int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toIssuerAndSN (ByteArray** baIssuerAndSN)
+{
+    if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_issuerAndSerialNumber) return RET_UAPKI_INVALID_STRUCT;
+
+    return asn_encode_ba(get_IssuerAndSerialNumber_desc(), &m_KarId->choice.issuerAndSerialNumber, baIssuerAndSN);
+}
+
+int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toRecipientKeyId (ByteArray** baSubjectKeyId)
+{
+    if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_rKeyId) return RET_UAPKI_INVALID_STRUCT;
+
+    int ret = RET_OK;
+
+    //  =subjectKeyIdentifier=
+    DO(asn_OCTSTRING2ba(&m_KarId->choice.rKeyId.subjectKeyIdentifier, baSubjectKeyId));
+
+    //  =date= (optional) - ignored
+    //  =other= (optional) - ignored
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toRecipientKeyId (ByteArray** baSubjectKeyId, std::string& date, ByteArray** baOtherKeyAttribute)
+{
+    if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_rKeyId) return RET_UAPKI_INVALID_STRUCT;
+
+    int ret = RET_OK;
+    const RecipientKeyIdentifier_t& recip_keyid = m_KarId->choice.rKeyId;
+    char* s_date = nullptr;
+
+    //  =subjectKeyIdentifier=
+    DO(asn_OCTSTRING2ba(&recip_keyid.subjectKeyIdentifier, baSubjectKeyId));
+
+    //  =date= (optional)
+    if (recip_keyid.date) {//TODO: need check
+        DO(asn_decodevalue_octetstring_to_stime(recip_keyid.date, &s_date));
+        date = string(s_date);
+    }
+
+    //  =other= (optional)
+    if (recip_keyid.other) {//TODO: need check
+        DO(asn_encode_ba(get_OtherKeyAttribute_desc(), &recip_keyid.other, baOtherKeyAttribute));
+    }
+
+cleanup:
+    ::free(s_date);
+    return ret;
+}
+
+
+
+EnvelopedDataParser::KeyAgreeRecipientInfo::KeyAgreeRecipientInfo (void)
     : m_Version(0)
     , m_OriginatorType(OriginatorIdentifierOrKey_PR_NOTHING)
     , m_BaOriginator(nullptr)
@@ -209,7 +285,7 @@ int EnvelopedDataParser::KeyAgreeRecipientInfo::parse (const KeyAgreeRecipientIn
 
     //  =originator=
     m_OriginatorType = kari.originator.present;
-    DO(encodeOriginator(kari.originator, &m_BaOriginator));
+    DO(parseOriginator(kari.originator, &m_BaOriginator));
 
     //  =ukm= (optional)
     if (kari.ukm) {
@@ -240,7 +316,7 @@ cleanup:
     return ret;
 }
 
-int EnvelopedDataParser::KeyAgreeRecipientInfo::encodeOriginator (const OriginatorIdentifierOrKey_t& originatorIdOrKey, ByteArray** baEncodedOriginator)
+int EnvelopedDataParser::KeyAgreeRecipientInfo::parseOriginator (const OriginatorIdentifierOrKey_t& originatorIdOrKey, ByteArray** baEncodedOriginator)
 {
     int ret = RET_OK;
 

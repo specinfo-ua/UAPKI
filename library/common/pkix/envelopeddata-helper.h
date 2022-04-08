@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-06
+//  Last update: 2022-04-07
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -100,6 +100,21 @@ namespace Pkcs7 {
             }
         };  //  end class RecipientEncryptedKey
 
+        class KeyAgreeRecipientIdentifier {
+            KeyAgreeRecipientIdentifier_t*
+                        m_KarId;
+        public:
+            KeyAgreeRecipientIdentifier (void);
+            ~KeyAgreeRecipientIdentifier (void);
+
+            KeyAgreeRecipientIdentifier_PR getType (void) const;
+            int parse (const ByteArray* baEncoded);
+            int toIssuerAndSN (ByteArray** baIssuerAndSN);
+            int toRecipientKeyId (ByteArray** baSubjectKeyId);
+            int toRecipientKeyId (ByteArray** baSubjectKeyId, std::string& date, ByteArray** baOtherKeyAttribute);
+
+        };  //  end class KeyAgreeRecipientIdentifier
+
         class KeyAgreeRecipientInfo {
             uint32_t    m_Version;
             OriginatorIdentifierOrKey_PR
@@ -125,7 +140,7 @@ namespace Pkcs7 {
             const std::vector<RecipientEncryptedKey>& getRecipientEncryptedKeys (void) const { return m_RecipientEncryptedKeys; }
 
         public:
-            static int encodeOriginator (const OriginatorIdentifierOrKey_t& originatorIdOrKey, ByteArray** baEncodedOriginator);
+            static int parseOriginator (const OriginatorIdentifierOrKey_t& originatorIdOrKey, ByteArray** baEncodedOriginator);
 
         };  //  end class KeyAgreeRecipientInfo
 

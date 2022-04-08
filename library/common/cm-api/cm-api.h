@@ -160,10 +160,10 @@ typedef CM_ERROR (*cm_key_get_csr_f) (struct CM_SESSION_API_ST* session,
         const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams,
         const CM_BYTEARRAY* baSubject, const CM_BYTEARRAY* baAttributes, CM_BYTEARRAY** baCsrEncoded);
 typedef CM_ERROR (*cm_key_dh_f) (struct CM_SESSION_API_ST* session,
-        const uint32_t count, const CM_BYTEARRAY** abaPubkeys, CM_BYTEARRAY*** abaSecrets);
+        const uint32_t count, const CM_BYTEARRAY** abaSPKIs, CM_BYTEARRAY*** abaSecrets);
 typedef CM_ERROR (*cm_key_dh_wrap_key_f) (struct CM_SESSION_API_ST* session,
         const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
-        const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSessionKeys,
+        const uint32_t count, const CM_BYTEARRAY** abaSPKIs, const CM_BYTEARRAY** abaSessionKeys,
         CM_BYTEARRAY*** abaSalts, CM_BYTEARRAY*** abaWrappedKeys);
 typedef CM_ERROR (*cm_key_dh_unwrap_key_f) (struct CM_SESSION_API_ST* session,
         const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,

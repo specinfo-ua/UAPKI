@@ -253,15 +253,15 @@ int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds)
     if (!m_Session->listKeys) return RET_UAPKI_NOT_SUPPORTED;
 
     uint32_t cnt_keys = 0;
-    CM_BYTEARRAY** aba_keyids = nullptr;
-    const int ret = (int)m_Session->listKeys(m_Session, &cnt_keys, &aba_keyids, nullptr);
+    CM_BYTEARRAY** cmba_keyids = nullptr;
+    const int ret = (int)m_Session->listKeys(m_Session, &cnt_keys, &cmba_keyids, nullptr);
     if (ret != RET_OK) return ret;
 
     vbaKeyIds.resize(cnt_keys);
     for (uint32_t i = 0; i < cnt_keys; i++) {
-        vbaKeyIds[i] = ba_copy_with_alloc((const ByteArray*)aba_keyids[i], 0, 0);
+        vbaKeyIds[i] = ba_copy_with_alloc((const ByteArray*)cmba_keyids[i], 0, 0);
     }
-    arrayCmbaFree(cnt_keys, aba_keyids);
+    arrayCmbaFree(cnt_keys, cmba_keyids);
     return ret;
 }
 
@@ -271,16 +271,16 @@ int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds, string& info
     if (!m_Session->listKeys) return RET_UAPKI_NOT_SUPPORTED;
 
     uint32_t cnt_keys = 0;
-    CM_BYTEARRAY** aba_keyids = nullptr;
+    CM_BYTEARRAY** cmba_keyids = nullptr;
     CM_JSON_PCHAR json_keysinfo = nullptr;
-    const int ret = (int)m_Session->listKeys(m_Session, &cnt_keys, &aba_keyids, &json_keysinfo);
+    const int ret = (int)m_Session->listKeys(m_Session, &cnt_keys, &cmba_keyids, &json_keysinfo);
     if (ret != RET_OK) return ret;
 
     vbaKeyIds.resize(cnt_keys);
     for (uint32_t i = 0; i < cnt_keys; i++) {
-        vbaKeyIds[i] = ba_copy_with_alloc((const ByteArray*)aba_keyids[i], 0, 0);
+        vbaKeyIds[i] = ba_copy_with_alloc((const ByteArray*)cmba_keyids[i], 0, 0);
     }
-    arrayCmbaFree(cnt_keys, aba_keyids);
+    arrayCmbaFree(cnt_keys, cmba_keyids);
 
     if (json_keysinfo) {
         infoKeys = string((char*)json_keysinfo);
@@ -323,15 +323,15 @@ int CmStorageProxy::sessionGetCertificates (vector<ByteArray*>& vbaCerts)
     if (!m_Session->getCertificates) return RET_UAPKI_NOT_SUPPORTED;
 
     uint32_t cnt_certs = 0;
-    CM_BYTEARRAY** aba_certs = nullptr;
-    const int ret = (int)m_Session->getCertificates(m_Session, &cnt_certs, &aba_certs);
+    CM_BYTEARRAY** cmba_certs = nullptr;
+    const int ret = (int)m_Session->getCertificates(m_Session, &cnt_certs, &cmba_certs);
     if (ret != RET_OK) return ret;
 
     vbaCerts.resize(cnt_certs);
     for (uint32_t i = 0; i < cnt_certs; i++) {
-        vbaCerts[i] = ba_copy_with_alloc((const ByteArray*)aba_certs[i], 0, 0);
+        vbaCerts[i] = ba_copy_with_alloc((const ByteArray*)cmba_certs[i], 0, 0);
     }
-    arrayCmbaFree(cnt_certs, aba_certs);
+    arrayCmbaFree(cnt_certs, cmba_certs);
     return ret;
 }
 
@@ -576,15 +576,15 @@ int CmStorageProxy::keyGetCertificates (vector<ByteArray*>& vbaCerts)
     if (!m_SelectedKey->getCertificates) return RET_UAPKI_NOT_SUPPORTED;
 
     uint32_t cnt_certs = 0;
-    CM_BYTEARRAY** aba_certs = nullptr;
-    const int ret = (int)m_SelectedKey->getCertificates(m_Session, &cnt_certs, &aba_certs);
+    CM_BYTEARRAY** cmba_certs = nullptr;
+    const int ret = (int)m_SelectedKey->getCertificates(m_Session, &cnt_certs, &cmba_certs);
     if (ret != RET_OK) return ret;
 
     vbaCerts.resize(cnt_certs);
     for (uint32_t i = 0; i < cnt_certs; i++) {
-        vbaCerts[i] = ba_copy_with_alloc((const ByteArray*)aba_certs[i], 0, 0);
+        vbaCerts[i] = ba_copy_with_alloc((const ByteArray*)cmba_certs[i], 0, 0);
     }
-    arrayCmbaFree(cnt_certs, aba_certs);
+    arrayCmbaFree(cnt_certs, cmba_certs);
     return ret;
 }
 
@@ -603,5 +603,71 @@ int CmStorageProxy::keyGetCsr (const string& signAlgo, const ByteArray* baSignAl
         (const CM_BYTEARRAY*)baAttributes,
         (CM_BYTEARRAY**)baCsr
     );
+    return ret;
+}
+
+int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
+                    const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
+                    vector<ByteArray*>& vbaSalts, vector<ByteArray*>& vbaWrappedKeys)
+{
+    if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
+    if (!m_SelectedKey->dhWrapKey) return RET_UAPKI_NOT_SUPPORTED;
+    if (kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty()
+        || (vbaSPKIs.size() != vbaSessionKeys.size())) return RET_UAPKI_INVALID_PARAMETER;
+
+    const uint32_t cnt_keys = (uint32_t)vbaSPKIs.size();
+    CM_BYTEARRAY** cmba_salts = nullptr;
+    CM_BYTEARRAY** cmba_wrappedkeys = nullptr;
+    const int ret = m_SelectedKey->dhWrapKey(m_Session,
+        (const CM_UTF8_CHAR*)kdfOid.c_str(),
+        (const CM_UTF8_CHAR*)wrapAlgOid.c_str(),
+        cnt_keys,
+        (const CM_BYTEARRAY**)vbaSPKIs.data(),
+        (const CM_BYTEARRAY**)vbaSessionKeys.data(),
+        &cmba_salts,
+        &cmba_wrappedkeys
+    );
+    if (ret != RET_OK) return ret;
+
+    vbaSalts.resize(cnt_keys);
+    vbaWrappedKeys.resize(cnt_keys);
+    for (uint32_t i = 0; i < cnt_keys; i++) {
+        vbaSalts[i] = ba_copy_with_alloc((const ByteArray*)cmba_salts[i], 0, 0);
+        vbaWrappedKeys[i] = ba_copy_with_alloc((const ByteArray*)cmba_wrappedkeys[i], 0, 0);
+    }
+    arrayCmbaFree(cnt_keys, cmba_salts);
+    arrayCmbaFree(cnt_keys, cmba_wrappedkeys);
+    return ret;
+}
+
+int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
+                    const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
+                    const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys)
+{
+    if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
+    if (!m_SelectedKey->dhUnwrapKey) return RET_UAPKI_NOT_SUPPORTED;
+    if (kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty()
+        || (vbaSPKIs.size() != vbaSalts.size())|| (vbaSPKIs.size() != vbaWrappedKeys.size())) return RET_UAPKI_INVALID_PARAMETER;
+
+    const uint32_t cnt_keys = (uint32_t)vbaSPKIs.size();
+    CM_BYTEARRAY** cmba_seskeys = nullptr;
+    const int ret = m_SelectedKey->dhUnwrapKey(m_Session,
+        (const CM_UTF8_CHAR*)kdfOid.c_str(),
+        (const CM_UTF8_CHAR*)wrapAlgOid.c_str(),
+        cnt_keys,
+        (const CM_BYTEARRAY**)vbaSPKIs.data(),
+        (const CM_BYTEARRAY**)vbaSalts.data(),
+        (const CM_BYTEARRAY**)vbaWrappedKeys.data(),
+        &cmba_seskeys
+    );
+    if (ret != RET_OK) return ret;
+
+    vbaSessionKeys.resize(cnt_keys);
+    for (uint32_t i = 0; i < cnt_keys; i++) {
+        vbaSessionKeys[i] = ba_copy_with_alloc((const ByteArray*)cmba_seskeys[i], 0, 0);
+    }
+    arrayCmbaFree(cnt_keys, cmba_seskeys);
     return ret;
 }

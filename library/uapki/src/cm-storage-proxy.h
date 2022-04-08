@@ -90,14 +90,24 @@ public:
     int keyGetPublicKey (ByteArray** baAlgoId, ByteArray** baPublicKey);
     int keyInitUsage (void* param);
     int keySetOtp (const char* otp);
-    int keySign (const string& signAlgo, const ByteArray* baSignAlgoParams, const vector<ByteArray*>& vbaHashes, vector<ByteArray*>& vbaSignatures);
+    int keySign (const string& signAlgo, const ByteArray* baSignAlgoParams,
+            const vector<ByteArray*>& vbaHashes, vector<ByteArray*>& vbaSignatures);
     int keySignInit (const string& signAlgo, const ByteArray* baSignAlgoParams);
     int keySignUpdate (const ByteArray* baData);
     int keySignFinal (ByteArray** baSignature);
-    int keySignData (const string& signAlgo, const ByteArray* baSignAlgoParams, const ByteArray* baData, ByteArray** baSignature);
+    int keySignData (const string& signAlgo, const ByteArray* baSignAlgoParams,
+            const ByteArray* baData, ByteArray** baSignature);
     int keyAddCertificate (const ByteArray* baCert);
     int keyGetCertificates (vector<ByteArray*>& vbaCerts);
-    int keyGetCsr (const string& signAlgo, const ByteArray* baSignAlgoParams, const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr);
+    int keyGetCsr (const string& signAlgo, const ByteArray* baSignAlgoParams,
+            const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr);
+
+    int keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
+            const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
+            vector<ByteArray*>& vbaSalts, vector<ByteArray*>& vbaWrappedKeys);//no tested
+    int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
+            const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
+            const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys);
 
     CM_SESSION_API* getCmSessionApi (void) const { return m_Session; }
     const CM_KEY_API* getSelectedKey (void) const { return m_SelectedKey; }
