@@ -276,6 +276,8 @@ static int responderid_to_json (JSON_Object* joResult, const OcspClientHelper::R
     case OcspClientHelper::ResponderIdType::BY_KEY:
         DO_JSON(json_object_set_hex(joResult, "responderId", baResponderId));
         break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
 cleanup:
@@ -301,13 +303,12 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
 
     DO(ocspClient.getResponderId(responder_idtype, &ba_responderid));
     DO(responderid_to_json(joResult, responder_idtype, ba_responderid));
-    switch (responder_idtype) {
-    case OcspClientHelper::ResponderIdType::BY_NAME:
+    if (responder_idtype == OcspClientHelper::ResponderIdType::BY_NAME) {
         DO(cerStore.getCertBySubject(ba_responderid, &cer_responder));
-        break;
-    case OcspClientHelper::ResponderIdType::BY_KEY:
+    }
+    else {
+        //  responder_idtype == OcspClientHelper::ResponderIdType::BY_KEY
         DO(cerStore.getCertByKeyId(ba_responderid, &cer_responder));
-        break;
     }
 
     ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
