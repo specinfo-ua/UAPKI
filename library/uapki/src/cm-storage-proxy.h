@@ -106,6 +106,9 @@ public:
             const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
             vector<ByteArray*>& vbaSalts, vector<ByteArray*>& vbaWrappedKeys);//no tested
     int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
+            const ByteArray* baSPKI, const ByteArray* baSalt,
+            const ByteArray* baWrappedKey, ByteArray** baSessionKey);
+    int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
             const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
             const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys);
 

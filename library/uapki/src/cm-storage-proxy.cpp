@@ -642,6 +642,37 @@ int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid
 }
 
 int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
+                    const ByteArray* baSPKI, const ByteArray* baSalt,
+                    const ByteArray* baWrappedKey, ByteArray** baSessionKey)
+{
+    if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
+    if (!m_SelectedKey->dhUnwrapKey) return RET_UAPKI_NOT_SUPPORTED;
+    if (kdfOid.empty() || wrapAlgOid.empty()
+        || !baSPKI || !baSalt || !baWrappedKey || !baSessionKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    vector<const ByteArray*> aba_spkis, aba_salts, aba_wrappedkeys;
+    aba_spkis.push_back(baSPKI);
+    aba_salts.push_back(baSalt);
+    aba_wrappedkeys.push_back(baWrappedKey);
+    CM_BYTEARRAY** cmba_seskeys = nullptr;
+    const int ret =  m_SelectedKey->dhUnwrapKey(m_Session,
+        (const CM_UTF8_CHAR*)kdfOid.c_str(),
+        (const CM_UTF8_CHAR*)wrapAlgOid.c_str(),
+        1,
+        (const CM_BYTEARRAY**)aba_spkis.data(),
+        (const CM_BYTEARRAY**)aba_salts.data(),
+        (const CM_BYTEARRAY**)aba_wrappedkeys.data(),
+        &cmba_seskeys
+    );
+    if (ret == RET_OK) {
+        *baSessionKey = ba_copy_with_alloc((const ByteArray*)cmba_seskeys[0], 0, 0);
+        arrayCmbaFree(1, cmba_seskeys);
+    }
+    return ret;
+}
+
+int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
                     const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
                     const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys)
 {
