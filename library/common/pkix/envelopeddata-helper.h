@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-07
+//  Last update: 2022-04-12
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -58,20 +58,35 @@ namespace Pkcs7 {
         }
     };  //  end struct EncryptedContentInfo
 
-    //class EnvelopedDataBuilder {
-    //    EnvelopedData_t*
-    //                m_EnvData;
-    //    ByteArray*  m_BaEncoded;
+    class EnvelopedDataBuilder {
+        EncryptedContentInfo
+                    m_EncryptedContentInfo;
+        EnvelopedData_t*
+                    m_EnvData;
+        ByteArray*  m_BaEncoded;
 
-    //public:
-    //    EnvelopedDataBuilder (void);
-    //    ~EnvelopedDataBuilder (void);
+    public:
+        EnvelopedDataBuilder (void);
+        ~EnvelopedDataBuilder (void);
 
-    //    int init (void);
-    //    int encode (void);
-    //    ByteArray* getEncoded (const bool move = false);
+        int init (const uint32_t version);
+//int setTest(const ByteArray*ba);//d
+        int addOriginatorCert (const ByteArray* baCertEncoded);
+        int addOriginatorCrl (const ByteArray* baCrlEncoded);
+        //recipientInfos
+        int setEncryptedContentInfo (const char* contentType,
+                const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent);
+        int setEncryptedContentInfo (const string& contentType,
+                const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent);
+        int addUnprotectedAttr (const UapkiNS::Attribute& unprotectedAttrs);
 
-    //};  //  end class EnvelopedDataBuilder
+        int encode (const char* contentType = OID_PKCS7_ENVELOPED_DATA);
+        int encode (const string& contentType);
+        ByteArray* getEncoded (const bool move = false);
+
+        EncryptedContentInfo& getEncryptedContentInfo (void) { return m_EncryptedContentInfo; }
+
+    };  //  end class EnvelopedDataBuilder
 
     class EnvelopedDataParser {
         EnvelopedData_t*
@@ -85,7 +100,8 @@ namespace Pkcs7 {
                     m_RecipientInfoTypes;
         EncryptedContentInfo
                     m_EncryptedContentInfo;
-        //TODO: unprotectedAttrs (OPTIONAL)
+        std::vector<UapkiNS::Attribute>
+                    m_UnprotectedAttrs;
 
     public:
         struct RecipientEncryptedKey {
@@ -156,11 +172,12 @@ namespace Pkcs7 {
         const VectorBA& getOriginatorCrls (void) const { return m_OriginatorInfo.crls; }
         const std::vector<RecipientInfo_PR>& getRecipientInfoTypes (void) const { return m_RecipientInfoTypes; }
         const EncryptedContentInfo& getEncryptedContentInfo (void) const { return m_EncryptedContentInfo; }
-        //TODO: getUnprotectedAttrs (void) const { return TODO; }
+        const std::vector<UapkiNS::Attribute>& getUnprotectedAttrs (void) const { return m_UnprotectedAttrs; }
 
     public:
         static int parseEncryptedContentInfo (const EncryptedContentInfo_t& encryptedContentInfo, EncryptedContentInfo& parsedECI);
         static int parseOriginatorInfo (const OriginatorInfo_t& originatorInfo, OriginatorInfo& parsedOriginatorInfo);
+        static int parseUnprotectedAttrs (const Attributes_t* attrs, std::vector<UapkiNS::Attribute>& parsedAttrs);
 
     };  //  end class EnvelopedDataParser
 

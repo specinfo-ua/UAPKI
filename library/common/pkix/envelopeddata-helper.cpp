@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-08
+//  Last update: 2022-04-12
 
 
 #include "envelopeddata-helper.h"
@@ -36,7 +36,7 @@
 #include <stdio.h>
 
 
-//#define DEBUG_OUTCON(expression)
+#define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
 #define DEBUG_OUTCON(expression) expression
 #endif
@@ -45,6 +45,169 @@
 namespace UapkiNS {
 
 namespace Pkcs7 {
+
+EnvelopedDataBuilder::EnvelopedDataBuilder (void)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataBuilder::EnvelopedDataBuilder()"));
+}
+
+EnvelopedDataBuilder::~EnvelopedDataBuilder (void)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataBuilder::~EnvelopedDataBuilder()"));
+    asn_free(get_EnvelopedData_desc(), m_EnvData);
+}
+
+int EnvelopedDataBuilder::init (const uint32_t version)
+{
+    if (version > 5) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_EnvData = (EnvelopedData_t*)calloc(1, sizeof(EnvelopedData_t));
+    if (!m_EnvData) return RET_UAPKI_GENERAL_ERROR;
+
+    const int ret = asn_ulong2INTEGER(&m_EnvData->version, (unsigned long)version);
+    return ret;
+}
+
+//int EnvelopedDataBuilder::setTest(const ByteArray* ba){ return asn_decode_ba(get_RecipientInfos_desc(), &m_EnvData->recipientInfos, ba); }//d
+
+int EnvelopedDataBuilder::addOriginatorCert (const ByteArray* baCertEncoded)
+{
+    int ret = RET_OK;
+    CertificateChoices_t* cert = nullptr;
+
+    if (!m_EnvData || !baCertEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_EnvData->originatorInfo) {
+        ASN_ALLOC_TYPE(m_EnvData->originatorInfo, OriginatorInfo_t);
+    }
+    if (!m_EnvData->originatorInfo->certs) {
+        ASN_ALLOC_TYPE(m_EnvData->originatorInfo->certs, CertificateSet);
+    }
+
+    ASN_ALLOC_TYPE(cert, CertificateChoices_t);
+    cert->present = CertificateChoices_PR_certificate;
+    DO(asn_decode_ba(get_Certificate_desc(), &cert->choice.certificate, baCertEncoded));
+
+    ASN_SET_ADD(m_EnvData->originatorInfo->certs, cert);
+    cert = nullptr;
+
+cleanup:
+    asn_free(get_CertificateChoices_desc(), cert);
+    return ret;
+}
+
+int EnvelopedDataBuilder::addOriginatorCrl (const ByteArray* baCrlEncoded)
+{
+    int ret = RET_OK;
+    RevocationInfoChoice_t* crl = nullptr;
+
+    if (!m_EnvData || !baCrlEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_EnvData->originatorInfo) {
+        ASN_ALLOC_TYPE(m_EnvData->originatorInfo, OriginatorInfo_t);
+    }
+    if (!m_EnvData->originatorInfo->crls) {
+        ASN_ALLOC_TYPE(m_EnvData->originatorInfo->crls, RevocationInfoChoices);
+    }
+
+    ASN_ALLOC_TYPE(crl, RevocationInfoChoice_t);
+    crl->present = RevocationInfoChoice_PR_crl;
+    DO(asn_decode_ba(get_CertificateList_desc(), &crl->choice.crl, baCrlEncoded));
+
+    ASN_SET_ADD(m_EnvData->originatorInfo->crls, crl);
+    crl = nullptr;
+
+cleanup:
+    asn_free(get_RevocationInfoChoice_desc(), crl);
+    return ret;
+}
+
+int EnvelopedDataBuilder::setEncryptedContentInfo (const char* contentType,
+                    const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent)
+{
+    int ret = RET_OK;
+
+    if (!m_EnvData || !contentType) return RET_UAPKI_INVALID_PARAMETER;
+
+    //  =contentType=
+    DO(asn_set_oid_from_text(contentType, &m_EnvData->encryptedContentInfo.contentType));
+
+    //  =contentEncryptionAlgorithm=
+    DO(asn_set_oid_from_text(aidContentEncryptionAlgoId.algorithm.c_str(),
+        &m_EnvData->encryptedContentInfo.contentEncryptionAlgorithm.algorithm));
+    if (aidContentEncryptionAlgoId.baParameters) {
+        CHECK_NOT_NULL(m_EnvData->encryptedContentInfo.contentEncryptionAlgorithm.parameters =
+            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), aidContentEncryptionAlgoId.baParameters));
+    }
+
+    //  =encryptedContent=
+    if (baEncryptedContent) {
+        ASN_ALLOC_TYPE(m_EnvData->encryptedContentInfo.encryptedContent, OCTET_STRING_t);
+        DO(asn_ba2OCTSTRING(baEncryptedContent, m_EnvData->encryptedContentInfo.encryptedContent));
+    }
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataBuilder::setEncryptedContentInfo (const string& contentType,
+                    const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent)
+{
+    if (!m_EnvData || contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    return setEncryptedContentInfo(contentType.c_str(), aidContentEncryptionAlgoId, baEncryptedContent);
+}
+
+int EnvelopedDataBuilder::addUnprotectedAttr (const UapkiNS::Attribute& unprotectedAttrs)
+{
+    int ret = RET_OK;
+
+    if (!m_EnvData || !unprotectedAttrs.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_EnvData->unprotectedAttrs) {
+        ASN_ALLOC_TYPE(m_EnvData->unprotectedAttrs, Attributes_t);
+    }
+
+    DO(attrs_add_attribute(m_EnvData->unprotectedAttrs, unprotectedAttrs.type.c_str(), unprotectedAttrs.baValues));
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataBuilder::encode (const char* contentType)
+{
+    int ret = RET_OK;
+    ContentInfo_t* content_info = nullptr;
+
+    if (!m_EnvData || !contentType) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(content_info, ContentInfo_t);
+    DO(asn_set_oid_from_text(contentType, &content_info->contentType));
+    DO(asn_set_any(get_EnvelopedData_desc(), (void*)m_EnvData, &content_info->content));
+
+    DO(asn_encode_ba(get_ContentInfo_desc(), content_info, &m_BaEncoded));
+
+cleanup:
+    asn_free(get_ContentInfo_desc(), content_info);
+    return ret;
+}
+
+int EnvelopedDataBuilder::encode (const string& contentType)
+{
+    if (contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    return encode(contentType.c_str());
+}
+
+ByteArray* EnvelopedDataBuilder::getEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaEncoded;
+    if (move) {
+        m_BaEncoded = nullptr;
+    }
+    return rv_ba;
+}
+
 
 
 EnvelopedDataParser::EnvelopedDataParser (void)
@@ -103,8 +266,8 @@ int EnvelopedDataParser::parse (const ByteArray* baEncoded)
     DO(parseEncryptedContentInfo(m_EnvData->encryptedContentInfo, m_EncryptedContentInfo));
 
     //  =unprotectedAttrs= (optional)
-    if (m_EnvData->unprotectedAttrs) {
-        //TODO:
+    if (m_EnvData->unprotectedAttrs && (m_EnvData->unprotectedAttrs->list.count > 0)) {
+        DO(parseUnprotectedAttrs(m_EnvData->unprotectedAttrs, m_UnprotectedAttrs));
     }
 
 cleanup:
@@ -173,6 +336,43 @@ int EnvelopedDataParser::parseOriginatorInfo (const OriginatorInfo_t& originator
     }
 
 cleanup:
+    return ret;
+}
+
+int EnvelopedDataParser::parseUnprotectedAttrs (const Attributes_t* attrs, std::vector<UapkiNS::Attribute>& parsedAttrs)
+{
+    int ret = RET_OK;
+    char* s_type = nullptr;
+
+    if (attrs && (attrs->list.count > 0)) {
+        parsedAttrs.resize(attrs->list.count);
+
+        for (size_t i = 0; i < attrs->list.count; i++) {
+            const Attribute_t* src_attr = attrs->list.array[i];
+            UapkiNS::Attribute& dst_attr = parsedAttrs[i];
+
+            //  =attrType=
+            DO(asn_oid_to_text(&src_attr->type, &s_type));
+            dst_attr.type = string(s_type);
+            ::free(s_type);
+            s_type = nullptr;
+
+            //  =attrValues=
+            if (src_attr->value.list.count > 0) {
+                const AttributeValue_t* attr_value = src_attr->value.list.array[0];
+                dst_attr.baValues = ba_alloc_from_uint8(attr_value->buf, attr_value->size);
+            }
+            else {
+                dst_attr.baValues = ba_alloc();
+            }
+            if (!dst_attr.baValues) {
+                SET_ERROR(RET_MEMORY_ALLOC_ERROR);
+            }
+        }
+    }
+
+cleanup:
+    ::free(s_type);
     return ret;
 }
 
