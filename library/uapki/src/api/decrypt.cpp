@@ -152,28 +152,16 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
             break;
         }
 
-        UapkiNS::VectorBA vba_spkis, vba_salts, vba_encryptedkeys, vba_sessionkeys;
-        vba_spkis.resize(1);
-        vba_salts.resize(1);
-        vba_encryptedkeys.resize(1);
-        vba_spkis[0] = (ByteArray*)csi_originator->baSPKI;
-        vba_salts[0] = (ByteArray*)kar_info.getUkm();
-        vba_encryptedkeys[0] = recip_ekeys[0].baEncryptedKey;
-
         ret = storage->keyDhUnwrapKey(s_kdf, s_wrapalg,
-            vba_spkis, vba_salts,
-            vba_encryptedkeys, vba_sessionkeys);
-        DEBUG_OUTCON(printf("unwrap key, ret: %d\n", ret); printf("vba_SessionKeys, hex: "); ba_print(stdout, vba_sessionkeys[0]));
-        sba_sessionkey.set(vba_sessionkeys[0]);
-        vba_spkis[0] = NULL;
-        vba_salts[0] = NULL;
-        vba_encryptedkeys[0] = NULL;
-        vba_sessionkeys[0] = NULL;
+            csi_originator->baSPKI, kar_info.getUkm(), recip_ekeys[0].baEncryptedKey,
+            &sba_sessionkey);
+        DEBUG_OUTCON(printf("unwrap key, ret: %d\n", ret); printf("vba_SessionKeys, hex: "); ba_print(stdout, sba_sessionkey.get()));
     }
 
     {   //TODO
         const string s_cryptalgo = envdata_parser.getEncryptedContentInfo().contentEncryptionAlgo.algorithm;
         if (s_cryptalgo != OID_GOST28147_CFB) return RET_UAPKI_NOT_SUPPORTED;//now only GOST28147_CFB ("1.2.804.2.1.1.1.1.1.1.3")
+        //baParameters, hex: 300F060B2A862402010101010101050500 //1.2.804.2.1.1.1.1.1.1.5 Gost28147wrap
 
         UapkiNS::SmartBA sba_iv;
         Gost28147Ctx* ctx = NULL;
@@ -196,6 +184,11 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
 
         if (csi_originator) {
             DO(json_object_set_base64(joResult, "originatorCertId", csi_originator->baCertId));
+        }
+
+        if (!envdata_parser.getUnprotectedAttrs().empty()) {
+            DEBUG_OUTCON(printf("unprotectedAttrs, count: %zu\n", envdata_parser.getUnprotectedAttrs().size()));
+            //TODO: set array of UnprotectedAttrs
         }
     }
 
