@@ -258,6 +258,30 @@ cleanup:
     return ret;
 }
 
+int asn_encodevalue_gentime (GeneralizedTime_t* genTime, const char* stime)
+{
+    int ret = RET_OK;
+    ByteArray* ba_date = NULL;
+    size_t len;
+
+    CHECK_PARAM(genTime != NULL);
+    CHECK_PARAM(stime != NULL);
+
+    len = strlen(stime);
+    if (len < 14) {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
+
+    CHECK_NOT_NULL(ba_date = ba_alloc_from_str(stime));
+    DO(ba_change_len(ba_date, len + 1));
+    DO(ba_set_byte(ba_date, len, 'Z'));
+    DO(asn_ba2OCTSTRING(ba_date, genTime));
+
+cleanup:
+    ba_free(ba_date);
+    return ret;
+}
+
 bool asn_octetstring_data_is_equals (const OCTET_STRING_t* octetStr1, const OCTET_STRING_t* octetStr2)
 {
     if ((octetStr1 == NULL) || (octetStr2 == NULL) || (octetStr1->size != octetStr2->size)) return false;

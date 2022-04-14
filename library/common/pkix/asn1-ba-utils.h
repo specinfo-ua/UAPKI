@@ -48,6 +48,7 @@ int asn_decodevalue_octetstring_to_stime (const OCTET_STRING_t* octetTime, char*
 int asn_decodevalue_octetstring_to_str (const OCTET_STRING_t* octetString, char** str);
 int asn_decodevalue_pkixtime (const PKIXTime_t* pkixTime, uint64_t* msTime);
 int asn_decodevalue_utctime (const UTCTime_t* utcTime, uint64_t* msTime);
+int asn_encodevalue_gentime (GeneralizedTime_t* genTime, const char* stime);
 
 bool asn_octetstring_data_is_equals (const OCTET_STRING_t* octetStr1, const OCTET_STRING_t* octetStr2);
 bool asn_primitive_data_is_equals (const ASN__PRIMITIVE_TYPE_t* primType1, const ASN__PRIMITIVE_TYPE_t* primType2);
