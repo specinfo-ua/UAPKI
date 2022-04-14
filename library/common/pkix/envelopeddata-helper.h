@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-12
+//  Last update: 2022-04-14
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -58,22 +58,70 @@ namespace Pkcs7 {
         }
     };  //  end struct EncryptedContentInfo
 
+    struct RecipientEncryptedKey {
+        ByteArray* baRid;
+        ByteArray* baEncryptedKey;
+
+        RecipientEncryptedKey (void)
+            : baRid(nullptr), baEncryptedKey(nullptr) {}
+        ~RecipientEncryptedKey (void) {
+            ba_free(baRid);
+            ba_free(baEncryptedKey);
+        }
+    };  //  end struct RecipientEncryptedKey
+
     class EnvelopedDataBuilder {
+        class RecipientInfoBase {
+            const RecipientInfo_PR
+                        m_RecipInfoType;
+
+        public:
+            RecipientInfoBase (const RecipientInfo_PR iRecipInfoType);
+            ~RecipientInfoBase (void);
+
+            RecipientInfo_PR getRecipientInfoType (void) const { return m_RecipInfoType; }
+
+        };  //  end class RecipientInfoBase
+
         EncryptedContentInfo
                     m_EncryptedContentInfo;
         EnvelopedData_t*
                     m_EnvData;
+        std::vector<RecipientInfoBase*>
+                    m_RecipientInfos;
         ByteArray*  m_BaEncoded;
+
+    public:
+        class KeyAgreeRecipientInfo : public RecipientInfoBase {
+            KeyAgreeRecipientInfo_t*
+                        m_RefKari;
+
+        public:
+            KeyAgreeRecipientInfo (KeyAgreeRecipientInfo_t* iRefKari);
+            ~KeyAgreeRecipientInfo (void);
+
+            int setVersion (const uint32_t version = 3u);
+            int setOriginatorByIssuerAndSN (const ByteArray* baIssuerAndSN);
+            int setOriginatorBySubjectKeyId (const ByteArray* baSubjectKeyId);
+            int setOriginatorByPublicKey (const UapkiNS::AlgorithmIdentifier& aidOriginator, const ByteArray* baPublicKey);
+            int setUkm (const ByteArray* baUkm);
+            int setKeyEncryptionAlgorithm (const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgoId);
+            int addRecipientEncryptedKey (const RecipientEncryptedKey& recipEncryptedKey);
+            int addRecipientEncryptedKeyByIssuerAndSN (const ByteArray* baIssuerAndSN, const ByteArray* baEncryptedKey);
+            int addRecipientEncryptedKeyByRecipientKeyId (const ByteArray* baSubjectKeyId, const ByteArray* baEncryptedKey,
+                    const std::string& date = std::string(""), const ByteArray* baOtherKeyAttribute = nullptr);
+
+        };  //  end class KeyAgreeRecipientInfo
 
     public:
         EnvelopedDataBuilder (void);
         ~EnvelopedDataBuilder (void);
 
         int init (const uint32_t version);
-//int setTest(const ByteArray*ba);//d
         int addOriginatorCert (const ByteArray* baCertEncoded);
         int addOriginatorCrl (const ByteArray* baCrlEncoded);
-        //recipientInfos
+        int addRecipientInfo (const RecipientInfo_PR recipInfoType);
+        KeyAgreeRecipientInfo* getKeyAgreeRecipientInfo (const size_t index = 0) const;
         int setEncryptedContentInfo (const char* contentType,
                 const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent);
         int setEncryptedContentInfo (const string& contentType,
@@ -104,18 +152,6 @@ namespace Pkcs7 {
                     m_UnprotectedAttrs;
 
     public:
-        struct RecipientEncryptedKey {
-            ByteArray*  baRid;
-            ByteArray*  baEncryptedKey;
-
-            RecipientEncryptedKey (void)
-                : baRid(nullptr), baEncryptedKey(nullptr) {}
-            ~RecipientEncryptedKey (void) {
-                ba_free(baRid);
-                ba_free(baEncryptedKey);
-            }
-        };  //  end class RecipientEncryptedKey
-
         class KeyAgreeRecipientIdentifier {
             KeyAgreeRecipientIdentifier_t*
                         m_KarId;

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-12
+//  Last update: 2022-04-14
 
 
 #include "envelopeddata-helper.h"
@@ -36,7 +36,7 @@
 #include <stdio.h>
 
 
-#define DEBUG_OUTCON(expression)
+//#define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
 #define DEBUG_OUTCON(expression) expression
 #endif
@@ -55,6 +55,18 @@ EnvelopedDataBuilder::~EnvelopedDataBuilder (void)
 {
     DEBUG_OUTCON(puts("EnvelopedDataBuilder::~EnvelopedDataBuilder()"));
     asn_free(get_EnvelopedData_desc(), m_EnvData);
+    for (size_t i = 0; i < m_RecipientInfos.size(); i++) {
+        RecipientInfoBase* recip_info = m_RecipientInfos[i];
+        switch (recip_info->getRecipientInfoType()) {
+        case RecipientInfo_PR_kari:
+            delete (KeyAgreeRecipientInfo*)recip_info;
+            break;
+        default:
+            break;
+        }
+        recip_info = nullptr;
+    }
+    ba_free(m_BaEncoded);
 }
 
 int EnvelopedDataBuilder::init (const uint32_t version)
@@ -67,8 +79,6 @@ int EnvelopedDataBuilder::init (const uint32_t version)
     const int ret = asn_ulong2INTEGER(&m_EnvData->version, (unsigned long)version);
     return ret;
 }
-
-//int EnvelopedDataBuilder::setTest(const ByteArray* ba){ return asn_decode_ba(get_RecipientInfos_desc(), &m_EnvData->recipientInfos, ba); }//d
 
 int EnvelopedDataBuilder::addOriginatorCert (const ByteArray* baCertEncoded)
 {
@@ -120,6 +130,57 @@ int EnvelopedDataBuilder::addOriginatorCrl (const ByteArray* baCrlEncoded)
 cleanup:
     asn_free(get_RevocationInfoChoice_desc(), crl);
     return ret;
+}
+
+int EnvelopedDataBuilder::addRecipientInfo (const RecipientInfo_PR recipInfoType)
+{
+    int ret = RET_OK;
+    RecipientInfo_t* recip_info = nullptr;
+    RecipientInfoBase* recipinfo_item = nullptr;
+
+    ASN_ALLOC_TYPE(recip_info, RecipientInfo_t);
+
+    recip_info->present = recipInfoType;
+    switch (recipInfoType) {
+    case RecipientInfo_PR_kari:
+        recipinfo_item = new KeyAgreeRecipientInfo(&recip_info->choice.kari);
+        break;
+    //case RecipientInfo_PR_ktri: case RecipientInfo_PR_kekri: case RecipientInfo_PR_pwri: case RecipientInfo_PR_ori:
+    default:
+        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+    }
+    if (!recipinfo_item) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+
+    ASN_SET_ADD(&m_EnvData->recipientInfos, recip_info);
+    recip_info = nullptr;
+
+    m_RecipientInfos.push_back(recipinfo_item);
+    recipinfo_item = nullptr;
+
+cleanup:
+    asn_free(get_RecipientInfo_desc(), recip_info);
+    if (recipinfo_item) {
+        switch (recipInfoType) {
+        case RecipientInfo_PR_kari:
+            delete (KeyAgreeRecipientInfo*)recipinfo_item;
+            break;
+        default:
+            //TODO:
+            break;
+        }
+    }
+    return ret;
+}
+
+EnvelopedDataBuilder::KeyAgreeRecipientInfo* EnvelopedDataBuilder::getKeyAgreeRecipientInfo (const size_t index) const
+{
+    if (index >= m_RecipientInfos.size()) return nullptr;
+
+    if (m_RecipientInfos[index]->getRecipientInfoType() != RecipientInfo_PR_kari) return nullptr;
+
+    return (KeyAgreeRecipientInfo*)m_RecipientInfos[index];
 }
 
 int EnvelopedDataBuilder::setEncryptedContentInfo (const char* contentType,
@@ -206,6 +267,198 @@ ByteArray* EnvelopedDataBuilder::getEncoded (const bool move)
         m_BaEncoded = nullptr;
     }
     return rv_ba;
+}
+
+
+
+EnvelopedDataBuilder::RecipientInfoBase::RecipientInfoBase (const RecipientInfo_PR iRecipInfoType)
+    : m_RecipInfoType(iRecipInfoType)
+{
+    DEBUG_OUTCON(printf("EnvelopedDataBuilder::RecipientInfoBase::RecipientInfoBase(%d)\n", m_RecipInfoType));
+}
+
+EnvelopedDataBuilder::RecipientInfoBase::~RecipientInfoBase (void)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataBuilder::RecipientInfoBase::~RecipientInfoBase()"));
+}
+
+
+
+EnvelopedDataBuilder::KeyAgreeRecipientInfo::KeyAgreeRecipientInfo (KeyAgreeRecipientInfo_t* iRefKari)
+    : RecipientInfoBase(RecipientInfo_PR_kari)
+    , m_RefKari(iRefKari)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataBuilder::KeyAgreeRecipientInfo::KeyAgreeRecipientInfo()"));
+}
+
+EnvelopedDataBuilder::KeyAgreeRecipientInfo::~KeyAgreeRecipientInfo (void)
+{
+    DEBUG_OUTCON(puts("EnvelopedDataBuilder::KeyAgreeRecipientInfo::KeyAgreeRecipientInfo()"));
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setVersion (const uint32_t version)
+{
+    if (!m_RefKari) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_ulong2INTEGER(&m_RefKari->version, (unsigned long)version);
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setOriginatorByIssuerAndSN (const ByteArray* baIssuerAndSN)
+{
+    if (!m_RefKari || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_RefKari->originator.present = OriginatorIdentifierOrKey_PR_issuerAndSerialNumber;
+    return asn_decode_ba(get_IssuerAndSerialNumber_desc(), &m_RefKari->originator.choice.issuerAndSerialNumber, baIssuerAndSN);
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setOriginatorBySubjectKeyId (const ByteArray* baSubjectKeyId)
+{
+    if (!m_RefKari || !baSubjectKeyId) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_RefKari->originator.present = OriginatorIdentifierOrKey_PR_subjectKeyIdentifier;
+    return asn_ba2OCTSTRING(baSubjectKeyId, &m_RefKari->originator.choice.subjectKeyIdentifier);
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setOriginatorByPublicKey (const UapkiNS::AlgorithmIdentifier& aidOriginator, const ByteArray* baPublicKey)
+{
+    if (!m_RefKari || !aidOriginator.isPresent() || !baPublicKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    OriginatorPublicKey_t& origin_pubkey = m_RefKari->originator.choice.originatorKey;
+    m_RefKari->originator.present = OriginatorIdentifierOrKey_PR_originatorKey;
+
+    //  =algorithm(algorithm, parameters)=
+    DO(asn_set_oid_from_text(aidOriginator.algorithm.c_str(), &origin_pubkey.algorithm.algorithm));
+    if (aidOriginator.baParameters) {
+        CHECK_NOT_NULL(origin_pubkey.algorithm.parameters =
+            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), aidOriginator.baParameters));
+    }
+
+    //  =publicKey=
+    DO(asn_ba2BITSTRING(baPublicKey, &origin_pubkey.publicKey));
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setUkm (const ByteArray* baUkm)
+{
+    if (!m_RefKari) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+
+    ASN_ALLOC_TYPE(m_RefKari->ukm, UserKeyingMaterial_t);
+
+    DO(asn_ba2OCTSTRING(baUkm, m_RefKari->ukm));
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setKeyEncryptionAlgorithm (const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgoId)
+{
+    if (!m_RefKari || !aidKeyEncryptionAlgoId.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+
+    //  =algorithm=
+    DO(asn_set_oid_from_text(aidKeyEncryptionAlgoId.algorithm.c_str(), &m_RefKari->keyEncryptionAlgorithm.algorithm));
+
+    //  =parameters=
+    if (aidKeyEncryptionAlgoId.baParameters) {
+        CHECK_NOT_NULL(m_RefKari->keyEncryptionAlgorithm.parameters =
+            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), aidKeyEncryptionAlgoId.baParameters));
+    }
+
+cleanup:
+    return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::addRecipientEncryptedKey (const RecipientEncryptedKey& recipEncryptedKey)
+{
+    if (!m_RefKari || !recipEncryptedKey.baRid || !recipEncryptedKey.baEncryptedKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    RecipientEncryptedKey_t* recip_encrkey = nullptr;
+
+    ASN_ALLOC_TYPE(recip_encrkey, RecipientEncryptedKey_t);
+
+    //  =rid=
+    DO(asn_decode_ba(get_KeyAgreeRecipientIdentifier_desc(), &recip_encrkey->rid, recipEncryptedKey.baRid));
+
+    //  =encryptedKey=
+    DO(asn_ba2OCTSTRING(recipEncryptedKey.baEncryptedKey, &recip_encrkey->encryptedKey));
+
+    ASN_SEQUENCE_ADD(&m_RefKari->recipientEncryptedKeys, recip_encrkey);
+    recip_encrkey = nullptr;
+
+cleanup:
+    asn_free(get_RecipientEncryptedKey_desc(), recip_encrkey);
+    return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::addRecipientEncryptedKeyByIssuerAndSN (const ByteArray* baIssuerAndSN, const ByteArray* baEncryptedKey)
+{
+    if (!m_RefKari || !baIssuerAndSN || !baEncryptedKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    RecipientEncryptedKey_t* recip_encrkey = nullptr;
+
+    ASN_ALLOC_TYPE(recip_encrkey, RecipientEncryptedKey_t);
+
+    //  =rid.issuerAndSerialNumber=
+    recip_encrkey->rid.present = KeyAgreeRecipientIdentifier_PR_issuerAndSerialNumber;
+    DO(asn_decode_ba(get_IssuerAndSerialNumber_desc(), &recip_encrkey->rid.choice.issuerAndSerialNumber, baIssuerAndSN));
+
+    //  =encryptedKey=
+    DO(asn_ba2OCTSTRING(baEncryptedKey, &recip_encrkey->encryptedKey));
+
+    ASN_SEQUENCE_ADD(&m_RefKari->recipientEncryptedKeys, recip_encrkey);
+    recip_encrkey = nullptr;
+
+cleanup:
+    asn_free(get_RecipientEncryptedKey_desc(), recip_encrkey);
+    return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::addRecipientEncryptedKeyByRecipientKeyId (const ByteArray* baSubjectKeyId, const ByteArray* baEncryptedKey,
+                    const std::string& date, const ByteArray* baOtherKeyAttribute)
+{
+    if (!m_RefKari || !baSubjectKeyId || !baEncryptedKey || (!date.empty() && (date.size() != 14))) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    RecipientEncryptedKey_t* recip_encrkey = nullptr;
+
+    ASN_ALLOC_TYPE(recip_encrkey, RecipientEncryptedKey_t);
+
+    recip_encrkey->rid.present = KeyAgreeRecipientIdentifier_PR_rKeyId;
+    {   //  =rid.rKeyId=
+        RecipientKeyIdentifier_t& recip_keyid = recip_encrkey->rid.choice.rKeyId;
+
+        //  =subjectKeyIdentifier=
+        DO(asn_ba2OCTSTRING(baSubjectKeyId, &recip_keyid.subjectKeyIdentifier));
+
+        //  =date= (optional)
+        if (!date.empty()) {
+            ASN_ALLOC_TYPE(recip_keyid.date, GeneralizedTime_t);
+            DO(asn_encodevalue_gentime(recip_keyid.date, date.c_str()));
+        }
+
+        //  =other= (optional)
+        if (baOtherKeyAttribute) {
+            CHECK_NOT_NULL(recip_keyid.other = (OtherKeyAttribute_t*)asn_decode_ba_with_alloc(get_OtherKeyAttribute_desc(), baOtherKeyAttribute));
+        }
+    }
+
+    //  =encryptedKey=
+    DO(asn_ba2OCTSTRING(baEncryptedKey, &recip_encrkey->encryptedKey));
+
+    ASN_SEQUENCE_ADD(&m_RefKari->recipientEncryptedKeys, recip_encrkey);
+    recip_encrkey = nullptr;
+
+cleanup:
+    asn_free(get_RecipientEncryptedKey_desc(), recip_encrkey);
+    return ret;
 }
 
 

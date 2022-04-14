@@ -134,7 +134,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
         const string s_wrapalg = string(OID_GOST28147_WRAP);// "1.2.804.2.1.1.1.1.1.1.5";
 
         //DEBUG_OUTCON(printf("kar_info.recipientEncryptedKeys, count: %zu\n", kar_info.getRecipientEncryptedKeys().size()));
-        const vector<UapkiNS::Pkcs7::EnvelopedDataParser::RecipientEncryptedKey>& recip_ekeys = kar_info.getRecipientEncryptedKeys();
+        const vector<UapkiNS::Pkcs7::RecipientEncryptedKey>& recip_ekeys = kar_info.getRecipientEncryptedKeys();
         UapkiNS::Pkcs7::EnvelopedDataParser::KeyAgreeRecipientIdentifier kar_id;
         DO(kar_id.parse(recip_ekeys[0].baRid));
         DEBUG_OUTCON(printf("kar_id.type: %u\n", kar_id.getType()));
