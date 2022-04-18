@@ -80,6 +80,23 @@ cleanup:
     return ret;
 }
 
+static int result_set_list_unprattrs (JSON_Object* joResult, const char* key, const vector<UapkiNS::Attribute>& attrs)
+{
+    int ret = RET_OK;
+    json_object_set_value(joResult, key, json_value_init_array());
+    JSON_Array* ja_attrs = json_object_get_array(joResult, key);
+    for (size_t i = 0; i < attrs.size(); i++) {
+        const UapkiNS::Attribute& attr = attrs[i];
+        json_array_append_value(ja_attrs, json_value_init_object());
+        JSON_Object* jo_attr = json_array_get_object(ja_attrs, i);
+        DO_JSON(json_object_set_string(jo_attr, "type", attr.type.c_str()));
+        DO_JSON(json_object_set_base64(jo_attr, "bytes", attr.baValues));
+    }
+
+cleanup:
+    return ret;
+}
+
 
 int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
 {
@@ -87,7 +104,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
     CerStore* cer_store = nullptr;
     const CerStore::Item* csi_originator = nullptr;
     UapkiNS::Pkcs7::EnvelopedDataParser envdata_parser;
-    UapkiNS::SmartBA sba_data, sba_decrypted, sba_sessionkey, sba_spki;
+    UapkiNS::SmartBA sba_data, sba_decrypted, sba_sessionkey;
     size_t idx_recip = 0;
 
     cer_store = get_cerstore();
@@ -116,10 +133,11 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
             DO(cer_store->getCertBySID(kar_info.getOriginator(), &csi_originator));
             break;
         case OriginatorIdentifierOrKey_PR_subjectKeyIdentifier:
-            DO(cer_store->getCertByKeyId(kar_info.getOriginator(), &csi_originator));//not tested
+            DO(cer_store->getCertByKeyId(kar_info.getOriginator(), &csi_originator));
             break;
         case OriginatorIdentifierOrKey_PR_originatorKey:
-            return RET_UAPKI_NOT_SUPPORTED;//TODO: need impl
+            //Nothing: use kar_info.getOriginator() later - in keyDhUnwrapKey()
+            break;
         default:
             return RET_UAPKI_INVALID_PARAMETER;
         }
@@ -153,7 +171,9 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
         }
 
         ret = storage->keyDhUnwrapKey(s_kdf, s_wrapalg,
-            csi_originator->baSPKI, kar_info.getUkm(), recip_ekeys[0].baEncryptedKey,
+            (csi_originator) ? csi_originator->baSPKI : kar_info.getOriginator(),
+            kar_info.getUkm(),
+            recip_ekeys[0].baEncryptedKey,
             &sba_sessionkey);
         DEBUG_OUTCON(printf("unwrap key, ret: %d\n", ret); printf("vba_SessionKeys, hex: "); ba_print(stdout, sba_sessionkey.get()));
     }
@@ -188,7 +208,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
 
         if (!envdata_parser.getUnprotectedAttrs().empty()) {
             DEBUG_OUTCON(printf("unprotectedAttrs, count: %zu\n", envdata_parser.getUnprotectedAttrs().size()));
-            //TODO: set array of UnprotectedAttrs
+            DO(result_set_list_unprattrs(joResult, "unprotectedAttrs", envdata_parser.getUnprotectedAttrs()));
         }
     }
 

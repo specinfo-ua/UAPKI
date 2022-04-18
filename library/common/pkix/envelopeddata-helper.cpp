@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-14
+//  Last update: 2022-04-18
 
 
 #include "envelopeddata-helper.h"
@@ -36,7 +36,7 @@
 #include <stdio.h>
 
 
-//#define DEBUG_OUTCON(expression)
+#define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
 #define DEBUG_OUTCON(expression) expression
 #endif
@@ -778,7 +778,7 @@ int EnvelopedDataParser::KeyAgreeRecipientInfo::parseOriginator (const Originato
         DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), &originatorIdOrKey.choice.issuerAndSerialNumber, baEncodedOriginator));
         break;
     case OriginatorIdentifierOrKey_PR_subjectKeyIdentifier:
-        DO(asn_encode_ba(get_SubjectKeyIdentifier_desc(), &originatorIdOrKey.choice.subjectKeyIdentifier, baEncodedOriginator));
+        DO(asn_OCTSTRING2ba(&originatorIdOrKey.choice.subjectKeyIdentifier, baEncodedOriginator));
         break;
     case OriginatorIdentifierOrKey_PR_originatorKey:
         DO(asn_encode_ba(get_OriginatorPublicKey_desc(), &originatorIdOrKey.choice.originatorKey, baEncodedOriginator));
