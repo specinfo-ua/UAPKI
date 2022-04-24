@@ -25,6 +25,7 @@
     <ClCompile Include="..\common\pkix\attribute-utils.c" />
     <ClCompile Include="..\common\pkix\ba-utils.c" />
     <ClCompile Include="..\common\pkix\certreq-builder.cpp" />
+    <ClCompile Include="..\common\pkix\cipher-helper.cpp" />
     <ClCompile Include="..\common\pkix\content-info.c" />
     <ClCompile Include="..\common\pkix\dstu-ns.cpp" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
@@ -33,9 +34,12 @@
     <ClCompile Include="..\common\pkix\extension-utils.c" />
     <ClCompile Include="..\common\pkix\http-helper.cpp" />
     <ClCompile Include="..\common\pkix\iconv-utils.c" />
+    <ClCompile Include="..\common\pkix\iso15946.c" />
+    <ClCompile Include="..\common\pkix\key-wrap.c" />
     <ClCompile Include="..\common\pkix\ocsp-utils.c" />
     <ClCompile Include="..\common\pkix\oids.c" />
     <ClCompile Include="..\common\pkix\oid-utils.c" />
+    <ClCompile Include="..\common\pkix\private-key.c" />
     <ClCompile Include="..\common\pkix\tsp-utils.c" />
     <ClCompile Include="..\common\pkix\uapki-errors.c" />
     <ClCompile Include="..\common\pkix\verify-utils.c" />
@@ -100,6 +104,7 @@
     <ClInclude Include="..\common\pkix\attribute-utils.h" />
     <ClInclude Include="..\common\pkix\ba-utils.h" />
     <ClInclude Include="..\common\pkix\certreq-builder.h" />
+    <ClInclude Include="..\common\pkix\cipher-helper.h" />
     <ClInclude Include="..\common\pkix\common.h" />
     <ClInclude Include="..\common\pkix\content-info.h" />
     <ClInclude Include="..\common\pkix\dstu-ns.h" />
@@ -109,11 +114,15 @@
     <ClInclude Include="..\common\pkix\extension-utils.h" />
     <ClInclude Include="..\common\pkix\http-helper.h" />
     <ClInclude Include="..\common\pkix\iconv-utils.h" />
+    <ClInclude Include="..\common\pkix\iso15946.h" />
+    <ClInclude Include="..\common\pkix\key-wrap.h" />
     <ClInclude Include="..\common\pkix\ocsp-utils.h" />
     <ClInclude Include="..\common\pkix\oids.h" />
     <ClInclude Include="..\common\pkix\oid-utils.h" />
+    <ClInclude Include="..\common\pkix\private-key.h" />
     <ClInclude Include="..\common\pkix\tsp-utils.h" />
     <ClInclude Include="..\common\pkix\uapki-errors.h" />
+    <ClInclude Include="..\common\pkix\uapki-ns.h" />
     <ClInclude Include="..\common\pkix\verify-utils.h" />
     <ClInclude Include="..\common\json\parson-ba-utils.h" />
     <ClInclude Include="..\common\json\parson-helper.h" />

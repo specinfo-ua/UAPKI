@@ -153,9 +153,9 @@ UAPKI_EXPORT char* process (const char* request)
     else if (strcmp(s_method, "DECRYPT") == 0) {
         err_code = uapki_decrypt(jo_params, jo_result);
     }
-    //else if (strcmp(s_method, "ENCRYPT") == 0) {
-    //    err_code = uapki_encrypt(jo_params, jo_result);
-    //}
+    else if (strcmp(s_method, "ENCRYPT") == 0) {
+        err_code = uapki_encrypt(jo_params, jo_result);
+    }
     else {
         err_code = RET_UAPKI_INVALID_METHOD;
     }

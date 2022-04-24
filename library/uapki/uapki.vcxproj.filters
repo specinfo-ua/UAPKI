@@ -234,6 +234,18 @@
     <ClCompile Include="..\common\pkix\envelopeddata-helper.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\cipher-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\private-key.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\iso15946.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\key-wrap.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -369,6 +381,21 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\envelopeddata-helper.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\cipher-helper.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\private-key.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\iso15946.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\key-wrap.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\uapki-ns.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
