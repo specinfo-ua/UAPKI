@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -47,7 +47,7 @@ static CM_ERROR cm_key_get_info (CM_SESSION_API* session,
     if (!session) return RET_CM_NO_SESSION;
     if (!keyInfo && !baKeyId) return RET_CM_INVALID_PARAMETER;
 
-    SessionPkcs12Context *ss_ctx = (SessionPkcs12Context*)session->ctx;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
     FileStorage& storage = ss_ctx->fileStorage;
@@ -85,7 +85,7 @@ static CM_ERROR cm_key_get_public_key (CM_SESSION_API* session,
     if (!session) return RET_CM_NO_SESSION;
     if (!baAlgorithmIdentifier && !baPublicKey) return RET_CM_INVALID_PARAMETER;
 
-    SessionPkcs12Context *ss_ctx = (SessionPkcs12Context*)session->ctx;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
     FileStorage& storage = ss_ctx->fileStorage;
@@ -94,7 +94,11 @@ static CM_ERROR cm_key_get_public_key (CM_SESSION_API* session,
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
-    const int ret = spki_by_privkeyinfo(selected_key->bagValue(), (ByteArray**)baAlgorithmIdentifier, (ByteArray**)baPublicKey);
+    const int ret = spki_by_privkeyinfo(
+        selected_key->bagValue(),
+        (ByteArray**)baAlgorithmIdentifier,
+        (ByteArray**)baPublicKey
+    );
     return ret;
 }   //  cm_key_get_public_key
 
@@ -106,7 +110,7 @@ static CM_ERROR cm_key_sign (CM_SESSION_API* session,
     if (!session) return RET_CM_NO_SESSION;
     if ((count == 0) || !abaHashes || !abaSignatures) return RET_CM_INVALID_PARAMETER;
 
-    SessionPkcs12Context *ss_ctx = (SessionPkcs12Context*)session->ctx;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
     FileStorage& storage = ss_ctx->fileStorage;
@@ -115,8 +119,14 @@ static CM_ERROR cm_key_sign (CM_SESSION_API* session,
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
-    const int ret = private_key_sign(selected_key->bagValue(), (const ByteArray**) abaHashes, count,
-        (const char*) signAlgo, (const ByteArray*) baSignAlgoParams, (ByteArray***) abaSignatures);
+    const int ret = private_key_sign(
+        selected_key->bagValue(),
+        (const ByteArray**) abaHashes,
+        count,
+        (const char*) signAlgo,
+        (const ByteArray*) baSignAlgoParams,
+        (ByteArray***) abaSignatures
+    );
     return ret;
 }   //  cm_key_sign
 
@@ -139,7 +149,12 @@ static CM_ERROR cm_key_sign_init (CM_SESSION_API* session,
     ss_ctx->resetSignLong();
 
     HashAlg hash_algo = HASH_ALG_UNDEFINED;
-    const int ret = private_key_sign_check(selected_key->bagValue(), (const char*) signAlgo, (const ByteArray*) baSignAlgoParams, &hash_algo);
+    const int ret = private_key_sign_check(
+        selected_key->bagValue(),
+        (const char*) signAlgo,
+        (const ByteArray*) baSignAlgoParams,
+        &hash_algo
+    );
     if (ret != RET_OK) return ret;
 
     ss_ctx->ctxHash = hash_alloc(hash_algo);
@@ -210,9 +225,9 @@ static CM_ERROR cm_key_dh_wrap_key (CM_SESSION_API* session,
 {
     DEBUG_OUTCON(puts("cm_key_dh_wrap_key()"));
     if (!session) return RET_CM_NO_SESSION;
-    if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaSessionKeys || !abaSalts || !abaWrappedKeys) return RET_CM_INVALID_PARAMETER;
+    if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaSessionKeys || !abaWrappedKeys) return RET_CM_INVALID_PARAMETER;
 
-    SessionPkcs12Context *ss_ctx = (SessionPkcs12Context*)session->ctx;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
     FileStorage& storage = ss_ctx->fileStorage;
@@ -221,10 +236,18 @@ static CM_ERROR cm_key_dh_wrap_key (CM_SESSION_API* session,
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
-    const int ret = key_wrap(selected_key->bagValue(), true,
-        (const char*)kdfOid, (const char*)wrapAlgOid,
-        count, (const ByteArray**)abaPubkeys, (const ByteArray**)abaSessionKeys,
-        (ByteArray***)abaSalts, (ByteArray***)abaWrappedKeys);
+    ByteArray** aba_stubsalts = nullptr;
+    const int ret = key_wrap(
+        selected_key->bagValue(),
+        (abaSalts),
+        (const char*)kdfOid,
+        (const char*)wrapAlgOid,
+        count,
+        (const ByteArray**)abaPubkeys,
+        (const ByteArray**)abaSessionKeys,
+        (abaSalts) ? ((ByteArray***)abaSalts) : &aba_stubsalts,
+        (ByteArray***)abaWrappedKeys
+    );
     return ret;
 }   //  cm_key_dh_wrap_key
 
@@ -237,7 +260,7 @@ static CM_ERROR cm_key_dh_unwrap_key (CM_SESSION_API* session,
     if (!session) return RET_CM_NO_SESSION;
     if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaWrappedKeys || !abaSessionKeys) return RET_CM_INVALID_PARAMETER;
 
-    SessionPkcs12Context *ss_ctx = (SessionPkcs12Context*)session->ctx;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
     FileStorage& storage = ss_ctx->fileStorage;
@@ -246,10 +269,16 @@ static CM_ERROR cm_key_dh_unwrap_key (CM_SESSION_API* session,
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
-    const int ret = key_unwrap(selected_key->bagValue(),
-        (const char*)kdfOid, (const char*)wrapAlgOid,
-        count, (const ByteArray**)abaPubkeys, (const ByteArray**)abaSalts, (const ByteArray**)abaWrappedKeys,
-        (ByteArray***)abaSessionKeys);
+    const int ret = key_unwrap(
+        selected_key->bagValue(),
+        (const char*)kdfOid,
+        (const char*)wrapAlgOid,
+        count,
+        (const ByteArray**)abaPubkeys,
+        (const ByteArray**)abaSalts,
+        (const ByteArray**)abaWrappedKeys,
+        (ByteArray***)abaSessionKeys
+    );
     return ret;
 }   //  cm_key_dh_unwrap_key
 
