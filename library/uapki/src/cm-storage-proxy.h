@@ -103,8 +103,11 @@ public:
             const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr);
 
     int keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
+            const ByteArray* baSPKI, const ByteArray* baSessionKey,
+            ByteArray** baSalt, ByteArray** baWrappedKey);
+    int keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
             const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
-            vector<ByteArray*>& vbaSalts, vector<ByteArray*>& vbaWrappedKeys);//no tested
+            vector<ByteArray*>* vbaSalts, vector<ByteArray*>& vbaWrappedKeys);
     int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
             const ByteArray* baSPKI, const ByteArray* baSalt,
             const ByteArray* baWrappedKey, ByteArray** baSessionKey);
