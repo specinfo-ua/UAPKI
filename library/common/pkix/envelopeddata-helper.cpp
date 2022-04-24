@@ -25,13 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-18
+//  Last update: 2022-04-24
 
 
 #include "envelopeddata-helper.h"
 #include "api-json-internal.h"
 #include "asn1-ba-utils.h"
 #include "attribute-utils.h"
+#include "dstu-ns.h"
 #include "oid-utils.h"
 #include <stdio.h>
 
@@ -335,10 +336,23 @@ int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setOriginatorByPublicKey (const
     }
 
     //  =publicKey=
-    DO(asn_ba2BITSTRING(baPublicKey, &origin_pubkey.publicKey));
+    if (DstuNS::isDstu4145family(aidOriginator.algorithm.c_str())) {
+        DO(DstuNS::ba2BitStringEncapOctet(baPublicKey, &origin_pubkey.publicKey));
+    }
+    else {
+        DO(asn_ba2BITSTRING(baPublicKey, &origin_pubkey.publicKey));
+    }
 
 cleanup:
     return ret;
+}
+
+int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setOriginatorByPublicKey (const ByteArray* baSPKI)
+{
+    if (!m_RefKari || !baSPKI) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_RefKari->originator.present = OriginatorIdentifierOrKey_PR_originatorKey;
+    return asn_decode_ba(get_OriginatorPublicKey_desc(), &m_RefKari->originator.choice.originatorKey, baSPKI);
 }
 
 int EnvelopedDataBuilder::KeyAgreeRecipientInfo::setUkm (const ByteArray* baUkm)

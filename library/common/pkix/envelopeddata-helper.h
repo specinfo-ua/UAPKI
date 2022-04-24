@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-14
+//  Last update: 2022-04-24
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -104,6 +104,7 @@ namespace Pkcs7 {
             int setOriginatorByIssuerAndSN (const ByteArray* baIssuerAndSN);
             int setOriginatorBySubjectKeyId (const ByteArray* baSubjectKeyId);
             int setOriginatorByPublicKey (const UapkiNS::AlgorithmIdentifier& aidOriginator, const ByteArray* baPublicKey);
+            int setOriginatorByPublicKey (const ByteArray* baSPKI);
             int setUkm (const ByteArray* baUkm);
             int setKeyEncryptionAlgorithm (const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgoId);
             int addRecipientEncryptedKey (const RecipientEncryptedKey& recipEncryptedKey);
