@@ -26,12 +26,14 @@
  */
 
 #include "api-json-internal.h"
+#include "cipher-helper.h"
 #include "cm-providers.h"
 #include "envelopeddata-helper.h"
 #include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
+
 
 #undef FILE_MARKER
 #define FILE_MARKER "api/decrypt.cpp"
@@ -44,24 +46,6 @@
 
 using namespace std;
 
-
-static int parse_gost28147params_wo_dke (const ByteArray* baEncoded, ByteArray** baIv)
-{
-    int ret = RET_OK;
-    GOST28147Params_t* params = nullptr;
-
-    CHECK_NOT_NULL(params = (GOST28147Params_t*)asn_decode_ba_with_alloc(get_GOST28147Params_desc(), baEncoded));
-
-    //  =iv=
-    DO(asn_OCTSTRING2ba(&params->iv, baIv));
-
-    //  =dke=
-    //DO(asn_OCTSTRING2ba(&params->dke, baDke));
-
-cleanup:
-    asn_free(get_GOST28147Params_desc(), params);
-    return ret;
-}
 
 static int add_certs_to_store (CerStore& cerStore, const vector<ByteArray*>& vbaCerts)
 {
@@ -77,6 +61,68 @@ static int add_certs_to_store (CerStore& cerStore, const vector<ByteArray*>& vba
     DEBUG_OUTCON({ size_t cnt_certs; cerStore.getCount(cnt_certs); printf("add_certs_to_store(), certs (after): %d\n", (int)cnt_certs); });
 
 cleanup:
+    return ret;
+}
+
+static int decrypt_content (const UapkiNS::Pkcs7::EncryptedContentInfo& eContentInfo,
+                    const ByteArray* baSecretKey, ByteArray** baDecryptedContent)
+{
+    int ret = RET_OK;
+    const UapkiNS::AlgorithmIdentifier& algo = eContentInfo.contentEncryptionAlgo;
+
+    if (algo.algorithm == string(OID_DSTU7624_256_CFB)) {
+        //TODO:
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+    }
+    else if (algo.algorithm == string(OID_GOST28147_CFB)) {
+        DO(UapkiNS::Cipher::Gost28147::cryptData(
+            algo,
+            baSecretKey,
+            UapkiNS::Cipher::Direction::DECRYPT,
+            eContentInfo.baEncryptedContent,
+            baDecryptedContent
+        ));
+    }
+
+cleanup:
+    return ret;
+}
+
+static int parse_keyencryption_algo (const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo, string& oidDhKdf, string& oidWrapAlgo)
+{
+    int ret = RET_OK;
+    AlgorithmIdentifier_t* aid = nullptr;
+    char* s_wrapalgo = nullptr;
+
+    DEBUG_OUTCON(printf("parse_keyencryption_algo(), algorithm: '%s'\n", aidKeyEncryptionAlgo.algorithm.c_str()));
+    DEBUG_OUTCON(printf("parse_keyencryption_algo(), baParameters, hex: "); ba_print(stdout, aidKeyEncryptionAlgo.baParameters));
+
+    oidDhKdf = aidKeyEncryptionAlgo.algorithm;
+    if ((oidDhKdf == OID_COFACTOR_DH_DSTU7564_KDF) || (oidDhKdf == OID_STD_DH_DSTU7564_KDF) ||
+        (oidDhKdf == OID_COFACTOR_DH_GOST34311_KDF) || (oidDhKdf == OID_STD_DH_GOST34311_KDF)) {
+        if (!aidKeyEncryptionAlgo.baParameters) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+
+        CHECK_NOT_NULL(aid = (AlgorithmIdentifier_t*)asn_decode_ba_with_alloc(get_AlgorithmIdentifier_desc(), aidKeyEncryptionAlgo.baParameters));
+        DO(asn_oid_to_text(&aid->algorithm, &s_wrapalgo));
+        oidWrapAlgo = string(s_wrapalgo);
+        if ((oidWrapAlgo == OID_DSTU7624_WRAP) || (oidWrapAlgo == OID_GOST28147_WRAP)) {
+            if (!aid->parameters || (aid->parameters->size != 2) || (aid->parameters->buf[0] != 0x05)) {
+                SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+            }
+        }
+        else {
+            SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+        }
+    }
+    else {
+        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+    }
+
+cleanup:
+    asn_free(get_AlgorithmIdentifier_desc(), aid);
+    ::free(s_wrapalgo);
     return ret;
 }
 
@@ -123,6 +169,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
     DO(add_certs_to_store(*cer_store, envdata_parser.getOriginatorCerts()));
 
     if (envdata_parser.getRecipientInfoTypes()[idx_recip] == RecipientInfo_PR_kari) {
+        string s_kdf, s_wrapalg;
         UapkiNS::Pkcs7::EnvelopedDataParser::KeyAgreeRecipientInfo kar_info;
         DO(envdata_parser.parseKeyAgreeRecipientInfo(idx_recip, kar_info));
 
@@ -142,14 +189,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
             return RET_UAPKI_INVALID_PARAMETER;
         }
 
-        DEBUG_OUTCON(printf("kar_info.keyEncryptionAlgorithm.algorithm: '%s'\n",
-            kar_info.getKeyEncryptionAlgorithm().algorithm.c_str()));
-        const string s_kdf = kar_info.getKeyEncryptionAlgorithm().algorithm;
-        if (s_kdf != OID_COFACTOR_DH_GOST34311_KDF) return RET_UAPKI_NOT_SUPPORTED;//now only COFACTOR_DH_GOST34311_KDF ("1.2.804.2.1.1.1.1.3.4")
-
-        DEBUG_OUTCON(printf("kar_info.keyEncryptionAlgorithm.baParameters, hex: ");
-            ba_print(stdout, kar_info.getKeyEncryptionAlgorithm().baParameters));
-        const string s_wrapalg = string(OID_GOST28147_WRAP);// "1.2.804.2.1.1.1.1.1.1.5";
+        DO(parse_keyencryption_algo(kar_info.getKeyEncryptionAlgorithm(), s_kdf, s_wrapalg));
 
         //DEBUG_OUTCON(printf("kar_info.recipientEncryptedKeys, count: %zu\n", kar_info.getRecipientEncryptedKeys().size()));
         const vector<UapkiNS::Pkcs7::RecipientEncryptedKey>& recip_ekeys = kar_info.getRecipientEncryptedKeys();
@@ -170,31 +210,18 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
             break;
         }
 
-        ret = storage->keyDhUnwrapKey(s_kdf, s_wrapalg,
+        ret = storage->keyDhUnwrapKey(
+            s_kdf,
+            s_wrapalg,
             (csi_originator) ? csi_originator->baSPKI : kar_info.getOriginator(),
             kar_info.getUkm(),
             recip_ekeys[0].baEncryptedKey,
-            &sba_sessionkey);
+            &sba_sessionkey
+        );
         DEBUG_OUTCON(printf("unwrap key, ret: %d\n", ret); printf("vba_SessionKeys, hex: "); ba_print(stdout, sba_sessionkey.get()));
     }
 
-    {   //TODO
-        const string s_cryptalgo = envdata_parser.getEncryptedContentInfo().contentEncryptionAlgo.algorithm;
-        if (s_cryptalgo != OID_GOST28147_CFB) return RET_UAPKI_NOT_SUPPORTED;//now only GOST28147_CFB ("1.2.804.2.1.1.1.1.1.1.3")
-        //baParameters, hex: 300F060B2A862402010101010101050500 //1.2.804.2.1.1.1.1.1.1.5 Gost28147wrap
-
-        UapkiNS::SmartBA sba_iv;
-        Gost28147Ctx* ctx = NULL;
-
-        DO(parse_gost28147params_wo_dke(envdata_parser.getEncryptedContentInfo().contentEncryptionAlgo.baParameters, &sba_iv));
-
-        ctx = gost28147_alloc(GOST28147_SBOX_ID_1);
-        DO(gost28147_init_cfb(ctx, sba_sessionkey.get(), sba_iv.get()));
-        DO(gost28147_decrypt(ctx, envdata_parser.getEncryptedContentInfo().baEncryptedContent, &sba_decrypted));
-        gost28147_free(ctx);
-
-        //DEBUG_OUTCON(printf("sba_decrypted, hex: "); ba_print(stdout, sba_decrypted.get()));
-    }
+    DO(decrypt_content(envdata_parser.getEncryptedContentInfo(), sba_sessionkey.get(), &sba_decrypted));
 
     {   //  Set result
         DO_JSON(json_object_set_value(joResult, "content", json_value_init_object()));
