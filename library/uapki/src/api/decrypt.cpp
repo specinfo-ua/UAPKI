@@ -98,8 +98,8 @@ static int parse_keyencryption_algo (const UapkiNS::AlgorithmIdentifier& aidKeyE
     DEBUG_OUTCON(printf("parse_keyencryption_algo(), baParameters, hex: "); ba_print(stdout, aidKeyEncryptionAlgo.baParameters));
 
     oidDhKdf = aidKeyEncryptionAlgo.algorithm;
-    if ((oidDhKdf == OID_COFACTOR_DH_DSTU7564_KDF) || (oidDhKdf == OID_STD_DH_DSTU7564_KDF) ||
-        (oidDhKdf == OID_COFACTOR_DH_GOST34311_KDF) || (oidDhKdf == OID_STD_DH_GOST34311_KDF)) {
+    if ((oidDhKdf == string(OID_COFACTOR_DH_DSTU7564_KDF)) || (oidDhKdf == string(OID_STD_DH_DSTU7564_KDF)) ||
+        (oidDhKdf == string(OID_COFACTOR_DH_GOST34311_KDF)) || (oidDhKdf == string(OID_STD_DH_GOST34311_KDF))) {
         if (!aidKeyEncryptionAlgo.baParameters) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
@@ -107,7 +107,7 @@ static int parse_keyencryption_algo (const UapkiNS::AlgorithmIdentifier& aidKeyE
         CHECK_NOT_NULL(aid = (AlgorithmIdentifier_t*)asn_decode_ba_with_alloc(get_AlgorithmIdentifier_desc(), aidKeyEncryptionAlgo.baParameters));
         DO(asn_oid_to_text(&aid->algorithm, &s_wrapalgo));
         oidWrapAlgo = string(s_wrapalgo);
-        if ((oidWrapAlgo == OID_DSTU7624_WRAP) || (oidWrapAlgo == OID_GOST28147_WRAP)) {
+        if ((oidWrapAlgo == string(OID_DSTU7624_WRAP)) || (oidWrapAlgo == string(OID_GOST28147_WRAP))) {
             if (!aid->parameters || (aid->parameters->size != 2) || (aid->parameters->buf[0] != 0x05)) {
                 SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
             }
@@ -169,7 +169,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
     DO(add_certs_to_store(*cer_store, envdata_parser.getOriginatorCerts()));
 
     if (envdata_parser.getRecipientInfoTypes()[idx_recip] == RecipientInfo_PR_kari) {
-        string s_kdf, s_wrapalg;
+        string s_kdfalgo, s_keywrapalgo;
         UapkiNS::Pkcs7::EnvelopedDataParser::KeyAgreeRecipientInfo kar_info;
         DO(envdata_parser.parseKeyAgreeRecipientInfo(idx_recip, kar_info));
 
@@ -189,7 +189,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
             return RET_UAPKI_INVALID_PARAMETER;
         }
 
-        DO(parse_keyencryption_algo(kar_info.getKeyEncryptionAlgorithm(), s_kdf, s_wrapalg));
+        DO(parse_keyencryption_algo(kar_info.getKeyEncryptionAlgorithm(), s_kdfalgo, s_keywrapalgo));
 
         //DEBUG_OUTCON(printf("kar_info.recipientEncryptedKeys, count: %zu\n", kar_info.getRecipientEncryptedKeys().size()));
         const vector<UapkiNS::Pkcs7::RecipientEncryptedKey>& recip_ekeys = kar_info.getRecipientEncryptedKeys();
@@ -211,8 +211,8 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
         }
 
         ret = storage->keyDhUnwrapKey(
-            s_kdf,
-            s_wrapalg,
+            s_kdfalgo,
+            s_keywrapalgo,
             (csi_originator) ? csi_originator->baSPKI : kar_info.getOriginator(),
             kar_info.getUkm(),
             recip_ekeys[0].baEncryptedKey,

@@ -63,6 +63,10 @@ typedef struct {
 } EncryptContent;
 
 
+static const char* OID_KDF_ALGO_DEFAULT = OID_COFACTOR_DH_DSTU7564_KDF;
+static const char* SHEX_KDFPARAM_DSTU7624WRAP   = "300F060B2A8624020101010101030B0500";
+static const char* SHEX_KDFPARAM_GOST28147WRAP  = "300F060B2A862402010101010101050500";
+
 
 static int add_originator_certs (CerStore& cerStore, UapkiNS::Pkcs7::EnvelopedDataBuilder& envDataBuilder, JSON_Array* jaCerts)
 {
@@ -148,14 +152,55 @@ cleanup:
     return ret;
 }
 
+static int parse_keyencryption_algo (JSON_Object* joRecipientInfo, UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo, string& oidWrapAlgo)
+{
+    int ret = RET_OK;
+    string s_kdfalgo;
+
+    s_kdfalgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "kdfAlgo", OID_KDF_ALGO_DEFAULT);
+    oidWrapAlgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "keyWrapAlgo");
+
+    if ((s_kdfalgo == string(OID_COFACTOR_DH_DSTU7564_KDF)) || (s_kdfalgo == string(OID_STD_DH_DSTU7564_KDF))) {
+        if (oidWrapAlgo.empty()) {
+            oidWrapAlgo = string(OID_DSTU7624_WRAP);
+        }
+        if (oidWrapAlgo == string(OID_DSTU7624_WRAP)) {
+            CHECK_NOT_NULL(aidKeyEncryptionAlgo.baParameters = ba_alloc_from_hex(SHEX_KDFPARAM_DSTU7624WRAP));
+        }
+        else {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+    }
+    else if ((s_kdfalgo == string(OID_COFACTOR_DH_GOST34311_KDF)) || (s_kdfalgo == string(OID_STD_DH_GOST34311_KDF))) {
+        if (oidWrapAlgo.empty()) {
+            oidWrapAlgo = string(OID_GOST28147_WRAP);
+        }
+        if (oidWrapAlgo == string(OID_GOST28147_WRAP)) {
+            CHECK_NOT_NULL(aidKeyEncryptionAlgo.baParameters = ba_alloc_from_hex(SHEX_KDFPARAM_GOST28147WRAP));
+        }
+        else {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+    }
+    else {
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+    }
+
+    aidKeyEncryptionAlgo.algorithm = s_kdfalgo;
+
+cleanup:
+    return ret;
+}
+
 static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::EnvelopedDataBuilder::KeyAgreeRecipientInfo* kari,
                     EncryptContent& encryptContent, JSON_Object* joRecipientInfo)
 {
     if (!kari) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    UapkiNS::AlgorithmIdentifier aid_encryptionkey;
+    UapkiNS::AlgorithmIdentifier aid_keyencryption;
     UapkiNS::SmartBA sba_ephemkey, sba_ephemspki, sba_wrappedkey;
+    string s_keywrapalgo;
 
     {   //  Check key usage: must be keyAgreement
         bool ku_keyagreement = false;
@@ -165,14 +210,12 @@ static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::Envel
         }
     }
 
-    //from JSON
-    aid_encryptionkey.algorithm = "1.2.804.2.1.1.1.1.3.4";//a
-    aid_encryptionkey.baParameters = ba_alloc_from_hex("300F060B2A862402010101010101050500");//a
+    DO(parse_keyencryption_algo(joRecipientInfo, aid_keyencryption, s_keywrapalgo));
 
     DO(generate_ephemeral_privkey(csiRecipient, &sba_ephemkey, &sba_ephemspki));
     DO(wrap_sessionkey(sba_ephemkey.get(),
-        aid_encryptionkey.algorithm,
-        string("1.2.804.2.1.1.1.1.1.1.5"),//a aid_encryptionkey.baParameters
+        aid_keyencryption.algorithm,
+        s_keywrapalgo,
         csiRecipient.baSPKI,
         encryptContent.secretkey.get(),
         nullptr,
@@ -181,8 +224,8 @@ static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::Envel
 
     DO(kari->setVersion());
     DO(kari->setOriginatorByPublicKey(sba_ephemspki.get()));
-    //  Salt(UserKeyingMaterial) not used
-    DO(kari->setKeyEncryptionAlgorithm(aid_encryptionkey));
+    //  Salt/UserKeyingMaterial not used
+    DO(kari->setKeyEncryptionAlgorithm(aid_keyencryption));
     DO(kari->addRecipientEncryptedKeyByRecipientKeyId(csiRecipient.baKeyId, sba_wrappedkey.get()));
 
 cleanup:
@@ -271,7 +314,7 @@ static int generate_secretkey (EncryptContent& content)
         DO(UapkiNS::Cipher::Gost28147::generateIV(&sba_iv));
 #ifdef DEBUG_USE_FIXED_RND
 sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB"));
-sba_dke.clear(); UapkiNS::Cipher::Gost28147::getDKE(GOST28147_SBOX_DEFAULT, &sba_dke);
+sba_dke.clear(); //UapkiNS::Cipher::Gost28147::getDKE(GOST28147_SBOX_DEFAULT, &sba_dke);
 #endif
         DO(UapkiNS::Cipher::Gost28147::encodeParams(sba_iv.get(), sba_dke.get(), &content.algo.baParameters));
         DO(UapkiNS::Cipher::Gost28147::generateKey(&content.secretkey));
