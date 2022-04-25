@@ -100,13 +100,13 @@
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\iso15946.h">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\key-wrap.h">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\private-key.h">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -186,13 +186,13 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\iso15946.c">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\key-wrap.c">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\private-key.c">
-      <Filter>src\crypto</Filter>
+      <Filter>common\pkix</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
