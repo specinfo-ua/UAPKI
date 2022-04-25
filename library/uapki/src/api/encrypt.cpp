@@ -282,8 +282,13 @@ static int encrypt_content (EncryptContent& content)
     int ret = RET_OK;
 
     if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        //TODO:
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        DO(UapkiNS::Cipher::Dstu7624::cryptData(
+            content.algo,
+            content.secretkey.get(),
+            UapkiNS::Cipher::Direction::ENCRYPT,
+            content.data.get(),
+            &content.encrypted
+        ));
     }
     else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
         DO(UapkiNS::Cipher::Gost28147::cryptData(
@@ -305,8 +310,17 @@ static int generate_secretkey (EncryptContent& content)
     UapkiNS::SmartBA sba_dke, sba_iv;
 
     if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        //TODO: dstu7624_generate_key(size_t key_len, ByteArray **key); default Калина-256/256-CFB
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        ba_free(content.algo.baParameters);
+        content.algo.baParameters = nullptr;
+        DO(UapkiNS::Cipher::Dstu7624::generateIV(&sba_iv));
+#ifdef DEBUG_USE_FIXED_RND
+        sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB303132333435363738394142434445464748494A4B4C4D4E"));
+#endif
+        DO(UapkiNS::Cipher::Dstu7624::encodeParams(sba_iv.get(), &content.algo.baParameters));
+        DO(UapkiNS::Cipher::Dstu7624::generateKey(32, &content.secretkey));
+#ifdef DEBUG_USE_FIXED_RND
+content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B76191597150D29E212B92937E1A6CA2CDA925DACF3B2C7FBB8E4FFC"));
+#endif
     }
     else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
         sba_dke.set(content.algo.baParameters);

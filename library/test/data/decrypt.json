@@ -111,6 +111,27 @@
       "skip": false
     },
     {
+      "comment": "Розшифрування envelopedData, файл: test-originator-pubkey-kdf-dstu7564.p7e",
+      "comment1": "Файл було створено штучно, використовується відомий сеансовий ключ",
+      "comment2": "Для шифрування використовується DSTU7564_CFB ('1.2.804.2.1.1.1.1.1.3.3.2')",
+      "method": "DECRYPT",
+      "parameters": {
+        "bytes": "MIIBYQYJKoZIhvcNAQcDoIIBUjCCAU4CAQIxgdqhgdcCAQOgXaFbMB4GCyqGJAIBAQEBAwEBMA8GDSqGJAIBAQEBAwEBAgkDOQAENleKlx5LvN9idav/1alWOlEt+uc50Vlm6t+8oTIWOzLEo4jJAKVUgazh80vDqJhVODXRg+/yETAdBgoqhiQCAQEBAQMEMA8GCyqGJAIBAQEBAQEFBQAwVDBSoCIEIGsbd8DRobYEc6mN1tT+UwJ0Ku3hAdqiHyyDpnzN7beCBCxBgINMnhpvU9xmjO7rtULrxMX3aXCIf35eE7sVmCHlovvddvlpYh2g/WPINjBsBgkqhkiG9w0BBwEwMgYMKoYkAgEBAQEBAwMCMCIEIBGQcN4S18arMDEyMzQ1Njc4OUFCQ0RFRkdISUpLTE1OgCtcYuXnQpuhxEtR37mbr1nniweBJu/+0uyO37bxqKwvAe34xtgGjeKD2+P+"
+      },
+      "skip": false
+    },
+    {
+      "comment": "Розшифрування envelopedData, файл: test-originator-pubkey-dstu7564.p7e",
+      "comment1": "Файл було створено штучно, використовується відомий сеансовий ключ",
+      "comment2": "Для KDF використовується DSTU7564 (COFACTOR_DH_DSTU7564_KDF{'1.2.804.2.1.1.1.1.3.7'} та DSTU7624_WRAP{'1.2.804.2.1.1.1.1.1.3.11'})",
+      "comment3": "Для шифрування використовується DSTU7564_CFB ('1.2.804.2.1.1.1.1.1.3.3.2')",
+      "method": "DECRYPT",
+      "parameters": {
+        "bytes": "MIIBmQYJKoZIhvcNAQcDoIIBijCCAYYCAQIxggERoYIBDQIBA6BdoVswHgYLKoYkAgEBAQEDAQEwDwYNKoYkAgEBAQEDAQECCQM5AAQ2ofoFS13bHRGTk+vAMcLFzlvYddDATjeYlcIFTN7TzeRUqSKtwnA/h+pw6AHCPVeKVunp1dlYMB0GCiqGJAIBAQEBAwcwDwYLKoYkAgEBAQEBAwsFADCBiTCBhqAiBCBrG3fA0aG2BHOpjdbU/lMCdCrt4QHaoh8sg6Z8ze23ggRg0ctRjmR8sLHYOzqz44TknTsQfoqAkSTTqQJEdUa8hSjr2mhNP6NbHF1SXiBBT08fPc49fOVA5XcFYHzZbWoPWl1bI4nH/EtRkTiZN+zbqANqsqqfocDnoxOyh9PIKCDmMGwGCSqGSIb3DQEHATAyBgwqhiQCAQEBAQEDAwIwIgQgEZBw3hLXxqswMTIzNDU2Nzg5QUJDREVGR0hJSktMTU6AK1xi5edCm6HES1HfuZuvWeeLB4Em7/7S7I7ftvGorC8B7fjG2AaN4oPb4/4="
+      },
+      "skip": false
+    },
+    {
       "method": "CLOSE"
     },
     {

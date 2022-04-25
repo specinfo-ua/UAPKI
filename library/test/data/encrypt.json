@@ -1,0 +1,96 @@
+{
+  "comment": "Encrypt enveloped data, 2022-apr-25",
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Ініціалізація бібліотеки",
+      "method": "INIT",
+      "parameters": {
+        "certCache": {
+          "path": "certs/",
+          "trustedCerts": []
+        }
+      }
+    },
+    {
+      "comment": "Encrypt envelopedData, use ephemeral key",
+      "comment1": "Use UAPKI-default params (COFACTOR_DH_DSTU7564_KDF, DSTU7624_WRAP, DSTU7624_256_CFB)",
+      "method": "ENCRYPT",
+      "parameters": {
+        "content": {
+          "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+          "encryptionAlgo": "1.2.804.2.1.1.1.1.1.3.3.2", // default: DSTU7624_256_CFB ("1.2.804.2.1.1.1.1.1.3.3.2" Калина-256/256-CFB)
+          "type": "1.2.840.113549.1.7.1" // optional, default PKCS7_DATA ("1.2.840.113549.1.7.1")
+        },
+        "recipientInfos": [
+          {
+            "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAdKV2AA==",
+            "kdfAlgo": "1.2.804.2.1.1.1.1.3.7", // default: COFACTOR_DH_DSTU7564_KDF ("1.2.804.2.1.1.1.1.3.7")
+            "keyWrapAlgo": "1.2.804.2.1.1.1.1.1.3.11" // optional, default: DSTU7624_WRAP ("1.2.804.2.1.1.1.1.1.3.11")
+          }
+        ]
+      },
+      "skip": false
+    },
+    {
+      "comment": "Encrypt envelopedData, use ephemeral key",
+      "comment1": "Use IIT-compatible params (COFACTOR_DH_GOST34311_KDF, GOST28147_WRAP, GOST28147_CFB)",
+      "method": "ENCRYPT",
+      "parameters": {
+        "content": {
+          "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+          "encryptionAlgo": "1.2.804.2.1.1.1.1.1.1.3" // GOST28147_CFB
+          //"type": "1.2.840.113549.1.7.1" // optional, default PKCS7_DATA ("1.2.840.113549.1.7.1")
+        },
+        "recipientInfos": [
+          {
+            "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAdKV2AA==",
+            "kdfAlgo": "1.2.804.2.1.1.1.1.3.4" // COFACTOR_DH_GOST34311_KDF
+            //"keyWrapAlgo": "1.2.804.2.1.1.1.1.1.1.5" // optional, for COFACTOR_DH_GOST34311_KDF/OID_STD_DH_GOST34311_KDF default: GOST28147_WRAP
+          }
+        ]
+      },
+      "skip": false
+    },
+    {
+      "comment": "Encrypt envelopedData with ephemeral key",
+      "comment1": "Use IIT-compatible params (COFACTOR_DH_GOST34311_KDF, GOST28147_WRAP, GOST28147_CFB)",
+      "comment2": "Included 2 certs and 2 unprotected attributes, set other contentType",
+      "method": "ENCRYPT",
+      "parameters": {
+        "content": {
+          "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+          "encryptionAlgo": "1.2.804.2.1.1.1.1.1.1.3" // GOST28147_CFB
+          //"type": "1.2.840.113549.1.7.1" // optional, default PKCS7_DATA ("1.2.840.113549.1.7.1")
+        },
+        "recipientInfos": [
+          {
+            "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAdKV2AA==",
+            "kdfAlgo": "1.2.804.2.1.1.1.1.3.4" // COFACTOR_DH_GOST34311_KDF
+            //"keyWrapAlgo": "1.2.804.2.1.1.1.1.1.1.5" // optional, for COFACTOR_DH_GOST34311_KDF/OID_STD_DH_GOST34311_KDF default: GOST28147_WRAP
+          }
+        ],
+        "originatorCertIds": [
+          "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAc6V2AA==",
+          "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAdKV2AA=="
+        ], // optional
+        "unprotectedAttrs": [
+          {
+            "type": "1.2.3.4",
+            "bytes": "AgEF"
+          },
+          {
+            "type": "1.2.3",
+            "bytes": "EwpUb2RvIGhlcmUu"
+          }
+        ] // optional
+      },
+      "skip": false
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-20
+//  Last update: 2022-04-25
 
 #ifndef UAPKI_NS_CIPHER_HELPER_H
 #define UAPKI_NS_CIPHER_HELPER_H
@@ -45,10 +45,25 @@ namespace UapkiNS {
             DECRYPT = 1
         };  //  end enum Direction
 
+        class Dstu7624 {
+        public:
+            static const size_t SIZE_IV = 32;
+
+            static int cryptData (const UapkiNS::AlgorithmIdentifier& algoId, const ByteArray* baKey,
+                                const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut);
+            static int decodeParams (const ByteArray* baEncoded, ByteArray** baIV);
+            static int encodeParams (const ByteArray* baIV, ByteArray** baEncoded);
+            static int generateKey (const size_t keyLen, ByteArray** baKey);
+            static int generateIV (ByteArray** baIV);
+
+        };  //  end class Dstu7624
+
         class Gost28147 {
         public:
+            static const size_t SIZE_IV = 8;
+
             static int cryptData (const UapkiNS::AlgorithmIdentifier& algoId, const ByteArray* baKey,
-                            const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut);
+                                const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut);
             static int decodeParams (const ByteArray* baEncoded, ByteArray** baIV, ByteArray** baDKE, const bool compressed = true);
             static int encodeParams (const ByteArray* baIV, const ByteArray* baDKE, ByteArray** baEncoded);
             static int generateKey (ByteArray** baKey);

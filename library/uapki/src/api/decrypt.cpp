@@ -71,8 +71,13 @@ static int decrypt_content (const UapkiNS::Pkcs7::EncryptedContentInfo& eContent
     const UapkiNS::AlgorithmIdentifier& algo = eContentInfo.contentEncryptionAlgo;
 
     if (algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        //TODO:
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        DO(UapkiNS::Cipher::Dstu7624::cryptData(
+            algo,
+            baSecretKey,
+            UapkiNS::Cipher::Direction::DECRYPT,
+            eContentInfo.baEncryptedContent,
+            baDecryptedContent
+        ));
     }
     else if (algo.algorithm == string(OID_GOST28147_CFB)) {
         DO(UapkiNS::Cipher::Gost28147::cryptData(
