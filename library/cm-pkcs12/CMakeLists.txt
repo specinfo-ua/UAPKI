@@ -57,8 +57,11 @@ set(COMMON_SOURCES
     ${PATH_COMMON_PKIX}/ba-utils.c
     ${PATH_COMMON_PKIX}/dstu4145-params.c
     ${PATH_COMMON_PKIX}/iconv-utils.c
+    ${PATH_COMMON_PKIX}/iso15946.c
+    ${PATH_COMMON_PKIX}/key-wrap.c
     ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/oids.c
+    ${PATH_COMMON_PKIX}/private-key.c
 )
 
 add_library(cm-pkcs12 SHARED

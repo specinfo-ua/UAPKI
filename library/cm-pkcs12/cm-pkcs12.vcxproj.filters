@@ -33,9 +33,6 @@
     <ClInclude Include="src\storage\store-bag.h">
       <Filter>src\storage</Filter>
     </ClInclude>
-    <ClInclude Include="src\crypto\iso15946.h">
-      <Filter>src\crypto</Filter>
-    </ClInclude>
     <ClInclude Include="src\storage\jks-buffer.h">
       <Filter>src\storage</Filter>
     </ClInclude>
@@ -53,12 +50,6 @@
     </ClInclude>
     <ClInclude Include="src\storage\jks-utils.h">
       <Filter>src\storage</Filter>
-    </ClInclude>
-    <ClInclude Include="src\crypto\private-key.h">
-      <Filter>src\crypto</Filter>
-    </ClInclude>
-    <ClInclude Include="src\crypto\key-wrap.h">
-      <Filter>src\crypto</Filter>
     </ClInclude>
     <ClInclude Include="src\storage\content-info.h">
       <Filter>src\storage</Filter>
@@ -108,6 +99,15 @@
     <ClInclude Include="..\common\pkix\uapki-ns.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\pkix\iso15946.h">
+      <Filter>src\crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\key-wrap.h">
+      <Filter>src\crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\private-key.h">
+      <Filter>src\crypto</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\crypto\pkcs5.c">
@@ -118,9 +118,6 @@
     </ClCompile>
     <ClCompile Include="src\storage\store-bag.cpp">
       <Filter>src\storage</Filter>
-    </ClCompile>
-    <ClCompile Include="src\crypto\iso15946.c">
-      <Filter>src\crypto</Filter>
     </ClCompile>
     <ClCompile Include="src\storage\jks-buffer.c">
       <Filter>src\storage</Filter>
@@ -139,12 +136,6 @@
     </ClCompile>
     <ClCompile Include="src\storage\jks-utils.c">
       <Filter>src\storage</Filter>
-    </ClCompile>
-    <ClCompile Include="src\crypto\private-key.c">
-      <Filter>src\crypto</Filter>
-    </ClCompile>
-    <ClCompile Include="src\crypto\key-wrap.c">
-      <Filter>src\crypto</Filter>
     </ClCompile>
     <ClCompile Include="src\storage\content-info.c">
       <Filter>src\storage</Filter>
@@ -193,6 +184,15 @@
     </ClCompile>
     <ClCompile Include="src\main-cm-pkcs12.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\iso15946.c">
+      <Filter>src\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\key-wrap.c">
+      <Filter>src\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\private-key.c">
+      <Filter>src\crypto</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
