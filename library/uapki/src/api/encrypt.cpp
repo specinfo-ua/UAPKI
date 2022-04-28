@@ -50,7 +50,7 @@
 using namespace  std;
 
 
-typedef struct {
+struct EncryptContent {
     UapkiNS::AlgorithmIdentifier
                 algo;
     UapkiNS::SmartBA
@@ -60,7 +60,7 @@ typedef struct {
     UapkiNS::SmartBA
                 encrypted;
     string      type;
-} EncryptContent;
+};
 
 
 static const char* OID_KDF_ALGO_DEFAULT = OID_COFACTOR_DH_DSTU7564_KDF;
@@ -199,7 +199,7 @@ static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::Envel
 
     int ret = RET_OK;
     UapkiNS::AlgorithmIdentifier aid_keyencryption;
-    UapkiNS::SmartBA sba_ephemkey, sba_ephemspki, sba_wrappedkey;
+    UapkiNS::SmartBA sba_ephemkey, sba_ephemspki, sba_recipissasn,sba_wrappedkey;
     string s_keywrapalgo;
 
     {   //  Check key usage: must be keyAgreement
@@ -222,11 +222,13 @@ static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::Envel
         &sba_wrappedkey
     ));
 
+    DO(csiRecipient.getIssuerAndSN(&sba_recipissasn));
+
     DO(kari->setVersion());
     DO(kari->setOriginatorByPublicKey(sba_ephemspki.get()));
     //  Salt/UserKeyingMaterial not used
     DO(kari->setKeyEncryptionAlgorithm(aid_keyencryption));
-    DO(kari->addRecipientEncryptedKeyByRecipientKeyId(csiRecipient.baKeyId, sba_wrappedkey.get()));
+    DO(kari->addRecipientEncryptedKeyByIssuerAndSN(sba_recipissasn.get(), sba_wrappedkey.get()));
 
 cleanup:
     return ret;
