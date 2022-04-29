@@ -345,19 +345,19 @@ int OcspClientHelper::scanSingleResponses (void)
 
         switch (resp->certStatus.present) {
         case CertStatus_PR_good:
-            ocsp_item.status = CrlStore::CertStatus::GOOD;
+            ocsp_item.status = UapkiNS::CertStatus::GOOD;
             break;
         case CertStatus_PR_revoked:
-            ocsp_item.status = CrlStore::CertStatus::REVOKED;
+            ocsp_item.status = UapkiNS::CertStatus::REVOKED;
             revoked_info = &resp->certStatus.choice.revoked;
             DO(asn_decodevalue_gentime(&revoked_info->revocationTime, &ocsp_item.msRevocationTime));
             if (revoked_info->revocationReason != nullptr) {
                 DO(asn_decodevalue_enumerated(revoked_info->revocationReason, &crl_reason));
-                ocsp_item.revocationReason = (CrlStore::CrlReason)crl_reason;
+                ocsp_item.revocationReason = (UapkiNS::CrlReason)crl_reason;
             }
             break;
         case CertStatus_PR_unknown:
-            ocsp_item.status = CrlStore::CertStatus::UNKNOWN;
+            ocsp_item.status = UapkiNS::CertStatus::UNKNOWN;
             break;
         default:
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);

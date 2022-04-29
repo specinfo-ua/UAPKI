@@ -215,7 +215,7 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
     const ByteArray* ba_crlnumber = nullptr;
     vector<const CrlStore::RevokedCertItem*> revoked_items;
     const CrlStore::RevokedCertItem* revcert_before = nullptr;
-    CrlStore::CertStatus cert_status = CrlStore::CertStatus::UNDEFINED;
+    UapkiNS::CertStatus cert_status = UapkiNS::CertStatus::UNDEFINED;
     const bool cfg_crldelta_enabled = true;
 
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(cert_status)));
@@ -239,7 +239,7 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
     });
 
     if (revoked_items.empty()) {
-        cert_status = CrlStore::CertStatus::GOOD;
+        cert_status = UapkiNS::CertStatus::GOOD;
     }
     else {
         revcert_before = CrlStore::foundNearBefore(revoked_items, validateTime);
@@ -248,25 +248,25 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
                 revcert_before->index, revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));
             switch (revcert_before->crlReason)
             {
-            case CrlStore::CrlReason::REMOVE_FROM_CRL:
-                cert_status = CrlStore::CertStatus::GOOD;
+            case UapkiNS::CrlReason::REMOVE_FROM_CRL:
+                cert_status = UapkiNS::CertStatus::GOOD;
                 break;
-            case CrlStore::CrlReason::UNDEFINED:
-                cert_status = CrlStore::CertStatus::UNDEFINED;
+            case UapkiNS::CrlReason::UNDEFINED:
+                cert_status = UapkiNS::CertStatus::UNDEFINED;
                 break;
-            case CrlStore::CrlReason::UNSPECIFIED:
-                cert_status = CrlStore::CertStatus::UNKNOWN;
+            case UapkiNS::CrlReason::UNSPECIFIED:
+                cert_status = UapkiNS::CertStatus::UNKNOWN;
                 break;
             default:
-                cert_status = CrlStore::CertStatus::REVOKED;
+                cert_status = UapkiNS::CertStatus::REVOKED;
                 break;
             }
-            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr((CrlStore::CrlReason)revcert_before->crlReason)));
+            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr((UapkiNS::CrlReason)revcert_before->crlReason)));
             const string s_time = TimeUtils::mstimeToFormat(revcert_before->getDate());
             DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
         }
         else {
-            cert_status = CrlStore::CertStatus::GOOD;
+            cert_status = UapkiNS::CertStatus::GOOD;
         }
     }
 
@@ -356,7 +356,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     vector<string> shuffled_uris, uris;
     string s_time;
 
-    DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(CrlStore::CertStatus::UNDEFINED)));
+    DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(UapkiNS::CertStatus::UNDEFINED)));
 
     if (HttpHelper::isOfflineMode()) {
         SET_ERROR(RET_UAPKI_OFFLINE_MODE);
@@ -410,7 +410,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
                 s_time = TimeUtils::mstimeToFormat(ocsp_record->msNextUpdate);
                 DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
             }
-            if (ocsp_record->status == CrlStore::CertStatus::REVOKED) {
+            if (ocsp_record->status == UapkiNS::CertStatus::REVOKED) {
                 DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(ocsp_record->revocationReason)));
                 s_time = TimeUtils::mstimeToFormat(ocsp_record->msRevocationTime);
                 DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));

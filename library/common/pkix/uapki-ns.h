@@ -1,4 +1,4 @@
-//  Last update: 2022-01-06
+//  Last update: 2022-04-29
 
 #ifndef UAPKI_NS_H
 #define UAPKI_NS_H
@@ -14,15 +14,16 @@ using namespace std;
 
 namespace UapkiNS {
 
-    enum class CertStatus : uint32_t {
+    enum class CertStatus : int32_t {
+        UNDEFINED   = -1,
         GOOD        = 0,
         REVOKED     = 1,
-        UNKNOWN     = 2,
-        UNDEFINED   = 3
-    };  //  end enum class CertStatus
+        UNKNOWN     = 2
+    };  //  end enum CertStatus
 
-    enum class CrlReason : uint32_t {
+    enum class CrlReason : int32_t {
         //  CRLReason ::= ENUMERATED    -- rfc5280 $5.3.1, z1400-12 $3.8.1 --
+        UNDEFINED               = -1,
         UNSPECIFIED             = 0,
         KEY_COMPROMISE          = 1,
         CA_COMPROMISE           = 2,
@@ -30,12 +31,11 @@ namespace UapkiNS {
         SUPERSEDED              = 4,
         CESSATION_OF_OPERATION  = 5,
         CERTIFICATE_HOLD        = 6,
-        //  -- value 7 is not used
+        // not used              (7)
         REMOVE_FROM_CRL         = 8,
         PRIVILEGE_WITHDRAWN     = 9,
-        AA_COMPROMISE           = 10,
-        UNDEFINED               = 11
-    };  //  end enum class CrlReason
+        AA_COMPROMISE           = 10
+    };  //  end enum CrlReason
 
     struct AlgorithmIdentifier {
         string      algorithm;

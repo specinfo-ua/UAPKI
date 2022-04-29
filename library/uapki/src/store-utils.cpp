@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright (c) 2022, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,6 +35,7 @@
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 #include "time-utils.h"
 #include "verify-utils.h"
 #include <string>
@@ -458,7 +459,7 @@ int CrlStoreUtils::revokedCertsToJson (JSON_Array* jaResult, const CrlStore::Ite
             uint32_t u32_crlreason = 0;
             ret = extns_get_crl_reason(revoked_cert->crlEntryExtensions, &u32_crlreason);
             if (ret == RET_OK) {
-                DO_JSON(json_object_set_string(jo_result, "crlReason", CrlStore::crlReasonToStr((CrlStore::CrlReason)u32_crlreason)));
+                DO_JSON(json_object_set_string(jo_result, "crlReason", CrlStore::crlReasonToStr((UapkiNS::CrlReason)u32_crlreason)));
             }
             ret = extns_get_crl_invalidity_date(revoked_cert->crlEntryExtensions, &ms_time);
             if (ret == RET_OK) {
