@@ -31,6 +31,7 @@
 #include "uapkic.h"
 #include "uapkif.h"
 #include "uapki-export.h"
+#include "uapki-ns.h"
 #include "verify-status.h"
 #include <string>
 #include <vector>
@@ -42,6 +43,25 @@ using namespace std;
 class CerStore {
 
 public:
+    enum class ValidationType : uint32_t {
+        UNDEFINED   = 0,
+        CRL         = 1,
+        OCSP        = 2
+    };  //  end enum ValidationType
+
+    struct CertStatusInfo {
+        UapkiNS::CertStatus
+                    status;
+        ValidationType
+                    type;
+        uint64_t    time;
+        ByteArray*  baResult;
+
+        CertStatusInfo (void);
+        ~CertStatusInfo (void);
+
+    };  //  end struct CertStatusInfo
+
     struct Item {
         const ByteArray*
                     baEncoded;
@@ -65,6 +85,8 @@ public:
         uint64_t    notAfter;
         uint32_t    keyUsage;
         bool        trusted;
+        CertStatusInfo
+                    certStatusInfo;
 
         Item (void);
         ~Item (void);
@@ -76,7 +98,7 @@ public:
         int getTspUris (vector<string>& uris) const;
         int keyUsageByBit (const uint32_t bitNum, bool& bitValue) const;
 
-    };
+    };  //  end struct Item
 
 private:
     string          m_Path;

@@ -79,6 +79,26 @@ cleanup:
 }   //  encode_issuer_and_sn
 
 
+
+CerStore::CertStatusInfo::CertStatusInfo (void)
+    : status(UapkiNS::CertStatus::UNDEFINED)
+    , type(ValidationType::UNDEFINED)
+    , time(0)
+    , baResult(nullptr)
+{
+}
+
+CerStore::CertStatusInfo::~CertStatusInfo (void)
+{
+    ba_free(baResult);
+    status = UapkiNS::CertStatus::UNDEFINED;
+    type = ValidationType::UNDEFINED;
+    time = 0;
+    baResult = nullptr;
+}
+
+
+
 CerStore::Item::Item (void)
     : baEncoded(nullptr), cert(nullptr), baCertId(nullptr)
     , keyAlgo(nullptr), baSerialNumber(nullptr), baKeyId(nullptr)

@@ -79,6 +79,24 @@ static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore
     return (issuer_is_expired || subject_is_expired);
 }
 
+static int parse_validation_type (const string& sValidationType, CerStore::ValidationType& validationType)
+{
+    int ret = RET_OK;
+
+    if (sValidationType == string("CRL")) {
+        validationType = CerStore::ValidationType::CRL;
+    }
+    else if (sValidationType == string("OCSP")) {
+        validationType = CerStore::ValidationType::OCSP;
+    }
+    else if (!sValidationType.empty()) {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
+
+cleanup:
+    return ret;
+}
+
 static vector<string> rand_uris (const vector<string>& uris)
 {
     if (uris.size() < 2) return uris;
@@ -417,14 +435,12 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     CerStore::Item* cer_subject = nullptr;
     ByteArray* ba_certid = nullptr;
     ByteArray* ba_encoded = nullptr;
-    string s_validatetime, s_validationtype;
+    string s_validatetime;
+    CerStore::ValidationType validation_type = CerStore::ValidationType::UNDEFINED;
     bool is_expired = false, is_selfsigned = false;
     uint64_t validate_time = 0;
 
-    s_validationtype = ParsonHelper::jsonObjectGetString(joParams, "validationType");
-    if (!s_validationtype.empty() && (s_validationtype != "OCSP") && (s_validationtype != "CRL")) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
+    DO(parse_validation_type(ParsonHelper::jsonObjectGetString(joParams, "validationType"), validation_type));
 
     cer_store = get_cerstore();
     if (!cer_store) {
@@ -472,16 +488,15 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     }
  
     if (!is_expired) {
-        if ((s_validationtype == "OCSP")) {
-            DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
-            JSON_Object* jo_ocsp = json_object_get_object(joResult, "validateByOCSP");
-            DO(validate_by_ocsp(jo_ocsp, cer_issuer, cer_subject, *cer_store));
-        }
-
-        if ((s_validationtype == "CRL")) {
+        if (validation_type == CerStore::ValidationType::CRL) {
             DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
             JSON_Object* jo_crl = json_object_get_object(joResult, "validateByCRL");
             DO(validate_by_crl(jo_crl, cer_issuer, cer_subject, validate_time));
+        }
+        else {
+            DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
+            JSON_Object* jo_ocsp = json_object_get_object(joResult, "validateByOCSP");
+            DO(validate_by_ocsp(jo_ocsp, cer_issuer, cer_subject, *cer_store));
         }
     }
 
