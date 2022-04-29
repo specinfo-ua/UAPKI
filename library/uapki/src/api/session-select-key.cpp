@@ -62,7 +62,7 @@ int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
     if (!json.parse(s_keyinfo.c_str())) return RET_UAPKI_INVALID_JSON_FORMAT;
 
     UapkiNS::VectorBA vba_certs;
-    const CerStore::Item* cer_selectedkey = nullptr;
+    CerStore::Item* cer_selectedkey = nullptr;
 
     DO_JSON(json_object_set_value(joResult, "signAlgo", json_value_init_array()));
     DO_JSON(json_array_copy_all_items(json_object_get_array(joResult, "signAlgo"), json.getArray("signAlgo")));

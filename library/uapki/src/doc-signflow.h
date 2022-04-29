@@ -57,7 +57,7 @@ struct SignParams {
     HashAlg     signHashAlgo;
     string      digestAlgo;  //  for digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
     string      signAlgo;
-    const CerStore::Item*
+    CerStore::Item*
                 cerStoreItem;
     ByteArray*  baKeyId;
     bool        detachedData;

@@ -78,7 +78,7 @@ static int add_originator_certs (CerStore& cerStore, UapkiNS::Pkcs7::EnvelopedDa
         UapkiNS::SmartBA sba_certid;
         if (!sba_certid.set(json_array_get_base64(jaCerts, i))) return RET_UAPKI_INVALID_PARAMETER;
 
-        const CerStore::Item* cer_item = nullptr;
+        CerStore::Item* cer_item = nullptr;
         DO(cerStore.getCertByCertId(sba_certid.get(), &cer_item));
         DO(envDataBuilder.addOriginatorCert(cer_item->baEncoded));
     }
@@ -243,7 +243,7 @@ static int add_recipient_infos (CerStore& cerStore, UapkiNS::Pkcs7::EnvelopedDat
     int ret = RET_OK;
     for (size_t i = 0; i < cnt_recips; i++) {
         UapkiNS::SmartBA sba_certid;
-        const CerStore::Item* csi_recipient = nullptr;
+        CerStore::Item* csi_recipient = nullptr;
         JSON_Object* jo_recipinfo = json_array_get_object(jaRecipientInfos, i);
 
         //  Now supported only KeyAgree, other - later

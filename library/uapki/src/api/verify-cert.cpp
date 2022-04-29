@@ -291,8 +291,8 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
     vector<ByteArray*> certs;
     OcspClientHelper::ResponderIdType responder_idtype = OcspClientHelper::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    CerStore::Item* cer_responder = nullptr;
     ByteArray* ba_responderid = nullptr;
-    const CerStore::Item* cer_responder = nullptr;
 
     DO(ocspClient.getCerts(certs));
     for (auto& it : certs) {
@@ -412,11 +412,11 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     CerStore* cer_store = nullptr;
+    CerStore::Item* cer_issuer = nullptr;
     CerStore::Item* cer_parsed = nullptr;
+    CerStore::Item* cer_subject = nullptr;
     ByteArray* ba_certid = nullptr;
     ByteArray* ba_encoded = nullptr;
-    const CerStore::Item* cer_issuer = nullptr;
-    const CerStore::Item* cer_subject = nullptr;
     string s_validatetime, s_validationtype;
     bool is_expired = false, is_selfsigned = false;
     uint64_t validate_time = 0;
@@ -435,7 +435,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     if (ba_encoded) {
         DO(CerStore::parseCert(ba_encoded, &cer_parsed));
         ba_encoded = nullptr;
-        cer_subject = (const CerStore::Item*)cer_parsed;
+        cer_subject = cer_parsed;
     }
     else {
         ba_certid = json_object_get_base64(joParams, "certId");

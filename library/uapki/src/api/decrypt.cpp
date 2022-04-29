@@ -153,7 +153,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     CerStore* cer_store = nullptr;
-    const CerStore::Item* csi_originator = nullptr;
+    CerStore::Item* csi_originator = nullptr;
     UapkiNS::Pkcs7::EnvelopedDataParser envdata_parser;
     UapkiNS::SmartBA sba_data, sba_decrypted, sba_sessionkey;
     size_t idx_recip = 0;

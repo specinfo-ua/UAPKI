@@ -242,7 +242,7 @@ int CerStore::getCountTrusted (size_t& count)
     return ret;
 }
 
-int CerStore::getCertByCertId (const ByteArray* baCertId, const Item** cerStoreItem)
+int CerStore::getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -260,7 +260,7 @@ int CerStore::getCertByCertId (const ByteArray* baCertId, const Item** cerStoreI
     return ret;
 }
 
-int CerStore::getCertByEncoded (const ByteArray* baEncoded, const Item** cerStoreItem)
+int CerStore::getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -278,7 +278,7 @@ int CerStore::getCertByEncoded (const ByteArray* baEncoded, const Item** cerStor
     return ret;
 }
 
-int CerStore::getCertByIndex (const size_t index, const Item** cerStoreItem)
+int CerStore::getCertByIndex (const size_t index, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -293,7 +293,7 @@ int CerStore::getCertByIndex (const size_t index, const Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertByKeyId (const ByteArray* baKeyId, const Item** cerStoreItem)
+int CerStore::getCertByKeyId (const ByteArray* baKeyId, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -311,7 +311,7 @@ int CerStore::getCertByKeyId (const ByteArray* baKeyId, const Item** cerStoreIte
     return ret;
 }
 
-int CerStore::getCertBySID (const ByteArray* baSID, const Item** cerStoreItem)
+int CerStore::getCertBySID (const ByteArray* baSID, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_OK;
@@ -344,7 +344,7 @@ int CerStore::getCertBySID (const ByteArray* baSID, const Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertBySPKI (const ByteArray* baSPKI, const Item** cerStoreItem)
+int CerStore::getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -362,7 +362,7 @@ int CerStore::getCertBySPKI (const ByteArray* baSPKI, const Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertBySubject (const ByteArray* baSubject, const Item** cerStoreItem)
+int CerStore::getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -395,7 +395,7 @@ int CerStore::load (const char* path)
     return ret;
 }
 
-int CerStore::getIssuerCert (const Item* cerSubject, const Item** cerIssuer, bool& isSelfSigned)
+int CerStore::getIssuerCert (const Item* cerSubject, Item** cerIssuer, bool& isSelfSigned)
 {
     int ret = RET_OK;
     ByteArray* ba_authkeyid = nullptr;
@@ -414,7 +414,7 @@ int CerStore::getIssuerCert (const Item* cerSubject, const Item** cerIssuer, boo
     }
     else {
         isSelfSigned = true;
-        *cerIssuer = cerSubject;
+        *cerIssuer = (Item*)cerSubject;
     }
 
 cleanup:
