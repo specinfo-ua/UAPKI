@@ -35,15 +35,12 @@
 #include <string>
 
 
-using namespace std;
-
-
 struct CM_PROVIDER_ST;
 
 
 class CmProviders {
 public:
-    static int loadProvider (const string& dir, const string& libName, const char* jsonParams);
+    static int loadProvider (const std::string& dir, const std::string& libName, const std::string& jsonParams);
     static void deinit (void);
 
     static size_t count (void);

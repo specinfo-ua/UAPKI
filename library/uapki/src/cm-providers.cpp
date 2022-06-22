@@ -73,20 +73,19 @@ static struct LIB_CMPROVIDERS_ST {
 } lib_cmproviders;
 
 
-int CmProviders::loadProvider (const string& dir, const string& libName, const char* jsonParams)
+int CmProviders::loadProvider (const string& dir, const string& libName, const string& jsonParams)
 {
+    DEBUG_OUTCON(printf("CmProviders::loadProvider(dir: '%s', libName: '%s', params: '%s')\n", dir.c_str(), libName.c_str(), jsonParams.c_str()));
+
     CmStorageProxy* storage = new CmStorageProxy();
     if (!storage) return RET_UAPKI_GENERAL_ERROR;
 
     int ret = RET_OK;
-    const string s_initparams = string((jsonParams) ? jsonParams : "");
-
-    DEBUG_OUTCON(printf("CmProviders::loadProvider(name: '%s', dir: '%s', params: '%s')\n", libName.c_str(), dir.c_str(), s_initparams.c_str()));
     if (!storage->load(libName, dir)) {
         SET_ERROR(RET_CM_LIBRARY_NOT_LOADED);
     }
 
-    ret = storage->providerInit(s_initparams);
+    ret = storage->providerInit(jsonParams);
     DEBUG_OUTCON(printf("CmProviders::loadProvider: session->providerInit(), ret: %d\n", ret));
     if (ret == RET_OK) {
         string s_id, s_provinfo;

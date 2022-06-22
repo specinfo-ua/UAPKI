@@ -42,30 +42,23 @@
 using namespace std;
 
 
-//static const char* DEFAULT_TSP_POLICYID = "1.2.804.2.1.1.1.2.3.1";  //  TSPpolicyDstu4145WithGost34311PB, z1399-12
-//static const char* DEFAULT_TSP_URL      = "http://csk.uss.gov.ua/services/tsp/";
-
-
-static int load_config (ParsonHelper& json, const char* configFile, JSON_Object** joResult)
+static int load_config (ParsonHelper& json, const string& configFile)
 {
     int ret = RET_OK;
-    ByteArray* ba_json = nullptr;
+    UapkiNS::SmartBA sba_json;
     size_t len = 0;
 
-    if (!configFile) return RET_OK;
+    DO(ba_alloc_from_file(configFile.c_str(), &sba_json));
 
-    DO(ba_alloc_from_file(configFile, &ba_json));
+    len = sba_json.size();
+    DO(ba_change_len(sba_json.get(), len + 1));
+    DO(ba_set_byte(sba_json.get(), len, 0));
 
-    len = ba_get_len(ba_json);
-    DO(ba_change_len(ba_json, len + 1));
-    DO(ba_set_byte(ba_json, len, 0));
-
-    if (json.parse((const char*)ba_get_buf_const(ba_json), true) == NULL) {
+    if (!json.parse((const char*)sba_json.buf(), true)) {
         SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
     }
 
 cleanup:
-    ba_free(ba_json);
     return ret;
 }   //  load_config
 
@@ -88,8 +81,7 @@ static int setup_cm_providers (JSON_Object* joParams)
             json.serialize(s_config);
         }
 
-        const int ret = CmProviders::loadProvider(s_dir, s_lib, !s_config.empty() ? s_config.c_str() : nullptr);
-        if (ret != RET_OK) return ret;
+        (void)CmProviders::loadProvider(s_dir, s_lib, s_config);
     }
 
     return RET_OK;
@@ -186,15 +178,20 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     LibraryConfig* lib_config = nullptr;
     CerStore* lib_cerstore = nullptr;
     CrlStore* lib_crlstore = nullptr;
-    JSON_Object* jo_params = joParams;
-    JSON_Object* jo_cat = nullptr;
+    JSON_Object* jo_refparams = joParams;
+    JSON_Object* jo_category = nullptr;
     size_t cnt;
     bool offline;
 
     lib_config = get_config();
     if (lib_config) {
         if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
-        DO(load_config(json, json_object_get_string(joParams, "configFile"), &jo_params));
+
+        const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
+        if (!fn_config.empty()) {
+            DO(load_config(json, fn_config));
+            jo_refparams = json.rootObject();
+        }
     }
     else {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
@@ -211,16 +208,16 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     //  Setup subsystems
-    DO(setup_cm_providers(json_object_get_object(jo_params, "cmProviders")));
+    DO(setup_cm_providers(json_object_get_object(jo_refparams, "cmProviders")));
 
-    DO(setup_cert_cache(json_object_get_object(jo_params, "certCache")));
+    DO(setup_cert_cache(json_object_get_object(jo_refparams, "certCache")));
 
-    DO(setup_crl_cache(json_object_get_object(jo_params, "crlCache")));
+    DO(setup_crl_cache(json_object_get_object(jo_refparams, "crlCache")));
 
-    offline = ParsonHelper::jsonObjectGetBoolean(jo_params, "offline", false);
+    offline = ParsonHelper::jsonObjectGetBoolean(jo_refparams, "offline", false);
     lib_config->setOffline(offline);
 
-    DO(setup_tsp(json_object_get_object(jo_params, "tsp"), *lib_config));
+    DO(setup_tsp(json_object_get_object(jo_refparams, "tsp"), *lib_config));
 
     HttpHelper::init(offline);
 
@@ -228,18 +225,18 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
     //  Out info subsystems
     DO_JSON(json_object_set_value(joResult, "certCache", json_value_init_object()));
-    jo_cat = json_object_get_object(joResult, "certCache");
+    jo_category = json_object_get_object(joResult, "certCache");
     if (lib_cerstore->getCount(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countCerts", (uint32_t)cnt));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt));
     }
     if (lib_cerstore->getCountTrusted(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countTrustedCerts", (uint32_t)cnt));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt));
     }
 
     DO_JSON(json_object_set_value(joResult, "crlCache", json_value_init_object()));
-    jo_cat = json_object_get_object(joResult, "crlCache");
+    jo_category = json_object_get_object(joResult, "crlCache");
     if (lib_crlstore->getCount(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_cat, "countCrls", (uint32_t)cnt));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt));
     }
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)CmProviders::count()));
@@ -247,19 +244,19 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline);
 
     DO_JSON(json_object_set_value(joResult, "tsp", json_value_init_object()));
-    jo_cat = json_object_get_object(joResult, "tsp");
-    if (jo_cat) {
+    jo_category = json_object_get_object(joResult, "tsp");
+    if (jo_category) {
         const LibraryConfig::TspParams& tsp_params = lib_config->getTsp();
         string s_url;
-        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_cat, "forced", tsp_params.forced));
-        DO_JSON(json_object_set_string(jo_cat, "policyId", tsp_params.policyId.c_str()));
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "forced", tsp_params.forced));
+        DO_JSON(json_object_set_string(jo_category, "policyId", tsp_params.policyId.c_str()));
         for (auto& it : tsp_params.uris) {
             s_url += it + ";";
         }
         if (!s_url.empty()) {
             s_url.pop_back();
         }
-        DO_JSON(json_object_set_string(jo_cat, "url", s_url.c_str()));
+        DO_JSON(json_object_set_string(jo_category, "url", s_url.c_str()));
     }
 
 cleanup:
