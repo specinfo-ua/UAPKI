@@ -634,7 +634,7 @@ int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid
     if (ret == RET_OK) {
         ByteArray* ba_salt = nullptr;
         ByteArray* ba_wrappedkey = nullptr;
-        if (baSalt) {
+        if (cmba_salts) {
             ba_salt = ba_copy_with_alloc((const ByteArray*)cmba_salts[0], 0, 0);
             arrayCmbaFree(1, cmba_salts);
         }
@@ -682,7 +682,7 @@ int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid
     );
     if (ret != RET_OK) return ret;
 
-    if (vbaSalts) {
+    if (vbaSalts && cmba_salts) {
         vector<ByteArray*>& vba_salts = *vbaSalts;
         vba_salts.resize(cnt_keys);
         for (uint32_t i = 0; i < cnt_keys; i++) {
