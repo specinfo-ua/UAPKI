@@ -38,6 +38,9 @@
 // "parameters": {"provider":"PKCS12", "storage":"test.p12", "password":"testpassword", "mode":"RO/RW/CREATE"}
 // out: {"mechanisms":[{"id":"ECDSA", "description":"ECDSA", "parameters":[{"id":"P256", "description":"NIST P256 curve"},{...}],{...}]}, "user_presense":false}
 
+using namespace std;
+
+
 static int session_info (CmStorageProxy& storage, JSON_Object* joResult)
 {
     string s_sesinfo;
@@ -103,9 +106,9 @@ cleanup:
 
 int uapki_storage_open (JSON_Object* joParams, JSON_Object* joResult)
 {
-    const char* s_providerid = json_object_get_string(joParams, "provider");
-    const char* s_storageid = json_object_get_string(joParams, "storage");
-    if (!s_providerid || !s_storageid) return RET_UAPKI_INVALID_PARAMETER;
+    const string s_providerid = ParsonHelper::jsonObjectGetString(joParams, "provider");
+    const string s_storageid = ParsonHelper::jsonObjectGetString(joParams, "storage");
+    if (s_providerid.empty() || s_storageid.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = CmProviders::storageOpen(s_providerid, s_storageid, joParams);
     if (ret != RET_OK) return ret;

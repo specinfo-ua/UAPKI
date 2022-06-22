@@ -155,19 +155,18 @@ cleanup:
     return ret;
 }
 
-struct CM_PROVIDER_ST* CmProviders::getProviderById (const char* id)
+struct CM_PROVIDER_ST* CmProviders::getProviderById (const string& providerId)
 {
-    const string s_id = string(id ? id : "");
     for (size_t i = 0; i < lib_cmproviders.providers.size(); i++) {
         CM_PROVIDER* provider = &lib_cmproviders.providers[i];
-        if (s_id == provider->id) {
+        if (providerId == provider->id) {
             return provider;
         }
     }
     return nullptr;
 }
 
-int CmProviders::listStorages (const char* providerId, JSON_Object* joResult)
+int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
 {
     CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
     if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
@@ -185,15 +184,14 @@ int CmProviders::listStorages (const char* providerId, JSON_Object* joResult)
     return ret;
 }
 
-int CmProviders::storageInfo (const char* providerId, const char* storageId, JSON_Object* joResult)
+int CmProviders::storageInfo (const string& providerId, const string& storageId, JSON_Object* joResult)
 {
     CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
     if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
 
     CmStorageProxy* storage = cm_provider->storage;
     string s_storinfo;
-    const string s_storageid = string(storageId ? storageId : "");
-    int ret = storage->storageInfo(s_storageid, s_storinfo);
+    int ret = storage->storageInfo(storageId, s_storinfo);
     if (ret != RET_OK) return ret;
 
     ParsonHelper json;
@@ -204,7 +202,7 @@ int CmProviders::storageInfo (const char* providerId, const char* storageId, JSO
     return ret;
 }
 
-int CmProviders::storageOpen (const char* providerId, const char* storageId, JSON_Object* joParams)
+int CmProviders::storageOpen (const string& providerId, const string& storageId, JSON_Object* joParams)
 {
     const string s_mode = ParsonHelper::jsonObjectGetString(joParams, "mode");
     const string s_password = ParsonHelper::jsonObjectGetString(joParams, "password");

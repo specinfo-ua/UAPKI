@@ -45,10 +45,10 @@ public:
 
     static size_t count (void);
     static int getInfo (const size_t index, JSON_Object* joResult);
-    static struct CM_PROVIDER_ST* getProviderById (const char* id);
-    static int listStorages (const char* providerId, JSON_Object* joResult);
-    static int storageInfo (const char* providerId, const char* storageId, JSON_Object* joResult);
-    static int storageOpen (const char* providerId, const char* storageId, JSON_Object* joParameters);
+    static struct CM_PROVIDER_ST* getProviderById (const std::string& providerId);
+    static int listStorages (const std::string& providerId, JSON_Object* joResult);
+    static int storageInfo (const std::string& providerId, const std::string& storageId, JSON_Object* joResult);
+    static int storageOpen (const std::string& providerId, const std::string& storageId, JSON_Object* joParams);
     static int storageClose (void);
 
     static CmStorageProxy* openedStorage (void);
