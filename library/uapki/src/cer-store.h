@@ -60,6 +60,9 @@ public:
         CertStatusInfo (void);
         ~CertStatusInfo (void);
 
+        void reset (const ValidationType type = ValidationType::UNDEFINED);
+        int set (const ValidationType type, const UapkiNS::CertStatus status, const ByteArray* baResult);
+
     };  //  end struct CertStatusInfo
 
     struct Item {
@@ -85,6 +88,8 @@ public:
         uint64_t    notAfter;
         uint32_t    keyUsage;
         bool        trusted;
+        CERTIFICATE_VERIFY::STATUS
+                    verifyStatus;
         CertStatusInfo
                     certStatusInfo;
 

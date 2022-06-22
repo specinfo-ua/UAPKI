@@ -37,6 +37,7 @@
 #include "macros-internal.h"
 #include "oids.h"
 #include "str-utils.h"
+#include "time-utils.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
 #include "verify-utils.h"
@@ -90,11 +91,25 @@ CerStore::CertStatusInfo::CertStatusInfo (void)
 
 CerStore::CertStatusInfo::~CertStatusInfo (void)
 {
+    reset();
+}
+
+void CerStore::CertStatusInfo::reset (const ValidationType type)
+{
     ba_free(baResult);
     status = UapkiNS::CertStatus::UNDEFINED;
-    type = ValidationType::UNDEFINED;
+    this->type = type;
     time = 0;
     baResult = nullptr;
+}
+
+int CerStore::CertStatusInfo::set (const ValidationType type, const UapkiNS::CertStatus status, const ByteArray* baResult)
+{
+    reset(type);
+    this->status = status;
+    this->time = TimeUtils::nowMsTime();
+    this->baResult = ba_copy_with_alloc(baResult, 0, 0);
+    return (this->baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
 
@@ -104,7 +119,7 @@ CerStore::Item::Item (void)
     , keyAlgo(nullptr), baSerialNumber(nullptr), baKeyId(nullptr)
     , baIssuer(nullptr), baSubject(nullptr), baSPKI(nullptr)
     , algoKeyId(HashAlg::HASH_ALG_UNDEFINED), notBefore(0), notAfter(0), keyUsage(0), trusted(false)
-    //, statusSign(SIGNATURE_VERIFY::STATUS::UNDEFINED)
+    , verifyStatus(CERTIFICATE_VERIFY::STATUS::UNDEFINED)
 {}
 
 CerStore::Item::~Item (void)
@@ -122,7 +137,7 @@ CerStore::Item::~Item (void)
     notBefore = 0;
     notAfter = 0;
     keyUsage = 0;
-    //statusSign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    verifyStatus = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
 }
 
 int CerStore::Item::checkValidity (const uint64_t validateTime) const

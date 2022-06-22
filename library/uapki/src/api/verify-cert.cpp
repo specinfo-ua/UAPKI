@@ -43,7 +43,7 @@
 
 
 #undef FILE_MARKER
-#define FILE_MARKER "api/verify-cert.c"
+#define FILE_MARKER "api/verify-cert.cpp"
 
 
 #define DEBUG_OUTCON(expression)
@@ -51,26 +51,6 @@
 #define DEBUG_OUTCON(expression) expression
 #endif
 
-
-static int check_signature_to_json (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject)
-{
-    int ret = RET_OK;
-    bool is_digitalsign = false;
-    CERTIFICATE_VERIFY::STATUS status = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
-
-    ret = CerStoreUtils::verify(cerSubject, cerIssuer);
-    status = (ret == RET_OK) ? CERTIFICATE_VERIFY::STATUS::VALID
-        : ((ret == RET_VERIFY_FAILED) ? CERTIFICATE_VERIFY::STATUS::INVALID : CERTIFICATE_VERIFY::STATUS::FAILED);
-    if (status == CERTIFICATE_VERIFY::STATUS::VALID) {
-        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
-        status = (is_digitalsign) ? CERTIFICATE_VERIFY::STATUS::VALID : CERTIFICATE_VERIFY::STATUS::VALID_WITHOUT_KEYUSAGE;
-    }
-
-    DO_JSON(json_object_set_string(joResult, "statusSignature", CERTIFICATE_VERIFY::toStr(status)));
-
-cleanup:
-    return ret;
-}
 
 static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, const uint64_t validateTime)
 {
@@ -118,7 +98,7 @@ static vector<string> rand_uris (const vector<string>& uris)
 }
 
 static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, CrlStore& crlStore,
-        const ByteArray** baCrlNumber, const uint64_t validateTime, vector<const CrlStore::RevokedCertItem*>& revokedItems)
+                    const ByteArray** baCrlNumber, const uint64_t validateTime, CrlStore::Item** crlItem)
 {
     int ret = RET_OK;
     const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
@@ -202,19 +182,21 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
         SET_ERROR(ret);
     }
 
-    DO(crl->revokedCerts(cerSubject, revokedItems));
+    *crlItem = crl;
 
 cleanup:
     return ret;
 }
 
-static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, const uint64_t validateTime)
+static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer,
+                    CerStore::Item* cerSubject, const uint64_t validateTime, const bool needUpdateCert)
 {
     int ret = RET_OK;
     CrlStore* crl_store = nullptr;
-    const ByteArray* ba_crlnumber = nullptr;
+    CrlStore::Item* crl_item = nullptr;
     vector<const CrlStore::RevokedCertItem*> revoked_items;
     const CrlStore::RevokedCertItem* revcert_before = nullptr;
+    const ByteArray* ba_crlnumber = nullptr;
     UapkiNS::CertStatus cert_status = UapkiNS::CertStatus::UNDEFINED;
     const bool cfg_crldelta_enabled = true;
 
@@ -226,12 +208,14 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
     }
 
     DO_JSON(json_object_set_value(joResult, "full", json_value_init_object()));
-    DO(process_crl(json_object_get_object(joResult, "full"), cerIssuer, cerSubject, *crl_store, &ba_crlnumber, validateTime, revoked_items));
-    DEBUG_OUTCON(printf("validate_by_crl_to_json() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
+    DO(process_crl(json_object_get_object(joResult, "full"), cerIssuer, cerSubject, *crl_store, &ba_crlnumber, validateTime, &crl_item));
+    DEBUG_OUTCON(printf("validate_by_crl() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
+    DO(crl_item->revokedCerts(cerSubject, revoked_items));
 
     if (cfg_crldelta_enabled) {
         DO_JSON(json_object_set_value(joResult, "delta", json_value_init_object()));
-        DO(process_crl(json_object_get_object(joResult, "delta"), cerIssuer, cerSubject, *crl_store, &ba_crlnumber, validateTime, revoked_items));
+        DO(process_crl(json_object_get_object(joResult, "delta"), cerIssuer, cerSubject, *crl_store, &ba_crlnumber, validateTime, &crl_item));
+        DO(crl_item->revokedCerts(cerSubject, revoked_items));
     }
 
     DEBUG_OUTCON(for (auto& it : revoked_items) {
@@ -272,6 +256,10 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
 
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(cert_status)));
 
+    if (needUpdateCert) {
+        cerSubject->certStatusInfo.set(CerStore::ValidationType::CRL, cert_status, crl_item->baCrlId);
+    }
+
 cleanup:
     for (auto& it : revoked_items) {
         delete it;
@@ -300,6 +288,26 @@ static int responderid_to_json (JSON_Object* joResult, const OcspClientHelper::R
 
 cleanup:
     asn_free(get_Name_desc(), name);
+    return ret;
+}
+
+static int verify_cert_sign (const CerStore::Item* cerIssuer, CerStore::Item* cerSubject)
+{
+    int ret = RET_OK;
+    bool is_digitalsign = false;
+    CERTIFICATE_VERIFY::STATUS status = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
+
+    ret = CerStoreUtils::verify(cerSubject, cerIssuer);
+    status = (ret == RET_OK) ? CERTIFICATE_VERIFY::STATUS::VALID
+        : ((ret == RET_VERIFY_FAILED) ? CERTIFICATE_VERIFY::STATUS::INVALID : CERTIFICATE_VERIFY::STATUS::FAILED);
+    if (status == CERTIFICATE_VERIFY::STATUS::VALID) {
+        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
+        status = (is_digitalsign) ? CERTIFICATE_VERIFY::STATUS::VALID : CERTIFICATE_VERIFY::STATUS::VALID_WITHOUT_KEYUSAGE;
+    }
+
+    cerSubject->verifyStatus = status;
+
+cleanup:
     return ret;
 }
 
@@ -346,7 +354,7 @@ cleanup:
     return ret;
 }
 
-static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, CerStore& cerStore)
+static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
 {
     int ret = RET_OK;
     OcspClientHelper ocsp_client;
@@ -415,6 +423,8 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
                 s_time = TimeUtils::mstimeToFormat(ocsp_record->msRevocationTime);
                 DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
             }
+
+            cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record->status, sba_resp.get());
         }
     }
 
@@ -437,7 +447,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     ByteArray* ba_encoded = nullptr;
     string s_validatetime;
     CerStore::ValidationType validation_type = CerStore::ValidationType::UNDEFINED;
-    bool is_expired = false, is_selfsigned = false;
+    bool is_expired = false, is_selfsigned = false, need_updatecert = false;
     uint64_t validate_time = 0;
 
     DO(parse_validation_type(ParsonHelper::jsonObjectGetString(joParams, "validationType"), validation_type));
@@ -464,11 +474,12 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     s_validatetime = ParsonHelper::jsonObjectGetString(joParams, "validateTime");
-    if (!s_validatetime.empty()) {
-        DO(TimeUtils::stimeToMstime(s_validatetime.c_str(), validate_time));
+    need_updatecert = s_validatetime.empty();
+    if (need_updatecert || (validation_type == CerStore::ValidationType::OCSP)) {
+        validate_time = TimeUtils::nowMsTime();
     }
     else {
-        validate_time = TimeUtils::nowMsTime();
+        DO(TimeUtils::stimeToMstime(s_validatetime.c_str(), validate_time));
     }
     s_validatetime = TimeUtils::mstimeToFormat(validate_time);
     DO_JSON(json_object_set_string(joResult, "validateTime", s_validatetime.c_str()));
@@ -481,22 +492,26 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", is_expired));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", is_selfsigned));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cer_subject->trusted));
-    DO(check_signature_to_json(joResult, cer_issuer, cer_subject));
+    if (cer_subject->verifyStatus == CERTIFICATE_VERIFY::STATUS::UNDEFINED) {
+        DO(verify_cert_sign(cer_issuer, cer_subject));
+    }
+    DO_JSON(json_object_set_string(joResult, "statusSignature", CERTIFICATE_VERIFY::toStr(cer_subject->verifyStatus)));
 
     if (!is_selfsigned) {
         DO(json_object_set_base64(joResult, "issuerCertId", cer_issuer->baCertId));
     }
  
     if (!is_expired) {
+        JSON_Object* jo;
         if (validation_type == CerStore::ValidationType::CRL) {
             DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
-            JSON_Object* jo_crl = json_object_get_object(joResult, "validateByCRL");
-            DO(validate_by_crl(jo_crl, cer_issuer, cer_subject, validate_time));
+            jo = json_object_get_object(joResult, "validateByCRL");
+            DO(validate_by_crl(jo, cer_issuer, cer_subject, validate_time, need_updatecert));
         }
         else {
             DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
-            JSON_Object* jo_ocsp = json_object_get_object(joResult, "validateByOCSP");
-            DO(validate_by_ocsp(jo_ocsp, cer_issuer, cer_subject, *cer_store));
+            jo = json_object_get_object(joResult, "validateByOCSP");
+            DO(validate_by_ocsp(jo, cer_issuer, cer_subject, *cer_store));
         }
     }
 
