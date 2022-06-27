@@ -49,6 +49,9 @@
 #endif
 
 
+using namespace std;
+
+
 static const char* DEFAULT_BAG_CIPHER   = OID_AES256_CBC_PAD;
 static const char* DEFAULT_BAG_KDF      = OID_HMAC_SHA512;
 static const char* DEFAULT_MAC_ALGO     = OID_SHA512;
@@ -112,15 +115,14 @@ int FileStorage::changePassword (const char* password)
     return ret;
 }
 
-int FileStorage::create (const char* fileName)
+void FileStorage::create (const string& fileName)
 {
-    DEBUG_OUTCON(printf("FileStorage::create(fileName: '%s')\n", fileName));
+    DEBUG_OUTCON(printf("FileStorage::create(fileName: '%s')\n", fileName.c_str()));
     reset();
 
     m_IsCreate = true;
-    m_Filename = string(fileName ? fileName : "");
+    m_Filename = fileName;
     m_ReadOnly = false;
-    return RET_OK;
 }
 
 int FileStorage::decode (const char* password)
@@ -185,24 +187,23 @@ vector<StoreBag*> FileStorage::listBags (const StoreBag::BAG_TYPE bagType)
     return rv_bags;
 }
 
-int FileStorage::loadFromBuffer (const ByteArray* baEncoded, const bool readOnly)
+void FileStorage::loadFromBuffer (ByteArray* baEncoded, const bool readOnly)
 {
     DEBUG_OUTCON(printf("FileStorage::loadFromBuffer(buf-size: %d, readOnly: %d)\n", (int)ba_get_len(baEncoded), readOnly));
     reset();
 
-    m_Buffer = ba_copy_with_alloc(baEncoded, 0, 0);
+    m_Buffer = baEncoded;
     m_ReadOnly = readOnly;
-    return (ba_get_len(m_Buffer) > 0) ? RET_OK : RET_CM_GENERAL_ERROR;
 }
 
-int FileStorage::loadFromFile (const char* fileName, const bool readOnly)
+int FileStorage::loadFromFile (const string& fileName, const bool readOnly)
 {
-    DEBUG_OUTCON(printf("FileStorage::loadFromFile(fileName: '%s', readOnly: %d)\n", fileName, readOnly));
+    DEBUG_OUTCON(printf("FileStorage::loadFromFile(fileName: '%s', readOnly: %d)\n", fileName.c_str(), readOnly));
     reset();
 
-    const int ret = ba_alloc_from_file(fileName, &m_Buffer);
+    const int ret = ba_alloc_from_file(fileName.c_str(), &m_Buffer);
     if (ret == RET_OK) {
-        m_Filename = string(fileName);
+        m_Filename = fileName;
         m_ReadOnly = readOnly;
     }
     return ret;
@@ -642,13 +643,12 @@ cleanup:
 int FileStorage::saveBuffer (void)
 {
     int ret = RET_OK;
-    const char* fn = filename();
-    if (fn && (strlen(fn) > 0)) {
+    if (!m_Filename.empty()) {
         if (ba_get_len(m_Buffer) > 0) {
-            ret = ba_to_file(m_Buffer, fn);
+            ret = ba_to_file(m_Buffer, m_Filename.c_str());
         }
         else {
-            ret = delete_file(fn);
+            ret = delete_file(m_Filename.c_str());
         }
     }
     return ret;

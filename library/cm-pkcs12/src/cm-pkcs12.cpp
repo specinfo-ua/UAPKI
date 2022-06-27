@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -68,31 +68,34 @@ CmPkcs12::~CmPkcs12 (void)
 CM_ERROR CmPkcs12::open (const char* urlFilename, uint32_t mode, const CM_JSON_PCHAR params, CM_SESSION_API** session)
 {
     DEBUG_OUTCON(printf("CmPkcs12::open(url = '%s', mode = %u)\n", urlFilename, mode));
+    if (!urlFilename || (strlen(urlFilename) == 0) || !session) return RET_CM_INVALID_PARAMETER;
+
     SessionPkcs12Context* ss_ctx = new SessionPkcs12Context();
     if (!ss_ctx) return RET_CM_GENERAL_ERROR;
 
     ss_ctx->fileStorage.storageParam().setDefault(&this->getDefaultParam());
 
+    ByteArray* ba_bytes = nullptr;
     CM_ERROR cm_err = RET_CM_INVALID_PARAMETER;
     switch (mode) {
     case OPEN_MODE_RW:
     case OPEN_MODE_RO:
-        if (urlFilename && (strlen(urlFilename) > 0)) {
-            cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromFile(urlFilename, mode == OPEN_MODE_RO));
-        }
-        else {
-            ByteArray* ba_encoded = nullptr;
-            cm_err = CmPkcs12::parseBytes(params, &ba_encoded);
-            if (cm_err == RET_OK) {
-                cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromBuffer(ba_encoded, mode == OPEN_MODE_RO));
-                ba_free(ba_encoded);
+        cm_err = CmPkcs12::parseBytes(params, &ba_bytes);
+        if (cm_err == RET_OK) {
+            if (ba_get_len(ba_bytes) == 0) {
+                cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromFile(urlFilename, mode == OPEN_MODE_RO));
+            }
+            else {
+                ss_ctx->fileStorage.loadFromBuffer(ba_bytes, mode == OPEN_MODE_RO);
+                ba_bytes = nullptr;
             }
         }
+        ba_free(ba_bytes);
         break;
     case OPEN_MODE_CREATE:
         cm_err = CmPkcs12::parseConfig(params, ss_ctx->fileStorage.storageParam());
         if (cm_err == RET_OK) {
-            cm_err = err_to_cmerror(ss_ctx->fileStorage.create(urlFilename));
+            ss_ctx->fileStorage.create(urlFilename);
         }
         break;
     default:
@@ -129,10 +132,13 @@ CM_ERROR CmPkcs12::close (CM_SESSION_API* session)
 
 CM_ERROR CmPkcs12::parseBytes (const CM_JSON_PCHAR jsonParams, ByteArray** baEncoded)
 {
-    if (!jsonParams) return RET_CM_INVALID_PARAMETER;
+    if (!jsonParams) return RET_OK;
 
     ParsonHelper json;
     if (!json.parse((const char*)jsonParams)) return RET_CM_INVALID_JSON;
+
+    //  =bytes= optional, if present then must be valid base64-encoding
+    if (!json.hasValue("bytes", JSONString)) return RET_OK;
 
     *baEncoded = json_object_get_base64(json.rootObject(), "bytes");
 
