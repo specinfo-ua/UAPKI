@@ -33,10 +33,8 @@
 #include "uapki-ns.h"
 
 
-#define DEBUG_OUTCON(expression)
-#ifndef DEBUG_OUTCON
-#define DEBUG_OUTCON(expression) expression
-#endif
+#undef FILE_MARKER
+#define FILE_MARKER "api/library-init.cpp"
 
 
 using namespace std;
@@ -66,9 +64,9 @@ static int setup_cm_providers (JSON_Object* joParams)
 {
     const string s_dir = ParsonHelper::jsonObjectGetString(joParams, "dir");
     JSON_Array* ja_providers = json_object_get_array(joParams, "allowedProviders");
-    size_t len = json_array_get_count(ja_providers);
+    const size_t cnt_providers = json_array_get_count(ja_providers);
 
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < cnt_providers; i++) {
         JSON_Object* jo_provider = json_array_get_object(ja_providers, i);
         if (!jo_provider) return RET_UAPKI_INVALID_JSON_FORMAT;
 
@@ -85,7 +83,7 @@ static int setup_cm_providers (JSON_Object* joParams)
     }
 
     return RET_OK;
-}
+}   //  setup_cm_providers
 
 static int setup_cert_cache (JSON_Object* joParams)
 {
@@ -135,38 +133,38 @@ cleanup:
     return ret;
 }   //  setup_crl_cache
 
-static int setup_tsp (JSON_Object* joParams, LibraryConfig& libConfig)
+static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
 {
     int ret = RET_OK;
-    LibraryConfig::TspParams params;
+    LibraryConfig::TspParams tsp_params;
 
     //  =forced=
-    params.forced = ParsonHelper::jsonObjectGetBoolean(joParams, "forced", false);
+    tsp_params.forced = ParsonHelper::jsonObjectGetBoolean(joParams, "forced", false);
 
     //  =policyId=
-    params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");
-    if (!params.policyId.empty()) {
+    tsp_params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");
+    if (!tsp_params.policyId.empty()) {
         UapkiNS::SmartBA sba_encoded;
-        if (ba_encode_oid(params.policyId.c_str(), &sba_encoded) != RET_OK) {
-            params.policyId.clear();
+        if (ba_encode_oid(tsp_params.policyId.c_str(), &sba_encoded) != RET_OK) {
+            tsp_params.policyId.clear();
         }
     }
 
     //  =url=
     if (ParsonHelper::jsonObjectHasValue(joParams, "url", JSONString)) {
         const string s_uri = ParsonHelper::jsonObjectGetString(joParams, "url");
-        params.uris.push_back(s_uri);
+        tsp_params.uris.push_back(s_uri);
     }
     else if (ParsonHelper::jsonObjectHasValue(joParams, "url", JSONArray)) {
         JSON_Array* ja_uris = json_object_get_array(joParams, "url");
         const size_t cnt = json_array_get_count(ja_uris);
         for (size_t i = 0; i < cnt; i++) {
             const string s_uri = ParsonHelper::jsonArrayGetString(ja_uris, i);
-            params.uris.push_back(s_uri);
+            tsp_params.uris.push_back(s_uri);
         }
     }
 
-    libConfig.setTsp(params);
+    libConfig.setTsp(tsp_params);
     return ret;
 }   //  setup_tsp
 
@@ -217,7 +215,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     offline = ParsonHelper::jsonObjectGetBoolean(jo_refparams, "offline", false);
     lib_config->setOffline(offline);
 
-    DO(setup_tsp(json_object_get_object(jo_refparams, "tsp"), *lib_config));
+    DO(setup_tsp(*lib_config, json_object_get_object(jo_refparams, "tsp")));
 
     HttpHelper::init(offline);
 

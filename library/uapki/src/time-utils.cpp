@@ -38,15 +38,16 @@ static const size_t STIME_FORMAT_INDECES[14] = { 0, 1, 2, 3, 5, 6, 8, 9, 11, 12,
 
 string TimeUtils::mstimeToFormat (const uint64_t msTime, const bool isLocal)
 {
-    string rv_stime;
-    rv_stime.resize(20);
     const time_t t = msTime / 1000;
+    string rv_stime;
+    rv_stime.resize(24);
     if (!isLocal) {
-        strftime((char*)rv_stime.data(), 20, "%Y-%m-%d %H:%M:%S", gmtime(&t));
+        strftime((char*)rv_stime.data(), 23, "%Y-%m-%d %H:%M:%S", gmtime(&t));
     }
     else {
-        strftime((char*)rv_stime.data(), 20, "%Y-%m-%d %H:%M:%S", localtime(&t));
+        strftime((char*)rv_stime.data(), 23, "%Y-%m-%d %H:%M:%S", localtime(&t));
     }
+    rv_stime.resize(19);
     return rv_stime;
 }
 

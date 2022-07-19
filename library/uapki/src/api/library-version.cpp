@@ -27,16 +27,23 @@
 
 #include "api-json-internal.h"
 
-static const char* LIB_VERSION = "2.0.6";
+
+#undef FILE_MARKER
+#define FILE_MARKER "api/library-version.cpp"
+
+
+static const char* LIB_NAME     = "UAPKI";
+static const char* LIB_VERSION  = "2.0.6";
+
 
 int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joParams;
     int ret = RET_OK;
 
-    DO_JSON(json_object_set_string(joResult, "name", "UAPKI"));
+    DO_JSON(json_object_set_string(joResult, "name", LIB_NAME));
     DO_JSON(json_object_set_string(joResult, "version", LIB_VERSION));
 
 cleanup:
-    return RET_OK;
+    return ret;
 }

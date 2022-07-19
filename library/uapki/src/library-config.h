@@ -47,7 +47,7 @@ public:
         TspParams (void)
             : forced(false) {
         }
-    };
+    };  //  end struct TspParams
 
 private:
     bool    m_IsInitialized;
