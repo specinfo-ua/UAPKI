@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-11
+//  Last update: 2022-07-14
 
 #ifndef UAPKI_OIDS_H
 #define UAPKI_OIDS_H
@@ -125,8 +125,8 @@ DEFINE_OID(OID_DSTU7624_128_KW,     "1.2.804.2.1.1.1.1.1.3.10.1");
 DEFINE_OID(OID_DSTU7624_256_KW,     "1.2.804.2.1.1.1.1.1.3.10.2");
 DEFINE_OID(OID_DSTU7624_512_KW,     "1.2.804.2.1.1.1.1.1.3.10.3");
 DEFINE_OID(OID_DSTU7624_WRAP,       "1.2.804.2.1.1.1.1.1.3.11");
-DEFINE_OID(OID_DSTU7624_GCM,        "1.2.804.2.1.1.1.1.1.3.12");       //!!! NON STANDARD
-DEFINE_OID(OID_DSTU7624_126_GCM,    "1.2.804.2.1.1.1.1.1.3.12.1"); //!!! NON STANDARD
+DEFINE_OID(OID_DSTU7624_GCM,        "1.2.804.2.1.1.1.1.1.3.12");   //!!! NON STANDARD
+DEFINE_OID(OID_DSTU7624_128_GCM,    "1.2.804.2.1.1.1.1.1.3.12.1"); //!!! NON STANDARD
 DEFINE_OID(OID_DSTU7624_256_GCM,    "1.2.804.2.1.1.1.1.1.3.12.2"); //!!! NON STANDARD
 DEFINE_OID(OID_DSTU7624_512_GCM,    "1.2.804.2.1.1.1.1.1.3.12.3"); //!!! NON STANDARD
 
@@ -475,6 +475,7 @@ DEFINE_OID(OID_PDS_UKRAINE_EDDR,            "1.2.804.2.1.1.1.11.1.4.11.1");
 
 bool oid_is_equal (const char* oid1, const char* oid2);
 bool oid_is_parent (const char* parent, const char* oid);
+bool oid_is_valid (const char* oid);
 
 
 #ifdef __cplusplus
