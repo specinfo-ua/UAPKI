@@ -41,12 +41,6 @@
 #include <string.h>
 
 
-#define ASN_ALLOC_TYPE(obj, typ) ((obj) = (typ*) calloc(1, sizeof(typ)));   \
-    if ((obj) == NULL) { ret = RET_MEMORY_ALLOC_ERROR;                      \
-                         ERROR_CREATE(ret);                                 \
-                         goto cleanup; }
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif

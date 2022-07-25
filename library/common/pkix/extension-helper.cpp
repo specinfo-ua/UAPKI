@@ -36,6 +36,9 @@
 #include "uapkif.h"
 
 
+using namespace std;
+
+
 static const char* KEY_USAGE_NAMES[9] = {   //  KeyUsage ::= BIT STRING -- rfc5280, $4.2.1.3
     "digitalSignature",  // (0),
     "contentCommitment", // (1), -- old name: "nonRepudiation" - recent editions of X.509 have renamed this bit to contentCommitment 

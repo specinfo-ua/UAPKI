@@ -246,6 +246,15 @@
     <ClCompile Include="..\common\pkix\key-wrap.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\uapki-ns-util.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\attribute-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\signeddata-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -396,6 +405,15 @@
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\uapki-ns.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\uapki-ns-util.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\attribute-helper.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\signeddata-helper.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>

@@ -35,8 +35,8 @@ namespace ExtensionHelper {
 
     namespace Decode {
 
-        int accessDescriptions          (const ByteArray* baEncoded, const char* oidAccessMethod, vector<string>& uris);
-        int distributionPoints          (const ByteArray* baEncoded, vector<string>& uris);
+        int accessDescriptions          (const ByteArray* baEncoded, const char* oidAccessMethod, std::vector<std::string>& uris);
+        int distributionPoints          (const ByteArray* baEncoded, std::vector<std::string>& uris);
 
     }   //  end namespace Decode
 

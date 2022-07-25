@@ -1,4 +1,31 @@
-//  Last update: 2022-04-29
+/*
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+//  Last update: 2022-07-21
 
 #ifndef UAPKI_NS_H
 #define UAPKI_NS_H
@@ -7,9 +34,6 @@
 #include <string>
 #include <vector>
 #include "byte-array.h"
-
-
-using namespace std;
 
 
 namespace UapkiNS {
@@ -38,13 +62,13 @@ namespace UapkiNS {
     };  //  end enum CrlReason
 
     struct AlgorithmIdentifier {
-        string      algorithm;
+        std::string algorithm;
         ByteArray*  baParameters;
 
         AlgorithmIdentifier (void)
             : baParameters(nullptr) {
         }
-        explicit AlgorithmIdentifier (const string& iAlgorithm, const ByteArray* iParameters = nullptr)
+        explicit AlgorithmIdentifier (const std::string& iAlgorithm, const ByteArray* iParameters = nullptr)
             : algorithm(iAlgorithm), baParameters((ByteArray*)iParameters) {
         }
         ~AlgorithmIdentifier (void) {
@@ -60,7 +84,7 @@ namespace UapkiNS {
     };  //  end struct AlgorithmIdentifier
 
     struct Attribute {
-        string      type;
+        std::string type;
         ByteArray*  baValues;
 
         Attribute (void)
@@ -79,7 +103,7 @@ namespace UapkiNS {
     };  //  end struct Attribute
 
     struct Extension {
-        string      extnId;
+        std::string extnId;
         bool        critical;
         ByteArray*  baExtnValue;
 
@@ -109,10 +133,9 @@ namespace UapkiNS {
             UNIVERSAL   = 6     // for backward compatibility
         };  //  end enum class StringType
 
-        string  type;
-        StringType
-                stringType;
-        string  value;
+        std::string type;
+        StringType  stringType;
+        std::string value;
 
         RdName (void)
             : stringType(StringType::UNDEFINED) {
@@ -154,7 +177,7 @@ namespace UapkiNS {
         size_t size (void) const { return ba_get_len(m_Ba); }
     };  //  end class SmartBA
 
-    class VectorBA : public vector<ByteArray*> {
+    class VectorBA : public std::vector<ByteArray*> {
     public:
         VectorBA (const size_t newSize = 0) {
             resize(newSize);

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-24
+//  Last update: 2022-07-25
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -125,12 +125,12 @@ namespace Pkcs7 {
         KeyAgreeRecipientInfo* getKeyAgreeRecipientInfo (const size_t index = 0) const;
         int setEncryptedContentInfo (const char* contentType,
                 const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent);
-        int setEncryptedContentInfo (const string& contentType,
+        int setEncryptedContentInfo (const std::string& contentType,
                 const UapkiNS::AlgorithmIdentifier& aidContentEncryptionAlgoId, const ByteArray* baEncryptedContent);
         int addUnprotectedAttr (const UapkiNS::Attribute& unprotectedAttrs);
 
         int encode (const char* contentType = OID_PKCS7_ENVELOPED_DATA);
-        int encode (const string& contentType);
+        int encode (const std::string& contentType);
         ByteArray* getEncoded (const bool move = false);
 
         EncryptedContentInfo& getEncryptedContentInfo (void) { return m_EncryptedContentInfo; }

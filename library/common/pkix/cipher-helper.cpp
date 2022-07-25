@@ -25,13 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-25
+//  Last update: 2022-07-25
 
 #include "cipher-helper.h"
 #include "dstu7624.h"
 #include "gost28147.h"
 #include "macros-internal.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
+
+
+using namespace std;
 
 
 static const char* SHEX_GOST28147_SBOX_ID_1 = "A9D6EB45F13C708280C4967B231F5EADF658EBA4C037291D38D96BF025CA4E17F8E9720DC615B43A28975F0BC1DEA36438B564EA2C179FD0123E6DB8FAC57904";
