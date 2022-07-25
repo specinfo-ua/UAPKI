@@ -37,7 +37,6 @@
 #include "time-utils.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
-#include "verify-signer-info.h"
 #include "verify-status.h"
 #include "verify-utils.h"
 
