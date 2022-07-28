@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-25
+//  Last update: 2022-07-27
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -81,6 +81,7 @@ namespace Pkcs7 {
             int setSid (const ByteArray* baSID);
             int setSidByKeyId (const ByteArray* baKeyId);
             int setDigestAlgorithm (const UapkiNS::AlgorithmIdentifier& aidDigest);
+            int addSignedAttr (const char* type, const ByteArray* baValues);
             int addSignedAttr (const UapkiNS::Attribute& signedAttr);
             int setSignedAttrs (const std::vector<UapkiNS::Attribute>& signedAttrs);
             int encodeSignedAttrs (void);
@@ -94,9 +95,10 @@ namespace Pkcs7 {
             const std::string& getSignAlgo (void) const { return m_SignAlgo; }
 
         public:
-            int addSignedAttr_ContentType (const char* contentType = OID_PKCS7_DATA);
-            int addSignedAttr_MessageDigest (const ByteArray* baMessageDigest);
-            int addSignedAttr_SigningTime (const uint64_t signingTime);
+            int addSignedAttrContentType (const char* contentType = OID_PKCS7_DATA);
+            int addSignedAttrContentType (const std::string& contentType);
+            int addSignedAttrMessageDigest (const ByteArray* baMessageDigest);
+            int addSignedAttrSigningTime (const uint64_t signingTime);
 
         };  //  end class SignerInfo
 

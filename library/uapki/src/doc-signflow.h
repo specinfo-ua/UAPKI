@@ -31,11 +31,10 @@
 #include "uapkic.h"
 #include "uapkif.h"
 #include "cer-store.h"
+#include "signeddata-helper.h"
+#include "uapki-ns.h"
 #include <string>
 #include <vector>
-
-
-using namespace  std;
 
 
 enum class SIGNATURE_FORMAT {
@@ -53,10 +52,12 @@ enum class SIGNATURE_FORMAT {
 struct SignParams {
     SIGNATURE_FORMAT
                 signatureFormat;
-    HashAlg     digestHashAlgo;
-    HashAlg     signHashAlgo;
-    string      digestAlgo;  //  for digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
-    string      signAlgo;
+    HashAlg     hashDigest;
+    HashAlg     hashSignature;
+    UapkiNS::AlgorithmIdentifier
+                aidDigest; //  for digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
+    UapkiNS::AlgorithmIdentifier
+                aidSignature;
     CerStore::Item*
                 cerStoreItem;
     ByteArray*  baKeyId;
@@ -68,17 +69,24 @@ struct SignParams {
     bool        sidUseKeyId;
     ByteArray*  baEssCertId;
     ByteArray*  baSignPolicy;
-    vector<string>
+    std::vector<std::string>
                 tspUris;
     const char* tspPolicy;
 
     SignParams (void)
     : signatureFormat(SIGNATURE_FORMAT::CADES_UNDEFINED)
-    , digestHashAlgo(HashAlg::HASH_ALG_UNDEFINED), signHashAlgo(HashAlg::HASH_ALG_UNDEFINED)
-    , cerStoreItem(nullptr), baKeyId(nullptr)
-    , detachedData(true), includeCert(false), includeTime(false)
-    , includeContentTS(false), includeSignatureTS(false)
-    , sidUseKeyId(false), baEssCertId(nullptr), baSignPolicy(nullptr)
+    , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
+    , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
+    , cerStoreItem(nullptr)
+    , baKeyId(nullptr)
+    , detachedData(true)
+    , includeCert(false)
+    , includeTime(false)
+    , includeContentTS(false)
+    , includeSignatureTS(false)
+    , sidUseKeyId(false)
+    , baEssCertId(nullptr)
+    , baSignPolicy(nullptr)
     , tspPolicy(nullptr)
     {}
     ~SignParams (void) {
@@ -89,70 +97,46 @@ struct SignParams {
     }
 };  //  end struct SignParams
 
-struct DocAttr {
-    const char* type;   //  reference
-    ByteArray*  baValue;
-
-    DocAttr (void)
-        : type(nullptr), baValue(nullptr) {}
-    explicit DocAttr (const char* iType, ByteArray* iValue)
-        : type(iType), baValue(iValue) {}
-    ~DocAttr (void) {
-        ba_free(baValue);
-    }
-};  //  end struct DocAttr
-
-struct SigningDoc {
+class SigningDoc {
+public:
     const SignParams*
                 signParams; //  ref
-    const char* id;         //  ref
+    UapkiNS::Pkcs7::SignedDataBuilder
+                builder;
+    UapkiNS::Pkcs7::SignedDataBuilder::SignerInfo*
+                signerInfo;
+    std::string id;
+    std::string contentType;
     bool        isDigest;
     ByteArray*  baData;
     ByteArray*  baMessageDigest;
-    ByteArray*  baSignedAttrs;
     ByteArray*  baHashSignedAttrs;
     ByteArray*  baSignature;
-    ByteArray*  baUnsignedAttrs;
-    ByteArray*  baEncoded;  //  in case RAW-format store value signature
-    vector<DocAttr*>
-                signedAttrs;
-    vector<DocAttr*>
-                unsignedAttrs;
-    string      tspUri;
+    std::string tspUri;
 
-    SigningDoc (void)
-    : signParams(nullptr), id(nullptr)
-    , isDigest(false), baData(nullptr), baMessageDigest(nullptr)
-    , baSignedAttrs(nullptr), baHashSignedAttrs(nullptr), baSignature(nullptr), baUnsignedAttrs(nullptr)
-    , baEncoded(nullptr)
-    {}
+private:
+    std::vector<UapkiNS::Attribute*>
+                m_SignedAttrs;
+    std::vector<UapkiNS::Attribute*>
+                m_UnsignedAttrs;
 
-    ~SigningDoc (void)
-    {
-        ba_free(baData);
-        ba_free(baMessageDigest);
-        ba_free(baSignedAttrs);
-        ba_free(baHashSignedAttrs);
-        ba_free(baSignature);
-        ba_free(baUnsignedAttrs);
-        ba_free(baEncoded);
-        for (auto& it : signedAttrs) {
-            delete it;
-        }
-        for (auto& it : unsignedAttrs) {
-            delete it;
-        }
-    }
+public:
+    SigningDoc (void);
+    ~SigningDoc (void);
 
-    int init (const SignParams* iSignParams, const char* iId, ByteArray* iData);
+    int init (const SignParams* signParams);
+    int addSignedAttribute (const std::string& type, ByteArray* baValues);
+    int addUnsignedAttribute (const std::string& type, ByteArray* baValues);
     int buildSignedAttributes (void);
     int buildSignedData (void);
-    int buildUnsignedAttributes (void);
     int digestMessage (void);
     int digestSignature (ByteArray** baHash);
     int digestSignedAttributes (void);
+    int setSignature (const ByteArray* baSignValue);
 
-};  //  end struct SigningDoc
+    ByteArray* getEncoded (void);
+
+};  //  end class SigningDoc
 
 
 #endif

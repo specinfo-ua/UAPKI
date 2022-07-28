@@ -151,6 +151,14 @@ int CerStore::Item::checkValidity (const uint64_t validateTime) const
     return RET_OK;
 }
 
+int CerStore::Item::generateEssCertId (
+        const UapkiNS::AlgorithmIdentifier& aidDigest,
+        UapkiNS::EssCertId& essCertId
+) const
+{
+    return CerStore::generateEssCertId(this, aidDigest, essCertId);
+}
+
 int CerStore::Item::getCrlUris (const bool isFull, vector<string>& uris) const
 {
     int ret = RET_OK;
@@ -521,6 +529,42 @@ int CerStore::calcKeyId (const HashAlg algoKeyId, const ByteArray* baPubkey, Byt
 
 cleanup:
     ba_free(ba_encappubkey);
+    return ret;
+}
+
+int CerStore::generateEssCertId (
+        const Item* cerStoreItem,
+        const UapkiNS::AlgorithmIdentifier& aidDigest,
+        UapkiNS::EssCertId& essCertId
+)
+{
+    int ret = RET_OK;
+    HashAlg hash_alg = HashAlg::HASH_ALG_UNDEFINED;
+    GeneralName_t* general_name = nullptr;
+    GeneralNames_t* general_names = nullptr;
+
+    if (!cerStoreItem || !aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
+    hash_alg = hash_from_oid(aidDigest.algorithm.c_str());
+    if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+
+    essCertId.hashAlgorithm = aidDigest;
+    DO(::hash(hash_alg, cerStoreItem->baEncoded, &essCertId.baCertHash));
+
+    ASN_ALLOC_TYPE(general_name, GeneralName_t);
+    general_name->present = GeneralName_PR_directoryName;
+    DO(asn_decode_ba(get_Name_desc(), &general_name->choice.directoryName, cerStoreItem->baIssuer));
+
+    ASN_ALLOC_TYPE(general_names, GeneralNames_t);
+    DO(ASN_SET_ADD(&general_names->list, (void*)general_name));
+    general_name = nullptr;
+
+    DO(asn_encode_ba(get_GeneralNames_desc(), general_names, &essCertId.issuerSerial.baIssuer));
+    CHECK_NOT_NULL(essCertId.issuerSerial.baSerialNumber = ba_copy_with_alloc(cerStoreItem->baSerialNumber, 0, 0));
+
+cleanup:
+    asn_free(get_GeneralName_desc(), general_name);
+    asn_free(get_GeneralNames_desc(), general_names);
     return ret;
 }
 

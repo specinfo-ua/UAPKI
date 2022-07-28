@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -40,109 +40,135 @@
 #endif
 
 
-int SigningDoc::init (const SignParams* iSignParams, const char* iId, ByteArray* iData)
-{
-    signParams = iSignParams;
-    id = iId;
-    baData = iData;
+using namespace std;
 
-    return (!signParams && !id || (ba_get_len(baData) > 0)) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
+
+SigningDoc::SigningDoc (void)
+    : signParams(nullptr)
+    , signerInfo(nullptr)
+    , isDigest(false)
+    , baData(nullptr)
+    , baMessageDigest(nullptr)
+    , baHashSignedAttrs(nullptr)
+    , baSignature(nullptr)
+{
+    DEBUG_OUTCON(puts("SigningDoc::SigningDoc()"));
+}
+
+SigningDoc::~SigningDoc (void)
+{
+    DEBUG_OUTCON(puts("SigningDoc::~SigningDoc()"));
+    ba_free(baData);
+    ba_free(baMessageDigest);
+    ba_free(baHashSignedAttrs);
+    ba_free(baSignature);
+    for (auto& it : m_SignedAttrs) {
+        delete it;
+    }
+    for (auto& it : m_UnsignedAttrs) {
+        delete it;
+    }
+}
+
+int SigningDoc::init (const SignParams* aSignParams)
+{
+    signParams = aSignParams;
+    if (!signParams) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (signParams->signatureFormat != SIGNATURE_FORMAT::RAW) {
+        int ret = builder.init();
+        if (ret != RET_OK) return ret;
+
+        ret = builder.addSignerInfo();
+        if (ret != RET_OK) return ret;
+
+        signerInfo = builder.getSignerInfo(0);
+        signerInfo->setDigestAlgorithm(signParams->aidDigest);
+    }
+    return RET_OK;
+}
+
+int SigningDoc::addSignedAttribute (const string& type, ByteArray* baValues)
+{
+    UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
+    if (!attr) return RET_UAPKI_GENERAL_ERROR;
+
+    m_SignedAttrs.push_back(attr);
+    return RET_OK;
+}
+
+int SigningDoc::addUnsignedAttribute (const string& type, ByteArray* baValues)
+{
+    UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
+    if (!attr) return RET_UAPKI_GENERAL_ERROR;
+
+    m_UnsignedAttrs.push_back(attr);
+    return RET_OK;
 }
 
 int SigningDoc::buildSignedAttributes (void)
 {
     int ret = RET_OK;
-    Attributes_t* signed_attrs = nullptr;
-    uint64_t signing_time = 0;
 
+    //  Add mandatory attrs
+    DO(signerInfo->addSignedAttrContentType(contentType));
+    DO(signerInfo->addSignedAttrMessageDigest(baMessageDigest));
     if (signParams->includeTime) {
-        signing_time = TimeUtils::nowMsTime();
+        DO(signerInfo->addSignedAttrSigningTime(TimeUtils::nowMsTime()));
     }
 
-    DO(create_std_signed_attrs(OID_PKCS7_DATA, baMessageDigest, signing_time, &signed_attrs));
-
-    for (auto& it : signedAttrs) {
-        DO(attrs_add_attribute(signed_attrs, it->type, it->baValue));
+    //  Add common attrs
+    if (signParams->baEssCertId) {
+        DO(signerInfo->addSignedAttr(OID_PKCS9_SIGNING_CERTIFICATE_V2, signParams->baEssCertId));
+    }
+    if (signParams->baSignPolicy) {
+        DO(signerInfo->addSignedAttr(OID_PKCS9_SIG_POLICY_ID, signParams->baSignPolicy));
     }
 
-    DO(asn_encode_ba(get_Attributes_desc(), signed_attrs, &baSignedAttrs));
+    //  Add other attrs
+    for (auto& it : m_SignedAttrs) {
+        DO(signerInfo->addSignedAttr(*it));
+    }
+
+    DO(signerInfo->encodeSignedAttrs());
 
 cleanup:
-    asn_free(get_Attributes_desc(), signed_attrs);
     return ret;
 }
 
 int SigningDoc::buildSignedData (void)
 {
     int ret = RET_OK;
-    SignerInfo_t* signer_info = nullptr;
-    SignedData_t* sdata = nullptr;
-    ByteArray* ba_sid = nullptr;
-    SignatureParams signatureParams;
+    UapkiNS::SmartBA sba_sid;
     uint32_t version = 0;
 
     if (!signParams->sidUseKeyId) {
-        DO(signParams->cerStoreItem->getIssuerAndSN(&ba_sid));
+        DO(signParams->cerStoreItem->getIssuerAndSN(&sba_sid));
+        DO(signerInfo->setSid(sba_sid.get()));
         version = 1;
     }
     else {
         DEBUG_OUTCON(printf("signParams->baKeyId, hex:"); ba_print(stdout, signParams->baKeyId));
-        DO(keyid_to_sid_subjectkeyid(signParams->baKeyId, &ba_sid));
+        DO(keyid_to_sid_subjectkeyid(signParams->baKeyId, &sba_sid));
+        DO(signerInfo->setSidByKeyId(sba_sid.get()));
         version = 3;
     }
-    DEBUG_OUTCON(printf("SigningDoc::buildSignedData(), ba_sid, hex:"); ba_print(stdout, ba_sid));
+    DEBUG_OUTCON(printf("SigningDoc::buildSignedData(), ba_sid, hex:"); ba_print(stdout, sba_sid.get()));
 
-    signatureParams.algo = signParams->signAlgo.c_str();
-    signatureParams.algoParams = nullptr;
-    signatureParams.value = baSignature;
-    DO(create_signer_info(
-        version,
-        ba_sid,
-        signParams->digestAlgo.c_str(),
-        baSignedAttrs,
-        &signatureParams,
-        baUnsignedAttrs,
-        &signer_info
-    ));
-
-    DO(create_signed_data(
-        version,
-        (signParams->detachedData) ? nullptr : baData,
-        (signParams->includeCert) ? signParams->cerStoreItem->baEncoded : nullptr,
-        signer_info,
-        &sdata
-    ));
-    signer_info = nullptr;
-
-    DO(encode_signed_data(sdata, &baEncoded));
-
-cleanup:
-    asn_free(get_SignerInfo_desc(), signer_info);
-    asn_free(get_SignedData_desc(), sdata);
-    ba_free(ba_sid);
-    return ret;
-}
-
-int SigningDoc::buildUnsignedAttributes (void)
-{
-    int ret = RET_OK;
-    Attributes_t* unsigned_attrs = nullptr;
-
-    if (!unsignedAttrs.empty()) {
-        unsigned_attrs = (Attributes_t*) calloc(1, sizeof(Attributes_t));
-        if (!unsigned_attrs) {
-            SET_ERROR(RET_MEMORY_ALLOC_ERROR);
-        }
-
-        for (auto& it : unsignedAttrs) {
-            DO(attrs_add_attribute(unsigned_attrs, it->type, it->baValue));
-        }
-
-        DO(asn_encode_ba(get_Attributes_desc(), unsigned_attrs, &baUnsignedAttrs));
+    DO(signerInfo->setVersion(version));
+    for (const auto& it : m_UnsignedAttrs) {
+        DO(signerInfo->addUnsignedAttr(*it));
     }
 
+    DO(builder.setVersion(version));
+    DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : baData));
+    if (signParams->includeCert) {
+        DO(builder.addCertificate(signParams->cerStoreItem->baEncoded));
+    }
+
+    DO(builder.encode());
+
 cleanup:
-    asn_free(get_Attributes_desc(), unsigned_attrs);
     return ret;
 }
 
@@ -151,10 +177,10 @@ int SigningDoc::digestMessage (void)
     int ret = RET_OK;
 
     if (!isDigest) {
-        DO(::hash(signParams->digestHashAlgo, baData, &baMessageDigest));
+        DO(::hash(signParams->hashDigest, baData, &baMessageDigest));
     }
     else {
-        const size_t hashsize_expected = hash_get_size(signParams->digestHashAlgo);
+        const size_t hashsize_expected = hash_get_size(signParams->hashDigest);
         if (hashsize_expected == ba_get_len(baData)) {
             baMessageDigest = baData;
             baData = nullptr;
@@ -174,7 +200,7 @@ int SigningDoc::digestSignature (ByteArray** baHash)
 
     CHECK_PARAM(baHash != nullptr);
 
-    DO(::hash(signParams->digestHashAlgo, baSignature, baHash));
+    DO(::hash(signParams->hashDigest, baSignature, baHash));
 
 cleanup:
     return ret;
@@ -184,8 +210,27 @@ int SigningDoc::digestSignedAttributes (void)
 {
     int ret = RET_OK;
 
-    DO(::hash(signParams->signHashAlgo, baSignedAttrs, &baHashSignedAttrs));
+    DO(::hash(signParams->hashSignature, signerInfo->getSignedAttrsEncoded(), &baHashSignedAttrs));
 
 cleanup:
     return ret;
+}
+
+int SigningDoc::setSignature (const ByteArray* baSignValue)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(baSignValue != nullptr);
+
+    DO(signerInfo->setSignature(signParams->aidSignature, baSignValue));
+    baSignature = (ByteArray*)baSignValue;
+
+cleanup:
+    return ret;
+}
+
+ByteArray* SigningDoc::getEncoded (void)
+{
+    return (signParams->signatureFormat != SIGNATURE_FORMAT::RAW)
+        ? builder.getEncoded() : baSignature;
 }

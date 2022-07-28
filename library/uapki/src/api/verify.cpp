@@ -106,7 +106,7 @@ struct VerifyInfo {
                 statusMessageDigest;
     bool        isDigest;
     uint64_t    signingTime;
-    vector<UapkiNS::EssCertIDv2>
+    vector<UapkiNS::EssCertId>
                 essCerts;
     SIGNATURE_VERIFY::STATUS
                 statusEssCert;
@@ -172,7 +172,7 @@ static int check_signing_certificate_v2 (VerifyInfo& verifyInfo)
     int ret = RET_OK;
     UapkiNS::SmartBA sba_certhash;
     
-    const UapkiNS::EssCertIDv2& ess_certid = verifyInfo.essCerts[0];
+    const UapkiNS::EssCertId& ess_certid = verifyInfo.essCerts[0];
     const HashAlg hash_algo = hash_from_oid(ess_certid.hashAlgorithm.algorithm.c_str());
     if (hash_algo == HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);

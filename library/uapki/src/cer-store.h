@@ -30,6 +30,7 @@
 
 #include "uapkic.h"
 #include "uapkif.h"
+#include "attribute-helper.h"
 #include "uapki-export.h"
 #include "uapki-ns.h"
 #include "verify-status.h"
@@ -97,6 +98,10 @@ public:
         ~Item (void);
 
         int checkValidity (const uint64_t validateTime) const;
+        int generateEssCertId (
+            const UapkiNS::AlgorithmIdentifier& aidDigest,
+            UapkiNS::EssCertId& essCertId
+        ) const;
         int getCrlUris (const bool isFull, vector<string>& uris) const;
         int getIssuerAndSN (ByteArray** baIssuerAndSN) const;
         int getOcspUris (vector<string>& uris) const;
@@ -131,6 +136,11 @@ public:
 
 public:
     static int calcKeyId (const HashAlg algoKeyId, const ByteArray* baPubkey, ByteArray** baKeyId);
+    static int generateEssCertId (
+        const Item* cerStoreItem,
+        const UapkiNS::AlgorithmIdentifier& aidDigest,
+        UapkiNS::EssCertId& essCertId
+    );
     static int parseCert (const ByteArray* baEncoded, Item** cerStoreItem);
     static int parseSID (const ByteArray* baSID, ByteArray** baIssuer, ByteArray** baSerialNumber, ByteArray** baKeyId);
 

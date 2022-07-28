@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-21
+//  Last update: 2022-07-28
 
 #ifndef UAPKI_NS_H
 #define UAPKI_NS_H
@@ -65,12 +65,13 @@ namespace UapkiNS {
         std::string algorithm;
         ByteArray*  baParameters;
 
-        AlgorithmIdentifier (void)
-            : baParameters(nullptr) {
-        }
-        explicit AlgorithmIdentifier (const std::string& iAlgorithm, const ByteArray* iParameters = nullptr)
-            : algorithm(iAlgorithm), baParameters((ByteArray*)iParameters) {
-        }
+        AlgorithmIdentifier (
+            const std::string& iAlgorithm = std::string(),
+            const ByteArray* iParameters = nullptr
+        )
+        : algorithm(iAlgorithm)
+        , baParameters((ByteArray*)iParameters)
+        {}
         ~AlgorithmIdentifier (void) {
             clear();
         }
@@ -87,9 +88,13 @@ namespace UapkiNS {
         std::string type;
         ByteArray*  baValues;
 
-        Attribute (void)
-            : baValues(nullptr) {
-        }
+        Attribute (
+            const std::string& iType = std::string(),
+            const ByteArray* iBaValues = nullptr
+        )
+        : type(iType)
+        , baValues((ByteArray*)iBaValues)
+        {}
         ~Attribute (void) {
             clear();
         }
@@ -97,7 +102,7 @@ namespace UapkiNS {
             type.clear();
             ba_free(baValues);
         }
-        bool isPresent(void) const {
+        bool isPresent (void) const {
             return (!type.empty());
         }
     };  //  end struct Attribute
@@ -107,9 +112,15 @@ namespace UapkiNS {
         bool        critical;
         ByteArray*  baExtnValue;
 
-        Extension (void)
-            : critical(false), baExtnValue(nullptr) {
-        }
+        Extension (
+            const std::string& iExtnId = std::string(),
+            const bool iCritical = false,
+            const ByteArray* iBaValues = nullptr
+        )
+        : extnId(iExtnId)
+        , critical(iCritical)
+        , baExtnValue((ByteArray*)iBaValues)
+        {}
         ~Extension (void) {
             clear();
         }

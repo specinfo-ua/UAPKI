@@ -1,4 +1,4 @@
-//  Last update: 2022-07-23
+//  Last update: 2022-07-27
 
 
 #include "uapki-ns-util.h"
@@ -35,17 +35,18 @@ cleanup:
     return ret;
 }
 
-int Util::algorithmIdentifierToAsn1 (const AlgorithmIdentifier& algoId, AlgorithmIdentifier_t& asn1)
+int Util::algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const char* algo, const ByteArray* baParams)
 {
     int ret = RET_OK;
-    if (!algoId.isPresent()) return RET_INVALID_PARAM;
+
+    if (!algo || !oid_is_valid(algo)) return RET_INVALID_PARAM;
 
     //  =algorithm=
-    DO(asn_set_oid_from_text(algoId.algorithm.c_str(), &asn1.algorithm));
+    DO(asn_set_oid_from_text(algo, &asn1.algorithm));
 
     //  =parameters=
-    if (algoId.baParameters) {
-        asn1.parameters = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), algoId.baParameters);
+    if (baParams) {
+        asn1.parameters = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baParams);
         if (!asn1.parameters) {
             SET_ERROR(RET_MEMORY_ALLOC_ERROR);
         }
@@ -53,6 +54,11 @@ int Util::algorithmIdentifierToAsn1 (const AlgorithmIdentifier& algoId, Algorith
 
 cleanup:
     return ret;
+}
+
+int Util::algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const AlgorithmIdentifier& algoId)
+{
+    return algorithmIdentifierToAsn1(asn1, algoId.algorithm.c_str(), algoId.baParameters);
 }
 
 int Util::attributeFromAsn1 (const Attribute_t& asn1, Attribute& attr)
@@ -81,24 +87,54 @@ cleanup:
     return ret;
 }
 
-int Util::attributeToAsn1 (const Attribute& attr, Attribute_t& asn1)
+int Util::attributeToAsn1 (Attribute_t& asn1, const char* type, const ByteArray* baValues)
 {
     int ret = RET_OK;
-    if (!attr.isPresent()) return RET_INVALID_PARAM;
+    ANY_t* any = nullptr;
+
+    if (!type || !oid_is_valid(type)) return RET_INVALID_PARAM;
 
     //  =attrType=
-    DO(asn_set_oid_from_text(attr.type.c_str(), &asn1.type));
+    DO(asn_set_oid_from_text(type, &asn1.type));
 
     //  =attrValues=
-    //if (algoId.baParameters) {
-    //    asn1.parameters = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), algoId.baParameters);
-    //    if (!asn1.parameters) {
-    //        SET_ERROR(RET_MEMORY_ALLOC_ERROR);
-    //    }
-    //}
+    if (baValues) {
+        CHECK_NOT_NULL(any = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baValues));
+        DO(ASN_SET_ADD(&asn1.value.list, any));
+        any = nullptr;
+    }
 
 cleanup:
+    asn_free(get_ANY_desc(), any);
     return ret;
+}
+
+int Util::attributeToAsn1 (Attribute_t& asn1, const Attribute& attr)
+{
+    return attributeToAsn1(asn1, attr.type.c_str(), attr.baValues);
+}
+
+int Util::addToAttributes (Attributes_t* attrs, const char* type, const ByteArray* baValues)
+{
+    int ret = RET_OK;
+    Attribute_t* attr = nullptr;
+
+    CHECK_PARAM(attrs != nullptr);
+
+    ASN_ALLOC_TYPE(attr, Attribute_t);
+    DO(attributeToAsn1(*attr, type, baValues));
+
+    DO(ASN_SET_ADD(&attrs->list, attr));
+    attr = nullptr;
+
+cleanup:
+    asn_free(get_Attribute_desc(), attr);
+    return ret;
+}
+
+int Util::addToAttributes (Attributes_t* attrs, const Attribute& attr)
+{
+    return addToAttributes(attrs, attr.type.c_str(), attr.baValues);
 }
 
 
