@@ -43,6 +43,29 @@
 using namespace std;
 
 
+SigningDoc::SignParams::SignParams (void)
+    : signatureFormat(SignatureFormat::UNDEFINED)
+    , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
+    , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
+    , cerStoreItem(nullptr)
+    , baKeyId(nullptr)
+    , detachedData(true)
+    , includeCert(false)
+    , includeTime(false)
+    , includeContentTS(false)
+    , includeSignatureTS(false)
+    , sidUseKeyId(false)
+    , tspPolicy(nullptr)
+{
+}
+SigningDoc::SignParams::~SignParams (void)
+{
+    signatureFormat = SignatureFormat::UNDEFINED;
+    cerStoreItem = nullptr; //  This ref
+    ba_free(baKeyId);
+}
+
+
 SigningDoc::SigningDoc (void)
     : signParams(nullptr)
     , signerInfo(nullptr)
@@ -75,7 +98,7 @@ int SigningDoc::init (const SignParams* aSignParams)
     signParams = aSignParams;
     if (!signParams) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (signParams->signatureFormat != SIGNATURE_FORMAT::RAW) {
+    if (signParams->signatureFormat != SignatureFormat::RAW) {
         int ret = builder.init();
         if (ret != RET_OK) return ret;
 
@@ -110,22 +133,22 @@ int SigningDoc::buildSignedAttributes (void)
 {
     int ret = RET_OK;
 
-    //  Add mandatory attrs
+    //  Add mandatory attrs (CMS/CAdES)
     DO(signerInfo->addSignedAttrContentType(contentType));
     DO(signerInfo->addSignedAttrMessageDigest(baMessageDigest));
     if (signParams->includeTime) {
         DO(signerInfo->addSignedAttrSigningTime(TimeUtils::nowMsTime()));
     }
 
-    //  Add common attrs
-    if (signParams->baEssCertId) {
-        DO(signerInfo->addSignedAttr(OID_PKCS9_SIGNING_CERTIFICATE_V2, signParams->baEssCertId));
+    //  Add CAdES-signed attrs
+    if (signParams->attrSigningCert.isPresent()) {
+        DO(signerInfo->addSignedAttr(signParams->attrSigningCert));
     }
-    if (signParams->baSignPolicy) {
-        DO(signerInfo->addSignedAttr(OID_PKCS9_SIG_POLICY_ID, signParams->baSignPolicy));
+    if (signParams->attrSignPolicy.isPresent()) {
+        DO(signerInfo->addSignedAttr(signParams->attrSignPolicy));
     }
 
-    //  Add other attrs
+    //  Add other signed attrs
     for (auto& it : m_SignedAttrs) {
         DO(signerInfo->addSignedAttr(*it));
     }
@@ -154,8 +177,23 @@ int SigningDoc::buildSignedData (void)
         version = 3;
     }
     DEBUG_OUTCON(printf("SigningDoc::buildSignedData(), ba_sid, hex:"); ba_print(stdout, sba_sid.get()));
-
     DO(signerInfo->setVersion(version));
+
+    //  Add CAdES-unsigned attrs
+    if (signParams->attrCertificateRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(signParams->attrCertificateRefs));
+    }
+    if (signParams->attrRevocationRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(signParams->attrRevocationRefs));
+    }
+    if (signParams->attrCertValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(signParams->attrCertValues));
+    }
+    if (signParams->attrRevocationValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(signParams->attrRevocationValues));
+    }
+
+    //  Add other unsigned attrs
     for (const auto& it : m_UnsignedAttrs) {
         DO(signerInfo->addUnsignedAttr(*it));
     }
@@ -231,6 +269,6 @@ cleanup:
 
 ByteArray* SigningDoc::getEncoded (void)
 {
-    return (signParams->signatureFormat != SIGNATURE_FORMAT::RAW)
+    return (signParams->signatureFormat != SignatureFormat::RAW)
         ? builder.getEncoded() : baSignature;
 }

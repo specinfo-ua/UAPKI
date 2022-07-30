@@ -58,31 +58,31 @@
 using namespace  std;
 
 
-static SIGNATURE_FORMAT signature_format_to_enum (const string& signFormat)
+static SigningDoc::SignatureFormat signature_format_to_enum (const string& signFormat)
 {
-    SIGNATURE_FORMAT rv = SIGNATURE_FORMAT::CADES_UNDEFINED;
+    SigningDoc::SignatureFormat rv = SigningDoc::SignatureFormat::UNDEFINED;
     if ((signFormat == string(CADES_BES_STR)) || signFormat.empty()) {
-        rv = SIGNATURE_FORMAT::CADES_BES;
+        rv = SigningDoc::SignatureFormat::CADES_BES;
     }
     else if (signFormat == string(CADES_T_STR)) {
-        rv = SIGNATURE_FORMAT::CADES_T;
+        rv = SigningDoc::SignatureFormat::CADES_T;
     }
     else if (signFormat == string(CADES_C_STR)) {
-        rv = SIGNATURE_FORMAT::CADES_C;
+        rv = SigningDoc::SignatureFormat::CADES_C;
     }
     else if (signFormat == string(CADES_A_V3_STR)) {
-        rv = SIGNATURE_FORMAT::CADES_Av3;
+        rv = SigningDoc::SignatureFormat::CADES_Av3;
     }
     else if (signFormat == string(CMS_STR)) {
-        rv = SIGNATURE_FORMAT::CMS_SID_KEYID;
+        rv = SigningDoc::SignatureFormat::CMS_SID_KEYID;
     }
     else if (signFormat == string(RAW_STR)) {
-        rv = SIGNATURE_FORMAT::RAW;
+        rv = SigningDoc::SignatureFormat::RAW;
     }
     return rv;
 }   //  signature_format_to_enum
 
-static int encode_attrvalue_esscertid (SignParams& signParams)
+static int encode_attrvalue_signingcert (SigningDoc::SignParams& signParams)
 {
     int ret = RET_OK;
     vector<UapkiNS::EssCertId> ess_certids;
@@ -92,11 +92,12 @@ static int encode_attrvalue_esscertid (SignParams& signParams)
     //  Now simple case: one cert
     ess_certids.resize(1);
     DO(signParams.cerStoreItem->generateEssCertId(signParams.aidDigest, ess_certids[0]));
-    DO(UapkiNS::AttributeHelper::encodeSigningCertificate(ess_certids, &signParams.baEssCertId));
+    DO(UapkiNS::AttributeHelper::encodeSigningCertificate(ess_certids, &signParams.attrSigningCert.baValues));
+    signParams.attrSigningCert.type = string(OID_PKCS9_SIGNING_CERTIFICATE_V2);
 
 cleanup:
     return ret;
-}   //  encode_attrvalue_esscertid
+}   //  encode_attrvalue_signingcert
 
 static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
 {
@@ -136,7 +137,7 @@ static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlg
     return ret;
 }
 
-static int parse_sign_params (JSON_Object* joSignParams, SignParams& signParams)
+static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams& signParams)
 {
     int ret = RET_OK;
 
@@ -151,19 +152,19 @@ static int parse_sign_params (JSON_Object* joSignParams, SignParams& signParams)
     signParams.includeContentTS = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeContentTS", false);
 
     switch (signParams.signatureFormat) {
-    case SIGNATURE_FORMAT::CADES_T:
+    case SigningDoc::SignatureFormat::CADES_Av3:
+    case SigningDoc::SignatureFormat::CADES_C:
+    case SigningDoc::SignatureFormat::CADES_T:
         signParams.includeContentTS = true;
         signParams.includeSignatureTS = true;
-    case SIGNATURE_FORMAT::CADES_BES:
+    case SigningDoc::SignatureFormat::CADES_BES:
         signParams.sidUseKeyId = false;
         break;
-    case SIGNATURE_FORMAT::CMS_SID_KEYID:
+    case SigningDoc::SignatureFormat::CMS_SID_KEYID:
         signParams.sidUseKeyId = true;
         break;
-    case SIGNATURE_FORMAT::RAW:
+    case SigningDoc::SignatureFormat::RAW:
         break;
-    case SIGNATURE_FORMAT::CADES_Av3:
-    case SIGNATURE_FORMAT::CADES_C:
     default:
         ret = RET_UAPKI_INVALID_PARAMETER;
     }
@@ -171,7 +172,8 @@ static int parse_sign_params (JSON_Object* joSignParams, SignParams& signParams)
     if (ParsonHelper::jsonObjectHasValue(joSignParams, "signaturePolicy", JSONObject)) {
         JSON_Object* jo_sigpolicy = json_object_get_object(joSignParams, "signaturePolicy");
         const string sig_policyid = ParsonHelper::jsonObjectGetString(jo_sigpolicy, "sigPolicyId");
-        DO(UapkiNS::AttributeHelper::encodeSignaturePolicy(sig_policyid, &signParams.baSignPolicy));
+        DO(UapkiNS::AttributeHelper::encodeSignaturePolicy(sig_policyid, &signParams.attrSignPolicy.baValues));
+        signParams.attrSignPolicy.type = string(OID_PKCS9_SIG_POLICY_ID);
     }
 
 cleanup:
@@ -323,7 +325,7 @@ static int parse_doc_from_json (SigningDoc& sdoc, JSON_Object* joDoc)
     if (sdoc.id.empty() || (ba_get_len(sdoc.baData) == 0)) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    if (sdoc.signParams->signatureFormat != SIGNATURE_FORMAT::RAW) {
+    if (sdoc.signParams->signatureFormat != SigningDoc::SignatureFormat::RAW) {
         sdoc.contentType = ParsonHelper::jsonObjectGetString(joDoc, "type", string(OID_PKCS7_DATA));
         if (!oid_is_valid(sdoc.contentType.c_str())) return RET_UAPKI_INVALID_PARAMETER;
         DO(parse_docattrs_from_json(sdoc, joDoc, string("signedAttributes")));
@@ -340,7 +342,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     int ret = RET_OK;
     LibraryConfig* config = nullptr;
     CerStore* cer_store = nullptr;
-    SignParams sign_params;
+    SigningDoc::SignParams sign_params;
     size_t cnt_docs = 0;
     JSON_Array* ja_results = nullptr;
     JSON_Array* ja_sources = nullptr;
@@ -378,7 +380,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
-    if (sign_params.aidDigest.algorithm.empty() || (sign_params.signatureFormat == SIGNATURE_FORMAT::RAW)) {
+    if (sign_params.aidDigest.algorithm.empty() || (sign_params.signatureFormat == SigningDoc::SignatureFormat::RAW)) {
         sign_params.hashDigest = sign_params.hashSignature;
         sign_params.aidDigest.algorithm = string(hash_to_oid(sign_params.hashDigest));
     }
@@ -389,7 +391,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
-    if ((sign_params.signatureFormat != SIGNATURE_FORMAT::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
+    if ((sign_params.signatureFormat != SigningDoc::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
         DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerStoreItem));
     }
 
@@ -418,11 +420,21 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     switch (sign_params.signatureFormat) {
-    case SIGNATURE_FORMAT::CADES_BES:
-    case SIGNATURE_FORMAT::CADES_T:
-    case SIGNATURE_FORMAT::CADES_C:
-    case SIGNATURE_FORMAT::CADES_Av3:
-        DO(encode_attrvalue_esscertid(sign_params));
+    case SigningDoc::SignatureFormat::CADES_BES:
+    case SigningDoc::SignatureFormat::CADES_T:
+        DO(encode_attrvalue_signingcert(sign_params));
+        break;
+    case SigningDoc::SignatureFormat::CADES_C:
+        DO(encode_attrvalue_signingcert(sign_params));
+        //DO(encode_attrvalue_certificaterefs(sign_params));
+        //DO(encode_attrvalue_revocationrefs(sign_params));
+        break;
+    case SigningDoc::SignatureFormat::CADES_Av3:
+        DO(encode_attrvalue_signingcert(sign_params));
+        //DO(encode_attrvalue_certificaterefs(sign_params));
+        //DO(encode_attrvalue_revocationrefs(sign_params));
+        //DO(encode_attrvalue_certificatevalues(sign_params));
+        //DO(encode_attrvalue_revocationvalues(sign_params));
         break;
     default:
         break;
@@ -436,7 +448,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
     }
 
-    if (sign_params.signatureFormat != SIGNATURE_FORMAT::RAW) {
+    if (sign_params.signatureFormat != SigningDoc::SignatureFormat::RAW) {
         for (size_t i = 0; i < signing_docs.size(); i++) {
             SigningDoc& sdoc = signing_docs[i];
 

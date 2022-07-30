@@ -37,70 +37,59 @@
 #include <vector>
 
 
-enum class SIGNATURE_FORMAT {
-    CADES_UNDEFINED     = 0,
-    CADES_BES           = 1,
-    CADES_T             = 2,
-    CADES_C             = 3,
-    CADES_Av3           = 4,
-    //  specified
-    CMS_SID_KEYID       = 10,
-    RAW                 = 11
-};
-
-
-struct SignParams {
-    SIGNATURE_FORMAT
-                signatureFormat;
-    HashAlg     hashDigest;
-    HashAlg     hashSignature;
-    UapkiNS::AlgorithmIdentifier
-                aidDigest; //  for digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
-    UapkiNS::AlgorithmIdentifier
-                aidSignature;
-    CerStore::Item*
-                cerStoreItem;
-    ByteArray*  baKeyId;
-    bool        detachedData;
-    bool        includeCert;
-    bool        includeTime;
-    bool        includeContentTS;
-    bool        includeSignatureTS;
-    bool        sidUseKeyId;
-    ByteArray*  baEssCertId;
-    ByteArray*  baSignPolicy;
-    std::vector<std::string>
-                tspUris;
-    const char* tspPolicy;
-
-    SignParams (void)
-    : signatureFormat(SIGNATURE_FORMAT::CADES_UNDEFINED)
-    , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
-    , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
-    , cerStoreItem(nullptr)
-    , baKeyId(nullptr)
-    , detachedData(true)
-    , includeCert(false)
-    , includeTime(false)
-    , includeContentTS(false)
-    , includeSignatureTS(false)
-    , sidUseKeyId(false)
-    , baEssCertId(nullptr)
-    , baSignPolicy(nullptr)
-    , tspPolicy(nullptr)
-    {}
-    ~SignParams (void) {
-        signatureFormat = SIGNATURE_FORMAT::CADES_UNDEFINED;
-        ba_free(baKeyId);
-        ba_free(baEssCertId);
-        ba_free(baSignPolicy);
-    }
-};  //  end struct SignParams
-
 class SigningDoc {
 public:
+    enum class SignatureFormat {
+        UNDEFINED       = 0,
+        RAW             = 1,
+        CMS_SID_KEYID   = 2,
+        CADES_BES       = 3,
+        CADES_T         = 4,
+        CADES_C         = 5,
+        CADES_Av3       = 6
+    };  //  end enum SignatureFormat
+
+    struct SignParams {
+        SignatureFormat
+                    signatureFormat;
+        HashAlg     hashDigest;
+        HashAlg     hashSignature;
+        UapkiNS::AlgorithmIdentifier
+                    aidDigest;      //  For digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
+        UapkiNS::AlgorithmIdentifier
+                    aidSignature;
+        CerStore::Item*
+                    cerStoreItem;   //  ref
+        ByteArray* baKeyId;
+        bool        detachedData;
+        bool        includeCert;
+        bool        includeTime;
+        bool        includeContentTS;
+        bool        includeSignatureTS;
+        bool        sidUseKeyId;
+        UapkiNS::Attribute
+                    attrSigningCert;
+        UapkiNS::Attribute
+                    attrSignPolicy;
+        UapkiNS::Attribute
+                    attrCertificateRefs;
+        UapkiNS::Attribute
+                    attrRevocationRefs;
+        UapkiNS::Attribute
+                    attrCertValues;
+        UapkiNS::Attribute
+                    attrRevocationValues;
+        std::vector<std::string>
+                    tspUris;
+        const char* tspPolicy;
+
+        SignParams (void);
+        ~SignParams (void);
+
+    };  //  end struct SignParams
+
     const SignParams*
-                signParams; //  ref
+                signParams;     //  ref
     UapkiNS::Pkcs7::SignedDataBuilder
                 builder;
     UapkiNS::Pkcs7::SignedDataBuilder::SignerInfo*

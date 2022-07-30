@@ -549,7 +549,7 @@ int CerStore::generateEssCertId (
     if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
 
     essCertId.hashAlgorithm = aidDigest;
-    DO(::hash(hash_alg, cerStoreItem->baEncoded, &essCertId.baCertHash));
+    DO(::hash(hash_alg, cerStoreItem->baEncoded, &essCertId.baHashValue));
 
     ASN_ALLOC_TYPE(general_name, GeneralName_t);
     general_name->present = GeneralName_PR_directoryName;

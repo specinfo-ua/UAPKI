@@ -179,7 +179,7 @@ static int check_signing_certificate_v2 (VerifyInfo& verifyInfo)
     }
 
     DO(::hash(hash_algo, verifyInfo.cerStoreItem->baEncoded, &sba_certhash));
-    verifyInfo.statusEssCert = (ba_cmp(sba_certhash.get(), ess_certid.baCertHash) == 0)
+    verifyInfo.statusEssCert = (ba_cmp(sba_certhash.get(), ess_certid.baHashValue) == 0)
         ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
 
 cleanup:

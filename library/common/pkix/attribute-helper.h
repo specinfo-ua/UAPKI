@@ -1,4 +1,4 @@
-//  Last update: 2022-07-27
+//  Last update: 2022-07-30
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -11,10 +11,10 @@
 
 namespace UapkiNS {
 
-    struct EssCertId {
+    struct AttrCertId {
         UapkiNS::AlgorithmIdentifier
-                    hashAlgorithm;  //  default: {algorithm id-sha256}
-        ByteArray*  baCertHash;
+                    hashAlgorithm;
+        ByteArray*  baHashValue;
         struct IssuerSerial {
             ByteArray*  baIssuer;
             ByteArray*  baSerialNumber;
@@ -28,27 +28,34 @@ namespace UapkiNS {
             bool isPresent (void) const {
                 return (baIssuer && baSerialNumber);
             }
-        }           issuerSerial;   // optional
+        }           issuerSerial;
 
-        EssCertId (void)
-            : baCertHash(nullptr) {
+        AttrCertId (void)
+            : baHashValue(nullptr) {
         }
-        ~EssCertId (void) {
-            ba_free(baCertHash);
+        ~AttrCertId (void) {
+            ba_free(baHashValue);
         }
         bool isPresent (void) const {
-            return (hashAlgorithm.isPresent() && baCertHash);
+            return (hashAlgorithm.isPresent() && baHashValue);
         }
-    };  //  end struct EssCertId
+    };  //  end struct AttrCertId
+
+    using EssCertId = AttrCertId;
+    using OtherCertId = AttrCertId;
 
 namespace AttributeHelper {
 
+    int decodeCertValues (const ByteArray* baEncoded, std::vector<ByteArray*>& certValues);
+    int decodeCertificateRefs (const ByteArray* baEncoded, std::vector<OtherCertId>& otherCertIds);
     int decodeContentType (const ByteArray* baEncoded, std::string& contentType);
     int decodeMessageDigest (const ByteArray* baEncoded, ByteArray** baMessageDigest);
     int decodeSignaturePolicy (const ByteArray* baEncoded, std::string& sigPolicyId);
     int decodeSigningCertificate (const ByteArray* baEncoded, std::vector<EssCertId>& essCertIds);
     int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime);
 
+    int encodeCertValues (const std::vector<const ByteArray*>& certValues, ByteArray** baEncoded);
+    int encodeCertificateRefs (const std::vector<OtherCertId>& otherCertIds, ByteArray** baEncoded);
     int encodeSignaturePolicy (const std::string& sigPolicyId, ByteArray** baEncoded);
     int encodeSigningCertificate (const std::vector<EssCertId>& essCertIds, ByteArray** baEncoded);
 

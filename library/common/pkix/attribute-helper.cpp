@@ -1,4 +1,4 @@
-//  Last update: 2022-07-27
+//  Last update: 2022-07-30
 
 
 #include "attribute-helper.h"
@@ -11,11 +11,73 @@
 #include "uapki-ns-util.h"
 
 
+#undef FILE_MARKER
+#define FILE_MARKER "common/pkix/attribute-helper.cpp"
+
+
 using namespace std;
 
 
 namespace UapkiNS {
 
+
+int AttributeHelper::decodeCertValues (const ByteArray* baEncoded, std::vector<ByteArray*>& certValues)
+{
+    int ret = RET_OK;
+    Certificates_t* cert_values = nullptr;
+
+    CHECK_NOT_NULL(cert_values = (Certificates_t*)asn_decode_ba_with_alloc(get_Certificates_desc(), baEncoded));
+
+    if (cert_values->list.count > 0) {
+        certValues.resize((size_t)cert_values->list.count);
+        for (int i = 0; i < cert_values->list.count; i++) {
+            DO(asn_encode_ba(get_Certificate_desc(), cert_values->list.array[i], &certValues[i]));
+        }
+    }
+
+cleanup:
+    asn_free(get_Certificates_desc(), cert_values);
+    return ret;
+}
+
+int AttributeHelper::decodeCertificateRefs (const ByteArray* baEncoded, std::vector<OtherCertId>& otherCertIds)
+{
+    int ret = RET_OK;
+    CompleteCertificateRefs_t* cert_refs = nullptr;
+
+    CHECK_NOT_NULL(cert_refs = (CompleteCertificateRefs_t*)asn_decode_ba_with_alloc(get_CompleteCertificateRefs_desc(), baEncoded));
+
+    if (cert_refs->list.count > 0) {
+        size_t idx = 0;
+        otherCertIds.resize((size_t)cert_refs->list.count);
+        for (auto& it: otherCertIds) {
+            const OtherCertID_t& other_certid = *cert_refs->list.array[idx++];
+            //  =otherCertHash= (default: algorithm id-sha1)
+            //  TODO: need new impl OtherHash_t by rfc5126/ETSI TS 101 733 V.1.7.4
+            //  OtherHash ::= CHOICE {
+            //    sha1Hash  OtherHashValue,  -- This contains a SHA-1 hash, OtherHashValue ::= OCTET STRING
+            //    otherHash OtherHashAlgAndValue
+            //  }
+            if (other_certid.otherCertHash.present != OtherHash_PR_otherHash) {
+                SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+            }
+            DO(Util::algorithmIdentifierFromAsn1(other_certid.otherCertHash.choice.otherHash.hashAlgorithm, it.hashAlgorithm));
+            DO(asn_OCTSTRING2ba(&other_certid.otherCertHash.choice.otherHash.hashValue, &it.baHashValue));
+
+            //  =issuerSerial= (optional)
+            if (other_certid.issuerSerial) {
+                //  =issuer=
+                DO(asn_encode_ba(get_GeneralNames_desc(), &other_certid.issuerSerial->issuer, &it.issuerSerial.baIssuer));
+                //  =serialNumber=
+                DO(asn_INTEGER2ba(&other_certid.issuerSerial->serialNumber, &it.issuerSerial.baSerialNumber));
+            }
+        }
+    }
+
+cleanup:
+    asn_free(get_CompleteCertificateRefs_desc(), cert_refs);
+    return ret;
+}
 
 int AttributeHelper::decodeContentType (const ByteArray* baEncoded, string& contentType)
 {
@@ -37,7 +99,7 @@ int AttributeHelper::decodeMessageDigest (const ByteArray* baEncoded, ByteArray*
 
 int AttributeHelper::decodeSignaturePolicy (const ByteArray* baEncoded, string& sigPolicyId)
 {
-    //  Current implementation ignore params sigPolicyHash and sigPolicyQualifiers (rfc3126)
+    //  Note: current implementation ignore params sigPolicyHash and sigPolicyQualifiers (rfc3126)
     int ret = RET_OK;
     SignaturePolicyIdentifier_t* sig_policy = nullptr;
     char* s_policyid = nullptr;
@@ -72,25 +134,25 @@ int AttributeHelper::decodeSigningCertificate (const ByteArray* baEncoded, vecto
 
     //  =certs=
     if (signing_cert->certs.list.count > 0) {
+        size_t idx = 0;
         essCertIds.resize((size_t)signing_cert->certs.list.count);
-        for (size_t i = 0; i < signing_cert->certs.list.count; i++) {
-            EssCertId& dst_esscertid = essCertIds[i];
-            const ESSCertIDv2_t& src_esscertid = *signing_cert->certs.list.array[i];
+        for (auto& it : essCertIds) {
+            const ESSCertIDv2_t& ess_certid = *signing_cert->certs.list.array[idx++];
             //  =hashAlgorithm= (default: sha256)
-            if (src_esscertid.hashAlgorithm) {
-                DO(Util::algorithmIdentifierFromAsn1(*src_esscertid.hashAlgorithm, dst_esscertid.hashAlgorithm));
+            if (ess_certid.hashAlgorithm) {
+                DO(Util::algorithmIdentifierFromAsn1(*ess_certid.hashAlgorithm, it.hashAlgorithm));
             }
             else {
-                dst_esscertid.hashAlgorithm.algorithm = string(OID_SHA256);
+                it.hashAlgorithm.algorithm = string(OID_SHA256);
             }
             //  =certHash=
-            DO(asn_OCTSTRING2ba(&src_esscertid.certHash, &dst_esscertid.baCertHash));
+            DO(asn_OCTSTRING2ba(&ess_certid.certHash, &it.baHashValue));
             //  =issuerSerial= (optional)
-            if (src_esscertid.issuerSerial) {
+            if (ess_certid.issuerSerial) {
                 //  =issuer=
-                DO(asn_encode_ba(get_GeneralNames_desc(), &src_esscertid.issuerSerial->issuer, &dst_esscertid.issuerSerial.baIssuer));
+                DO(asn_encode_ba(get_GeneralNames_desc(), &ess_certid.issuerSerial->issuer, &it.issuerSerial.baIssuer));
                 //  =serialNumber=
-                DO(asn_INTEGER2ba(&src_esscertid.issuerSerial->serialNumber, &dst_esscertid.issuerSerial.baSerialNumber));
+                DO(asn_INTEGER2ba(&ess_certid.issuerSerial->serialNumber, &it.issuerSerial.baSerialNumber));
             }
         }
     }
@@ -106,6 +168,72 @@ cleanup:
 int AttributeHelper::decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime)
 {
     return ba_decode_pkixtime(baEncoded, &signingTime);
+}
+
+int AttributeHelper::encodeCertValues (const std::vector<const ByteArray*>& certValues, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    Certificates_t* cert_values = nullptr;
+    Certificate_t* cert = nullptr;
+
+    ASN_ALLOC_TYPE(cert_values, Certificates_t);
+
+    for (const auto& it : certValues) {
+        CHECK_NOT_NULL(cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), it));
+
+        DO(ASN_SEQUENCE_ADD(&cert_values->list, cert));
+        cert = nullptr;
+    }
+
+    DO(asn_encode_ba(get_Certificates_desc(), cert_values, baEncoded));
+
+cleanup:
+    asn_free(get_Certificates_desc(), cert_values);
+    asn_free(get_Certificate_desc(), cert);
+    return ret;
+}
+
+int AttributeHelper::encodeCertificateRefs (const vector<OtherCertId>& otherCertIds, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    CompleteCertificateRefs_t* cert_refs = nullptr;
+    OtherCertID_t* other_certid = nullptr;
+
+    ASN_ALLOC_TYPE(cert_refs, CompleteCertificateRefs_t);
+
+    for (const auto& it : otherCertIds) {
+        ASN_ALLOC_TYPE(other_certid, OtherCertID_t);
+
+        //  =otherCertHash= (default: algorithm id-sha1)
+        //  TODO: need new impl OtherHash_t by rfc draft-ietf-smime-cades-07, ETSI TS 101 733 V.1.7.4
+        //  OtherHash ::= CHOICE {
+        //    sha1Hash  OtherHashValue,  -- This contains a SHA-1 hash, OtherHashValue ::= OCTET STRING
+        //    otherHash OtherHashAlgAndValue
+        //  }
+        if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+        {
+            other_certid->otherCertHash.present = OtherHash_PR_otherHash;
+            DO(Util::algorithmIdentifierToAsn1(other_certid->otherCertHash.choice.otherHash.hashAlgorithm, it.hashAlgorithm));
+            DO(asn_ba2OCTSTRING(it.baHashValue, &other_certid->otherCertHash.choice.otherHash.hashValue));
+        }
+
+        //  =issuerSerial= (optional)
+        if (it.issuerSerial.isPresent()) {
+            ASN_ALLOC_TYPE(other_certid->issuerSerial, IssuerSerial_t);
+            DO(asn_decode_ba(get_GeneralNames_desc(), &other_certid->issuerSerial->issuer, it.issuerSerial.baIssuer));
+            DO(asn_ba2INTEGER(it.issuerSerial.baSerialNumber, &other_certid->issuerSerial->serialNumber));
+        }
+
+        DO(ASN_SEQUENCE_ADD(&cert_refs->list, other_certid));
+        other_certid = nullptr;
+    }
+
+    DO(asn_encode_ba(get_CompleteCertificateRefs_desc(), cert_refs, baEncoded));
+
+cleanup:
+    asn_free(get_CompleteCertificateRefs_desc(), cert_refs);
+    asn_free(get_OtherCertID_desc(), other_certid);
+    return ret;
 }
 
 int AttributeHelper::encodeSignaturePolicy (const string& sigPolicyId, ByteArray** baEncoded)
@@ -145,7 +273,7 @@ int AttributeHelper::encodeSigningCertificate (const vector<EssCertId>& essCertI
         }
 
         //  =certHash=
-        DO(asn_ba2OCTSTRING(it.baCertHash, &ess_certidv2->certHash));
+        DO(asn_ba2OCTSTRING(it.baHashValue, &ess_certidv2->certHash));
 
         //  =issuerSerial= (optional)
         if (it.issuerSerial.isPresent()) {
