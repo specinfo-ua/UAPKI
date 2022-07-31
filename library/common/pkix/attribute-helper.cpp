@@ -1,4 +1,4 @@
-//  Last update: 2022-07-30
+//  Last update: 2022-07-31
 
 
 #include "attribute-helper.h"
@@ -52,17 +52,19 @@ int AttributeHelper::decodeCertificateRefs (const ByteArray* baEncoded, std::vec
         otherCertIds.resize((size_t)cert_refs->list.count);
         for (auto& it: otherCertIds) {
             const OtherCertID_t& other_certid = *cert_refs->list.array[idx++];
-            //  =otherCertHash= (default: algorithm id-sha1)
-            //  TODO: need new impl OtherHash_t by rfc5126/ETSI TS 101 733 V.1.7.4
-            //  OtherHash ::= CHOICE {
-            //    sha1Hash  OtherHashValue,  -- This contains a SHA-1 hash, OtherHashValue ::= OCTET STRING
-            //    otherHash OtherHashAlgAndValue
-            //  }
-            if (other_certid.otherCertHash.present != OtherHash_PR_otherHash) {
+            //  =otherCertHash= (default: id-sha1)
+            switch (other_certid.otherCertHash.present) {
+            case OtherHash_PR_sha1Hash:
+                it.hashAlgorithm.algorithm = string(OID_SHA1);
+                DO(asn_OCTSTRING2ba(&other_certid.otherCertHash.choice.sha1Hash, &it.baHashValue));
+                break;
+            case OtherHash_PR_otherHash:
+                DO(Util::algorithmIdentifierFromAsn1(other_certid.otherCertHash.choice.otherHash.hashAlgorithm, it.hashAlgorithm));
+                DO(asn_OCTSTRING2ba(&other_certid.otherCertHash.choice.otherHash.hashValue, &it.baHashValue));
+                break;
+            default:
                 SET_ERROR(RET_UAPKI_INVALID_STRUCT);
             }
-            DO(Util::algorithmIdentifierFromAsn1(other_certid.otherCertHash.choice.otherHash.hashAlgorithm, it.hashAlgorithm));
-            DO(asn_OCTSTRING2ba(&other_certid.otherCertHash.choice.otherHash.hashValue, &it.baHashValue));
 
             //  =issuerSerial= (optional)
             if (other_certid.issuerSerial) {
@@ -138,7 +140,7 @@ int AttributeHelper::decodeSigningCertificate (const ByteArray* baEncoded, vecto
         essCertIds.resize((size_t)signing_cert->certs.list.count);
         for (auto& it : essCertIds) {
             const ESSCertIDv2_t& ess_certid = *signing_cert->certs.list.array[idx++];
-            //  =hashAlgorithm= (default: sha256)
+            //  =hashAlgorithm= (default: id-sha256)
             if (ess_certid.hashAlgorithm) {
                 DO(Util::algorithmIdentifierFromAsn1(*ess_certid.hashAlgorithm, it.hashAlgorithm));
             }
@@ -204,17 +206,15 @@ int AttributeHelper::encodeCertificateRefs (const vector<OtherCertId>& otherCert
     for (const auto& it : otherCertIds) {
         ASN_ALLOC_TYPE(other_certid, OtherCertID_t);
 
-        //  =otherCertHash= (default: algorithm id-sha1)
-        //  TODO: need new impl OtherHash_t by rfc draft-ietf-smime-cades-07, ETSI TS 101 733 V.1.7.4
-        //  OtherHash ::= CHOICE {
-        //    sha1Hash  OtherHashValue,  -- This contains a SHA-1 hash, OtherHashValue ::= OCTET STRING
-        //    otherHash OtherHashAlgAndValue
-        //  }
-        if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-        {
+        //  =otherCertHash= (default: id-sha1)
+        if (it.isPresent() && (it.hashAlgorithm.algorithm != string(OID_SHA1))) {
             other_certid->otherCertHash.present = OtherHash_PR_otherHash;
             DO(Util::algorithmIdentifierToAsn1(other_certid->otherCertHash.choice.otherHash.hashAlgorithm, it.hashAlgorithm));
             DO(asn_ba2OCTSTRING(it.baHashValue, &other_certid->otherCertHash.choice.otherHash.hashValue));
+        }
+        else {
+            other_certid->otherCertHash.present = OtherHash_PR_sha1Hash;
+            DO(asn_ba2OCTSTRING(it.baHashValue, &other_certid->otherCertHash.choice.sha1Hash));
         }
 
         //  =issuerSerial= (optional)
@@ -266,7 +266,7 @@ int AttributeHelper::encodeSigningCertificate (const vector<EssCertId>& essCertI
     for (const auto& it : essCertIds) {
         ASN_ALLOC_TYPE(ess_certidv2, ESSCertIDv2_t);
 
-        //  =hashAlgorithm= (default: algorithm id-sha256)
+        //  =hashAlgorithm= (default: id-sha256)
         if (it.hashAlgorithm.isPresent() && (it.hashAlgorithm.algorithm != string(OID_SHA256))) {
             ASN_ALLOC_TYPE(ess_certidv2->hashAlgorithm, AlgorithmIdentifier_t);
             DO(Util::algorithmIdentifierToAsn1(*ess_certidv2->hashAlgorithm, it.hashAlgorithm));
