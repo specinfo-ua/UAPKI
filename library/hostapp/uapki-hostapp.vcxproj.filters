@@ -21,5 +21,6 @@
     <ClInclude Include="..\common\loaders\uapki-loader.h">
       <Filter>common\loaders</Filter>
     </ClInclude>
+    <ClInclude Include="uapki-hostapp-debug.h" />
   </ItemGroup>
 </Project>

@@ -160,6 +160,7 @@
   <ItemGroup>
     <ClInclude Include="..\common\loaders\dl-macros.h" />
     <ClInclude Include="..\common\loaders\uapki-loader.h" />
+    <ClInclude Include="uapki-hostapp-debug.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
