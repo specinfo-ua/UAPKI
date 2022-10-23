@@ -37,6 +37,7 @@
     <ClInclude Include="..\common\json\parson-helper.h" />
     <ClInclude Include="..\common\json\parson.h" />
     <ClInclude Include="..\common\pkix\uapki-ns.h" />
+    <ClInclude Include="src\cm-pkcs12-debug.h" />
     <ClInclude Include="src\crypto\pkcs5.h" />
     <ClInclude Include="src\cm-pkcs12-ctx.h" />
     <ClInclude Include="src\cm-pkcs12.h" />

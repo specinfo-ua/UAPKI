@@ -31,8 +31,16 @@
 #include "cm-errors.h"
 #include "cm-export.h"
 #include "cm-pkcs12.h"
+#include "cm-pkcs12-debug.h"
 #include "parson.h"
 #include "uapkic.h"
+
+
+#define DEBUG_OUTPUT(msg)
+#ifndef DEBUG_OUTPUT
+DEBUG_OUTPUT_FUNC
+#define DEBUG_OUTPUT(msg) debug_output(DEBUG_OUTSTREAM_DEFAULT, msg);
+#endif
 
 
 static const char* JSON_PROVIDER_INFO = "{"
@@ -56,6 +64,7 @@ extern "C" {
 
 CM_EXPORT CM_ERROR provider_info (CM_JSON_PCHAR* providerInfo)
 {
+    DEBUG_OUTPUT("provider_info()");
     if (!providerInfo) return RET_CM_INVALID_PARAMETER;
 
     *providerInfo = (CM_JSON_PCHAR)strdup(JSON_PROVIDER_INFO);
@@ -64,6 +73,7 @@ CM_EXPORT CM_ERROR provider_info (CM_JSON_PCHAR* providerInfo)
 
 CM_EXPORT CM_ERROR provider_init (CM_JSON_PCHAR providerParams)
 {
+    DEBUG_OUTPUT("provider_init()");
     CM_ERROR cm_err = RET_CM_GENERAL_ERROR;
     if (!cm_pkcs12) {
         uapkic_init(nullptr, nullptr);
@@ -84,6 +94,7 @@ CM_EXPORT CM_ERROR provider_init (CM_JSON_PCHAR providerParams)
 
 CM_EXPORT CM_ERROR provider_deinit (void)
 {
+    DEBUG_OUTPUT("provider_deinit()");
     CM_ERROR cm_err = RET_OK;
     if (cm_pkcs12) {
         delete cm_pkcs12;
@@ -98,11 +109,13 @@ CM_EXPORT CM_ERROR provider_deinit (void)
 CM_EXPORT CM_ERROR provider_open (const char* urlFilename, uint32_t mode,
                     const CM_JSON_PCHAR params, CM_SESSION_API** session)
 {
+    DEBUG_OUTPUT("provider_open()");
     return (cm_pkcs12) ? cm_pkcs12->open(urlFilename, mode, params, session) : RET_CM_NOT_INITIALIZED;
 }
 
 CM_EXPORT CM_ERROR provider_close (CM_SESSION_API* session)
 {
+    DEBUG_OUTPUT("provider_close()");
     return (cm_pkcs12) ? cm_pkcs12->close(session) : RET_CM_NOT_INITIALIZED;
 }
 

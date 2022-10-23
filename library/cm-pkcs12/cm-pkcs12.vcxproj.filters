@@ -108,6 +108,9 @@
     <ClInclude Include="..\common\pkix\private-key.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
+    <ClInclude Include="src\cm-pkcs12-debug.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\crypto\pkcs5.c">

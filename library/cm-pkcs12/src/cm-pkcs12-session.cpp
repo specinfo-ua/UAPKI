@@ -29,22 +29,26 @@
 #include "cm-errors.h"
 #include "cm-pkcs12.h"
 #include "cm-pkcs12-ctx.h"
+#include "cm-pkcs12-debug.h"
 #include "oids.h"
 #include "parson-helper.h"
 #include "private-key.h"
 #include "uapkif.h"
 
 
-#define DEBUG_OUTCON(expression)
-#ifndef DEBUG_OUTCON
-#define DEBUG_OUTCON(expression) expression
+#define DEBUG_OUTPUT(msg)
+#ifndef DEBUG_OUTPUT
+DEBUG_OUTPUT_FUNC
+#define DEBUG_OUTPUT(msg) debug_output(DEBUG_OUTSTREAM_DEFAULT, msg);
 #endif
 
 
-static CM_ERROR cm_session_info (CM_SESSION_API* session,
-                    CM_JSON_PCHAR* sessionInfo)
+static CM_ERROR cm_session_info (
+        CM_SESSION_API* session,
+        CM_JSON_PCHAR* sessionInfo
+)
 {
-    DEBUG_OUTCON(puts("cm_session_info()"));
+    DEBUG_OUTPUT("cm_session_info()");
     if (!session) return RET_CM_NO_SESSION;
     if (!sessionInfo) return RET_CM_INVALID_PARAMETER;
 
@@ -55,21 +59,27 @@ static CM_ERROR cm_session_info (CM_SESSION_API* session,
     return CmPkcs12::sessionInfoToJson(ss_ctx->fileStorage.filename(), (CM_JSON_PCHAR*)sessionInfo);
 }   //  cm_session_info
 
-static CM_ERROR cm_session_mechanism_parameters (CM_SESSION_API* session,
-                    const CM_UTF8_CHAR* mechanismId, CM_JSON_PCHAR* parameterIds)
+static CM_ERROR cm_session_mechanism_parameters (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* mechanismId,
+        CM_JSON_PCHAR* parameterIds
+)
 {
-    DEBUG_OUTCON(puts("cm_session_mechanism_parameters()"));
+    DEBUG_OUTPUT("cm_session_mechanism_parameters()");
     if (!session) return RET_CM_NO_SESSION;
     if (!mechanismId || !parameterIds || (strlen((char*)mechanismId) == 0)) return RET_CM_INVALID_PARAMETER;
 
     return CmPkcs12::mechanismParamsToJson((const char*)mechanismId, parameterIds);
 }   //  cm_session_mechanism_parameters
 
-static CM_ERROR cm_session_login (CM_SESSION_API* session,
-                    const CM_UTF8_CHAR* password, const CM_JSON_PCHAR* loginParams)
+static CM_ERROR cm_session_login (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* password,
+        const void* reserved
+)
 {
-    (void)loginParams;
-    DEBUG_OUTCON(puts("cm_session_login()"));
+    DEBUG_OUTPUT("cm_session_login()");
+    (void)reserved;
     if (!session) return RET_CM_NO_SESSION;
     if (!password || (strlen((const char*)password) == 0)) return RET_CM_INVALID_PARAMETER;
 
@@ -89,9 +99,11 @@ static CM_ERROR cm_session_login (CM_SESSION_API* session,
     return ret;
 }   //  cm_session_login
 
-static CM_ERROR cm_session_logout (CM_SESSION_API* session)
+static CM_ERROR cm_session_logout (
+        CM_SESSION_API* session
+)
 {
-    DEBUG_OUTCON(puts("cm_session_logout()"));
+    DEBUG_OUTPUT("cm_session_logout()");
     if (!session) return RET_CM_NO_SESSION;
 
     SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
@@ -102,10 +114,14 @@ static CM_ERROR cm_session_logout (CM_SESSION_API* session)
     return RET_OK;
 }   //  cm_session_logout
 
-static CM_ERROR cm_session_list_keys (CM_SESSION_API* session,
-                    uint32_t* count, CM_BYTEARRAY*** abaKeyIds, CM_JSON_PCHAR* keysInfo)
+static CM_ERROR cm_session_list_keys (
+        CM_SESSION_API* session,
+        uint32_t* count,
+        CM_BYTEARRAY*** abaKeyIds,
+        CM_JSON_PCHAR* keysInfo
+)
 {
-    DEBUG_OUTCON(puts("cm_session_list_keys()"));
+    DEBUG_OUTPUT("cm_session_list_keys()");
     if (!session) return RET_CM_NO_SESSION;
     if (!count || !abaKeyIds) return RET_CM_INVALID_PARAMETER;
 
@@ -119,11 +135,11 @@ static CM_ERROR cm_session_list_keys (CM_SESSION_API* session,
     if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
 
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON(printf("cm_session_list_keys(), count keys: %d\n", (int)list_keys.size()));
+    DEBUG_OUTPUT(std::string("cm_session_list_keys(), count keys: ") + std::to_string(list_keys.size()));
 
     if (list_keys.empty()) return RET_OK;
 
-    //  Set returned keysInfo(JSON)
+    //  Set returned keysInfo(JSON), optional
     if (keysInfo) {
         ParsonHelper json;
         if (!json.create()) return RET_CM_GENERAL_ERROR;
@@ -141,7 +157,7 @@ static CM_ERROR cm_session_list_keys (CM_SESSION_API* session,
         if (!json.serialize((char**)keysInfo)) return RET_CM_GENERAL_ERROR;
     }
 
-    //  Set returned keysId(array)
+    //  Set returned abaKeyIds(array)
     ByteArray** aba_keyids = (ByteArray**)calloc(list_keys.size(), sizeof(ByteArray*));
     if (!aba_keyids) return RET_CM_GENERAL_ERROR;
 
@@ -162,10 +178,13 @@ static CM_ERROR cm_session_list_keys (CM_SESSION_API* session,
     return RET_OK;
 }   //  cm_session_list_keys
 
-static CM_ERROR cm_session_select_key (CM_SESSION_API* session,
-                    const CM_BYTEARRAY* baKeyId, const CM_KEY_API** key)
+static CM_ERROR cm_session_select_key (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baKeyId,
+        const CM_KEY_API** key
+)
 {
-    DEBUG_OUTCON(puts("cm_session_select_key()"));
+    DEBUG_OUTPUT("cm_session_select_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!baKeyId || !key) return RET_CM_INVALID_PARAMETER;
 
@@ -178,7 +197,8 @@ static CM_ERROR cm_session_select_key (CM_SESSION_API* session,
 
     storage.selectKey(nullptr);
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON(printf("cm_session_select_key(), count keys: %d\n", (int)list_keys.size()));
+    DEBUG_OUTPUT(std::string("cm_session_select_key(), count keys: ") + std::to_string(list_keys.size()));
+
     for (size_t i = 0; i < list_keys.size(); i++) {
         if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
             storage.selectKey(list_keys[i]);
@@ -192,141 +212,13 @@ static CM_ERROR cm_session_select_key (CM_SESSION_API* session,
     return RET_OK;
 }   //  cm_session_select_key
 
-static CM_ERROR cm_session_get_selected_key (CM_SESSION_API* session,
-                    const CM_KEY_API** key)
+static CM_ERROR cm_session_create_key (
+        CM_SESSION_API* session,
+        const CM_JSON_PCHAR keyParam,
+        const CM_KEY_API** key
+)
 {
-    DEBUG_OUTCON(puts("cm_session_get_selected_key()"));
-    if (!session) return RET_CM_NO_SESSION;
-    if (!key) return RET_CM_INVALID_PARAMETER;
-
-    *key = nullptr;
-    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
-    if (!ss_ctx) return RET_CM_NO_SESSION;
-
-    FileStorage& storage = ss_ctx->fileStorage;
-    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
-    if (!storage.selectedKey()) return RET_CM_KEY_NOT_SELECTED;
-
-    *key = (const CM_KEY_API*)&ss_ctx->keyApi;
-    return RET_OK;
-}   //  cm_session_get_selected_key
-
-static CM_ERROR cm_session_get_certificates (CM_SESSION_API* session,
-                    uint32_t* count, CM_BYTEARRAY*** abaCertificates)
-{
-    DEBUG_OUTCON(puts("cm_session_get_certificates()"));
-    if (!session) return RET_CM_NO_SESSION;
-    if (!count || !abaCertificates) return RET_CM_INVALID_PARAMETER;
-
-    *count = 0;
-    *abaCertificates = nullptr;
-    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
-    if (!ss_ctx) return RET_CM_NO_SESSION;
-
-    FileStorage& storage = ss_ctx->fileStorage;
-    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
-
-    vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-    DEBUG_OUTCON(printf("cm_session_get_certificates(), count certs: %d\n", (int)list_certs.size()));
-
-    ByteArray** aba_certs = (ByteArray**)calloc(list_certs.size(), sizeof(ByteArray*));
-    if (!aba_certs) return RET_CM_GENERAL_ERROR;
-
-    for (size_t i = 0; i < list_certs.size(); i++) {
-        aba_certs[i] = ba_copy_with_alloc(list_certs[i]->bagValue(), 0, 0);
-        if (!aba_certs[i]) {
-            for (size_t j = 0; j < i; j++) {
-                ba_free(aba_certs[j]);
-                aba_certs[j] = nullptr;
-            }
-            free(aba_certs);
-            return RET_CM_GENERAL_ERROR;
-        }
-    }
-    *abaCertificates = (CM_BYTEARRAY**)aba_certs;
-    *count = (uint32_t)list_certs.size();
-    return RET_OK;
-}   //  cm_session_get_certificates
-
-static CM_ERROR cm_session_add_certificate (CM_SESSION_API* session,
-                    const CM_BYTEARRAY* baCertEncoded)
-{
-    DEBUG_OUTCON(puts("cm_session_add_certificate()"));
-    if (!session) return RET_CM_NO_SESSION;
-    if (!baCertEncoded) return RET_CM_INVALID_PARAMETER;
-
-    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
-    if (!ss_ctx) return RET_CM_NO_SESSION;
-
-    FileStorage& storage = ss_ctx->fileStorage;
-    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
-    if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
-
-    ByteArray* ba_cert = nullptr;
-    int ret = keyid_by_cert((ByteArray*)baCertEncoded, &ba_cert);
-    ba_free(ba_cert);
-    ba_cert = nullptr;
-    //  Make copy for store
-    ba_cert = ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0);
-    if (!ba_cert) return RET_CM_GENERAL_ERROR;
-
-    StoreBag *store_bag = new StoreBag();
-    if (!store_bag) {
-        ba_free(ba_cert);
-        return RET_CM_GENERAL_ERROR;
-    }
-
-    store_bag->setBagId(OID_PKCS12_CERT_BAG);
-    store_bag->setData((ret == RET_OK) ? StoreBag::BAG_TYPE::CERT : StoreBag::BAG_TYPE::DATA, ba_cert);
-
-    ret = store_bag->encodeBag();
-    if (ret != RET_OK) {
-        delete store_bag;
-        return ret;
-    }
-
-    storage.addBag(store_bag);
-
-    ret = storage.store();
-    return ret;
-}   //  cm_session_add_certificate
-
-static CM_ERROR cm_session_delete_certificate (CM_SESSION_API* session,
-                    const CM_BYTEARRAY* baKeyId)
-{
-    DEBUG_OUTCON(puts("cm_session_delete_certificate()"));
-    if (!session) return RET_CM_NO_SESSION;
-    if (!baKeyId) return RET_CM_INVALID_PARAMETER;
-
-    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
-    if (!ss_ctx) return RET_CM_NO_SESSION;
-
-    FileStorage& storage = ss_ctx->fileStorage;
-    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
-    if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
-
-    bool flag_found = false;
-    vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-    DEBUG_OUTCON(printf("cm_session_delete_certificate(), count certs: %d\n", (int)list_certs.size()));
-    for (size_t i = 0; i < list_certs.size(); i++) {
-        ByteArray *ba_keyid = nullptr;
-        int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
-        if ((ret == RET_OK) && (ba_cmp(ba_keyid, (ByteArray*)baKeyId) == 0)) {
-            storage.deleteBag(list_certs[i]);
-            flag_found = true;
-        }
-        ba_free(ba_keyid);
-    }
-    if (!flag_found) return RET_CM_CERTIFICATE_NOT_FOUND;
-
-    const int ret = storage.store();
-    return ret;
-}   //  cm_session_delete_certificate
-
-static CM_ERROR cm_session_create_key (CM_SESSION_API* session,
-                    const CM_JSON_PCHAR keyParam, const CM_KEY_API** key)
-{
-    DEBUG_OUTCON(puts("cm_session_create_key()"));
+    DEBUG_OUTPUT("cm_session_create_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!keyParam || !key) return RET_CM_INVALID_PARAMETER;
 
@@ -385,10 +277,13 @@ static CM_ERROR cm_session_create_key (CM_SESSION_API* session,
     return ret;
 }   //  cm_session_create_key
 
-static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
-                    const CM_BYTEARRAY* baKeyId, const bool deleteRelatedObjects)
+static CM_ERROR cm_session_delete_key (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baKeyId,
+        const bool deleteRelatedObjects
+)
 {
-    DEBUG_OUTCON(puts("cm_session_delete_key()"));
+    DEBUG_OUTPUT("cm_session_delete_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!baKeyId) return RET_CM_INVALID_PARAMETER;
 
@@ -401,7 +296,8 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
 
     StoreBag* bag_to_del = nullptr;
     vector<StoreBag*> list_keys = storage.listBags(StoreBag::BAG_TYPE::KEY);
-    DEBUG_OUTCON(printf("cm_session_delete_key(), count keys: %d\n", (int)list_keys.size()));
+    DEBUG_OUTPUT(std::string("cm_session_delete_key(), count keys: ") + std::to_string(list_keys.size()));
+
     for (size_t i = 0; i < list_keys.size(); i++) {
         if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
             bag_to_del = list_keys[i];
@@ -418,7 +314,8 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
 
     if (deleteRelatedObjects) {
         vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
-        DEBUG_OUTCON(printf("cm_session_delete_key(), count certs: %d\n", (int)list_certs.size()));
+        DEBUG_OUTPUT(std::string("cm_session_delete_key(), count certs: ") + std::to_string(list_certs.size()));
+
         for (size_t i = 0; i < list_certs.size(); i++) {
             ByteArray *ba_keyid = nullptr;
             int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
@@ -433,10 +330,153 @@ static CM_ERROR cm_session_delete_key (CM_SESSION_API* session,
     return ret;
 }   //  cm_session_delete_key
 
-static CM_ERROR cm_session_change_password (CM_SESSION_API* session,
-                    const CM_UTF8_CHAR* newPassword)
+static CM_ERROR cm_session_get_selected_key (
+        CM_SESSION_API* session,
+        const CM_KEY_API** key
+)
 {
-    DEBUG_OUTCON(puts("cm_session_change_password()"));
+    DEBUG_OUTPUT("cm_session_get_selected_key()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!key) return RET_CM_INVALID_PARAMETER;
+
+    *key = nullptr;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    FileStorage& storage = ss_ctx->fileStorage;
+    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
+    if (!storage.selectedKey()) return RET_CM_KEY_NOT_SELECTED;
+
+    *key = (const CM_KEY_API*)&ss_ctx->keyApi;
+    return RET_OK;
+}   //  cm_session_get_selected_key
+
+static CM_ERROR cm_session_get_certificates (
+        CM_SESSION_API* session,
+        uint32_t* count,
+        CM_BYTEARRAY*** abaCertificates
+)
+{
+    DEBUG_OUTPUT("cm_session_get_certificates()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!count || !abaCertificates) return RET_CM_INVALID_PARAMETER;
+
+    *count = 0;
+    *abaCertificates = nullptr;
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    FileStorage& storage = ss_ctx->fileStorage;
+    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
+
+    vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
+    DEBUG_OUTPUT(std::string("cm_session_get_certificates(), count certs: ") + std::to_string(list_certs.size()));
+
+    ByteArray** aba_certs = (ByteArray**)calloc(list_certs.size(), sizeof(ByteArray*));
+    if (!aba_certs) return RET_CM_GENERAL_ERROR;
+
+    for (size_t i = 0; i < list_certs.size(); i++) {
+        aba_certs[i] = ba_copy_with_alloc(list_certs[i]->bagValue(), 0, 0);
+        if (!aba_certs[i]) {
+            for (size_t j = 0; j < i; j++) {
+                ba_free(aba_certs[j]);
+                aba_certs[j] = nullptr;
+            }
+            free(aba_certs);
+            return RET_CM_GENERAL_ERROR;
+        }
+    }
+    *abaCertificates = (CM_BYTEARRAY**)aba_certs;
+    *count = (uint32_t)list_certs.size();
+    return RET_OK;
+}   //  cm_session_get_certificates
+
+static CM_ERROR cm_session_add_certificate (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baCertEncoded
+)
+{
+    DEBUG_OUTPUT("cm_session_add_certificate()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!baCertEncoded) return RET_CM_INVALID_PARAMETER;
+
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    FileStorage& storage = ss_ctx->fileStorage;
+    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
+    if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
+
+    ByteArray* ba_cert = nullptr;
+    int ret = keyid_by_cert((ByteArray*)baCertEncoded, &ba_cert);
+    ba_free(ba_cert);
+    ba_cert = nullptr;
+    //  Make copy for store
+    ba_cert = ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0);
+    if (!ba_cert) return RET_CM_GENERAL_ERROR;
+
+    StoreBag *store_bag = new StoreBag();
+    if (!store_bag) {
+        ba_free(ba_cert);
+        return RET_CM_GENERAL_ERROR;
+    }
+
+    store_bag->setBagId(OID_PKCS12_CERT_BAG);
+    store_bag->setData((ret == RET_OK) ? StoreBag::BAG_TYPE::CERT : StoreBag::BAG_TYPE::DATA, ba_cert);
+
+    ret = store_bag->encodeBag();
+    if (ret != RET_OK) {
+        delete store_bag;
+        return ret;
+    }
+
+    storage.addBag(store_bag);
+
+    ret = storage.store();
+    return ret;
+}   //  cm_session_add_certificate
+
+static CM_ERROR cm_session_delete_certificate (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baKeyId
+)
+{
+    DEBUG_OUTPUT("cm_session_delete_certificate()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!baKeyId) return RET_CM_INVALID_PARAMETER;
+
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    FileStorage& storage = ss_ctx->fileStorage;
+    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
+    if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
+
+    bool flag_found = false;
+    vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
+    DEBUG_OUTPUT(std::string("cm_session_delete_certificate(), count certs: ") + std::to_string(list_certs.size()));
+
+    for (size_t i = 0; i < list_certs.size(); i++) {
+        ByteArray *ba_keyid = nullptr;
+        int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
+        if ((ret == RET_OK) && (ba_cmp(ba_keyid, (ByteArray*)baKeyId) == 0)) {
+            storage.deleteBag(list_certs[i]);
+            flag_found = true;
+        }
+        ba_free(ba_keyid);
+    }
+    if (!flag_found) return RET_CM_CERTIFICATE_NOT_FOUND;
+
+    const int ret = storage.store();
+    return ret;
+}   //  cm_session_delete_certificate
+
+static CM_ERROR cm_session_change_password (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* newPassword
+)
+{
+    DEBUG_OUTPUT("cm_session_change_password()");
     if (!session) return RET_CM_NO_SESSION;
     if (!newPassword || (strlen((const char*) newPassword) == 0)) return RET_CM_INVALID_PARAMETER;
 
@@ -451,14 +491,29 @@ static CM_ERROR cm_session_change_password (CM_SESSION_API* session,
     return ret;
 }   //  cm_session_change_password
 
+/*static CM_ERROR cm_session_random_bytes (
+        CM_SESSION_API* session,
+        CM_BYTEARRAY* baBuffer
+)
+{
+    DEBUG_OUTPUT("cm_session_random_bytes()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (ba_get_len((ByteArray*)baBuffer) == 0) return RET_CM_INVALID_PARAMETER;
+
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    //TODO
+    return ret;
+}   //  cm_session_random_bytes*/
+
 
 void CmPkcs12::assignSessionFunc (CM_SESSION_API& session)
 {
-    DEBUG_OUTCON(puts("CmPkcs12::assignSessionFunc()"));
     session.version             = CmPkcs12::CM_SESSION_API_V1;
     session.info                = cm_session_info;
     session.mechanismParameters = cm_session_mechanism_parameters;
-    session.login               = (cm_session_login_f)cm_session_login;
+    session.login               = cm_session_login;
     session.logout              = cm_session_logout;
     session.listKeys            = cm_session_list_keys;
     session.selectKey           = cm_session_select_key;
@@ -471,4 +526,4 @@ void CmPkcs12::assignSessionFunc (CM_SESSION_API& session)
     session.deleteCertificate   = cm_session_delete_certificate;
     session.changePassword      = cm_session_change_password;
     session.randomBytes         = nullptr;
-}
+}   //  CmPkcs12::assignSessionFunc

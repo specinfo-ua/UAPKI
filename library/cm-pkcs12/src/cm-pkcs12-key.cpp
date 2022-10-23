@@ -29,21 +29,26 @@
 #include "cm-errors.h"
 #include "cm-pkcs12.h"
 #include "cm-pkcs12-ctx.h"
+#include "cm-pkcs12-debug.h"
 #include "key-wrap.h"
 #include "parson-helper.h"
 #include "private-key.h"
 
 
-#define DEBUG_OUTCON(expression)
-#ifndef DEBUG_OUTCON
-    #define DEBUG_OUTCON(expression) expression
+#define DEBUG_OUTPUT(msg)
+#ifndef DEBUG_OUTPUT
+DEBUG_OUTPUT_FUNC
+#define DEBUG_OUTPUT(msg) debug_output(DEBUG_OUTSTREAM_DEFAULT, msg);
 #endif
 
 
-static CM_ERROR cm_key_get_info (CM_SESSION_API* session,
-        CM_JSON_PCHAR* keyInfo, CM_BYTEARRAY** baKeyId)
+static CM_ERROR cm_key_get_info (
+        CM_SESSION_API* session,
+        CM_JSON_PCHAR* keyInfo,
+        CM_BYTEARRAY** baKeyId
+)
 {
-    DEBUG_OUTCON(puts("cm_key_get_info()"));
+    DEBUG_OUTPUT("cm_key_get_info()");
     if (!session) return RET_CM_NO_SESSION;
     if (!keyInfo && !baKeyId) return RET_CM_INVALID_PARAMETER;
 
@@ -78,10 +83,13 @@ static CM_ERROR cm_key_get_info (CM_SESSION_API* session,
     return RET_OK;
 }   //  cm_key_get_info
 
-static CM_ERROR cm_key_get_public_key (CM_SESSION_API* session,
-        CM_BYTEARRAY** baAlgorithmIdentifier, CM_BYTEARRAY** baPublicKey)
+static CM_ERROR cm_key_get_public_key (
+        CM_SESSION_API* session,
+        CM_BYTEARRAY** baAlgorithmIdentifier,
+        CM_BYTEARRAY** baPublicKey
+)
 {
-    DEBUG_OUTCON(puts("cm_key_get_public_key()"));
+    DEBUG_OUTPUT("cm_key_get_public_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!baAlgorithmIdentifier && !baPublicKey) return RET_CM_INVALID_PARAMETER;
 
@@ -102,11 +110,16 @@ static CM_ERROR cm_key_get_public_key (CM_SESSION_API* session,
     return ret;
 }   //  cm_key_get_public_key
 
-static CM_ERROR cm_key_sign (CM_SESSION_API* session,
-        const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams,
-        const uint32_t count, const CM_BYTEARRAY** abaHashes, CM_BYTEARRAY*** abaSignatures)
+static CM_ERROR cm_key_sign (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* signAlgo,
+        const CM_BYTEARRAY* baSignAlgoParams,
+        const uint32_t count,
+        const CM_BYTEARRAY** abaHashes,
+        CM_BYTEARRAY*** abaSignatures
+)
 {
-    DEBUG_OUTCON(puts("cm_key_sign()"));
+    DEBUG_OUTPUT("cm_key_sign()");
     if (!session) return RET_CM_NO_SESSION;
     if ((count == 0) || !abaHashes || !abaSignatures) return RET_CM_INVALID_PARAMETER;
 
@@ -130,10 +143,13 @@ static CM_ERROR cm_key_sign (CM_SESSION_API* session,
     return ret;
 }   //  cm_key_sign
 
-static CM_ERROR cm_key_sign_init (CM_SESSION_API* session,
-    const CM_UTF8_CHAR* signAlgo, const CM_BYTEARRAY* baSignAlgoParams)
+static CM_ERROR cm_key_sign_init (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* signAlgo,
+        const CM_BYTEARRAY* baSignAlgoParams
+)
 {
-    DEBUG_OUTCON(puts("cm_key_sign_init()"));
+    DEBUG_OUTPUT("cm_key_sign_init()");
     if (!session) return RET_CM_NO_SESSION;
     if (!signAlgo) return RET_CM_INVALID_PARAMETER;
 
@@ -167,9 +183,12 @@ static CM_ERROR cm_key_sign_init (CM_SESSION_API* session,
     return RET_OK;
 }   //  cm_key_sign_init
 
-static CM_ERROR cm_key_sign_update (CM_SESSION_API* session, const CM_BYTEARRAY* baData)
+static CM_ERROR cm_key_sign_update (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baData
+)
 {
-    DEBUG_OUTCON(puts("cm_key_sign_update()"));
+    DEBUG_OUTPUT("cm_key_sign_update()");
     if (!session) return RET_CM_NO_SESSION;
     if (!baData) return RET_CM_INVALID_PARAMETER;
 
@@ -186,9 +205,12 @@ static CM_ERROR cm_key_sign_update (CM_SESSION_API* session, const CM_BYTEARRAY*
     return ret;
 }   //  cm_key_sign_update
 
-static CM_ERROR cm_key_sign_final (CM_SESSION_API* session, CM_BYTEARRAY** baSignature)
+static CM_ERROR cm_key_sign_final (
+        CM_SESSION_API* session,
+        CM_BYTEARRAY** baSignature
+)
 {
-    DEBUG_OUTCON(puts("cm_key_sign_final()"));
+    DEBUG_OUTPUT("cm_key_sign_final()");
     if (!session) return RET_CM_NO_SESSION;
     if (!baSignature) return RET_CM_INVALID_PARAMETER;
 
@@ -204,7 +226,6 @@ static CM_ERROR cm_key_sign_final (CM_SESSION_API* session, CM_BYTEARRAY** baSig
     ByteArray* ba_hash = nullptr;
     int ret = hash_final(ss_ctx->ctxHash, &ba_hash);
     if (ret == RET_OK) {
-        DEBUG_OUTCON(printf("cm_key_sign_final(), ba_hash: "); ba_print(stdout, ba_hash));
         ret = private_key_sign_single(
             ss_ctx->activeBag->bagValue(),
             (const char*)ss_ctx->aidSignAlgo.algorithm.c_str(),
@@ -218,12 +239,18 @@ static CM_ERROR cm_key_sign_final (CM_SESSION_API* session, CM_BYTEARRAY** baSig
     return ret;
 }   //  cm_key_sign_final
 
-static CM_ERROR cm_key_dh_wrap_key (CM_SESSION_API* session,
-    const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
-    const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSessionKeys,
-    CM_BYTEARRAY*** abaSalts, CM_BYTEARRAY*** abaWrappedKeys)
+static CM_ERROR cm_key_dh_wrap_key (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* kdfOid,
+        const CM_UTF8_CHAR* wrapAlgOid,
+        const uint32_t count,
+        const CM_BYTEARRAY** abaPubkeys,
+        const CM_BYTEARRAY** abaSessionKeys,
+        CM_BYTEARRAY*** abaSalts,
+        CM_BYTEARRAY*** abaWrappedKeys
+)
 {
-    DEBUG_OUTCON(puts("cm_key_dh_wrap_key()"));
+    DEBUG_OUTPUT("cm_key_dh_wrap_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaSessionKeys || !abaWrappedKeys) return RET_CM_INVALID_PARAMETER;
 
@@ -251,12 +278,18 @@ static CM_ERROR cm_key_dh_wrap_key (CM_SESSION_API* session,
     return ret;
 }   //  cm_key_dh_wrap_key
 
-static CM_ERROR cm_key_dh_unwrap_key (CM_SESSION_API* session,
-    const CM_UTF8_CHAR* kdfOid, const CM_UTF8_CHAR* wrapAlgOid,
-    const uint32_t count, const CM_BYTEARRAY** abaPubkeys, const CM_BYTEARRAY** abaSalts, const CM_BYTEARRAY** abaWrappedKeys,
-    CM_BYTEARRAY*** abaSessionKeys)
+static CM_ERROR cm_key_dh_unwrap_key (
+        CM_SESSION_API* session,
+        const CM_UTF8_CHAR* kdfOid,
+        const CM_UTF8_CHAR* wrapAlgOid,
+        const uint32_t count,
+        const CM_BYTEARRAY** abaPubkeys,
+        const CM_BYTEARRAY** abaSalts,
+        const CM_BYTEARRAY** abaWrappedKeys,
+        CM_BYTEARRAY*** abaSessionKeys
+)
 {
-    DEBUG_OUTCON(puts("cm_key_dh_unwrap_key()"));
+    DEBUG_OUTPUT("cm_key_dh_unwrap_key()");
     if (!session) return RET_CM_NO_SESSION;
     if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaWrappedKeys || !abaSessionKeys) return RET_CM_INVALID_PARAMETER;
 
@@ -285,7 +318,6 @@ static CM_ERROR cm_key_dh_unwrap_key (CM_SESSION_API* session,
 
 void CmPkcs12::assignKeyFunc (CM_KEY_API& key)
 {
-    DEBUG_OUTCON(puts("CmPkcs12::assignKeyFunc()"));
     key.getInfo         = cm_key_get_info;
     key.getPublicKey    = cm_key_get_public_key;
     key.initKeyUsage    = nullptr;
@@ -304,4 +336,4 @@ void CmPkcs12::assignKeyFunc (CM_KEY_API& key)
     key.encrypt         = nullptr;
     key.setInfo         = nullptr;
     key.exportKey       = nullptr;
-}
+}   //  CmPkcs12::assignKeyFunc
