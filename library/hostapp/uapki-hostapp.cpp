@@ -24,16 +24,14 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-//  Last update: 2022-10-21
 
-#include <stddef.h>
-#include <stdio.h>
 #include <chrono>
 #include <thread>
 #include <locale.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 #include <iostream>
 #include <string>
 #include "uapki-hostapp-debug.h"
@@ -41,6 +39,7 @@
 
 #if defined(_WIN32) || defined(__WINDOWS__)
 #include <fcntl.h>
+#include <io.h>
 #endif
 
 //#define DEBUG_LOG_ENABLE
@@ -57,7 +56,7 @@
 using namespace std;
 
 static const string NAME_HOSTAPP = "UAPKI-HOSTAPP";
-static const string VERSION_HOSTAPP = "2.0.2";
+static const string VERSION_HOSTAPP = "2.0.3";
 static const string UAPKI_LIB_NAME = "uapki";
 static const string JSON_REQ_HOSTAPP_VERSION = "{\"method\":\"HOSTAPP_VERSION\"}";
 static const string JSON_RESULT_HOSTAPP_VERSION = "{\"hostName\":\"" + NAME_HOSTAPP + "\",\"hostVersion\":\"" + VERSION_HOSTAPP + "\"}";
@@ -128,6 +127,11 @@ static string json_stringify (const int errCode, const string& errText, const st
 
 int main (void)
 {
+#if defined(_WIN32) || defined(__WINDOWS__)
+    (void)_setmode(_fileno(stdin), O_BINARY);
+    (void)_setmode(_fileno(stdout), O_BINARY);
+#endif
+
     DEBUG_OUTPUT("START");
     string s_req, s_resp;
 
