@@ -103,14 +103,14 @@ cleanup:
 
 int SignedDataBuilder::setEncapContentInfo (const string& eContentType, const ByteArray* baEncapContent)
 {
-    if (!m_SignedData || eContentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    if (eContentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return setEncapContentInfo(eContentType.c_str(), baEncapContent);
 }
 
 int SignedDataBuilder::setEncapContentInfo (const EncapsulatedContentInfo& encapContentInfo)
 {
-    if (!m_SignedData || encapContentInfo.contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    if (encapContentInfo.contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return setEncapContentInfo(encapContentInfo.contentType.c_str(), encapContentInfo.baEncapContent);
 }

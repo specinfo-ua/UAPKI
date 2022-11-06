@@ -1,4 +1,4 @@
-//  Last update: 2022-07-31
+//  Last update: 2022-11-06
 
 
 #include "attribute-helper.h"
@@ -9,10 +9,17 @@
 #include "oids.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
+#include "uapkif.h"
 
 
 #undef FILE_MARKER
 #define FILE_MARKER "common/pkix/attribute-helper.cpp"
+
+
+#define DEBUG_OUTCON(expression)
+#ifndef DEBUG_OUTCON
+#define DEBUG_OUTCON(expression) expression
+#endif
 
 
 using namespace std;
@@ -20,8 +27,10 @@ using namespace std;
 
 namespace UapkiNS {
 
+namespace AttributeHelper {
 
-int AttributeHelper::decodeCertValues (const ByteArray* baEncoded, std::vector<ByteArray*>& certValues)
+
+int decodeCertValues (const ByteArray* baEncoded, vector<ByteArray*>& certValues)
 {
     int ret = RET_OK;
     Certificates_t* cert_values = nullptr;
@@ -40,7 +49,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::decodeCertificateRefs (const ByteArray* baEncoded, std::vector<OtherCertId>& otherCertIds)
+int decodeCertificateRefs (const ByteArray* baEncoded, vector<OtherCertId>& otherCertIds)
 {
     int ret = RET_OK;
     CompleteCertificateRefs_t* cert_refs = nullptr;
@@ -81,7 +90,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::decodeContentType (const ByteArray* baEncoded, string& contentType)
+int decodeContentType (const ByteArray* baEncoded, string& contentType)
 {
     int ret = RET_OK;
     char* s_contenttype = nullptr;
@@ -94,12 +103,12 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::decodeMessageDigest (const ByteArray* baEncoded, ByteArray** baMessageDigest)
+int decodeMessageDigest (const ByteArray* baEncoded, ByteArray** baMessageDigest)
 {
     return ba_decode_octetstring(baEncoded, baMessageDigest);
 }
 
-int AttributeHelper::decodeSignaturePolicy (const ByteArray* baEncoded, string& sigPolicyId)
+int decodeSignaturePolicy (const ByteArray* baEncoded, string& sigPolicyId)
 {
     //  Note: current implementation ignore params sigPolicyHash and sigPolicyQualifiers (rfc3126)
     int ret = RET_OK;
@@ -127,7 +136,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::decodeSigningCertificate (const ByteArray* baEncoded, vector<EssCertId>& essCertIds)
+int decodeSigningCertificate (const ByteArray* baEncoded, vector<EssCertId>& essCertIds)
 {
     int ret = RET_OK;
     SigningCertificateV2_t* signing_cert = nullptr;
@@ -167,12 +176,12 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime)
+int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime)
 {
     return ba_decode_pkixtime(baEncoded, &signingTime);
 }
 
-int AttributeHelper::encodeCertValues (const std::vector<const ByteArray*>& certValues, ByteArray** baEncoded)
+int encodeCertValues (const vector<const ByteArray*>& certValues, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     Certificates_t* cert_values = nullptr;
@@ -195,7 +204,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::encodeCertificateRefs (const vector<OtherCertId>& otherCertIds, ByteArray** baEncoded)
+int encodeCertificateRefs (const vector<OtherCertId>& otherCertIds, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     CompleteCertificateRefs_t* cert_refs = nullptr;
@@ -236,7 +245,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::encodeSignaturePolicy (const string& sigPolicyId, ByteArray** baEncoded)
+int encodeSignaturePolicy (const string& sigPolicyId, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     SignaturePolicyIdentifier_t* sig_policy = nullptr;
@@ -255,7 +264,7 @@ cleanup:
     return ret;
 }
 
-int AttributeHelper::encodeSigningCertificate (const vector<EssCertId>& essCertIds, ByteArray** baEncoded)
+int encodeSigningCertificate (const vector<EssCertId>& essCertIds, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     SigningCertificateV2_t* signing_certv2 = nullptr;
@@ -294,5 +303,389 @@ cleanup:
     return ret;
 }
 
+
+RevocationRefsBuilder::RevocationRefsBuilder (void)
+    : m_RevRefs(nullptr)
+    , m_BaEncoded(nullptr)
+{
+    DEBUG_OUTCON(puts("RevocationRefsBuilder::RevocationRefsBuilder()"));
+}
+
+RevocationRefsBuilder::~RevocationRefsBuilder (void)
+{
+    DEBUG_OUTCON(puts("RevocationValuesBuilder::~RevocationValuesBuilder()"));
+    asn_free(get_CompleteRevocationRefs_desc(), m_RevRefs);
+    for (auto& it : m_CrlOcspRefs) {
+        delete it;
+    }
+    ba_free(m_BaEncoded);
+}
+
+int RevocationRefsBuilder::init (void)
+{
+    m_RevRefs = (CompleteRevocationRefs_t*)calloc(1, sizeof(CompleteRevocationRefs_t));
+    return (m_RevRefs) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int RevocationRefsBuilder::addCrlOcspRef (void)
+{
+    int ret = RET_OK;
+    CrlOcspRef_t* crlocsp_ref = nullptr;
+
+    if (!m_RevRefs) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(crlocsp_ref, CrlOcspRef_t);
+
+    DO(ASN_SEQUENCE_ADD(&m_RevRefs->list, crlocsp_ref));
+    m_CrlOcspRefs.push_back(new CrlOcspRef(crlocsp_ref));
+    crlocsp_ref = nullptr;
+
+cleanup:
+    asn_free(get_CrlOcspRef_desc(), crlocsp_ref);
+    return ret;
+}
+
+RevocationRefsBuilder::CrlOcspRef* RevocationRefsBuilder::getCrlOcspRef (const size_t index) const
+{
+    if (index >= m_CrlOcspRefs.size()) return nullptr;
+
+    return m_CrlOcspRefs[index];
+}
+
+int RevocationRefsBuilder::encode (void)
+{
+    if (!m_RevRefs) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_encode_ba(get_CompleteRevocationRefs_desc(), m_RevRefs, &m_BaEncoded);
+}
+
+ByteArray* RevocationRefsBuilder::getEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaEncoded;
+    if (move) {
+        m_BaEncoded = nullptr;
+    }
+    return rv_ba;
+}
+
+RevocationRefsBuilder::CrlOcspRef::CrlOcspRef (CrlOcspRef_t* iRefCrlOcspRef)
+    : m_RefCrlOcspRef(iRefCrlOcspRef)
+{
+    DEBUG_OUTCON(puts("RevocationRefsBuilder::CrlOcspRef::CrlOcspRef()"));
+}
+
+RevocationRefsBuilder::CrlOcspRef::~CrlOcspRef (void)
+{
+    DEBUG_OUTCON(puts("RevocationRefsBuilder::CrlOcspRef::~CrlOcspRef()"));
+}
+
+int RevocationRefsBuilder::CrlOcspRef::addCrlValidatedId (const ByteArray* baCrlHash, const ByteArray* baCrlIdentifier)
+{
+    int ret = RET_OK;
+    CrlValidatedID_t* crl_valid = nullptr;
+
+    if (!m_RefCrlOcspRef || !baCrlHash) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_RefCrlOcspRef->crlids) {
+        ASN_ALLOC_TYPE(m_RefCrlOcspRef->crlids, CRLListID_t);
+    }
+
+    ASN_ALLOC_TYPE(crl_valid, CrlValidatedID_t);
+    DO(asn_decode_ba(get_OtherHash_desc(), &crl_valid->crlHash, baCrlHash));
+    if (baCrlIdentifier) {//TODO: param baCrlIdentifier need check
+        CHECK_NOT_NULL(crl_valid->crlIdentifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baCrlIdentifier));
+    }
+
+    DO(ASN_SEQUENCE_ADD(&m_RefCrlOcspRef->crlids->crls.list, crl_valid));
+    crl_valid = nullptr;
+
+cleanup:
+    asn_free(get_CrlValidatedID_desc(), crl_valid);
+    return ret;
+}
+
+int RevocationRefsBuilder::CrlOcspRef::addOcspResponseId (const ByteArray* baOcspIdentifier, const ByteArray* baOcspRespHash)
+{
+    int ret = RET_OK;
+    OcspResponsesID_t* ocsp_respsid = nullptr;
+
+    if (!m_RefCrlOcspRef || !baOcspIdentifier) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_RefCrlOcspRef->ocspids) {
+        ASN_ALLOC_TYPE(m_RefCrlOcspRef->ocspids, OcspListID_t);
+    }
+
+    ASN_ALLOC_TYPE(ocsp_respsid, OcspResponsesID_t);
+    DO(asn_decode_ba(get_OcspIdentifier_desc(), &ocsp_respsid->ocspIdentifier, baOcspIdentifier));
+    if (baOcspRespHash) {
+        CHECK_NOT_NULL(ocsp_respsid->ocspRepHash = (OtherHash_t*)asn_decode_ba_with_alloc(get_OtherHash_desc(), baOcspRespHash));
+    }
+
+    DO(ASN_SEQUENCE_ADD(&m_RefCrlOcspRef->ocspids->ocspResponses.list, ocsp_respsid));
+    ocsp_respsid = nullptr;
+
+cleanup:
+    asn_free(get_OcspResponsesID_desc(), ocsp_respsid);
+    return ret;
+}
+
+int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (const char* otherRevRefType, const ByteArray* baOtherRevRefs)
+{
+    int ret = RET_OK;
+
+    if (!m_RefCrlOcspRef || !otherRevRefType || !baOtherRevRefs) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(m_RefCrlOcspRef->otherRev, OtherRevRefs_t);
+    DO(asn_set_oid_from_text(otherRevRefType, &m_RefCrlOcspRef->otherRev->otherRevRefType));
+    DO(asn_decode_ba(get_ANY_desc(), &m_RefCrlOcspRef->otherRev->otherRevRefs, baOtherRevRefs));
+
+cleanup:
+    return ret;
+}
+
+int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (const string& otherRevRefType, const ByteArray* baOtherRevRefs)
+{
+    if (otherRevRefType.empty() || !baOtherRevRefs) return RET_UAPKI_INVALID_PARAMETER;
+
+    return setOtherRevRefs(otherRevRefType.c_str(), baOtherRevRefs);
+}
+
+
+RevocationRefsParser::RevocationRefsParser (void)
+    : m_RevRefs(nullptr)
+    , m_CountCrlOcspRefs(0)
+{
+    DEBUG_OUTCON(puts("RevocationRefsParser::RevocationRefsParser()"));
+}
+
+RevocationRefsParser::~RevocationRefsParser (void)
+{
+    DEBUG_OUTCON(puts("RevocationRefsParser::~RevocationRefsParser()"));
+    asn_free(get_CompleteRevocationRefs_desc(), m_RevRefs);
+}
+
+int RevocationRefsParser::parse (const ByteArray* baEncoded)
+{
+    int ret = RET_OK;
+
+    CHECK_NOT_NULL(m_RevRefs = (CompleteRevocationRefs_t*)asn_decode_ba_with_alloc(get_CompleteRevocationRefs_desc(), baEncoded));
+    m_CountCrlOcspRefs = (size_t)m_RevRefs->list.count;
+
+cleanup:
+    return ret;
+}
+
+int RevocationRefsParser::parseCrlOcspRef (const size_t index, CrlOcspRef& crlOcspRef)
+{
+    if (index >= m_CountCrlOcspRefs) return RET_INDEX_OUT_OF_RANGE;
+
+    return crlOcspRef.parse(*m_RevRefs->list.array[index]);
+}
+
+
+RevocationRefsParser::CrlOcspRef::CrlOcspRef (void)
+{
+    DEBUG_OUTCON(puts("RevocationRefsParser::CrlOcspRef::CrlOcspRef()"));
+}
+
+RevocationRefsParser::CrlOcspRef::~CrlOcspRef (void)
+{
+    DEBUG_OUTCON(puts("RevocationRefsParser::CrlOcspRef::~CrlOcspRef()"));
+}
+
+int RevocationRefsParser::CrlOcspRef::parse (const CrlOcspRef_t& crlOcspRef)
+{
+    int ret = RET_OK;
+    char* s_type = nullptr;
+
+    //  =crlids= (optional)
+    if (crlOcspRef.crlids && (crlOcspRef.crlids->crls.list.count > 0)) {
+        m_CrlIds.resize((size_t)crlOcspRef.crlids->crls.list.count);
+        for (size_t i = 0; i < m_CrlIds.size(); i++) {
+            const CrlValidatedID_t* crl_valid = crlOcspRef.crlids->crls.list.array[i];
+            DO(asn_encode_ba(get_OtherHash_desc(), &crl_valid->crlHash, &m_CrlIds[i].baHash));
+            if (crl_valid->crlIdentifier) {//TODO: crlIdentifier need check
+                DO(asn_encode_ba(get_CrlIdentifier_desc(), crl_valid->crlIdentifier, &m_CrlIds[i].baId));
+            }
+        }
+    }
+
+    //  =ocspids= (optional)
+    if (crlOcspRef.ocspids && (crlOcspRef.ocspids->ocspResponses.list.count > 0)) {
+        m_OcspIds.resize((size_t)crlOcspRef.ocspids->ocspResponses.list.count);
+        for (size_t i = 0; i < m_OcspIds.size(); i++) {
+            const OcspResponsesID_t* ocsp_respsid = crlOcspRef.ocspids->ocspResponses.list.array[i];
+            DO(asn_encode_ba(get_OcspIdentifier_desc(), &ocsp_respsid->ocspIdentifier, &m_OcspIds[i].baId));
+            if (ocsp_respsid->ocspRepHash) {
+                DO(asn_encode_ba(get_OtherHash_desc(), ocsp_respsid->ocspRepHash, &m_OcspIds[i].baHash));
+            }
+        }
+    }
+
+    //  =otherRev= (optional)
+    if (crlOcspRef.otherRev) {
+        const OtherRevRefs_t* other_revrefs = crlOcspRef.otherRev;
+        DO(asn_oid_to_text(&other_revrefs->otherRevRefType, &s_type));
+        m_OtherRevRefs.type = string(s_type);
+        m_OtherRevRefs.baValues = ba_alloc_from_uint8(other_revrefs->otherRevRefs.buf, other_revrefs->otherRevRefs.size);
+    }
+
+cleanup:
+    ::free(s_type);
+    return ret;
+}
+
+
+RevocationValuesBuilder::RevocationValuesBuilder (void)
+    : m_RevValues(nullptr)
+    , m_BaEncoded(nullptr)
+{
+    DEBUG_OUTCON(puts("RevocationValuesBuilder::RevocationValuesBuilder()"));
+}
+
+RevocationValuesBuilder::~RevocationValuesBuilder (void)
+{
+    DEBUG_OUTCON(puts("RevocationValuesBuilder::~RevocationValuesBuilder()"));
+    asn_free(get_RevocationValues_desc(), m_RevValues);
+    ba_free(m_BaEncoded);
+}
+
+int RevocationValuesBuilder::init (void)
+{
+    m_RevValues = (RevocationValues_t*)calloc(1, sizeof(RevocationValues_t));
+    return (m_RevValues) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int RevocationValuesBuilder::addCrl (const ByteArray* baCrlEncoded)
+{
+    int ret = RET_OK;
+    CertificateList_t* crl = nullptr;
+
+    if (!m_RevValues || !baCrlEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_RevValues->crlVals) {
+        void* ptr = calloc(1, sizeof(*RevocationValues_t::crlVals));
+        if (!ptr) return RET_UAPKI_GENERAL_ERROR;
+        memcpy(&m_RevValues->crlVals, &ptr, sizeof(ptr));
+    }
+
+    CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), baCrlEncoded));
+    DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
+    crl = nullptr;
+
+cleanup:
+    asn_free(get_CertificateList_desc(), crl);
+    return ret;
+}
+
+int RevocationValuesBuilder::addOcspResponse (const ByteArray* baBasicOcspResponse)
+{
+    int ret = RET_OK;
+    BasicOCSPResponse_t* ocsp_resp = nullptr;
+
+    if (!m_RevValues || !baBasicOcspResponse) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_RevValues->ocspVals) {
+        void* ptr = calloc(1, sizeof(*RevocationValues_t::ocspVals));
+        if (!ptr) return RET_UAPKI_GENERAL_ERROR;
+        memcpy(&m_RevValues->ocspVals, &ptr, sizeof(ptr));
+    }
+
+    CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baBasicOcspResponse));
+    DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
+    ocsp_resp = nullptr;
+
+cleanup:
+    asn_free(get_BasicOCSPResponse_desc(), ocsp_resp);
+    return ret;
+}
+
+int RevocationValuesBuilder::setOtherRevVals (const char* otherRevValType, const ByteArray* baOtherRevVals)
+{
+    int ret = RET_OK;
+
+    if (!m_RevValues || !otherRevValType || !baOtherRevVals) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(m_RevValues->otherRevVals, OtherRevVals_t);
+    DO(asn_set_oid_from_text(otherRevValType, &m_RevValues->otherRevVals->otherRevValType));
+    DO(asn_decode_ba(get_ANY_desc(), &m_RevValues->otherRevVals->otherRevVals, baOtherRevVals));
+
+cleanup:
+    return ret;
+}
+
+int RevocationValuesBuilder::setOtherRevVals (const string& otherRevValType, const ByteArray* baOtherRevVals)
+{
+    if (otherRevValType.empty() || !baOtherRevVals) return RET_UAPKI_INVALID_PARAMETER;
+
+    return setOtherRevVals(otherRevValType.c_str(), baOtherRevVals);
+}
+
+int RevocationValuesBuilder::encode (void)
+{
+    if (!m_RevValues) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_encode_ba(get_RevocationValues_desc(), m_RevValues, &m_BaEncoded);
+}
+
+ByteArray* RevocationValuesBuilder::getEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaEncoded;
+    if (move) {
+        m_BaEncoded = nullptr;
+    }
+    return rv_ba;
+}
+
+
+RevocationValuesParser::RevocationValuesParser (void)
+{
+    DEBUG_OUTCON(puts("RevocationValuesParser::RevocationValuesParser()"));
+}
+
+RevocationValuesParser::~RevocationValuesParser (void)
+{
+    DEBUG_OUTCON(puts("RevocationValuesParser::~RevocationValuesParser()"));
+}
+
+int RevocationValuesParser::parse (const ByteArray* baEncoded)
+{
+    int ret = RET_OK;
+    RevocationValues_t* rev_values;
+    char* s_type = nullptr;
+
+    CHECK_NOT_NULL(rev_values = (RevocationValues_t*)asn_decode_ba_with_alloc(get_RevocationValues_desc(), baEncoded));
+
+    //  =crlVals= (optional)
+    if (rev_values->crlVals && (rev_values->crlVals->list.count > 0)) {
+        m_CrlVals.resize((size_t)rev_values->crlVals->list.count);
+        for (size_t i = 0; i < m_CrlVals.size(); i++) {
+            DO(asn_encode_ba(get_CertificateList_desc(), rev_values->crlVals->list.array[i], &m_CrlVals[i]));
+        }
+    }
+
+    //  =ocspVals= (optional)
+    if (rev_values->ocspVals && (rev_values->ocspVals->list.count > 0)) {
+        m_OcspVals.resize((size_t)rev_values->ocspVals->list.count);
+        for (size_t i = 0; i < m_OcspVals.size(); i++) {
+            DO(asn_encode_ba(get_BasicOCSPResponse_desc(), rev_values->ocspVals->list.array[i], &m_OcspVals[i]));
+        }
+    }
+
+    //  =otherRevVals= (optional)
+    if (rev_values->otherRevVals) {
+        const OtherRevVals_t* other_revvals = rev_values->otherRevVals;
+        DO(asn_oid_to_text(&other_revvals->otherRevValType, &s_type));
+        m_OtherRevVals.type = string(s_type);
+        m_OtherRevVals.baValues = ba_alloc_from_uint8(other_revvals->otherRevVals.buf, other_revvals->otherRevVals.size);
+    }
+
+cleanup:
+    asn_free(get_RevocationValues_desc(), rev_values);
+    ::free(s_type);
+    return ret;
+}
+
+}   //  end namespace AttributeHelper
 
 }   //  end namespace UapkiNS
