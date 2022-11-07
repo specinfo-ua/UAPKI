@@ -31,7 +31,6 @@
 #include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"
-#include "ocsp-utils.h"
 #include "parson-helper.h"
 #include "store-utils.h"
 #include "time-utils.h"
@@ -353,13 +352,12 @@ cleanup:
     return ret;
 }
 
-static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
+static int validate_by_ocsp(JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
 {
     int ret = RET_OK;
     OcspClientHelper ocsp_client;
-    OcspClientHelper::ResponseStatus resp_status = OcspClientHelper::ResponseStatus::UNDEFINED;
     const OcspClientHelper::OcspRecord* ocsp_record = nullptr;
-    UapkiNS::SmartBA sba_req, sba_resp;
+    UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
     string s_time;
 
@@ -374,16 +372,16 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     }
     shuffled_uris = rand_uris(uris);
 
-    DO(ocsp_client.createRequest());
+    DO(ocsp_client.init());
     DO(ocsp_client.addCert(cerIssuer, cerSubject));
-    DO(ocsp_client.setNonce(20));
-    DO(ocsp_client.encodeRequest(&sba_req));
+    DO(ocsp_client.genNonce(20));
+    DO(ocsp_client.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, sba_req.get()));
+    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_client.getEncoded()));
 
     for (auto& it : shuffled_uris) {
         DEBUG_OUTCON(printf("validate_by_ocsp(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, sba_req.get(), &sba_resp);
+        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_client.getEncoded(), &sba_resp);
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
             DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
@@ -396,10 +394,10 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
 
     DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
 
-    ret = ocsp_client.parseResponse(sba_resp.get(), resp_status);
-    DO_JSON(json_object_set_string(joResult, "responseStatus", OcspClientHelper::responseStatusToStr(resp_status)));
+    ret = ocsp_client.parseResponse(sba_resp.get());
+    DO_JSON(json_object_set_string(joResult, "responseStatus", OcspClientHelper::responseStatusToStr(ocsp_client.getResponseStatus())));
 
-    if ((ret == RET_OK) && (resp_status == OcspClientHelper::ResponseStatus::SUCCESSFUL)) {
+    if ((ret == RET_OK) && (ocsp_client.getResponseStatus() == OcspClientHelper::ResponseStatus::SUCCESSFUL)) {
         DO(verify_response_data(joResult, ocsp_client, cerStore));
 
         DO(ocsp_client.checkNonce());

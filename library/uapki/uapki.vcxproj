@@ -37,7 +37,6 @@
     <ClCompile Include="..\common\pkix\iconv-utils.c" />
     <ClCompile Include="..\common\pkix\iso15946.c" />
     <ClCompile Include="..\common\pkix\key-wrap.c" />
-    <ClCompile Include="..\common\pkix\ocsp-utils.c" />
     <ClCompile Include="..\common\pkix\oids.c" />
     <ClCompile Include="..\common\pkix\oid-utils.c" />
     <ClCompile Include="..\common\pkix\private-key.c" />
@@ -119,7 +118,6 @@
     <ClInclude Include="..\common\pkix\iconv-utils.h" />
     <ClInclude Include="..\common\pkix\iso15946.h" />
     <ClInclude Include="..\common\pkix\key-wrap.h" />
-    <ClInclude Include="..\common\pkix\ocsp-utils.h" />
     <ClInclude Include="..\common\pkix\oids.h" />
     <ClInclude Include="..\common\pkix\oid-utils.h" />
     <ClInclude Include="..\common\pkix\private-key.h" />

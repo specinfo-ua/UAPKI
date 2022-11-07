@@ -33,18 +33,31 @@
 #include "uapkic.h"
 #include "uapkif.h"
 #include "uapki-errors.h"
+#include "uapki-ns-util.h"
 #include "verify-utils.h"
 
 
-static const size_t NONCE_MAXLEN = 64;
-
 static const char* RESPONSE_STATUS_STRINGS[8] = {
-    "UNDEFINED", "SUCCESSFUL", "MALFORMED_REQUEST", "INTERNAL_ERROR", "TRY_LATER",
-    "", "SIG_REQUIRED", "UNAUTHORIZED"
+    "UNDEFINED",
+    "SUCCESSFUL",
+    "MALFORMED_REQUEST",
+    "INTERNAL_ERROR",
+    "TRY_LATER",
+    "",
+    "SIG_REQUIRED",
+    "UNAUTHORIZED"
 };
 
 
-static int certid_hashed_issuer (OCSPCertID& certId, const CerStore::Item* cerIssuer)
+struct OcspCertId {
+    const char* hashAlgo;
+    bool        hashAlgoParamIsNull;
+    ByteArray*  issuerNameHash;
+    ByteArray*  issuerKeyHash;
+    ByteArray*  serialNumber;
+};  //  end struct OcspCertId
+
+static int certid_hashed_issuer (OcspCertId& certId, const CerStore::Item* cerIssuer)
 {
     int ret = RET_OK;
     ByteArray* ba_encoded = nullptr;
@@ -58,12 +71,44 @@ static int certid_hashed_issuer (OCSPCertID& certId, const CerStore::Item* cerIs
 cleanup:
     ba_free(ba_encoded);
     return ret;
-}
+}   //  certid_hashed_issuer
+
+static int ocsprequest_add_certid (OCSPRequest_t& ocspRequest, const OcspCertId& certId)
+{
+    int ret = RET_OK;
+    Request_t* request = nullptr;
+    NULL_t* null_params = nullptr;
+
+    ASN_ALLOC_TYPE(request, Request_t);
+
+    DO(asn_set_oid_from_text(certId.hashAlgo, &request->reqCert.hashAlgorithm.algorithm));
+    if (certId.hashAlgoParamIsNull) {
+        ASN_ALLOC_TYPE(null_params, NULL_t);
+        DO(asn_create_any(get_NULL_desc(), null_params, &request->reqCert.hashAlgorithm.parameters));
+    }
+    DO(asn_ba2OCTSTRING(certId.issuerNameHash, &request->reqCert.issuerNameHash));
+    DO(asn_ba2OCTSTRING(certId.issuerKeyHash, &request->reqCert.issuerKeyHash));
+    DO(asn_ba2INTEGER(certId.serialNumber, &request->reqCert.serialNumber));
+
+    DO(ASN_SEQUENCE_ADD(&ocspRequest.tbsRequest.requestList.list, request));
+    request = nullptr;
+
+cleanup:
+    asn_free(get_Request_desc(), request);
+    asn_free(get_NULL_desc(), null_params);
+    return ret;
+}   //  ocsprequest_add_certid
 
 
 OcspClientHelper::OcspClientHelper (void)
-    : m_OcspRequest(nullptr), m_BasicOcspResp(nullptr)
-    , m_Nonce(nullptr), m_ResponseData(nullptr), m_ProducedAt(0)
+    : m_OcspRequest(nullptr)
+    , m_BasicOcspResp(nullptr)
+    , m_BaNonce(nullptr)
+    , m_BaEncoded(nullptr)
+    , m_BaTbsEncoded(nullptr)
+    , m_BaResponseData(nullptr)
+    , m_ProducedAt(0)
+    , m_ResponseStatus(ResponseStatus::UNDEFINED)
 {
 }
 
@@ -74,57 +119,49 @@ OcspClientHelper::~OcspClientHelper (void)
 
 void OcspClientHelper::reset (void)
 {
-    ocsp_request_free(m_OcspRequest);
+    asn_free(get_OCSPRequest_desc(), m_OcspRequest);
     asn_free(get_BasicOCSPResponse_desc(), m_BasicOcspResp);
-    ba_free(m_Nonce);
-    ba_free(m_ResponseData);
+    ba_free(m_BaEncoded);
+    ba_free(m_BaNonce);
+    ba_free(m_BaResponseData);
 
     m_OcspRecords.clear();
     m_OcspRequest = nullptr;
     m_BasicOcspResp = nullptr;
-    m_Nonce = nullptr;
-    m_ResponseData = nullptr;
+    m_BaEncoded = nullptr;
+    m_BaNonce = nullptr;
+    m_BaResponseData = nullptr;
     m_ProducedAt = 0;
+    m_ResponseStatus = ResponseStatus::UNDEFINED;
 }
 
-int OcspClientHelper::createRequest (void)
+int OcspClientHelper::init (void)
 {
-    int ret = RET_OK;
-
-    CHECK_NOT_NULL(m_OcspRequest = ocsp_request_alloc());
-
-cleanup:
-    return ret;
+    m_OcspRequest = (OCSPRequest_t*)calloc(1, sizeof(OCSPRequest_t));
+    return (m_OcspRequest) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
 int OcspClientHelper::addCert (const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject)
 {
-    int ret = RET_OK;
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
 
-    CHECK_PARAM(cerSubject != nullptr);
-
-    DO(addSN(cerIssuer, cerSubject->baSerialNumber));
-
-cleanup:
-    return ret;
+    return addSN(cerIssuer, cerSubject->baSerialNumber);
 }
 
 int OcspClientHelper::addSN (const CerStore::Item* cerIssuer, const ByteArray* baSerialNumber)
 {
     int ret = RET_OK;
-    OCSPCertID cert_id;
+    OcspCertId cert_id;
 
-    memset(&cert_id, 0, sizeof(OCSPCertID));
-    cert_id.hashAlgoParam_isNULL = false;
+    if (!m_OcspRequest || !cerIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
 
-    CHECK_PARAM(m_OcspRequest != nullptr);
-    CHECK_PARAM(cerIssuer != nullptr);
-    CHECK_PARAM(baSerialNumber != nullptr);
+    memset(&cert_id, 0, sizeof(OcspCertId));
+    cert_id.hashAlgoParamIsNull = false;
 
     DO(certid_hashed_issuer(cert_id, cerIssuer));
     cert_id.serialNumber = (ByteArray*)baSerialNumber;
 
-    DO(ocsp_request_add_certid(m_OcspRequest, &cert_id));
+    DO(ocsprequest_add_certid(*m_OcspRequest, cert_id));
     m_OcspRecords.push_back(OcspRecord());
 
 cleanup:
@@ -133,54 +170,150 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::setNonce (size_t nonceLen)
+int OcspClientHelper::genNonce (const size_t nonceLen)
 {
     int ret = RET_OK;
-    ByteArray* ba_nonce = nullptr;
+    UapkiNS::SmartBA sba_nonce;
 
-    CHECK_PARAM(m_OcspRequest != nullptr);
+    if ((nonceLen < NONCE_MINLEN) || (nonceLen > NONCE_MAXLEN)) return RET_UAPKI_INVALID_PARAMETER;
 
-    nonceLen = (nonceLen < NONCE_MAXLEN) ? nonceLen : NONCE_MAXLEN;
+    if (!sba_nonce.set(ba_alloc_by_len(nonceLen))) return RET_UAPKI_GENERAL_ERROR;
 
-    CHECK_NOT_NULL(ba_nonce = ba_alloc_by_len(nonceLen));
-    DO(drbg_random(ba_nonce));
-    DO(ocsp_request_set_nonce(m_OcspRequest, ba_nonce));
+    DO(drbg_random(sba_nonce.get()));
 
-    m_Nonce = ba_nonce;
-    ba_nonce = nullptr;
+    DO(setNonce(sba_nonce.get()));
 
 cleanup:
-    ba_free(ba_nonce);
     return ret;
 }
 
 int OcspClientHelper::setNonce (const ByteArray* baNonce)
 {
     int ret = RET_OK;
+    const size_t nonce_len = ba_get_len(baNonce);
 
-    CHECK_PARAM(m_OcspRequest != nullptr);
-    CHECK_PARAM(baNonce != nullptr);
+    if ((nonce_len < NONCE_MINLEN) || (nonce_len > NONCE_MAXLEN)) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(ocsp_request_set_nonce(m_OcspRequest, baNonce));
+    CHECK_NOT_NULL(m_BaNonce = ba_copy_with_alloc(baNonce, 0, 0));
 
-    CHECK_NOT_NULL(m_Nonce = ba_copy_with_alloc(baNonce, 0, 0));
+    DO(addNonceToExtension());
 
 cleanup:
     return ret;
 }
 
-int OcspClientHelper::encodeRequest (ByteArray** baEncoded)
+int OcspClientHelper::addNonceToExtension (void)
 {
     int ret = RET_OK;
 
-    CHECK_PARAM(m_OcspRequest != nullptr);
-    CHECK_PARAM(baEncoded != nullptr);
-    CHECK_PARAM(m_OcspRecords.size() > 0);
+    if (!m_OcspRequest || !m_BaNonce) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, baEncoded));
+    TBSRequest_t* tbs_request = &m_OcspRequest->tbsRequest;
+    if (!tbs_request->requestExtensions) {
+        ASN_ALLOC_TYPE(tbs_request->requestExtensions, Extensions_t);
+    }
+
+    DO(extns_add_ocsp_nonce(tbs_request->requestExtensions, m_BaNonce));
 
 cleanup:
     return ret;
+}
+
+int OcspClientHelper::parseOcspResponse (const ByteArray* baEncoded)
+{
+    int ret = RET_OK;
+    OCSPResponse_t* ocsp_resp = nullptr;
+    BasicOCSPResponse_t* basic_ocspresp = nullptr;
+    uint32_t status = 0;
+
+    m_ResponseStatus = ResponseStatus::UNDEFINED;
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(ocsp_resp = (OCSPResponse_t*)asn_decode_ba_with_alloc(get_OCSPResponse_desc(), baEncoded));
+
+    DO(asn_decodevalue_enumerated(&ocsp_resp->responseStatus, &status));
+    m_ResponseStatus = static_cast<ResponseStatus>(status);
+    if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
+        ResponseBytes_t* resp_bytes = ocsp_resp->responseBytes;
+        if ((resp_bytes == NULL) || (!OID_is_equal_oid(&resp_bytes->responseType, OID_PKIX_OcspBasic))) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
+        }
+
+        CHECK_NOT_NULL(basic_ocspresp = (BasicOCSPResponse_t*)asn_decode_with_alloc(
+            get_BasicOCSPResponse_desc(), resp_bytes->response.buf, resp_bytes->response.size));
+
+        DO(asn_encode_ba(get_ResponseData_desc(), &basic_ocspresp->tbsResponseData, &m_BaResponseData));
+
+        m_BasicOcspResp = basic_ocspresp;
+        basic_ocspresp = nullptr;
+    }
+
+cleanup:
+    asn_free(get_BasicOCSPResponse_desc(), basic_ocspresp);
+    asn_free(get_OCSPResponse_desc(), ocsp_resp);
+    return ret;
+}
+
+int OcspClientHelper::encodeTbsRequest (void)
+{
+    if (!m_OcspRequest) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_encode_ba(get_TBSRequest_desc(), &m_OcspRequest->tbsRequest, &m_BaTbsEncoded);
+}
+
+int OcspClientHelper::setSignature (
+    const UapkiNS::AlgorithmIdentifier& aidSignature,
+    const ByteArray* baSignValue,
+    const std::vector<ByteArray*>& certs
+)
+{
+    int ret = RET_OK;
+    Certificate_t* cert = nullptr;
+    Signature_t* sign = nullptr;
+
+    if (!m_OcspRequest || !aidSignature.isPresent() || !baSignValue) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(sign, Signature_t);
+
+    //  =signatureAlgorithm=
+    DO(UapkiNS::Util::algorithmIdentifierToAsn1(sign->signatureAlgorithm, aidSignature));
+
+    //  =signature=
+    DO(asn_ba2BITSTRING(baSignValue, &sign->signature));
+
+    //  =certs= (optional)
+    if (!certs.empty() && !sign->certs) {
+        ASN_ALLOC_TYPE(sign->certs, Certificates_t);
+    }
+    for (const auto& it : certs) {
+        CHECK_NOT_NULL(cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), it));
+        DO(ASN_SEQUENCE_ADD(&sign->certs->list, cert));
+        cert = nullptr;
+    }
+
+    m_OcspRequest->optionalSignature = sign;
+    sign = nullptr;
+
+cleanup:
+    asn_free(get_Certificate_desc(), cert);
+    asn_free(get_Signature_desc(), sign);
+    return ret;
+}
+
+int OcspClientHelper::encodeRequest (void)
+{
+    if (!m_OcspRequest || m_OcspRecords.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaEncoded);
+}
+
+ByteArray* OcspClientHelper::getEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaEncoded;
+    if (move) {
+        m_BaEncoded = nullptr;
+    }
+    return rv_ba;
 }
 
 const OcspClientHelper::OcspRecord* OcspClientHelper::getOcspRecord (const size_t index) const
@@ -192,16 +325,13 @@ const OcspClientHelper::OcspRecord* OcspClientHelper::getOcspRecord (const size_
     return rv_record;
 }
 
-int OcspClientHelper::parseResponse (const ByteArray* baEncoded, ResponseStatus& responseStatus)
+int OcspClientHelper::parseResponse (const ByteArray* baEncoded)
 {
     int ret = RET_OK;
-    uint32_t status = (uint32_t)ResponseStatus::UNDEFINED;
 
-    responseStatus = ResponseStatus::UNDEFINED;
-    DO(ocsp_response_parse(baEncoded, &status, &m_BasicOcspResp, &m_ResponseData));
+    DO(parseOcspResponse(baEncoded));
 
-    responseStatus = (ResponseStatus)status;
-    if (responseStatus == ResponseStatus::SUCCESSFUL) {
+    if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
         DO(asn_decodevalue_gentime(&m_BasicOcspResp->tbsResponseData.producedAt, &m_ProducedAt));
     }
 
@@ -230,6 +360,30 @@ int OcspClientHelper::getCerts (vector<ByteArray*>& certs)
 
 cleanup:
     ba_free(ba_cert);
+    return ret;
+}
+
+int OcspClientHelper::getOcspIdentifier (ByteArray** baOcspIdentifier)
+{
+    int ret = RET_OK;
+    OcspIdentifier_t* ocsp_identifier = nullptr;
+
+    if (!m_BasicOcspResp || !baOcspIdentifier) return RET_UAPKI_INVALID_PARAMETER;
+
+    const ResponseData_t* response_data = &m_BasicOcspResp->tbsResponseData;
+
+    ASN_ALLOC_TYPE(ocsp_identifier, OcspIdentifier_t);
+
+    //  =ocspResponderID=
+    DO(asn_copy(get_ResponderID_desc(), &response_data->responderID, &ocsp_identifier->ocspResponderID));
+
+    //  =producedAt=
+    DO(asn_copy(get_GeneralizedTime_desc(), &response_data->producedAt, &ocsp_identifier->producedAt));
+
+    DO(asn_encode_ba(get_OcspIdentifier_desc(), ocsp_identifier, baOcspIdentifier));
+
+cleanup:
+    asn_free(get_OcspIdentifier_desc(), ocsp_identifier);
     return ret;
 }
 
@@ -276,7 +430,7 @@ int OcspClientHelper::verifyTbsResponseData (const CerStore::Item* cerResponder,
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = verify_signature(s_signalgo, m_ResponseData, false, cerResponder->baSPKI, ba_signature);
+    ret = verify_signature(s_signalgo, m_BaResponseData, false, cerResponder->baSPKI, ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SIGNATURE_VERIFY::STATUS::VALID;
@@ -299,13 +453,13 @@ int OcspClientHelper::checkNonce (void)
     int ret = RET_OK;
     ByteArray* ba_nonce = nullptr;
 
-    if (m_Nonce == nullptr) return ret;
+    if (m_BaNonce == nullptr) return ret;
 
     CHECK_PARAM(m_BasicOcspResp != nullptr);
 
     ret = extns_get_ocsp_nonce(m_BasicOcspResp->tbsResponseData.responseExtensions, &ba_nonce);
     if (ret == RET_OK) {
-        DO(ba_cmp(m_Nonce, ba_nonce));
+        DO(ba_cmp(m_BaNonce, ba_nonce));
     }
 
 cleanup:

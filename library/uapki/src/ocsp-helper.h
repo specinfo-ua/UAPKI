@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef OCSP_HELPER_H
-#define OCSP_HELPER_H
+#ifndef OCSP_CLIENT_HELPER_H
+#define OCSP_CLIENT_HELPER_H
 
 
 #include "uapkic.h"
@@ -34,7 +34,6 @@
 #include "cer-store.h"
 #include "crl-store.h"
 #include "common.h"
-#include "ocsp-utils.h"
 #include "verify-status.h"
 #include "uapki-ns.h"
 #include <vector>
@@ -46,6 +45,9 @@ using namespace std;
 class OcspClientHelper
 {
 public:
+    static const size_t NONCE_MAXLEN    = 64;
+    static const size_t NONCE_MINLEN    = 8;
+
     enum class ResponderIdType : int32_t {
         UNDEFINED   = -1,
         BY_NAME     = 0,
@@ -72,8 +74,11 @@ public:
         UapkiNS::CrlReason
                     revocationReason;
         OcspRecord (void)
-            : status(UapkiNS::CertStatus::UNDEFINED), msThisUpdate(0), msNextUpdate(0)
-            , msRevocationTime(0), revocationReason(UapkiNS::CrlReason::UNDEFINED)
+            : status(UapkiNS::CertStatus::UNDEFINED)
+            , msThisUpdate(0)
+            , msNextUpdate(0)
+            , msRevocationTime(0)
+            , revocationReason(UapkiNS::CrlReason::UNDEFINED)
         {}
     };  //  end struct OcspRecord
 
@@ -84,9 +89,13 @@ private:
                 m_OcspRequest;
     BasicOCSPResponse_t*
                 m_BasicOcspResp;
-    ByteArray*  m_Nonce;
-    ByteArray*  m_ResponseData;
+    ByteArray*  m_BaNonce;
+    ByteArray*  m_BaEncoded;
+    ByteArray*  m_BaTbsEncoded;
+    ByteArray*  m_BaResponseData;
     uint64_t    m_ProducedAt;
+    ResponseStatus
+                m_ResponseStatus;
 
 public:
     OcspClientHelper (void);
@@ -94,26 +103,41 @@ public:
 
     void reset (void);
 
-    int createRequest (void);
+    int init (void);
     int addCert (const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject);
     int addSN (const CerStore::Item* cerIssuer, const ByteArray* baSerialNumber);
-    int setNonce (size_t nonceLen);
+    int genNonce (const size_t nonceLen);
     int setNonce (const ByteArray* baNonce);
-    int encodeRequest (ByteArray** baEncoded);
 
-    const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
-    const OcspRecord* getOcspRecord (const size_t index) const;
-    uint64_t getProducedAt (void) const { return m_ProducedAt; }
-    const ByteArray* getResponseData (void) const { return m_ResponseData; }
+    int encodeTbsRequest (void);
+    int setSignature (
+            const UapkiNS::AlgorithmIdentifier& aidSignature,
+            const ByteArray* baSignValue,
+            const std::vector<ByteArray*>& certs = std::vector<ByteArray*>()
+    );
 
-    int parseResponse (const ByteArray* baEncoded, ResponseStatus& responseStatus);
+    int encodeRequest (void);
+    ByteArray* getEncoded (const bool move = false);
+
+    int parseResponse (const ByteArray* baEncoded);
     int getCerts (vector<ByteArray*>& certs);
+    int getOcspIdentifier (ByteArray** baOcspIdentifier);   //  For complete-revocation-references Attribute (rfc5126, $6.2.2)
     int getResponderId (ResponderIdType &responderIdType, ByteArray** baResponderId);
     int verifyTbsResponseData (const CerStore::Item* cerResponder, SIGNATURE_VERIFY::STATUS& statusSign);
     int checkNonce (void);
     int scanSingleResponses (void);
 
+    const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
+    const ByteArray* getNonce (void) const { return m_BaNonce; }
+    const OcspRecord* getOcspRecord (const size_t index) const;
+    uint64_t getProducedAt (void) const { return m_ProducedAt; }
+    const ByteArray* getResponseData (void) const { return m_BaResponseData; }
+    ResponseStatus getResponseStatus (void) const { return m_ResponseStatus; }
+    const ByteArray* getTbsEncoded (void) const { return m_BaTbsEncoded; }
+
 public:
+    int addNonceToExtension (void);
+    int parseOcspResponse (const ByteArray* baEncoded);
     static const char* responseStatusToStr (const ResponseStatus status);
 
 };  //  end class OcspClientHelper

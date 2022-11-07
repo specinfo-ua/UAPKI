@@ -90,9 +90,6 @@
     <ClCompile Include="..\common\pkix\iconv-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\pkix\ocsp-utils.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\pkix\oid-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
@@ -324,9 +321,6 @@
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\iconv-utils.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\ocsp-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\oid-utils.h">
