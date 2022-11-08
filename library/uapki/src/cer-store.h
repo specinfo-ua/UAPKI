@@ -135,14 +135,30 @@ public:
     void reset (void);
 
 public:
-    static int calcKeyId (const HashAlg algoKeyId, const ByteArray* baPubkey, ByteArray** baKeyId);
+    static int calcKeyId (
+        const HashAlg algoKeyId,
+        const ByteArray* baPubkey,
+        ByteArray** baKeyId
+    );
     static int generateEssCertId (
         const Item* cerStoreItem,
         const UapkiNS::AlgorithmIdentifier& aidDigest,
         UapkiNS::EssCertId& essCertId
     );
-    static int parseCert (const ByteArray* baEncoded, Item** cerStoreItem);
-    static int parseSID (const ByteArray* baSID, ByteArray** baIssuer, ByteArray** baSerialNumber, ByteArray** baKeyId);
+    static int issuerToGeneralNames (
+        const ByteArray* baIssuer,
+        ByteArray** baEncoded
+    );
+    static int parseCert (
+        const ByteArray* baEncoded,
+        Item** cerStoreItem
+    );
+    static int parseSID (
+        const ByteArray* baSID,
+        ByteArray** baIssuer,
+        ByteArray** baSerialNumber,
+        ByteArray** baKeyId
+    );
 
 private:
     //  addItem - added unique item, return new-item or exists-item

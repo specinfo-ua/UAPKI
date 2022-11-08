@@ -79,6 +79,14 @@ namespace UapkiNS {
             algorithm.clear();
             ba_free(baParameters);
         }
+        bool copy (const AlgorithmIdentifier& src) {
+            algorithm = src.algorithm;
+            if (src.baParameters) {
+                baParameters = ba_copy_with_alloc(src.baParameters, 0, 0);
+                return (baParameters);
+            }
+            return true;
+        }
         bool isPresent (void) const {
             return (!algorithm.empty());
         }
