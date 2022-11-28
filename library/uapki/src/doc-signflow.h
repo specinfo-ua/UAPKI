@@ -60,7 +60,7 @@ public:
                     aidSignature;
         CerStore::Item*
                     cerStoreItem;   //  ref
-        ByteArray* baKeyId;
+        ByteArray*  baKeyId;
         bool        detachedData;
         bool        includeCert;
         bool        includeTime;
@@ -86,7 +86,38 @@ public:
         SignParams (void);
         ~SignParams (void);
 
+        int setSignatureFormat (const SignatureFormat signatureFormat);
+
     };  //  end struct SignParams
+
+    class CadesBuilder {
+        CerStore*   m_CerStore;
+        SignParams  m_SignParams;
+        bool        m_IsCadesFormat;
+        std::vector<CerStore::Item*>
+                    m_ChainCerts;
+        std::vector<UapkiNS::EssCertId>
+                    m_EssCertids;
+
+    public:
+        CadesBuilder (CerStore* iCerStore);
+        ~CadesBuilder (void);
+
+        CerStore* getCerStore (void) { return m_CerStore; }
+        std::vector<CerStore::Item*>& getChainCerts (void) { return m_ChainCerts; }
+        SignParams& getSignParams (void) { return m_SignParams; }
+        bool isCadesFormat (void) const { return m_IsCadesFormat; }
+
+        int init (void);
+        int buildChainCerts (void);
+        int process (void);
+
+    private:
+        int encodeCertificateRefs (UapkiNS::Attribute& attr);
+        int encodeRevocationRefs (UapkiNS::Attribute& attr);
+        int encodeSigningCertificate (UapkiNS::Attribute& attr);
+
+    };  //  end class CadesBuilder
 
     const SignParams*
                 signParams;     //  ref

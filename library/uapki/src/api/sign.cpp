@@ -82,23 +82,6 @@ static SigningDoc::SignatureFormat signature_format_to_enum (const string& signF
     return rv;
 }   //  signature_format_to_enum
 
-static int encode_attrvalue_signingcert (SigningDoc::SignParams& signParams)
-{
-    int ret = RET_OK;
-    vector<UapkiNS::EssCertId> ess_certids;
-
-    if (!signParams.cerStoreItem) return RET_UAPKI_INVALID_PARAMETER;
-
-    //  Now simple case: one cert
-    ess_certids.resize(1);
-    DO(signParams.cerStoreItem->generateEssCertId(signParams.aidDigest, ess_certids[0]));
-    DO(UapkiNS::AttributeHelper::encodeSigningCertificate(ess_certids, &signParams.attrSigningCert.baValues));
-    signParams.attrSigningCert.type = string(OID_PKCS9_SIGNING_CERTIFICATE_V2);
-
-cleanup:
-    return ret;
-}   //  encode_attrvalue_signingcert
-
 static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
 {
     string s_keyinfo;
@@ -141,7 +124,7 @@ static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams&
 {
     int ret = RET_OK;
 
-    signParams.signatureFormat = signature_format_to_enum(
+    const SigningDoc::SignatureFormat signature_format = signature_format_to_enum(
         ParsonHelper::jsonObjectGetString(joSignParams, "signatureFormat")
     );
     signParams.aidSignature.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
@@ -151,23 +134,7 @@ static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams&
     signParams.includeTime = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeTime", false);
     signParams.includeContentTS = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeContentTS", false);
 
-    switch (signParams.signatureFormat) {
-    case SigningDoc::SignatureFormat::CADES_Av3:
-    case SigningDoc::SignatureFormat::CADES_C:
-    case SigningDoc::SignatureFormat::CADES_T:
-        signParams.includeContentTS = true;
-        signParams.includeSignatureTS = true;
-    case SigningDoc::SignatureFormat::CADES_BES:
-        signParams.sidUseKeyId = false;
-        break;
-    case SigningDoc::SignatureFormat::CMS_SID_KEYID:
-        signParams.sidUseKeyId = true;
-        break;
-    case SigningDoc::SignatureFormat::RAW:
-        break;
-    default:
-        ret = RET_UAPKI_INVALID_PARAMETER;
-    }
+    DO(signParams.setSignatureFormat(signature_format));
 
     if (ParsonHelper::jsonObjectHasValue(joSignParams, "signaturePolicy", JSONObject)) {
         JSON_Object* jo_sigpolicy = json_object_get_object(joSignParams, "signaturePolicy");
@@ -336,13 +303,12 @@ cleanup:
     return ret;
 }   //  parse_doc_from_json
 
-
 int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     LibraryConfig* config = nullptr;
-    CerStore* cer_store = nullptr;
-    SigningDoc::SignParams sign_params;
+    SigningDoc::CadesBuilder cades_builder(get_cerstore());
+    SigningDoc::SignParams& sign_params = cades_builder.getSignParams();
     size_t cnt_docs = 0;
     JSON_Array* ja_results = nullptr;
     JSON_Array* ja_sources = nullptr;
@@ -355,8 +321,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
     config = get_config();
-    cer_store = get_cerstore();
-    if (!config || !cer_store) {
+    if (!config || !cades_builder.getCerStore()) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
@@ -392,7 +357,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     if ((sign_params.signatureFormat != SigningDoc::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
-        DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerStoreItem));
+        DO(cades_builder.getCerStore()->getCertByKeyId(sign_params.baKeyId, &sign_params.cerStoreItem));
     }
 
     if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
@@ -419,25 +384,11 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         }
     }
 
-    switch (sign_params.signatureFormat) {
-    case SigningDoc::SignatureFormat::CADES_BES:
-    case SigningDoc::SignatureFormat::CADES_T:
-        DO(encode_attrvalue_signingcert(sign_params));
-        break;
-    case SigningDoc::SignatureFormat::CADES_C:
-        DO(encode_attrvalue_signingcert(sign_params));
-        //DO(encode_attrvalue_certificaterefs(sign_params));
-        //DO(encode_attrvalue_revocationrefs(sign_params));
-        break;
-    case SigningDoc::SignatureFormat::CADES_Av3:
-        DO(encode_attrvalue_signingcert(sign_params));
-        //DO(encode_attrvalue_certificaterefs(sign_params));
-        //DO(encode_attrvalue_revocationrefs(sign_params));
-        //DO(encode_attrvalue_certificatevalues(sign_params));
-        //DO(encode_attrvalue_revocationvalues(sign_params));
-        break;
-    default:
-        break;
+    DO(cades_builder.init());
+    if (cades_builder.isCadesFormat()) {
+        DO(cades_builder.buildChainCerts());
+        //aaa todo: check status certs
+        DO(cades_builder.process());
     }
 
     signing_docs.resize(cnt_docs);

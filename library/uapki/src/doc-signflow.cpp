@@ -58,11 +58,186 @@ SigningDoc::SignParams::SignParams (void)
     , tspPolicy(nullptr)
 {
 }
+
 SigningDoc::SignParams::~SignParams (void)
 {
     signatureFormat = SignatureFormat::UNDEFINED;
     cerStoreItem = nullptr; //  This ref
     ba_free(baKeyId);
+}
+
+int SigningDoc::SignParams::setSignatureFormat (const SignatureFormat aSignatureFormat)
+{
+    switch (aSignatureFormat) {
+    case SignatureFormat::CADES_Av3:
+    case SignatureFormat::CADES_C:
+    case SignatureFormat::CADES_T:
+        includeContentTS = true;
+        includeSignatureTS = true;
+    case SignatureFormat::CADES_BES:
+        sidUseKeyId = false;
+        break;
+    case SignatureFormat::CMS_SID_KEYID:
+        sidUseKeyId = true;
+        break;
+    case SignatureFormat::RAW:
+        break;
+    default:
+        return RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    signatureFormat = aSignatureFormat;
+    return RET_OK;
+}
+
+
+SigningDoc::CadesBuilder::CadesBuilder (CerStore* iCerStore)
+    : m_CerStore(iCerStore)
+    , m_IsCadesFormat(false)
+{
+    DEBUG_OUTCON(puts("SigningDoc::CadesBuilder::CadesBuilder()"));
+}
+
+SigningDoc::CadesBuilder::~CadesBuilder (void)
+{
+    DEBUG_OUTCON(puts("SigningDoc::CadesBuilder::~CadesBuilder()"));
+}
+
+int SigningDoc::CadesBuilder::init (void)
+{
+    switch (m_SignParams.signatureFormat) {
+    case SignatureFormat::CADES_BES:
+    case SignatureFormat::CADES_T:
+    case SignatureFormat::CADES_C:
+    case SignatureFormat::CADES_Av3:
+        m_IsCadesFormat = true;
+        break;
+    default:
+        m_IsCadesFormat = false;
+        break;
+    }
+
+    if (m_IsCadesFormat) {
+        if (!m_SignParams.cerStoreItem) return RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    return RET_OK;
+}
+
+int SigningDoc::CadesBuilder::buildChainCerts (void)
+{
+    int ret = RET_OK;
+    CerStore::Item* cer_subject = m_SignParams.cerStoreItem;
+    CerStore::Item* cer_issuer = nullptr;
+    bool is_selfsigned = false;
+
+    while (!is_selfsigned) {
+        DO(m_CerStore->getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
+        if (!is_selfsigned) {
+            m_ChainCerts.push_back(cer_issuer);
+        }
+        cer_subject = cer_issuer;
+    }
+
+cleanup:
+    DEBUG_OUTCON(printf("SigningDoc::CadesBuilder::buildChainCerts(), ret: %d  chain len: %zu\n", ret, m_ChainCerts.size()));
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::process (void)
+{
+    int ret = RET_OK;
+
+    //  Now simple case: one cert
+    m_EssCertids.resize(1);
+    DO(m_SignParams.cerStoreItem->generateEssCertId(m_SignParams.aidDigest, m_EssCertids[0]));
+
+    switch (m_SignParams.signatureFormat) {
+    case SignatureFormat::CADES_BES:
+    case SignatureFormat::CADES_T:
+        DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
+        break;
+    case SignatureFormat::CADES_C:
+        DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
+        DO(encodeCertificateRefs(m_SignParams.attrCertificateRefs));
+        DO(encodeRevocationRefs(m_SignParams.attrRevocationRefs));
+        break;
+    case SignatureFormat::CADES_Av3:
+        DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
+        DO(encodeCertificateRefs(m_SignParams.attrCertificateRefs));
+        DO(encodeRevocationRefs(m_SignParams.attrRevocationRefs));
+        //DO(encode_attrvalue_certificatevalues(sign_params));
+        //DO(encode_attrvalue_revocationvalues(sign_params));
+        break;
+    default:
+        break;
+    }
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::encodeCertificateRefs (UapkiNS::Attribute& attr)
+{
+    int ret = RET_OK;
+    vector<UapkiNS::OtherCertId> other_certids;
+    size_t idx = 0;
+
+    if (m_ChainCerts.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    other_certids.resize(m_ChainCerts.size());
+    for (const auto& it : m_ChainCerts) {
+        UapkiNS::OtherCertId& dst_othercertid = other_certids[idx++];
+
+        DO(::hash(m_SignParams.hashDigest, it->baEncoded, &dst_othercertid.baHashValue));
+        if (!dst_othercertid.hashAlgorithm.copy(m_SignParams.aidDigest)) return RET_UAPKI_GENERAL_ERROR;
+
+        DO(CerStore::issuerToGeneralNames(it->baIssuer, &dst_othercertid.issuerSerial.baIssuer));
+        CHECK_NOT_NULL(dst_othercertid.issuerSerial.baSerialNumber = ba_copy_with_alloc(it->baSerialNumber, 0, 0));
+    }
+
+    attr.type = string(OID_PKCS9_CERTIFICATE_REFS);
+    DO(UapkiNS::AttributeHelper::encodeCertificateRefs(other_certids, &attr.baValues));
+    DEBUG_OUTCON(puts("encodeCertificateRefs:"); ba_print(stdout, attr.baValues));
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::encodeRevocationRefs (UapkiNS::Attribute& attr)
+{
+    int ret = RET_OK;
+    UapkiNS::AttributeHelper::RevocationRefsBuilder revocrefs_builder;
+
+    //check
+
+    DO(revocrefs_builder.init());
+    //  Now is empty: 3 empty CrlOcspRef's
+    DO(revocrefs_builder.addCrlOcspRef());
+    DO(revocrefs_builder.addCrlOcspRef());
+    DO(revocrefs_builder.addCrlOcspRef());
+    DO(revocrefs_builder.encode());
+
+    attr.type = string(OID_PKCS9_REVOCATION_REFS);
+    attr.baValues = revocrefs_builder.getEncoded(true);
+    DEBUG_OUTCON(puts("encodeRevocationRefs:"); ba_print(stdout, attr.baValues));
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::encodeSigningCertificate (UapkiNS::Attribute& attr)
+{
+    int ret = RET_OK;
+
+    if (m_EssCertids.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    attr.type = string(OID_PKCS9_SIGNING_CERTIFICATE_V2);
+    DO(UapkiNS::AttributeHelper::encodeSigningCertificate(m_EssCertids, &attr.baValues));
+    DEBUG_OUTCON(puts("encodeSigningCertificate:"); ba_print(stdout, attr.baValues));
+
+cleanup:
+    return ret;
 }
 
 
