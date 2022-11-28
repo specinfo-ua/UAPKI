@@ -33,9 +33,6 @@
     <ClCompile Include="src\verify-status.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\cms-utils.c">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\ocsp-helper.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -258,9 +255,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\verify-status.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cms-utils.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\ocsp-helper.h">

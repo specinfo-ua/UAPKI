@@ -28,7 +28,6 @@
 #include "api-json-internal.h"
 #include "attribute-utils.h"
 #include "cer-store.h"
-#include "cms-utils.h"
 #include "doc-signflow.h"
 #include "oid-utils.h"
 #include "time-utils.h"
@@ -41,6 +40,29 @@
 
 
 using namespace std;
+
+
+static int keyid_to_sid_subjectkeyid (const ByteArray* baKeyId, ByteArray** baSubjectKeyId)
+{
+    int ret = RET_OK;
+    //  Note:   SignerIdentifierIm_t - is SignerIdentifier IMPLICIT (use tag 0x80),
+    //          SignerIdentifierEx_t - is SignerIdentifier EXPLICIT (use tag 0xA0),
+    //          Here we need use implicit case SignerIdentifier
+    SignerIdentifierIm_t* sid_im = NULL;
+
+    CHECK_PARAM(baKeyId != NULL);
+    CHECK_PARAM(baSubjectKeyId != NULL);
+
+    ASN_ALLOC_TYPE(sid_im, SignerIdentifierIm_t);
+    sid_im->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
+    DO(asn_ba2OCTSTRING(baKeyId, &sid_im->choice.subjectKeyIdentifier));
+
+    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid_im, baSubjectKeyId));
+
+cleanup:
+    asn_free(get_SignerIdentifierIm_desc(), sid_im);
+    return ret;
+}   //  keyid_to_sid_subjectkeyid
 
 
 SigningDoc::SignParams::SignParams (void)
