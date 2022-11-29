@@ -131,7 +131,7 @@ public:
     const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
     const ByteArray* getBasicOcspResponse (void) const { return m_BaBasicOcspResponse; }
     const ByteArray* getNonce (void) const { return m_BaNonce; }
-    const OcspRecord* getOcspRecord (const size_t index) const;
+    const OcspRecord& getOcspRecord (const size_t index) const;
     uint64_t getProducedAt (void) const { return m_ProducedAt; }
     ResponseStatus getResponseStatus (void) const { return m_ResponseStatus; }
     const ByteArray* getTbsEncoded (void) const { return m_BaTbsEncoded; }

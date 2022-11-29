@@ -348,11 +348,10 @@ cleanup:
     return ret;
 }
 
-static int validate_by_ocsp(JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
+static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
 {
     int ret = RET_OK;
     OcspClientHelper ocsp_client;
-    const OcspClientHelper::OcspRecord* ocsp_record = nullptr;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
     string s_time;
@@ -402,23 +401,22 @@ static int validate_by_ocsp(JSON_Object* joResult, const CerStore::Item* cerIssu
         DO_JSON(json_object_set_string(joResult, "producedAt", s_time.c_str()));
 
         DO(ocsp_client.scanSingleResponses());
-        ocsp_record = ocsp_client.getOcspRecord(0);
-        if (ocsp_record) {
-            DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(ocsp_record->status)));
-            s_time = TimeUtils::mstimeToFormat(ocsp_record->msThisUpdate);
-            DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
-            if (ocsp_record->msNextUpdate > 0) {
-                s_time = TimeUtils::mstimeToFormat(ocsp_record->msNextUpdate);
-                DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
-            }
-            if (ocsp_record->status == UapkiNS::CertStatus::REVOKED) {
-                DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(ocsp_record->revocationReason)));
-                s_time = TimeUtils::mstimeToFormat(ocsp_record->msRevocationTime);
-                DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
-            }
+        const OcspClientHelper::OcspRecord& ocsp_record = ocsp_client.getOcspRecord(0); //  Work with one OCSP request that has one certificate
 
-            cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record->status, sba_resp.get());
+        DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(ocsp_record.status)));
+        s_time = TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate);
+        DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
+        if (ocsp_record.msNextUpdate > 0) {
+            s_time = TimeUtils::mstimeToFormat(ocsp_record.msNextUpdate);
+            DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
         }
+        if (ocsp_record.status == UapkiNS::CertStatus::REVOKED) {
+            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(ocsp_record.revocationReason)));
+            s_time = TimeUtils::mstimeToFormat(ocsp_record.msRevocationTime);
+            DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
+        }
+
+        cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record.status, sba_resp.get());
     }
 
 cleanup:

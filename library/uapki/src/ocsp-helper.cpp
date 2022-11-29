@@ -48,6 +48,8 @@ static const char* RESPONSE_STATUS_STRINGS[8] = {
     "UNAUTHORIZED"
 };
 
+static OcspClientHelper::OcspRecord ocsp_record_empty;
+
 
 struct OcspCertId {
     const char* hashAlgo;
@@ -320,13 +322,11 @@ ByteArray* OcspClientHelper::getEncoded (const bool move)
     return rv_ba;
 }
 
-const OcspClientHelper::OcspRecord* OcspClientHelper::getOcspRecord (const size_t index) const
+const OcspClientHelper::OcspRecord& OcspClientHelper::getOcspRecord (const size_t index) const
 {
-    const OcspRecord* rv_record = nullptr;
-    if (index < m_OcspRecords.size()) {
-        rv_record = &m_OcspRecords[index];
-    }
-    return rv_record;
+    if (index >= m_OcspRecords.size()) return ocsp_record_empty;
+
+    return m_OcspRecords[index];
 }
 
 int OcspClientHelper::parseResponse (const ByteArray* baEncoded)
