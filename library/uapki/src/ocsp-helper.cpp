@@ -106,7 +106,8 @@ OcspClientHelper::OcspClientHelper (void)
     , m_BaNonce(nullptr)
     , m_BaEncoded(nullptr)
     , m_BaTbsEncoded(nullptr)
-    , m_BaResponseData(nullptr)
+    , m_BaBasicOcspResponse(nullptr)
+    , m_BaTbsResponseData(nullptr)
     , m_ProducedAt(0)
     , m_ResponseStatus(ResponseStatus::UNDEFINED)
 {
@@ -123,14 +124,16 @@ void OcspClientHelper::reset (void)
     asn_free(get_BasicOCSPResponse_desc(), m_BasicOcspResp);
     ba_free(m_BaEncoded);
     ba_free(m_BaNonce);
-    ba_free(m_BaResponseData);
+    ba_free(m_BaBasicOcspResponse);
+    ba_free(m_BaTbsResponseData);
 
     m_OcspRecords.clear();
     m_OcspRequest = nullptr;
     m_BasicOcspResp = nullptr;
     m_BaEncoded = nullptr;
     m_BaNonce = nullptr;
-    m_BaResponseData = nullptr;
+    m_BaBasicOcspResponse = nullptr;
+    m_BaTbsResponseData = nullptr;
     m_ProducedAt = 0;
     m_ResponseStatus = ResponseStatus::UNDEFINED;
 }
@@ -235,14 +238,15 @@ int OcspClientHelper::parseOcspResponse (const ByteArray* baEncoded)
     m_ResponseStatus = static_cast<ResponseStatus>(status);
     if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
         ResponseBytes_t* resp_bytes = ocsp_resp->responseBytes;
-        if ((resp_bytes == NULL) || (!OID_is_equal_oid(&resp_bytes->responseType, OID_PKIX_OcspBasic))) {
+        if (!resp_bytes || (!OID_is_equal_oid(&resp_bytes->responseType, OID_PKIX_OcspBasic))) {
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
         }
 
         CHECK_NOT_NULL(basic_ocspresp = (BasicOCSPResponse_t*)asn_decode_with_alloc(
             get_BasicOCSPResponse_desc(), resp_bytes->response.buf, resp_bytes->response.size));
 
-        DO(asn_encode_ba(get_ResponseData_desc(), &basic_ocspresp->tbsResponseData, &m_BaResponseData));
+        CHECK_NOT_NULL(m_BaBasicOcspResponse = ba_alloc_from_uint8(resp_bytes->response.buf, (size_t)resp_bytes->response.size));
+        DO(asn_encode_ba(get_ResponseData_desc(), &basic_ocspresp->tbsResponseData, &m_BaTbsResponseData));
 
         m_BasicOcspResp = basic_ocspresp;
         basic_ocspresp = nullptr;
@@ -430,7 +434,7 @@ int OcspClientHelper::verifyTbsResponseData (const CerStore::Item* cerResponder,
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = verify_signature(s_signalgo, m_BaResponseData, false, cerResponder->baSPKI, ba_signature);
+    ret = verify_signature(s_signalgo, m_BaTbsResponseData, false, cerResponder->baSPKI, ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SIGNATURE_VERIFY::STATUS::VALID;
@@ -474,6 +478,7 @@ int OcspClientHelper::scanSingleResponses (void)
     const TBSRequest_t* tbs_req = nullptr;
     const ResponseData_t* tbs_respdata = nullptr;
     const RevokedInfo_t* revoked_info = nullptr;
+    size_t cnt_responses;
     uint32_t crl_reason = 0;
 
     CHECK_PARAM(m_OcspRequest != nullptr);
@@ -481,8 +486,8 @@ int OcspClientHelper::scanSingleResponses (void)
 
     tbs_req = &m_OcspRequest->tbsRequest;
     tbs_respdata = &m_BasicOcspResp->tbsResponseData;
-    if ((m_OcspRecords.size() != (size_t)tbs_respdata->responses.list.count)
-        || (tbs_req->requestList.list.count != tbs_respdata->responses.list.count)) {
+    cnt_responses = (size_t)tbs_respdata->responses.list.count;
+    if ((m_OcspRecords.size() != cnt_responses) || ((size_t)tbs_req->requestList.list.count != cnt_responses)) {
         SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
     }
 

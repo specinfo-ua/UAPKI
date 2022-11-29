@@ -312,27 +312,27 @@ cleanup:
 static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
-    vector<ByteArray*> certs;
+    UapkiNS::SmartBA sba_responderid;
+    UapkiNS::VectorBA vba_certs;
     OcspClientHelper::ResponderIdType responder_idtype = OcspClientHelper::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
     CerStore::Item* cer_responder = nullptr;
-    ByteArray* ba_responderid = nullptr;
 
-    DO(ocspClient.getCerts(certs));
-    for (auto& it : certs) {
+    DO(ocspClient.getCerts(vba_certs));
+    for (auto& it : vba_certs) {
         bool is_unique;
         DO(cerStore.addCert(it, false, false, false, is_unique, nullptr));
         it = nullptr;
     }
 
-    DO(ocspClient.getResponderId(responder_idtype, &ba_responderid));
-    DO(responderid_to_json(joResult, responder_idtype, ba_responderid));
+    DO(ocspClient.getResponderId(responder_idtype, &sba_responderid));
+    DO(responderid_to_json(joResult, responder_idtype, sba_responderid.get()));
     if (responder_idtype == OcspClientHelper::ResponderIdType::BY_NAME) {
-        DO(cerStore.getCertBySubject(ba_responderid, &cer_responder));
+        DO(cerStore.getCertBySubject(sba_responderid.get(), &cer_responder));
     }
     else {
         //  responder_idtype == OcspClientHelper::ResponderIdType::BY_KEY
-        DO(cerStore.getCertByKeyId(ba_responderid, &cer_responder));
+        DO(cerStore.getCertByKeyId(sba_responderid.get(), &cer_responder));
     }
 
     ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
@@ -345,10 +345,6 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
     }
 
 cleanup:
-    for (auto& it : certs) {
-        ba_free(it);
-    }
-    ba_free(ba_responderid);
     return ret;
 }
 

@@ -92,7 +92,8 @@ private:
     ByteArray*  m_BaNonce;
     ByteArray*  m_BaEncoded;
     ByteArray*  m_BaTbsEncoded;
-    ByteArray*  m_BaResponseData;
+    ByteArray*  m_BaBasicOcspResponse;
+    ByteArray*  m_BaTbsResponseData;
     uint64_t    m_ProducedAt;
     ResponseStatus
                 m_ResponseStatus;
@@ -128,12 +129,13 @@ public:
     int scanSingleResponses (void);
 
     const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
+    const ByteArray* getBasicOcspResponse (void) const { return m_BaBasicOcspResponse; }
     const ByteArray* getNonce (void) const { return m_BaNonce; }
     const OcspRecord* getOcspRecord (const size_t index) const;
     uint64_t getProducedAt (void) const { return m_ProducedAt; }
-    const ByteArray* getResponseData (void) const { return m_BaResponseData; }
     ResponseStatus getResponseStatus (void) const { return m_ResponseStatus; }
     const ByteArray* getTbsEncoded (void) const { return m_BaTbsEncoded; }
+    const ByteArray* getTbsResponseData (void) const { return m_BaTbsResponseData; }
 
 public:
     int addNonceToExtension (void);
