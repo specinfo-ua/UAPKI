@@ -67,6 +67,21 @@ cleanup:
 }   //  keyid_to_sid_subjectkeyid
 
 
+SigningDoc::OcspResponseItem::OcspResponseItem (void)
+    : baBasicOcspResponse(nullptr)
+    , baOcspIdentifier(nullptr)
+    , baOcspRespHash(nullptr)
+{
+}
+
+SigningDoc::OcspResponseItem::~OcspResponseItem (void)
+{
+    ba_free(baBasicOcspResponse);
+    ba_free(baOcspIdentifier);
+    ba_free(baOcspRespHash);
+}
+
+
 SigningDoc::SignParams::SignParams (void)
     : signatureFormat(SignatureFormat::UNDEFINED)
     , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
@@ -125,6 +140,9 @@ SigningDoc::CadesBuilder::CadesBuilder (CerStore* iCerStore)
 SigningDoc::CadesBuilder::~CadesBuilder (void)
 {
     DEBUG_OUTCON(puts("SigningDoc::CadesBuilder::~CadesBuilder()"));
+    for (auto& it : m_OcspResponseItems) {
+        delete it;
+    }
 }
 
 int SigningDoc::CadesBuilder::init (void)
@@ -168,12 +186,13 @@ cleanup:
     return ret;
 }
 
-int SigningDoc::CadesBuilder::addOcspValue (const ByteArray* baBasicOcspResponseEncoded)
+SigningDoc::OcspResponseItem* SigningDoc::CadesBuilder::addOcspResponseItem (void)
 {
-    if (!baBasicOcspResponseEncoded) return RET_UAPKI_INVALID_PARAMETER;
-
-    m_OcspValues.push_back((ByteArray*)baBasicOcspResponseEncoded);
-    return RET_OK;
+    SigningDoc::OcspResponseItem* rv_item = new SigningDoc::OcspResponseItem();
+    if (rv_item) {
+        m_OcspResponseItems.push_back(rv_item);
+    }
+    return rv_item;
 }
 
 int SigningDoc::CadesBuilder::process (void)
@@ -259,14 +278,18 @@ int SigningDoc::CadesBuilder::encodeRevocationRefs (UapkiNS::Attribute& attr)
 {
     int ret = RET_OK;
     UapkiNS::AttributeHelper::RevocationRefsBuilder revocrefs_builder;
-
-    //check
+    size_t idx = 0;
 
     DO(revocrefs_builder.init());
-    //  Now is empty: 3 empty CrlOcspRef's
-    DO(revocrefs_builder.addCrlOcspRef());
-    DO(revocrefs_builder.addCrlOcspRef());
-    DO(revocrefs_builder.addCrlOcspRef());
+    for (const auto& it : m_OcspResponseItems) {
+        DO(revocrefs_builder.addCrlOcspRef());
+        UapkiNS::AttributeHelper::RevocationRefsBuilder::CrlOcspRef* crlocsp_ref = revocrefs_builder.getCrlOcspRef(idx);
+        if (!crlocsp_ref) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+        DO(crlocsp_ref->addOcspResponseId(it->baOcspIdentifier, it->baOcspRespHash));
+        idx++;
+    }
     DO(revocrefs_builder.encode());
 
     attr.type = string(OID_PKCS9_REVOCATION_REFS);
@@ -283,8 +306,9 @@ int SigningDoc::CadesBuilder::encodeRevocationValues (UapkiNS::Attribute& attr)
     UapkiNS::AttributeHelper::RevocationValuesBuilder revocvalues_builder;
 
     DO(revocvalues_builder.init());
-    if (!m_OcspValues.empty()) {
-        revocvalues_builder.setOcspValues((const vector<const ByteArray*>&)m_OcspValues);
+    for (const auto& it : m_OcspResponseItems) {
+        DO(revocvalues_builder.addOcspValue(it->baBasicOcspResponse));
+//            (const vector<const ByteArray*>&)m_OcspValues);
     }
     DO(revocvalues_builder.encode());
 

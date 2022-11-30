@@ -33,6 +33,7 @@
 #include "uapkic.h"
 #include "uapkif.h"
 #include "cer-store.h"
+#include "ocsp-helper.h"
 #include "signeddata-helper.h"
 #include "uapki-ns.h"
 #include <string>
@@ -50,6 +51,16 @@ public:
         CADES_C         = 5,
         CADES_Av3       = 6
     };  //  end enum SignatureFormat
+
+    struct OcspResponseItem {
+        ByteArray*  baBasicOcspResponse;
+        ByteArray*  baOcspIdentifier;
+        ByteArray*  baOcspRespHash;
+
+        OcspResponseItem (void);
+        ~OcspResponseItem (void);
+
+    };  //  end struct OcspResponseItem
 
     struct SignParams {
         SignatureFormat
@@ -100,8 +111,8 @@ public:
                     m_ChainCerts;
         std::vector<UapkiNS::EssCertId>
                     m_EssCertids;
-        UapkiNS::VectorBA
-                    m_OcspValues;
+        vector<OcspResponseItem*>
+                    m_OcspResponseItems;
 
     public:
         CadesBuilder (CerStore* iCerStore);
@@ -114,7 +125,7 @@ public:
 
         int init (void);
         int buildChainCerts (void);
-        int addOcspValue (const ByteArray* baBasicOcspResponseEncoded);
+        OcspResponseItem* addOcspResponseItem (void);
         int process (void);
 
     private:
