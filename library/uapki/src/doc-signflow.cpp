@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//  Last update: 2022-11-30
+
 #include "api-json-internal.h"
 #include "attribute-utils.h"
 #include "cer-store.h"
@@ -166,6 +168,14 @@ cleanup:
     return ret;
 }
 
+int SigningDoc::CadesBuilder::addOcspValue (const ByteArray* baBasicOcspResponseEncoded)
+{
+    if (!baBasicOcspResponseEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_OcspValues.push_back((ByteArray*)baBasicOcspResponseEncoded);
+    return RET_OK;
+}
+
 int SigningDoc::CadesBuilder::process (void)
 {
     int ret = RET_OK;
@@ -188,12 +198,31 @@ int SigningDoc::CadesBuilder::process (void)
         DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
         DO(encodeCertificateRefs(m_SignParams.attrCertificateRefs));
         DO(encodeRevocationRefs(m_SignParams.attrRevocationRefs));
-        //DO(encode_attrvalue_certificatevalues(sign_params));
-        //DO(encode_attrvalue_revocationvalues(sign_params));
+        DO(encodeCertValues(m_SignParams.attrCertValues));
+        DO(encodeRevocationValues(m_SignParams.attrRevocationValues));
         break;
     default:
         break;
     }
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::encodeCertValues (UapkiNS::Attribute& attr)
+{
+    int ret = RET_OK;
+    vector<const ByteArray*> cert_values;
+
+    if (m_ChainCerts.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    for (const auto& it : m_ChainCerts) {
+        cert_values.push_back(it->baEncoded);
+    }
+
+    attr.type = string(OID_PKCS9_CERT_VALUES);
+    DO(UapkiNS::AttributeHelper::encodeCertValues(cert_values, &attr.baValues));
+    DEBUG_OUTCON(puts("encodeCertValues:"); ba_print(stdout, attr.baValues));
 
 cleanup:
     return ret;
@@ -243,6 +272,25 @@ int SigningDoc::CadesBuilder::encodeRevocationRefs (UapkiNS::Attribute& attr)
     attr.type = string(OID_PKCS9_REVOCATION_REFS);
     attr.baValues = revocrefs_builder.getEncoded(true);
     DEBUG_OUTCON(puts("encodeRevocationRefs:"); ba_print(stdout, attr.baValues));
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::CadesBuilder::encodeRevocationValues (UapkiNS::Attribute& attr)
+{
+    int ret = RET_OK;
+    UapkiNS::AttributeHelper::RevocationValuesBuilder revocvalues_builder;
+
+    DO(revocvalues_builder.init());
+    if (!m_OcspValues.empty()) {
+        revocvalues_builder.setOcspValues((const vector<const ByteArray*>&)m_OcspValues);
+    }
+    DO(revocvalues_builder.encode());
+
+    attr.type = string(OID_PKCS9_REVOCATION_VALUES);
+    attr.baValues = revocvalues_builder.getEncoded(true);
+    DEBUG_OUTCON(puts("encodeRevocationValues:"); ba_print(stdout, attr.baValues));
 
 cleanup:
     return ret;

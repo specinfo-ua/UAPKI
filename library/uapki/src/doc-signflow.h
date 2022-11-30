@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//  Last update: 2022-11-30
+
 #ifndef DOC_SIGNFLOW_H
 #define DOC_SIGNFLOW_H
 
@@ -98,6 +100,8 @@ public:
                     m_ChainCerts;
         std::vector<UapkiNS::EssCertId>
                     m_EssCertids;
+        UapkiNS::VectorBA
+                    m_OcspValues;
 
     public:
         CadesBuilder (CerStore* iCerStore);
@@ -110,11 +114,14 @@ public:
 
         int init (void);
         int buildChainCerts (void);
+        int addOcspValue (const ByteArray* baBasicOcspResponseEncoded);
         int process (void);
 
     private:
+        int encodeCertValues (UapkiNS::Attribute& attr);
         int encodeCertificateRefs (UapkiNS::Attribute& attr);
         int encodeRevocationRefs (UapkiNS::Attribute& attr);
+        int encodeRevocationValues (UapkiNS::Attribute& attr);
         int encodeSigningCertificate (UapkiNS::Attribute& attr);
 
     };  //  end class CadesBuilder
