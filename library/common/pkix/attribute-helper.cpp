@@ -1,4 +1,31 @@
-//  Last update: 2022-11-06
+/*
+ * Copyright (c) 2022, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+//  Last update: 2022-11-30
 
 
 #include "attribute-helper.h"
@@ -556,7 +583,7 @@ int RevocationValuesBuilder::init (void)
     return (m_RevValues) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
-int RevocationValuesBuilder::addCrl (const ByteArray* baCrlEncoded)
+int RevocationValuesBuilder::addCrlValue (const ByteArray* baCrlEncoded)
 {
     int ret = RET_OK;
     CertificateList_t* crl = nullptr;
@@ -578,12 +605,12 @@ cleanup:
     return ret;
 }
 
-int RevocationValuesBuilder::addOcspResponse (const ByteArray* baBasicOcspResponse)
+int RevocationValuesBuilder::addOcspValue (const ByteArray* baBasicOcspResponseEncoded)
 {
     int ret = RET_OK;
     BasicOCSPResponse_t* ocsp_resp = nullptr;
 
-    if (!m_RevValues || !baBasicOcspResponse) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_RevValues || !baBasicOcspResponseEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
     if (!m_RevValues->ocspVals) {
         void* ptr = calloc(1, sizeof(*RevocationValues_t::ocspVals));
@@ -591,9 +618,57 @@ int RevocationValuesBuilder::addOcspResponse (const ByteArray* baBasicOcspRespon
         memcpy(&m_RevValues->ocspVals, &ptr, sizeof(ptr));
     }
 
-    CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baBasicOcspResponse));
+    CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baBasicOcspResponseEncoded));
     DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
     ocsp_resp = nullptr;
+
+cleanup:
+    asn_free(get_BasicOCSPResponse_desc(), ocsp_resp);
+    return ret;
+}
+
+int RevocationValuesBuilder::setCrlValues (const vector<const ByteArray*>& abaCrlValues)
+{
+    int ret = RET_OK;
+    CertificateList_t* crl = nullptr;
+
+    if (!m_RevValues) return RET_UAPKI_INVALID_PARAMETER;
+
+    void* ptr = calloc(1, sizeof(*RevocationValues_t::crlVals));
+    if (!ptr) return RET_UAPKI_GENERAL_ERROR;
+    memcpy(&m_RevValues->crlVals, &ptr, sizeof(ptr));
+
+    for (const auto& it : abaCrlValues) {
+        if (!it) return RET_UAPKI_INVALID_PARAMETER;
+
+        CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), it));
+        DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
+        crl = nullptr;
+    }
+
+cleanup:
+    asn_free(get_CertificateList_desc(), crl);
+    return ret;
+}
+
+int RevocationValuesBuilder::setOcspValues (const vector<const ByteArray*>& abaOcspValues)
+{
+    int ret = RET_OK;
+    BasicOCSPResponse_t* ocsp_resp = nullptr;
+
+    if (!m_RevValues) return RET_UAPKI_INVALID_PARAMETER;
+
+    void* ptr = calloc(1, sizeof(*RevocationValues_t::ocspVals));
+    if (!ptr) return RET_UAPKI_GENERAL_ERROR;
+    memcpy(&m_RevValues->ocspVals, &ptr, sizeof(ptr));
+
+    for (const auto& it : abaOcspValues) {
+        if (!it) return RET_UAPKI_INVALID_PARAMETER;
+
+        CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), it));
+        DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
+        ocsp_resp = nullptr;
+    }
 
 cleanup:
     asn_free(get_BasicOCSPResponse_desc(), ocsp_resp);
