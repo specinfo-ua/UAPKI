@@ -338,10 +338,10 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
     ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
     DO_JSON(json_object_set_string(joResult, "statusSignature", SIGNATURE_VERIFY::toStr(status_sign)));
     if (ret == RET_VERIFY_FAILED) {
-        SET_ERROR(RET_UAPKI_OCSP_VERIFY_RESPONSE_FAILED);
+        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED);
     }
     else if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_OCSP_VERIFY_RESPONSE_ERROR);
+        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_ERROR);
     }
 
 cleanup:
@@ -372,11 +372,11 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     DO(ocsp_client.genNonce(20));
     DO(ocsp_client.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_client.getEncoded()));
+    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_client.getRequestEncoded()));
 
     for (auto& it : shuffled_uris) {
         DEBUG_OUTCON(printf("validate_by_ocsp(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_client.getEncoded(), &sba_resp);
+        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_client.getRequestEncoded(), &sba_resp);
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
             DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
@@ -385,6 +385,9 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     }
     if (ret != RET_OK) {
         SET_ERROR(ret);
+    }
+    else if (sba_resp.size() == 0) {
+        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
     }
 
     DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));

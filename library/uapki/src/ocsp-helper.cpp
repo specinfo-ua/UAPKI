@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//  Last update: 2022-11-30
+
 #include "ocsp-helper.h"
 #include "asn1-ba-utils.h"
 #include "extension-utils.h"
@@ -241,7 +243,7 @@ int OcspClientHelper::parseOcspResponse (const ByteArray* baEncoded)
     if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
         ResponseBytes_t* resp_bytes = ocsp_resp->responseBytes;
         if (!resp_bytes || (!OID_is_equal_oid(&resp_bytes->responseType, OID_PKIX_OcspBasic))) {
-            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
 
         CHECK_NOT_NULL(basic_ocspresp = (BasicOCSPResponse_t*)asn_decode_with_alloc(
@@ -313,7 +315,7 @@ int OcspClientHelper::encodeRequest (void)
     return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaEncoded);
 }
 
-ByteArray* OcspClientHelper::getEncoded (const bool move)
+ByteArray* OcspClientHelper::getRequestEncoded (const bool move)
 {
     ByteArray* rv_ba = m_BaEncoded;
     if (move) {
@@ -341,6 +343,15 @@ int OcspClientHelper::parseResponse (const ByteArray* baEncoded)
 
 cleanup:
     return ret;
+}
+
+ByteArray* OcspClientHelper::getBasicOcspResponseEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaBasicOcspResponse;
+    if (move) {
+        m_BaBasicOcspResponse = nullptr;
+    }
+    return rv_ba;
 }
 
 int OcspClientHelper::getCerts (vector<ByteArray*>& certs)
@@ -468,7 +479,7 @@ int OcspClientHelper::checkNonce (void)
 
 cleanup:
     ba_free(ba_nonce);
-    ret = (ret == RET_OK) ? RET_OK : RET_UAPKI_OCSP_INVALID_NONCE;
+    ret = (ret == RET_OK) ? RET_OK : RET_UAPKI_OCSP_RESPONSE_INVALID_NONCE;
     return ret;
 }
 
@@ -488,7 +499,7 @@ int OcspClientHelper::scanSingleResponses (void)
     tbs_respdata = &m_BasicOcspResp->tbsResponseData;
     cnt_responses = (size_t)tbs_respdata->responses.list.count;
     if ((m_OcspRecords.size() != cnt_responses) || ((size_t)tbs_req->requestList.list.count != cnt_responses)) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
+        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
     }
 
     for (size_t i = 0; i < m_OcspRecords.size(); i++) {
@@ -499,7 +510,7 @@ int OcspClientHelper::scanSingleResponses (void)
             || !asn_octetstring_data_is_equals(&req_certid->issuerNameHash, &resp->certID.issuerNameHash)
             || !asn_octetstring_data_is_equals(&req_certid->issuerKeyHash, &resp->certID.issuerKeyHash)
             || !asn_primitive_data_is_equals(&req_certid->serialNumber, &resp->certID.serialNumber)) {
-            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
 
         switch (resp->certStatus.present) {
@@ -519,7 +530,7 @@ int OcspClientHelper::scanSingleResponses (void)
             ocsp_item.status = UapkiNS::CertStatus::UNKNOWN;
             break;
         default:
-            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID_CONTENT);
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
 
         DO(asn_decodevalue_gentime(&resp->thisUpdate, &ocsp_item.msThisUpdate));

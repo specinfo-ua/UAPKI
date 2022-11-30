@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//  Last update: 2022-11-30
+
 #ifndef OCSP_CLIENT_HELPER_H
 #define OCSP_CLIENT_HELPER_H
 
@@ -118,9 +120,10 @@ public:
     );
 
     int encodeRequest (void);
-    ByteArray* getEncoded (const bool move = false);
+    ByteArray* getRequestEncoded (const bool move = false);
 
     int parseResponse (const ByteArray* baEncoded);
+    ByteArray* getBasicOcspResponseEncoded (const bool move = false);
     int getCerts (vector<ByteArray*>& certs);
     int getOcspIdentifier (ByteArray** baOcspIdentifier);   //  For complete-revocation-references Attribute (rfc5126, $6.2.2)
     int getResponderId (ResponderIdType &responderIdType, ByteArray** baResponderId);
@@ -129,7 +132,6 @@ public:
     int scanSingleResponses (void);
 
     const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
-    const ByteArray* getBasicOcspResponse (void) const { return m_BaBasicOcspResponse; }
     const ByteArray* getNonce (void) const { return m_BaNonce; }
     const OcspRecord& getOcspRecord (const size_t index) const;
     uint64_t getProducedAt (void) const { return m_ProducedAt; }
