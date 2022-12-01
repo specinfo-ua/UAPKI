@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-30
-
 #include "api-json-internal.h"
 #include "attribute-utils.h"
 #include "cer-store.h"

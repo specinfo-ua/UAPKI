@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-12-01
-
 #include "ocsp-helper.h"
 #include "asn1-ba-utils.h"
 #include "extension-utils.h"
