@@ -59,30 +59,6 @@
 using namespace  std;
 
 
-static SigningDoc::SignatureFormat signature_format_to_enum (const string& signFormat)
-{
-    SigningDoc::SignatureFormat rv = SigningDoc::SignatureFormat::UNDEFINED;
-    if ((signFormat == string(CADES_BES_STR)) || signFormat.empty()) {
-        rv = SigningDoc::SignatureFormat::CADES_BES;
-    }
-    else if (signFormat == string(CADES_T_STR)) {
-        rv = SigningDoc::SignatureFormat::CADES_T;
-    }
-    else if (signFormat == string(CADES_C_STR)) {
-        rv = SigningDoc::SignatureFormat::CADES_C;
-    }
-    else if (signFormat == string(CADES_A_V3_STR)) {
-        rv = SigningDoc::SignatureFormat::CADES_Av3;
-    }
-    else if (signFormat == string(CMS_STR)) {
-        rv = SigningDoc::SignatureFormat::CMS_SID_KEYID;
-    }
-    else if (signFormat == string(RAW_STR)) {
-        rv = SigningDoc::SignatureFormat::RAW;
-    }
-    return rv;
-}   //  signature_format_to_enum
-
 static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
 {
     string s_keyinfo;
@@ -125,7 +101,7 @@ static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams&
 {
     int ret = RET_OK;
 
-    const SigningDoc::SignatureFormat signature_format = signature_format_to_enum(
+    const UapkiNS::SignatureFormat signature_format = UapkiNS::signatureFormatFromString(
         ParsonHelper::jsonObjectGetString(joSignParams, "signatureFormat")
     );
     signParams.aidSignature.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
@@ -293,7 +269,7 @@ static int parse_doc_from_json (SigningDoc& sdoc, JSON_Object* joDoc)
     if (sdoc.id.empty() || (ba_get_len(sdoc.baData) == 0)) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    if (sdoc.signParams->signatureFormat != SigningDoc::SignatureFormat::RAW) {
+    if (sdoc.signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
         sdoc.contentType = ParsonHelper::jsonObjectGetString(joDoc, "type", string(OID_PKCS7_DATA));
         if (!oid_is_valid(sdoc.contentType.c_str())) return RET_UAPKI_INVALID_PARAMETER;
         DO(parse_docattrs_from_json(sdoc, joDoc, string("signedAttributes")));
@@ -425,12 +401,12 @@ cleanup:
 static int get_cert_status_for_chain_certs (SigningDoc::CadesBuilder& cadesBuilder)
 {
     int ret = RET_OK;
-    const SigningDoc::SignatureFormat signature_format = cadesBuilder.getSignParams().signatureFormat;
+    const UapkiNS::SignatureFormat signature_format = cadesBuilder.getSignParams().signatureFormat;
 
     //  Now use OCSP for CADES_C and CADES_Av3, later for all
     switch (signature_format) {
-    case SigningDoc::SignatureFormat::CADES_C:
-    case SigningDoc::SignatureFormat::CADES_Av3:
+    case UapkiNS::SignatureFormat::CADES_C:
+    case UapkiNS::SignatureFormat::CADES_Av3:
         break;
     default:
         return RET_OK;
@@ -490,7 +466,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
-    if (sign_params.aidDigest.algorithm.empty() || (sign_params.signatureFormat == SigningDoc::SignatureFormat::RAW)) {
+    if (sign_params.aidDigest.algorithm.empty() || (sign_params.signatureFormat == UapkiNS::SignatureFormat::RAW)) {
         sign_params.hashDigest = sign_params.hashSignature;
         sign_params.aidDigest.algorithm = string(hash_to_oid(sign_params.hashDigest));
     }
@@ -501,7 +477,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
-    if ((sign_params.signatureFormat != SigningDoc::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
+    if ((sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
         DO(cades_builder.getCerStore()->getCertByKeyId(sign_params.baKeyId, &sign_params.cerStoreItem));
     }
 
@@ -544,7 +520,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
     }
 
-    if (sign_params.signatureFormat != SigningDoc::SignatureFormat::RAW) {
+    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) {
         for (size_t i = 0; i < signing_docs.size(); i++) {
             SigningDoc& sdoc = signing_docs[i];
 

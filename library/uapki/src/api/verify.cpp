@@ -29,6 +29,7 @@
 #include "attribute-helper.h"
 #include "global-objects.h"
 #include "parson-helper.h"
+#include "signature-format.h"
 #include "signeddata-helper.h"
 #include "store-utils.h"
 #include "time-utils.h"
@@ -96,16 +97,6 @@ struct AttrTimeStamp {
 
 
 struct VerifyInfo {
-    enum class SignatureFormat {
-        UNDEFINED       = 0,
-        RAW             = 1,
-        CMS_SID_KEYID   = 2,
-        CADES_BES       = 3,
-        CADES_T         = 4,
-        CADES_C         = 5,
-        CADES_Av3       = 6
-    };  //  end enum SignatureFormat
-
     UapkiNS::Pkcs7::SignedDataParser::SignerInfo
                 signerInfo;
     CerStore::Item*
@@ -116,7 +107,7 @@ struct VerifyInfo {
                 statusMessageDigest;
     bool        isDigest;
     uint64_t    signingTime;
-    SignatureFormat
+    UapkiNS::SignatureFormat
                 signatureFormat;
     vector<UapkiNS::EssCertId>
                 essCerts;
@@ -135,7 +126,7 @@ struct VerifyInfo {
         , statusEssCert(SIGNATURE_VERIFY::STATUS::UNDEFINED)
         , isDigest(false)
         , signingTime(0)
-        , signatureFormat(SignatureFormat::UNDEFINED)
+        , signatureFormat(UapkiNS::SignatureFormat::UNDEFINED)
     {}
     ~VerifyInfo (void)
     {
@@ -152,20 +143,6 @@ struct VerifyOptions {
         : encodeCert(true), validateCertByOCSP(false), validateCertByCRL(false) {}
 };  //  end struct VerifyOptions
 
-
-static const char* signatureformat_to_str (VerifyInfo::SignatureFormat signatureFormat)
-{
-    switch (signatureFormat) {
-    case VerifyInfo::SignatureFormat::RAW:              return "RAW";
-    case VerifyInfo::SignatureFormat::CMS_SID_KEYID:    return "CMS";
-    case VerifyInfo::SignatureFormat::CADES_BES:        return "CAdES-BES";
-    case VerifyInfo::SignatureFormat::CADES_T:          return "CAdES-T";
-    case VerifyInfo::SignatureFormat::CADES_C:          return "CAdES-C";
-    case VerifyInfo::SignatureFormat::CADES_Av3:        return "CAdES-Av3";
-    default: break;
-    }
-    return "UNDEFINED";
-}   //  signatureformat_to_str
 
 static int add_certs_to_store (
         CerStore& cerStore,
@@ -344,7 +321,7 @@ static int result_sign_info_to_json (JSON_Object* joSignInfo, VerifyInfo& verify
     //TODO: check options.validateCertByCRL and options.validateCertByOCSP
     //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
 
-    DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", signatureformat_to_str(verifyInfo.signatureFormat)));
+    DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", UapkiNS::signatureFormatToStr(verifyInfo.signatureFormat)));
     DO_JSON(json_object_set_string(joSignInfo, "status", SIGNATURE_VALIDATION::toStr(status)));
     DO_JSON(json_object_set_string(joSignInfo, "statusSignature", SIGNATURE_VERIFY::toStr(verifyInfo.statusSignature)));
     DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", SIGNATURE_VERIFY::toStr(verifyInfo.statusMessageDigest)));
@@ -417,7 +394,7 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
         break;
     case UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
         DO(cerStore.getCertByKeyId(signer_info.getSid(), &verifyInfo.cerStoreItem));
-        verifyInfo.signatureFormat = VerifyInfo::SignatureFormat::CMS_SID_KEYID;
+        verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CMS_SID_KEYID;
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
@@ -464,8 +441,8 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
     //  Process attributes
     if (!verifyInfo.essCerts.empty()) {
         DO(check_signing_certificate_v2(verifyInfo));
-        if (verifyInfo.signatureFormat != VerifyInfo::SignatureFormat::CMS_SID_KEYID) {
-            verifyInfo.signatureFormat = VerifyInfo::SignatureFormat::CADES_BES;
+        if (verifyInfo.signatureFormat != UapkiNS::SignatureFormat::CMS_SID_KEYID) {
+            verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_BES;
         }
     }
     if (verifyInfo.contentTS.isPresent()) {
@@ -476,9 +453,9 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
     }
 
     //  Determine signatureFormat for CAdES
-    if (verifyInfo.signatureFormat == VerifyInfo::SignatureFormat::CADES_BES) {
+    if (verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) {
         if (verifyInfo.contentTS.isPresent() && verifyInfo.signatureTS.isPresent()) {
-            verifyInfo.signatureFormat = VerifyInfo::SignatureFormat::CADES_T;
+            verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_T;
 
             bool detect_certrefs = false, detect_revocrefs = false;
             bool detect_certvals = false, detect_revocvals = false;
@@ -491,7 +468,7 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
 
             if (detect_certrefs && detect_revocrefs) {
                 verifyInfo.signatureFormat = (detect_certvals && detect_revocvals)
-                    ? VerifyInfo::SignatureFormat::CADES_Av3 : VerifyInfo::SignatureFormat::CADES_C;
+                    ? UapkiNS::SignatureFormat::CADES_Av3 : UapkiNS::SignatureFormat::CADES_C;
             }
         }
     }

@@ -81,7 +81,7 @@ SigningDoc::OcspResponseItem::~OcspResponseItem (void)
 
 
 SigningDoc::SignParams::SignParams (void)
-    : signatureFormat(SignatureFormat::UNDEFINED)
+    : signatureFormat(UapkiNS::SignatureFormat::UNDEFINED)
     , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
     , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
     , cerStoreItem(nullptr)
@@ -98,26 +98,26 @@ SigningDoc::SignParams::SignParams (void)
 
 SigningDoc::SignParams::~SignParams (void)
 {
-    signatureFormat = SignatureFormat::UNDEFINED;
+    signatureFormat = UapkiNS::SignatureFormat::UNDEFINED;
     cerStoreItem = nullptr; //  This ref
     ba_free(baKeyId);
 }
 
-int SigningDoc::SignParams::setSignatureFormat (const SignatureFormat aSignatureFormat)
+int SigningDoc::SignParams::setSignatureFormat (const UapkiNS::SignatureFormat aSignatureFormat)
 {
     switch (aSignatureFormat) {
-    case SignatureFormat::CADES_Av3:
-    case SignatureFormat::CADES_C:
-    case SignatureFormat::CADES_T:
+    case UapkiNS::SignatureFormat::CADES_Av3:
+    case UapkiNS::SignatureFormat::CADES_C:
+    case UapkiNS::SignatureFormat::CADES_T:
         includeContentTS = true;
         includeSignatureTS = true;
-    case SignatureFormat::CADES_BES:
+    case UapkiNS::SignatureFormat::CADES_BES:
         sidUseKeyId = false;
         break;
-    case SignatureFormat::CMS_SID_KEYID:
+    case UapkiNS::SignatureFormat::CMS_SID_KEYID:
         sidUseKeyId = true;
         break;
-    case SignatureFormat::RAW:
+    case UapkiNS::SignatureFormat::RAW:
         break;
     default:
         return RET_UAPKI_INVALID_PARAMETER;
@@ -146,10 +146,10 @@ SigningDoc::CadesBuilder::~CadesBuilder (void)
 int SigningDoc::CadesBuilder::init (void)
 {
     switch (m_SignParams.signatureFormat) {
-    case SignatureFormat::CADES_BES:
-    case SignatureFormat::CADES_T:
-    case SignatureFormat::CADES_C:
-    case SignatureFormat::CADES_Av3:
+    case UapkiNS::SignatureFormat::CADES_BES:
+    case UapkiNS::SignatureFormat::CADES_T:
+    case UapkiNS::SignatureFormat::CADES_C:
+    case UapkiNS::SignatureFormat::CADES_Av3:
         m_IsCadesFormat = true;
         break;
     default:
@@ -202,16 +202,16 @@ int SigningDoc::CadesBuilder::process (void)
     DO(m_SignParams.cerStoreItem->generateEssCertId(m_SignParams.aidDigest, m_EssCertids[0]));
 
     switch (m_SignParams.signatureFormat) {
-    case SignatureFormat::CADES_BES:
-    case SignatureFormat::CADES_T:
+    case UapkiNS::SignatureFormat::CADES_BES:
+    case UapkiNS::SignatureFormat::CADES_T:
         DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
         break;
-    case SignatureFormat::CADES_C:
+    case UapkiNS::SignatureFormat::CADES_C:
         DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
         DO(encodeCertificateRefs(m_SignParams.attrCertificateRefs));
         DO(encodeRevocationRefs(m_SignParams.attrRevocationRefs));
         break;
-    case SignatureFormat::CADES_Av3:
+    case UapkiNS::SignatureFormat::CADES_Av3:
         DO(encodeSigningCertificate(m_SignParams.attrSigningCert));
         DO(encodeCertificateRefs(m_SignParams.attrCertificateRefs));
         DO(encodeRevocationRefs(m_SignParams.attrRevocationRefs));
@@ -365,7 +365,7 @@ int SigningDoc::init (const SignParams* aSignParams)
     signParams = aSignParams;
     if (!signParams) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (signParams->signatureFormat != SignatureFormat::RAW) {
+    if (signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
         int ret = builder.init();
         if (ret != RET_OK) return ret;
 
@@ -536,6 +536,6 @@ cleanup:
 
 ByteArray* SigningDoc::getEncoded (void)
 {
-    return (signParams->signatureFormat != SignatureFormat::RAW)
+    return (signParams->signatureFormat != UapkiNS::SignatureFormat::RAW)
         ? builder.getEncoded() : baSignature;
 }

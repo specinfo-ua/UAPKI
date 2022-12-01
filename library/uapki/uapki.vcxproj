@@ -82,6 +82,7 @@
     <ClCompile Include="src\api\verify.cpp" />
     <ClCompile Include="src\cm-storage-proxy.cpp" />
     <ClCompile Include="src\global-objects.cpp" />
+    <ClCompile Include="src\signature-format.cpp" />
     <ClCompile Include="src\store-utils.cpp" />
     <ClCompile Include="src\cer-store.cpp" />
     <ClCompile Include="src\cm-providers.cpp" />
@@ -133,6 +134,7 @@
     <ClInclude Include="src\api\api-json-internal.h" />
     <ClInclude Include="src\cm-storage-proxy.h" />
     <ClInclude Include="src\library-config.h" />
+    <ClInclude Include="src\signature-format.h" />
     <ClInclude Include="src\store-utils.h" />
     <ClInclude Include="src\cer-store.h" />
     <ClInclude Include="src\cm-providers.h" />

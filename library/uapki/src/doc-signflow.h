@@ -32,6 +32,7 @@
 #include "uapkif.h"
 #include "cer-store.h"
 #include "ocsp-helper.h"
+#include "signature-format.h"
 #include "signeddata-helper.h"
 #include "uapki-ns.h"
 #include <string>
@@ -40,16 +41,6 @@
 
 class SigningDoc {
 public:
-    enum class SignatureFormat {
-        UNDEFINED       = 0,
-        RAW             = 1,
-        CMS_SID_KEYID   = 2,
-        CADES_BES       = 3,
-        CADES_T         = 4,
-        CADES_C         = 5,
-        CADES_Av3       = 6
-    };  //  end enum SignatureFormat
-
     struct OcspResponseItem {
         ByteArray*  baBasicOcspResponse;
         ByteArray*  baOcspIdentifier;
@@ -61,7 +52,7 @@ public:
     };  //  end struct OcspResponseItem
 
     struct SignParams {
-        SignatureFormat
+        UapkiNS::SignatureFormat
                     signatureFormat;
         HashAlg     hashDigest;
         HashAlg     hashSignature;
@@ -97,7 +88,7 @@ public:
         SignParams (void);
         ~SignParams (void);
 
-        int setSignatureFormat (const SignatureFormat signatureFormat);
+        int setSignatureFormat (const UapkiNS::SignatureFormat signatureFormat);
 
     };  //  end struct SignParams
 

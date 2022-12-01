@@ -40,10 +40,10 @@
       "parameters": {
         "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
         "storage": "memory", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо контейнер ключів зберігається у пам'яті, то використовуються будь-яка строка (наприклад "memory").
-        "password": "testpassword", // Для PKCS12 обов'язковий, пароль
+        "password": "Test", // Для PKCS12 обов'язковий, пароль
         "mode": "RO", // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
         "openParams": {
-          "bytes": "MIICTQIBAzCCAeoGCSqGSIb3DQEHAaCCAdsEggHXMIIB0zCCAc8GCSqGSIb3DQEHAaCCAcAEggG8MIIBuDCCAbQGCyqGSIb3DQEMCgECoIIBejCCAXYwgbAGCSqGSIb3DQEFDTCBojBDBgkqhkiG9w0BBQwwNgQgU3w9ZkIGbJpSSd23QVQlMWh9P3E3FfXPaTItnAErzy8CAicQMA4GCiqGJAIBAQEBAQIFADBbBgsqhiQCAQEBAQEBAzBMBAgHkIMudZLpPgRAqdbrRfE8cIKAxJZ7Ix9erfZY66TANykdONlr8CXKThf46XINxhW0OiiXXwvB3qNkOLVk6iwXn9ASPm24+sV5BASBwK9QMpi5ARNqJB6qJo+RDLJem0NsZMPTG+fqvC/rPH1XbMSiouqSpAhv/RBWt1mj6YdVTOs/7uvlQChG6OnQcfoosso74ioRGagVU9krwykGD/o47hlwIFWlj99ZdH2AzwNroa6plclANJwAMcUVRSxkRKvC05gwh5FvMbmpPUorUZ6KIhWoGC2r+izdAE+rz99OV6zU/AFxQ1yKCEDUw81BGmDjmHvX5pdBjNyW+lxXZ99cMZaL/EMG0qo/P9NXJjEnMCUGCSqGSIb3DQEJFDEYHhYAdABlAHMAdAAgAGsAZQB5ACAAMQAAMFowMjAOBgoqhiQCAQEBAQIBBQAEIOTzKBa2xWlbdRxh1w5MhWXsTxFyJKJYJmANq0nTk4s4BCAzHs8/IvJwuvExCPhJzt2h2LHUelUyYoJfUcaJNkRzKgICJxA="
+          "bytes": "MIIE4wIBAzCCBIAGCSqGSIb3DQEHAaCCBHEEggRtMIIEaTCCBGUGCSqGSIb3DQEHAaCCBFYEggRSMIIETjCCAfIGCyqGSIb3DQEMCgECoIIBrjCCAaowgbAGCSqGSIb3DQEFDTCBojBDBgkqhkiG9w0BBQwwNgQgV2qtQEAUEBJFxL/32RCWEbbCCSPZVOg8v0dHKqxU/T8CAicQMA4GCiqGJAIBAQEBAQIFADBbBgsqhiQCAQEBAQEBAzBMBAgamOsuY5vEygRAqdbrRfE8cIKAxJZ7Ix9erfZY66TANykdONlr8CXKThf46XINxhW0OiiXXwvB3qNkOLVk6iwXn9ASPm24+sV5BASB9JWXxCMdTHbHO/3cV2Rh26FCT/x6vQx5ramNwAwWms1sKB+FiCilrgDAqj23ccPlsE82mLZ5Ui3oACHIs/XJarRskrkj2W9DLTIQb8+eL7hrZ4MClwVO+Kmx+W+U0fWiKHT6t/XhlGJSlhg66J3fRRT6nAxFpHOaxi4fe+MwsLKyiP7WZjvUxsZSZDJQn+heTeeB3a0PKdqnPWdnCBOTRIYGfZO1aTh5qvXOhxwQUWuKnFare5VbNbxsC3JiWCoNQNdJCe4ZVbQlBun4YziMNxGiGWB007x85TgY07fkrh0lX85zSgYSIMVSg+eagdkA/5O2i94xMTAvBgkqhkiG9w0BCRUxIgQgW8bAbuHgDBcA6Sqnqa11+C08t6m2bjqYAjIJskUTMVwwggJUBgsqhkiG9w0BDAoBAqCCAhAwggIMMIGwBgkqhkiG9w0BBQ0wgaIwQwYJKoZIhvcNAQUMMDYEILBoPpAJ3D81IH/906O/9Uzget6oMKvhOckDE9dVM2vRAgInEDAOBgoqhiQCAQEBAQECBQAwWwYLKoYkAgEBAQEBAQMwTAQIqPLW3Ud0X18EQKnW60XxPHCCgMSWeyMfXq32WOukwDcpHTjZa/Alyk4X+OlyDcYVtDool18Lwd6jZDi1ZOosF5/QEj5tuPrFeQQEggFVm31YVohnsVa+L95jmxmCZ0CHuAJNn1anriubn5IGI4MRoH9ofgfC/ISo3wqKrAQAQdC/4NAyTdMQ7uMAqSptSyqSGFMboCDwv/YHz1ceoHF1+SVkySrP5EOGgrF0VBFsVzXbFCPcytgPYdgF0PAHbLZipENMz0Mf9nzoWAQzpEaz/zYXUhYBaPZNnUqRqtLu2BlW0Bz+lhIVco47cv1FtpBm6a7k0LSN8eOI34aDM50Lmw6D+RBZ9d/UlbDL2HSiSlXKn18IhSPPzqEw9CDKfoIoHX6N7pFFjCHWCm9wd/bfm6N7ricb5+DN5vFwW8zC12cuPZTIwwn3+IRdIQxsMeLLUGtYC/CmiZZ7eECF5X1gW5FashzpIl753+RQnSfqtjbuKWFgR4PwRgbFxK3bRO1qzn4PCC3sw5gZMZnxzCW88i1QIF9QIrO9y5L8frf3jzfKllgxMTAvBgkqhkiG9w0BCRUxIgQgaxt3wNGhtgRzqY3W1P5TAnQq7eEB2qIfLIOmfM3tt4IwWjAyMA4GCiqGJAIBAQEBAgEFAAQgJxu4d1YOPccXGhs2E7d6iwxt/AyeHg9jZIJ897zLflYEIMuXfe6AaRLQIwS6zphOifYjYzNMUGw+MTvyMsX+IPnZAgInEA=="
         }
       }
     },
@@ -55,7 +55,7 @@
       "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
       "method": "SELECT_KEY",
       "parameters": {
-        "id": "BCB3BE7274D075DD52252B67D74AA281D568B8A05B0DF8F3D5C7F69D00BC1370" // обов'язковий, ідентифікатор ключа
+        "id": "5BC6C06EE1E00C1700E92AA7A9AD75F82D3CB7A9B66E3A98023209B24513315C" // обов'язковий, ідентифікатор ключа
       }
     },
     {
