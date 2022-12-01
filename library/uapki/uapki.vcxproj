@@ -270,7 +270,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src\api;$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\pkix;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\json;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include;$(ProjectDir)include;$(ProjectDir)..\uapkic\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)src\api;$(ProjectDir)..\common\cm-api;$(ProjectDir)..\common\curl\include;$(ProjectDir)..\common\json;$(ProjectDir)..\common\macros;$(ProjectDir)..\common\loaders;$(ProjectDir)..\common\pkix;$(ProjectDir)..\uapkic\include;$(ProjectDir)..\uapkif\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
