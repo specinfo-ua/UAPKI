@@ -266,18 +266,18 @@ cleanup:
     return ret;
 }
 
-static int responderid_to_json (JSON_Object* joResult, const OcspClientHelper::ResponderIdType responderIdType, const ByteArray* baResponderId)
+static int responderid_to_json (JSON_Object* joResult, const UapkiNS::Ocsp::ResponderIdType responderIdType, const ByteArray* baResponderId)
 {
     int ret = RET_OK;
     Name_t* name = nullptr;
 
     switch (responderIdType) {
-    case OcspClientHelper::ResponderIdType::BY_NAME:
+    case UapkiNS::Ocsp::ResponderIdType::BY_NAME:
         CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baResponderId));
         DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
         DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), *name));
         break;
-    case OcspClientHelper::ResponderIdType::BY_KEY:
+    case UapkiNS::Ocsp::ResponderIdType::BY_KEY:
         DO_JSON(json_object_set_hex(joResult, "responderId", baResponderId));
         break;
     default:
@@ -309,12 +309,12 @@ cleanup:
     return ret;
 }
 
-static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspClient, CerStore& cerStore)
+static int verify_response_data (JSON_Object* joResult, UapkiNS::Ocsp::OcspHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
     UapkiNS::SmartBA sba_responderid;
     UapkiNS::VectorBA vba_certs;
-    OcspClientHelper::ResponderIdType responder_idtype = OcspClientHelper::ResponderIdType::UNDEFINED;
+    UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
     CerStore::Item* cer_responder = nullptr;
 
@@ -327,11 +327,11 @@ static int verify_response_data (JSON_Object* joResult, OcspClientHelper& ocspCl
 
     DO(ocspClient.getResponderId(responder_idtype, &sba_responderid));
     DO(responderid_to_json(joResult, responder_idtype, sba_responderid.get()));
-    if (responder_idtype == OcspClientHelper::ResponderIdType::BY_NAME) {
+    if (responder_idtype == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
         DO(cerStore.getCertBySubject(sba_responderid.get(), &cer_responder));
     }
     else {
-        //  responder_idtype == OcspClientHelper::ResponderIdType::BY_KEY
+        //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
         DO(cerStore.getCertByKeyId(sba_responderid.get(), &cer_responder));
     }
 
@@ -351,7 +351,7 @@ cleanup:
 static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
 {
     int ret = RET_OK;
-    OcspClientHelper ocsp_client;
+    UapkiNS::Ocsp::OcspHelper ocsp_helper;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
     string s_time;
@@ -367,16 +367,16 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     }
     shuffled_uris = rand_uris(uris);
 
-    DO(ocsp_client.init());
-    DO(ocsp_client.addCert(cerIssuer, cerSubject));
-    DO(ocsp_client.genNonce(20));
-    DO(ocsp_client.encodeRequest());
+    DO(ocsp_helper.init());
+    DO(ocsp_helper.addCert(cerIssuer, cerSubject));
+    DO(ocsp_helper.genNonce(20));
+    DO(ocsp_helper.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_client.getRequestEncoded()));
+    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_helper.getRequestEncoded()));
 
     for (auto& it : shuffled_uris) {
         DEBUG_OUTCON(printf("validate_by_ocsp(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_client.getRequestEncoded(), &sba_resp);
+        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_helper.getRequestEncoded(), &sba_resp);
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
             DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
@@ -392,19 +392,19 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
 
     DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
 
-    ret = ocsp_client.parseResponse(sba_resp.get());
-    DO_JSON(json_object_set_string(joResult, "responseStatus", OcspClientHelper::responseStatusToStr(ocsp_client.getResponseStatus())));
+    ret = ocsp_helper.parseResponse(sba_resp.get());
+    DO_JSON(json_object_set_string(joResult, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(ocsp_helper.getResponseStatus())));
 
-    if ((ret == RET_OK) && (ocsp_client.getResponseStatus() == OcspClientHelper::ResponseStatus::SUCCESSFUL)) {
-        DO(verify_response_data(joResult, ocsp_client, cerStore));
+    if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
+        DO(verify_response_data(joResult, ocsp_helper, cerStore));
 
-        DO(ocsp_client.checkNonce());
+        DO(ocsp_helper.checkNonce());
 
-        s_time = TimeUtils::mstimeToFormat(ocsp_client.getProducedAt());
+        s_time = TimeUtils::mstimeToFormat(ocsp_helper.getProducedAt());
         DO_JSON(json_object_set_string(joResult, "producedAt", s_time.c_str()));
 
-        DO(ocsp_client.scanSingleResponses());
-        const OcspClientHelper::OcspRecord& ocsp_record = ocsp_client.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+        DO(ocsp_helper.scanSingleResponses());
+        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
 
         DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(ocsp_record.status)));
         s_time = TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate);

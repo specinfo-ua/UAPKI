@@ -40,7 +40,7 @@ static const char* CADES_C_STR      = "CAdES-C";
 static const char* CADES_A_V3_STR   = "CAdES-Av3";
 
 static constexpr size_t COUNT_SIGNATURE_FORMATS = 7;
-static const char* STR_SIGNATURE_FORMATS[COUNT_SIGNATURE_FORMATS] = {
+static const char* SIGNATURE_FORMAT_STRINGS[COUNT_SIGNATURE_FORMATS] = {
     UNDEFINED_STR,  //  0 = UNDEFINED
     RAW_STR,        //  1 = RAW
     CMS_STR,        //  2 = CMS_SID_KEYID
@@ -77,9 +77,9 @@ UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
 
 const char* UapkiNS::signatureFormatToStr (const SignatureFormat signatureFormat)
 {
-    const size_t idx = ((size_t)signatureFormat <= (size_t)SignatureFormat::CADES_Av3)
-        ? (size_t)signatureFormat : (size_t)SignatureFormat::UNDEFINED;
-    return STR_SIGNATURE_FORMATS[idx];
+    const uint32_t idx = ((uint32_t)signatureFormat <= (uint32_t)SignatureFormat::CADES_Av3)
+        ? (uint32_t)signatureFormat : (uint32_t)SignatureFormat::UNDEFINED;
+    return SIGNATURE_FORMAT_STRINGS[idx];
 }
 
 string UapkiNS::signatureFormatToString (const SignatureFormat signatureFormat)

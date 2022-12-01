@@ -37,6 +37,11 @@
 #include "verify-utils.h"
 
 
+namespace UapkiNS {
+
+namespace Ocsp {
+
+
 static const char* RESPONSE_STATUS_STRINGS[8] = {
     "UNDEFINED",
     "SUCCESSFUL",
@@ -48,7 +53,7 @@ static const char* RESPONSE_STATUS_STRINGS[8] = {
     "UNAUTHORIZED"
 };
 
-static OcspClientHelper::OcspRecord ocsp_record_empty;
+static OcspHelper::OcspRecord ocsp_record_empty;
 
 
 struct OcspCertId {
@@ -102,7 +107,7 @@ cleanup:
 }   //  ocsprequest_add_certid
 
 
-OcspClientHelper::OcspClientHelper (void)
+OcspHelper::OcspHelper (void)
     : m_OcspRequest(nullptr)
     , m_BasicOcspResp(nullptr)
     , m_BaNonce(nullptr)
@@ -115,12 +120,12 @@ OcspClientHelper::OcspClientHelper (void)
 {
 }
 
-OcspClientHelper::~OcspClientHelper (void)
+OcspHelper::~OcspHelper (void)
 {
     reset();
 }
 
-void OcspClientHelper::reset (void)
+void OcspHelper::reset (void)
 {
     asn_free(get_OCSPRequest_desc(), m_OcspRequest);
     asn_free(get_BasicOCSPResponse_desc(), m_BasicOcspResp);
@@ -140,13 +145,13 @@ void OcspClientHelper::reset (void)
     m_ResponseStatus = ResponseStatus::UNDEFINED;
 }
 
-int OcspClientHelper::init (void)
+int OcspHelper::init (void)
 {
     m_OcspRequest = (OCSPRequest_t*)calloc(1, sizeof(OCSPRequest_t));
     return (m_OcspRequest) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
-int OcspClientHelper::addCert (
+int OcspHelper::addCert (
         const CerStore::Item* cerIssuer,
         const CerStore::Item* cerSubject
 )
@@ -156,7 +161,7 @@ int OcspClientHelper::addCert (
     return addSN(cerIssuer, cerSubject->baSerialNumber);
 }
 
-int OcspClientHelper::addSN (
+int OcspHelper::addSN (
         const CerStore::Item* cerIssuer,
         const ByteArray* baSerialNumber
 )
@@ -181,7 +186,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::genNonce (
+int OcspHelper::genNonce (
         const size_t nonceLen
 )
 {
@@ -200,7 +205,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::setNonce (
+int OcspHelper::setNonce (
         const ByteArray* baNonce
 )
 {
@@ -217,7 +222,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::addNonceToExtension (void)
+int OcspHelper::addNonceToExtension (void)
 {
     int ret = RET_OK;
 
@@ -234,7 +239,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::parseOcspResponse (const ByteArray* baEncoded)
+int OcspHelper::parseOcspResponse (const ByteArray* baEncoded)
 {
     int ret = RET_OK;
     OCSPResponse_t* ocsp_resp = nullptr;
@@ -270,14 +275,14 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::encodeTbsRequest (void)
+int OcspHelper::encodeTbsRequest (void)
 {
     if (!m_OcspRequest) return RET_UAPKI_INVALID_PARAMETER;
 
     return asn_encode_ba(get_TBSRequest_desc(), &m_OcspRequest->tbsRequest, &m_BaTbsEncoded);
 }
 
-int OcspClientHelper::setSignature (
+int OcspHelper::setSignature (
         const UapkiNS::AlgorithmIdentifier& aidSignature,
         const ByteArray* baSignValue,
         const std::vector<ByteArray*>& certs
@@ -316,14 +321,14 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::encodeRequest (void)
+int OcspHelper::encodeRequest (void)
 {
     if (!m_OcspRequest || m_OcspRecords.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaEncoded);
 }
 
-ByteArray* OcspClientHelper::getRequestEncoded (
+ByteArray* OcspHelper::getRequestEncoded (
         const bool move
 )
 {
@@ -334,7 +339,7 @@ ByteArray* OcspClientHelper::getRequestEncoded (
     return rv_ba;
 }
 
-int OcspClientHelper::parseResponse (
+int OcspHelper::parseResponse (
         const ByteArray* baEncoded
 )
 {
@@ -350,7 +355,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::checkNonce (void)
+int OcspHelper::checkNonce (void)
 {
     int ret = RET_OK;
     ByteArray* ba_nonce = nullptr;
@@ -370,7 +375,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::generateOtherHash (
+int OcspHelper::generateOtherHash (
         const UapkiNS::AlgorithmIdentifier& aidHash,
         ByteArray** baEncoded
 )
@@ -378,7 +383,7 @@ int OcspClientHelper::generateOtherHash (
     return generateOtherHash(m_BaEncoded, aidHash, baEncoded);
 }
 
-ByteArray* OcspClientHelper::getBasicOcspResponseEncoded (
+ByteArray* OcspHelper::getBasicOcspResponseEncoded (
         const bool move
 )
 {
@@ -389,7 +394,7 @@ ByteArray* OcspClientHelper::getBasicOcspResponseEncoded (
     return rv_ba;
 }
 
-int OcspClientHelper::getCerts (
+int OcspHelper::getCerts (
         vector<ByteArray*>& certs
 )
 {
@@ -415,7 +420,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::getOcspIdentifier (
+int OcspHelper::getOcspIdentifier (
         ByteArray** baOcspIdentifier
 )
 {
@@ -441,7 +446,7 @@ cleanup:
     return ret;
 }
 
-const OcspClientHelper::OcspRecord& OcspClientHelper::getOcspRecord (
+const OcspHelper::OcspRecord& OcspHelper::getOcspRecord (
         const size_t index
 ) const
 {
@@ -450,7 +455,7 @@ const OcspClientHelper::OcspRecord& OcspClientHelper::getOcspRecord (
     return m_OcspRecords[index];
 }
 
-int OcspClientHelper::getResponderId (
+int OcspHelper::getResponderId (
         ResponderIdType& responderIdType,
         ByteArray** baResponderId
 )
@@ -478,7 +483,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::scanSingleResponses (void)
+int OcspHelper::scanSingleResponses (void)
 {
     int ret = RET_OK;
     const TBSRequest_t* tbs_req = nullptr;
@@ -538,7 +543,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::verifyTbsResponseData (
+int OcspHelper::verifyTbsResponseData (
         const CerStore::Item* cerResponder,
         SIGNATURE_VERIFY::STATUS& statusSign
 )
@@ -577,7 +582,7 @@ cleanup:
     return ret;
 }
 
-int OcspClientHelper::generateOtherHash (
+int OcspHelper::generateOtherHash (
         const ByteArray* baOcspResponseEncoded,
         const UapkiNS::AlgorithmIdentifier& aidHash,
         ByteArray** baEncoded
@@ -613,11 +618,17 @@ cleanup:
     return ret;
 }
 
-const char* OcspClientHelper::responseStatusToStr (
+
+const char* responseStatusToStr (
         const ResponseStatus status
 )
 {
     int32_t idx = (int32_t)status + 1;
     return RESPONSE_STATUS_STRINGS[(idx < 8) ? idx : 0];
 }
+
+
+}   //  end namespace Ocsp
+
+}   //  end namespace UapkiNS
 

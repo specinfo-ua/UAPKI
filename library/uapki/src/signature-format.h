@@ -29,12 +29,13 @@
 #define UAPKI_NS_SIGNATURE_FORMAT_H
 
 
+#include <stdint.h>
 #include <string>
 
 
 namespace UapkiNS {
 
-    enum class SignatureFormat : size_t {
+    enum class SignatureFormat : uint32_t {
         UNDEFINED       = 0,
         RAW             = 1,
         CMS_SID_KEYID   = 2,

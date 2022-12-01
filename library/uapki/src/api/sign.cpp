@@ -280,12 +280,12 @@ cleanup:
     return ret;
 }   //  parse_doc_from_json
 
-static int verify_ocsp_responsedata (OcspClientHelper& ocspClient, CerStore& cerStore)
+static int verify_ocsp_responsedata (UapkiNS::Ocsp::OcspHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
     UapkiNS::SmartBA sba_responderid;
     UapkiNS::VectorBA vba_certs;
-    OcspClientHelper::ResponderIdType responder_idtype = OcspClientHelper::ResponderIdType::UNDEFINED;
+    UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
     CerStore::Item* cer_responder = nullptr;
 
@@ -297,11 +297,11 @@ static int verify_ocsp_responsedata (OcspClientHelper& ocspClient, CerStore& cer
     }
 
     DO(ocspClient.getResponderId(responder_idtype, &sba_responderid));
-    if (responder_idtype == OcspClientHelper::ResponderIdType::BY_NAME) {
+    if (responder_idtype == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
         DO(cerStore.getCertBySubject(sba_responderid.get(), &cer_responder));
     }
     else {
-        //  responder_idtype == OcspClientHelper::ResponderIdType::BY_KEY
+        //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
         DO(cerStore.getCertByKeyId(sba_responderid.get(), &cer_responder));
     }
 
@@ -322,7 +322,7 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     int ret = RET_OK;
     CerStore& cer_store = *cadesBuilder.getCerStore();
     SigningDoc::SignParams& sign_params = cadesBuilder.getSignParams();
-    OcspClientHelper ocsp_client;
+    UapkiNS::Ocsp::OcspHelper ocsp_helper;
     CerStore::Item* cer_issuer = nullptr;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
@@ -339,16 +339,16 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     }
     shuffled_uris = rand_uris(uris);
 
-    DO(ocsp_client.init());
-    DO(ocsp_client.addCert(cer_issuer, cerSubject));
-    DO(ocsp_client.genNonce(20));
-    DO(ocsp_client.encodeRequest());
+    DO(ocsp_helper.init());
+    DO(ocsp_helper.addCert(cer_issuer, cerSubject));
+    DO(ocsp_helper.genNonce(20));
+    DO(ocsp_helper.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_client.getRequestEncoded()));
+    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_helper.getRequestEncoded()));
 
     for (auto& it : shuffled_uris) {
         DEBUG_OUTCON(printf("get_cert_status(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_client.getRequestEncoded(), &sba_resp);
+        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_helper.getRequestEncoded(), &sba_resp);
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("get_cert_status(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
             DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
@@ -364,14 +364,14 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
 
     DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
 
-    DO(ocsp_client.parseResponse(sba_resp.get()));
+    DO(ocsp_helper.parseResponse(sba_resp.get()));
 
-    if (ocsp_client.getResponseStatus() == OcspClientHelper::ResponseStatus::SUCCESSFUL) {
-        DO(verify_ocsp_responsedata(ocsp_client, cer_store));
-        DO(ocsp_client.checkNonce());
-        DO(ocsp_client.scanSingleResponses());
+    if (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL) {
+        DO(verify_ocsp_responsedata(ocsp_helper, cer_store));
+        DO(ocsp_helper.checkNonce());
+        DO(ocsp_helper.scanSingleResponses());
 
-        const OcspClientHelper::OcspRecord& ocsp_record = ocsp_client.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
         DO(cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record.status, sba_resp.get()));
 
         SigningDoc::OcspResponseItem* ocsp_respitem = nullptr;
@@ -381,9 +381,9 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
             if (!ocsp_respitem) {
                 SET_ERROR(RET_UAPKI_GENERAL_ERROR);
             }
-            ocsp_respitem->baBasicOcspResponse = ocsp_client.getBasicOcspResponseEncoded(true);
-            DO(ocsp_client.getOcspIdentifier(&ocsp_respitem->baOcspIdentifier));
-            DO(ocsp_client.generateOtherHash(sign_params.aidDigest, &ocsp_respitem->baOcspRespHash));
+            ocsp_respitem->baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
+            DO(ocsp_helper.getOcspIdentifier(&ocsp_respitem->baOcspIdentifier));
+            DO(ocsp_helper.generateOtherHash(sign_params.aidDigest, &ocsp_respitem->baOcspRespHash));
             break;
         case UapkiNS::CertStatus::REVOKED:
             SET_ERROR(RET_UAPKI_CERT_STATUS_REVOKED);

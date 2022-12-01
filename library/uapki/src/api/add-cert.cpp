@@ -26,7 +26,6 @@
  */
 
 #include "api-json-internal.h"
-#include "content-info.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
