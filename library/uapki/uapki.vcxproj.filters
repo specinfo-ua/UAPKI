@@ -72,9 +72,6 @@
     <ClCompile Include="..\common\pkix\ba-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\pkix\content-info.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\pkix\dstu4145-params.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
@@ -91,9 +88,6 @@
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\oids.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\pkix\tsp-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\uapki-errors.c">
@@ -249,6 +243,9 @@
     <ClCompile Include="src\signature-format.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\tsp-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -302,12 +299,6 @@
     <ClInclude Include="..\common\pkix\ba-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\pkix\common.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\content-info.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\pkix\dstu4145-params.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
@@ -324,9 +315,6 @@
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\oids.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\tsp-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\uapki-errors.h">
@@ -403,6 +391,9 @@
     </ClInclude>
     <ClInclude Include="src\signature-format.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\tsp-helper.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

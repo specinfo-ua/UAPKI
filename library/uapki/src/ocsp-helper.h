@@ -33,7 +33,6 @@
 #include "byte-array.h"
 #include "cer-store.h"
 #include "crl-store.h"
-#include "common.h"
 #include "uapki-ns.h"
 #include "uapkif.h"
 #include "verify-status.h"

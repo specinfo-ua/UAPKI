@@ -247,7 +247,7 @@ int OcspHelper::parseOcspResponse (const ByteArray* baEncoded)
     uint32_t status = 0;
 
     m_ResponseStatus = ResponseStatus::UNDEFINED;
-    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+    if (!baEncoded) return RET_UAPKI_OCSP_RESPONSE_INVALID;
 
     CHECK_NOT_NULL(ocsp_resp = (OCSPResponse_t*)asn_decode_ba_with_alloc(get_OCSPResponse_desc(), baEncoded));
 
@@ -631,4 +631,3 @@ const char* responseStatusToStr (
 }   //  end namespace Ocsp
 
 }   //  end namespace UapkiNS
-

@@ -35,7 +35,7 @@
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-utils.h"
-#include "tsp-utils.h"
+#include "tsp-helper.h"
 #include "uapki-ns.h"
 
 
@@ -144,30 +144,27 @@ static vector<string> rand_uris (const vector<string>& uris)
     return rv_uris;
 }   //  rand_uris
 
-static int tsp_process (SigningDoc& sdoc, MessageImprintParams& msgimParams, ByteArray **baTsToken)
+static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
 {
     int ret = RET_OK;
-    TspRequestParams tsp_params;
-    UapkiNS::SmartBA sba_req, sba_resp, sba_tstinfo, sba_tstoken;
-    uint32_t status = 0;
-    uint8_t byte = 0;
+    UapkiNS::SmartBA sba_resp, sba_tstinfo, sba_tstoken;
 
-    CHECK_PARAM(baTsToken != nullptr);
+    DO(tspHelper.genNonce(8));
+    //DO(tspHelper.setCertReq(param_certreq));
+    DO(tspHelper.setReqPolicy(string(sdoc.signParams->tspPolicy)));
 
-    CHECK_NOT_NULL(tsp_params.nonce = ba_alloc_by_len(8));
-    DO(drbg_random(tsp_params.nonce));
-    DO(ba_get_byte(tsp_params.nonce, 0, &byte));
-    DO(ba_set_byte(tsp_params.nonce, 0, byte & 0x7F));  //  Integer must be a positive number
-    tsp_params.certReq = false;
-    tsp_params.reqPolicy = sdoc.signParams->tspPolicy;
-
-    DO(tsp_request_encode(&msgimParams, &tsp_params, &sba_req));
+    DO(tspHelper.encodeRequest());
     DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, sba_req.get()));
 
     if (sdoc.tspUri.empty()) {
         const vector<string> shuffled_uris = rand_uris(sdoc.signParams->tspUris);
         for (auto& it : shuffled_uris) {
-            ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, sba_req.get(), &sba_resp);
+            ret = HttpHelper::post(
+                it.c_str(),
+                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+                tspHelper.getRequestEncoded(),
+                &sba_resp
+            );
             if (ret == RET_OK) {
                 sdoc.tspUri = it.c_str();
                 break;
@@ -175,23 +172,27 @@ static int tsp_process (SigningDoc& sdoc, MessageImprintParams& msgimParams, Byt
         }
     }
     else {
-        ret = HttpHelper::post(sdoc.tspUri.c_str(), HttpHelper::CONTENT_TYPE_TSP_REQUEST, sba_req.get(), &sba_resp);
+        ret = HttpHelper::post(
+            sdoc.tspUri.c_str(),
+            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+            tspHelper.getRequestEncoded(),
+            &sba_resp
+        );
     }
     if (ret != RET_OK) {
         SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
     }
 
     DEBUG_OUTCON(printf("tsp_process(), response: "); ba_print(stdout, sba_resp.get()));
-    DO(tsp_response_parse(sba_resp.get(), &status, &sba_tstoken, &sba_tstinfo));
-    if ((status != PKIStatus_granted) && (status != PKIStatus_grantedWithMods)) {
-        //ret = parse_tsp_response_statusinfo(ba_tsr, &status, &s_statusString, &failInfo);
+    DO(tspHelper.parseResponse(sba_resp.get()));
+    if (
+        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED) &&
+        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED_WITHMODS)
+    ) {
         SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
     }
 
-    DO(tsp_tstinfo_is_equal_request(sba_req.get(), sba_tstinfo.get()));
-
-    *baTsToken = sba_tstoken.get();
-    sba_tstoken.set(nullptr);
+    DO(tspHelper.tstInfoIsEqualRequest());
 
 cleanup:
     return ret;
@@ -201,28 +202,27 @@ static int add_timestamp_to_attrs (SigningDoc& sdoc, const string& attrType)
 {
     int ret = RET_OK;
     const bool is_contentts = (attrType == string(OID_PKCS9_CONTENT_TIMESTAMP));
-    MessageImprintParams msgim_params;
-    UapkiNS::SmartBA sba_hash, sba_tstoken;
+    UapkiNS::Tsp::TspHelper tsp_helper;
 
-    msgim_params.hashAlgo = sdoc.signParams->aidDigest.algorithm.c_str();
-    msgim_params.hashAlgoParam_isNULL = false;
+    DO(tsp_helper.init());
+
     if (is_contentts) {
-        msgim_params.hashedMessage = sdoc.baMessageDigest;
+        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.baMessageDigest));
     }
     else {
+        UapkiNS::SmartBA sba_hash;
         DO(sdoc.digestSignature(&sba_hash));
-        msgim_params.hashedMessage = sba_hash.get();
+        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sba_hash.get()));
     }
 
-    DO(tsp_process(sdoc, msgim_params, &sba_tstoken));
+    DO(tsp_process(sdoc, tsp_helper));
 
     if (is_contentts) {
-        DO(sdoc.addSignedAttribute(attrType, sba_tstoken.get()));
+        DO(sdoc.addSignedAttribute(attrType, tsp_helper.getTsToken(true)));
     }
     else {
-        DO(sdoc.addUnsignedAttribute(attrType, sba_tstoken.get()));
+        DO(sdoc.addUnsignedAttribute(attrType, tsp_helper.getTsToken(true)));
     }
-    sba_tstoken.set(nullptr);
 
 cleanup:
     return ret;

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-30
+//  Last update: 2022-12-02
 
 #ifndef _UAPKI_ERRORS_H_
 #define _UAPKI_ERRORS_H_
@@ -131,5 +131,6 @@
 #define RET_UAPKI_TSP_NOT_RESPONDING                                  (UAPKI_ERROR_NAME_CODE | 0x00000071)
 #define RET_UAPKI_TSP_RESPONSE_NOT_GRANTED                            (UAPKI_ERROR_NAME_CODE | 0x00000072)
 #define RET_UAPKI_TSP_RESPONSE_NOT_EQUAL_REQUEST                      (UAPKI_ERROR_NAME_CODE | 0x00000073)
+#define RET_UAPKI_TSP_RESPONSE_INVALID                                (UAPKI_ERROR_NAME_CODE | 0x00000074)
 
 #endif

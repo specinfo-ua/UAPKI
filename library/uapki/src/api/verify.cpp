@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
+#include <vector>
 #include "api-json-internal.h"
 #include "attribute-helper.h"
 #include "global-objects.h"
@@ -33,11 +35,11 @@
 #include "signeddata-helper.h"
 #include "store-utils.h"
 #include "time-utils.h"
-#include "tsp-utils.h"
+#include "tsp-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
 #include "verify-utils.h"
-#include <vector>
+
 
 #undef FILE_MARKER
 #define FILE_MARKER "api/verify.cpp"
@@ -193,22 +195,16 @@ cleanup:
 static int decode_attr_timestamp (const ByteArray* baValues, AttrTimeStamp& attrTS)
 {
     int ret = RET_OK;
-    char* s_policy = NULL;//a need redesign tsp-utils.h to CPP
-    char* s_hashalgo = NULL;//a need redesign tsp-utils.h to CPP
+    UapkiNS::Tsp::TsTokenParser tstoken_parser;
 
-    DO(tsp_response_parse_tstoken_basic(
-        baValues,
-        &s_policy,
-        &s_hashalgo,
-        &attrTS.baHashedMessage,
-        &attrTS.msGenTime
-    ));
-    attrTS.policy = string(s_policy);
-    attrTS.hashAlgo = string(s_hashalgo);
+    DO(tstoken_parser.parse(baValues));
+
+    attrTS.policy = tstoken_parser.getPolicyId();
+    attrTS.hashAlgo = tstoken_parser.getHashAlgo();
+    attrTS.baHashedMessage = tstoken_parser.getHashedMessage(true);
+    attrTS.msGenTime = tstoken_parser.getGenTime();
 
 cleanup:
-    ::free(s_policy);
-    ::free(s_hashalgo);
     return ret;
 }   //  decode_attr_timestamp
 

@@ -163,7 +163,7 @@ namespace Pkcs7 {
             ByteArray*  m_BaSignedAttrsEncoded;
             struct MandatoryAttrs {
                 std::string contentType;
-                ByteArray* baMessageDigest;
+                ByteArray*  baMessageDigest;
             }           m_MandatoryAttrs;
 
         public:
@@ -190,8 +190,8 @@ namespace Pkcs7 {
 
         public:
             static int decodeAttributes (
-                    const Attributes_t& attrs,
-                    std::vector<Attribute>& decodedAttrs
+                const Attributes_t& attrs,
+                std::vector<Attribute>& decodedAttrs
             );
 
         };  //  end class SignerInfo

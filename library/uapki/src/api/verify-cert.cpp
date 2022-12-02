@@ -27,7 +27,6 @@
 
 #include "api-json-internal.h"
 #include "asn1-ba-utils.h"
-#include "common.h"
 #include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"

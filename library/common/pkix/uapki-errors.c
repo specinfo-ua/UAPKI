@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-30
+//  Last update: 2022-12-02
 
 #include <stddef.h>
 
@@ -265,7 +265,7 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "TSP_NOT_RESPONDING",               //  (UAPKI_ERROR_NAME_CODE | 0x00000071)
     "TSP_RESPONSE_NOT_GRANTED",         //  (UAPKI_ERROR_NAME_CODE | 0x00000072)
     "TSP_RESPONSE_NOT_EQUAL_REQUEST",   //  (UAPKI_ERROR_NAME_CODE | 0X00000073)
-    "",
+    "TSP_RESPONSE_INVALID",             //  (UAPKI_ERROR_NAME_CODE | 0x00000074)
     "",
     "",
     "",
