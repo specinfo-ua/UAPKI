@@ -151,7 +151,9 @@ static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
 
     DO(tspHelper.genNonce(8));
     //DO(tspHelper.setCertReq(param_certreq));
-    DO(tspHelper.setReqPolicy(string(sdoc.signParams->tspPolicy)));
+    if (sdoc.signParams->tspPolicy) {
+        DO(tspHelper.setReqPolicy(string(sdoc.signParams->tspPolicy)));
+    }
 
     DO(tspHelper.encodeRequest());
     DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, sba_req.get()));
