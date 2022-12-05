@@ -395,5 +395,8 @@
     <ClInclude Include="..\common\pkix\tsp-helper.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
+    <ClInclude Include="include\uapki-debug.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

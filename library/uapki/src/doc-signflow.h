@@ -41,6 +41,8 @@
 
 class SigningDoc {
 public:
+    static const size_t MAX_COUNT_DOCS  = 100;
+
     struct OcspResponseItem {
         ByteArray*  baBasicOcspResponse;
         ByteArray*  baOcspIdentifier;

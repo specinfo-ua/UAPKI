@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-12-02
+//  Last update: 2022-12-05
 
 #include <stddef.h>
 
@@ -252,6 +252,7 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "OCSP_RESPONSE_VERIFY_ERROR",       //  (UAPKI_ERROR_NAME_CODE | 0x00000064)
     "OCSP_RESPONSE_INVALID_NONCE",      //  (UAPKI_ERROR_NAME_CODE | 0x00000065)
     "OCSP_RESPONSE_INVALID",            //  (UAPKI_ERROR_NAME_CODE | 0x00000066)
+    "",
     "",
     "",
     "",

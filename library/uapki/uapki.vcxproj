@@ -127,6 +127,7 @@
     <ClInclude Include="..\common\json\parson-ba-utils.h" />
     <ClInclude Include="..\common\json\parson-helper.h" />
     <ClInclude Include="..\common\json\parson.h" />
+    <ClInclude Include="include\uapki-debug.h" />
     <ClInclude Include="include\uapki-export.h" />
     <ClInclude Include="src\api\api-json-internal.h" />
     <ClInclude Include="src\cm-storage-proxy.h" />

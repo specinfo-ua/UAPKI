@@ -37,6 +37,7 @@
 #include "store-utils.h"
 #include "tsp-helper.h"
 #include "uapki-ns.h"
+#include "uapki-debug.h"
 
 
 #undef FILE_MARKER
@@ -47,16 +48,14 @@
 #define DEBUG_OUTCON(expression) expression
 #endif
 
-#define CADES_A_V3_STR "CAdES-Av3"
-#define CADES_BES_STR "CAdES-BES"
-#define CADES_C_STR "CAdES-C"
-#define CADES_T_STR "CAdES-T"
-#define CMS_STR "CMS"
-#define RAW_STR "RAW"
-#define SIGN_MAX_DOCS 100
+#define DEBUG_OUTPUT_OUTSTREAM(msg,baData)
+#ifndef DEBUG_OUTPUT_OUTSTREAM
+DEBUG_OUTPUT_OUTSTREAM_FUNC
+#define DEBUG_OUTPUT_OUTSTREAM(msg,baData) debug_output_stream(DEBUG_OUTSTREAM_FOPEN,"SIGN",msg,baData)
+#endif
 
 
-using namespace  std;
+using namespace std;
 
 
 static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
@@ -156,17 +155,18 @@ static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
     }
 
     DO(tspHelper.encodeRequest());
-    DEBUG_OUTCON(printf("tsp_process(), request: "); ba_print(stdout, sba_req.get()));
 
     if (sdoc.tspUri.empty()) {
         const vector<string> shuffled_uris = rand_uris(sdoc.signParams->tspUris);
         for (auto& it : shuffled_uris) {
+            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
             ret = HttpHelper::post(
                 it.c_str(),
                 HttpHelper::CONTENT_TYPE_TSP_REQUEST,
                 tspHelper.getRequestEncoded(),
                 &sba_resp
             );
+            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
             if (ret == RET_OK) {
                 sdoc.tspUri = it.c_str();
                 break;
@@ -174,18 +174,19 @@ static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
         }
     }
     else {
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
         ret = HttpHelper::post(
             sdoc.tspUri.c_str(),
             HttpHelper::CONTENT_TYPE_TSP_REQUEST,
             tspHelper.getRequestEncoded(),
             &sba_resp
         );
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
     }
     if (ret != RET_OK) {
         SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
     }
 
-    DEBUG_OUTCON(printf("tsp_process(), response: "); ba_print(stdout, sba_resp.get()));
     DO(tspHelper.parseResponse(sba_resp.get()));
     if (
         (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED) &&
@@ -346,11 +347,15 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     DO(ocsp_helper.genNonce(20));
     DO(ocsp_helper.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_helper.getRequestEncoded()));
-
     for (auto& it : shuffled_uris) {
-        DEBUG_OUTCON(printf("get_cert_status(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_helper.getRequestEncoded(), &sba_resp);
+        DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
+        ret = HttpHelper::post(
+            it.c_str(),
+            HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
+            ocsp_helper.getRequestEncoded(),
+            &sba_resp
+        );
+        DEBUG_OUTPUT_OUTSTREAM(string("OCSP-response, url=") + it, sba_resp.get());
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("get_cert_status(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
             DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
@@ -363,8 +368,6 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     else if (sba_resp.size() == 0) {
         SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
     }
-
-    DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
 
     DO(ocsp_helper.parseResponse(sba_resp.get()));
 
@@ -458,7 +461,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
     ja_sources = json_object_get_array(joParams, "dataTbs");
     cnt_docs = json_array_get_count(ja_sources);
-    if ((cnt_docs == 0) || (cnt_docs > SIGN_MAX_DOCS)) { 
+    if ((cnt_docs == 0) || (cnt_docs > SigningDoc::MAX_COUNT_DOCS)) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
