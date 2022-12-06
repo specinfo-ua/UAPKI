@@ -60,6 +60,28 @@
       "skip": false
     },
     {
+      "comment": "Verify certificate (validationType - issuerAndOcsp) 'diia-test-sign-7775603.cer' from cer-store",
+      "comment1": "2 time OCSP",
+      "method": "VERIFY_CERT",
+      "parameters": {
+        "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAc6V2AA==",
+        "validationType": "OCSP",
+        "reportTime": true
+      },
+      "skip": false
+    },
+    {
+      "comment": "Verify certificate (validationType - issuerAndCrl) 'diia-test-sign-7775603.cer' from cer-store",
+      "method": "VERIFY_CERT",
+      "parameters": {
+        "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAc6V2AA==",
+        "validationType": "CRL",
+        "validateTime": "2022-08-24 16:00:00",
+        "reportTime": true
+      },
+      "skip": true
+    },
+    {
       "comment": "Verify certificate(Serpen Augusto, SN: 122555289206669935155620253106797026752923172864, 0x157791B9508857ED04000000350000005C000000) from cer-store",
       "comment1": "Validity: from 2020-08-26 20:13:07 to 2022-08-26 20:13:07",
       "comment2": "Included in CRL 4 times",

@@ -35,6 +35,7 @@
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-utils.h"
+#include "time-utils.h"
 #include "tsp-helper.h"
 #include "uapki-ns.h"
 #include "uapki-debug.h"
@@ -329,9 +330,7 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     CerStore::Item* cer_issuer = nullptr;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
-    bool is_selfsigned;
-
-    //TODO: check local status cerSubject, now - need validate every time
+    bool is_selfsigned, need_update;
 
     DO(cer_store.getIssuerCert(cerSubject, &cer_issuer, is_selfsigned));
     if (is_selfsigned) return RET_OK;
@@ -340,36 +339,39 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
     if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
         SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
     }
-    shuffled_uris = rand_uris(uris);
 
-    DO(ocsp_helper.init());
-    DO(ocsp_helper.addCert(cer_issuer, cerSubject));
-    DO(ocsp_helper.genNonce(20));
-    DO(ocsp_helper.encodeRequest());
+    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    if (need_update) {
+        DO(ocsp_helper.init());
+        DO(ocsp_helper.addCert(cer_issuer, cerSubject));
+        DO(ocsp_helper.genNonce(20));
+        DO(ocsp_helper.encodeRequest());
 
-    for (auto& it : shuffled_uris) {
-        DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
-        ret = HttpHelper::post(
-            it.c_str(),
-            HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
-            ocsp_helper.getRequestEncoded(),
-            &sba_resp
-        );
-        DEBUG_OUTPUT_OUTSTREAM(string("OCSP-response, url=") + it, sba_resp.get());
-        if (ret == RET_OK) {
-            DEBUG_OUTCON(printf("get_cert_status(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
-            DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
-            break;
+        shuffled_uris = rand_uris(uris);
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
+            ret = HttpHelper::post(
+                it.c_str(),
+                HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
+                ocsp_helper.getRequestEncoded(),
+                &sba_resp
+            );
+            DEBUG_OUTPUT_OUTSTREAM(string("OCSP-response, url=") + it, sba_resp.get());
+            if (ret == RET_OK) {
+                DEBUG_OUTCON(printf("get_cert_status(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
+                DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
+                break;
+            }
+        }
+        if (ret != RET_OK) {
+            SET_ERROR(ret);
+        }
+        else if (sba_resp.size() == 0) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
     }
-    if (ret != RET_OK) {
-        SET_ERROR(ret);
-    }
-    else if (sba_resp.size() == 0) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
-    }
 
-    DO(ocsp_helper.parseResponse(sba_resp.get()));
+    DO(ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult));
 
     if (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL) {
         DO(verify_ocsp_responsedata(ocsp_helper, cer_store));
@@ -377,7 +379,13 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
         DO(ocsp_helper.scanSingleResponses());
 
         const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
-        DO(cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record.status, sba_resp.get()));
+        if (need_update) {
+            DO(cerSubject->certStatusByOcsp.set(
+                ocsp_record.status,
+                ocsp_record.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                sba_resp.get()
+            ));
+        }
 
         SigningDoc::OcspResponseItem* ocsp_respitem = nullptr;
         switch (ocsp_record.status) {
@@ -388,7 +396,11 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
             }
             ocsp_respitem->baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
             DO(ocsp_helper.getOcspIdentifier(&ocsp_respitem->baOcspIdentifier));
-            DO(ocsp_helper.generateOtherHash(sign_params.aidDigest, &ocsp_respitem->baOcspRespHash));
+            DO(UapkiNS::Ocsp::generateOtherHash(
+                need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult,
+                sign_params.aidDigest,
+                &ocsp_respitem->baOcspRespHash
+            ));
             break;
         case UapkiNS::CertStatus::REVOKED:
             SET_ERROR(RET_UAPKI_CERT_STATUS_REVOKED);

@@ -28,17 +28,15 @@
 #ifndef UAPKI_CER_STORE_H
 #define UAPKI_CER_STORE_H
 
+
+#include <string>
+#include <vector>
 #include "uapkic.h"
 #include "uapkif.h"
 #include "attribute-helper.h"
 #include "uapki-export.h"
 #include "uapki-ns.h"
 #include "verify-status.h"
-#include <string>
-#include <vector>
-
-
-using namespace std;
 
 
 class CerStore {
@@ -51,18 +49,25 @@ public:
     };  //  end enum ValidationType
 
     struct CertStatusInfo {
+        const ValidationType
+                    type;
+        ByteArray*  baResult;
         UapkiNS::CertStatus
                     status;
-        ValidationType
-                    type;
-        uint64_t    time;
-        ByteArray*  baResult;
+        uint64_t    validTime;
 
-        CertStatusInfo (void);
+        CertStatusInfo (
+            const ValidationType validationType
+        );
         ~CertStatusInfo (void);
 
-        void reset (const ValidationType type = ValidationType::UNDEFINED);
-        int set (const ValidationType type, const UapkiNS::CertStatus status, const ByteArray* baResult);
+        bool isExpired (const uint64_t time) const;
+        void reset (void);
+        int set (
+            const UapkiNS::CertStatus status,
+            const uint64_t validTime,
+            const ByteArray* baResult
+        );
 
     };  //  end struct CertStatusInfo
 
@@ -92,7 +97,9 @@ public:
         CERTIFICATE_VERIFY::STATUS
                     verifyStatus;
         CertStatusInfo
-                    certStatusInfo;
+                    certStatusByCrl;
+        CertStatusInfo
+                    certStatusByOcsp;
 
         Item (void);
         ~Item (void);
@@ -102,23 +109,31 @@ public:
             const UapkiNS::AlgorithmIdentifier& aidDigest,
             UapkiNS::EssCertId& essCertId
         ) const;
-        int getCrlUris (const bool isFull, vector<string>& uris) const;
+        int getCrlUris (const bool isFull, std::vector<std::string>& uris) const;
         int getIssuerAndSN (ByteArray** baIssuerAndSN) const;
-        int getOcspUris (vector<string>& uris) const;
-        int getTspUris (vector<string>& uris) const;
+        int getOcspUris (std::vector<std::string>& uris) const;
+        int getTspUris (std::vector<std::string>& uris) const;
         int keyUsageByBit (const uint32_t bitNum, bool& bitValue) const;
 
     };  //  end struct Item
 
 private:
-    string          m_Path;
-    vector<Item*>   m_Items;
+    std::string m_Path;
+    std::vector<Item*>
+                m_Items;
 
 public:
     CerStore (void);
     ~CerStore (void);
 
-    int addCert (const ByteArray* baEncoded, const bool copyWithAlloc, const bool permanent, const bool trusted, bool& isUnique, const Item** cerStoreItem);
+    int addCert (
+        const ByteArray* baEncoded,
+        const bool copyWithAlloc,
+        const bool permanent,
+        const bool trusted,
+        bool& isUnique,
+        const Item** cerStoreItem
+    );
     int getCount (size_t& count);
     int getCountTrusted (size_t& count);
     int getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem);

@@ -81,11 +81,13 @@ cleanup:
 
 
 
-CerStore::CertStatusInfo::CertStatusInfo (void)
-    : status(UapkiNS::CertStatus::UNDEFINED)
-    , type(ValidationType::UNDEFINED)
-    , time(0)
+CerStore::CertStatusInfo::CertStatusInfo (
+        const ValidationType validationType
+)
+    : type(validationType)
     , baResult(nullptr)
+    , status(UapkiNS::CertStatus::UNDEFINED)
+    , validTime(0)
 {
 }
 
@@ -94,20 +96,28 @@ CerStore::CertStatusInfo::~CertStatusInfo (void)
     reset();
 }
 
-void CerStore::CertStatusInfo::reset (const ValidationType type)
+bool CerStore::CertStatusInfo::isExpired (const uint64_t time) const
 {
-    ba_free(baResult);
-    status = UapkiNS::CertStatus::UNDEFINED;
-    this->type = type;
-    time = 0;
-    baResult = nullptr;
+    return (time > validTime);
 }
 
-int CerStore::CertStatusInfo::set (const ValidationType type, const UapkiNS::CertStatus status, const ByteArray* baResult)
+void CerStore::CertStatusInfo::reset (void)
 {
-    reset(type);
+    ba_free(baResult);
+    baResult = nullptr;
+    status = UapkiNS::CertStatus::UNDEFINED;
+    validTime = 0;
+}
+
+int CerStore::CertStatusInfo::set (
+        const UapkiNS::CertStatus status,
+        const uint64_t validTime,
+        const ByteArray* baResult
+)
+{
+    reset();
     this->status = status;
-    this->time = TimeUtils::nowMsTime();
+    this->validTime = validTime;
     this->baResult = ba_copy_with_alloc(baResult, 0, 0);
     return (this->baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
@@ -115,12 +125,25 @@ int CerStore::CertStatusInfo::set (const ValidationType type, const UapkiNS::Cer
 
 
 CerStore::Item::Item (void)
-    : baEncoded(nullptr), cert(nullptr), baCertId(nullptr)
-    , keyAlgo(nullptr), baSerialNumber(nullptr), baKeyId(nullptr)
-    , baIssuer(nullptr), baSubject(nullptr), baSPKI(nullptr)
-    , algoKeyId(HashAlg::HASH_ALG_UNDEFINED), notBefore(0), notAfter(0), keyUsage(0), trusted(false)
+    : baEncoded(nullptr)
+    , cert(nullptr)
+    , baCertId(nullptr)
+    , keyAlgo(nullptr)
+    , baSerialNumber(nullptr)
+    , baKeyId(nullptr)
+    , baIssuer(nullptr)
+    , baSubject(nullptr)
+    , baSPKI(nullptr)
+    , algoKeyId(HashAlg::HASH_ALG_UNDEFINED)
+    , notBefore(0)
+    , notAfter(0)
+    , keyUsage(0)
+    , trusted(false)
     , verifyStatus(CERTIFICATE_VERIFY::STATUS::UNDEFINED)
-{}
+    , certStatusByCrl(ValidationType::CRL)
+    , certStatusByOcsp(ValidationType::OCSP)
+{
+}
 
 CerStore::Item::~Item (void)
 {
@@ -223,8 +246,14 @@ CerStore::~CerStore (void)
     reset();
 }
 
-int CerStore::addCert (const ByteArray* baEncoded, const bool copyWithAlloc, const bool permanent,
-                    const bool trusted, bool& isUnique, const CerStore::Item** cerStoreItem)
+int CerStore::addCert (
+        const ByteArray* baEncoded,
+        const bool copyWithAlloc,
+        const bool permanent,
+        const bool trusted,
+        bool& isUnique,
+        const Item** cerStoreItem
+)
 {
     int ret = RET_OK;
     Item* cer_parsed = nullptr;

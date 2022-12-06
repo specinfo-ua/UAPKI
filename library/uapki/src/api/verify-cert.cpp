@@ -37,16 +37,25 @@
 #include "uapki-ns.h"
 #include "verify-status.h"
 #include "verify-utils.h"
+#include "uapki-debug.h"
 
 
 #undef FILE_MARKER
 #define FILE_MARKER "api/verify-cert.cpp"
 
-
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
 #define DEBUG_OUTCON(expression) expression
 #endif
+
+#define DEBUG_OUTPUT_OUTSTREAM(msg,baData)
+#ifndef DEBUG_OUTPUT_OUTSTREAM
+DEBUG_OUTPUT_OUTSTREAM_FUNC
+#define DEBUG_OUTPUT_OUTSTREAM(msg,baData) debug_output_stream(DEBUG_OUTSTREAM_FOPEN,"VERIFY_CERT",msg,baData)
+#endif
+
+
+using namespace std;
 
 
 static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, const uint64_t validateTime)
@@ -254,7 +263,11 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(cert_status)));
 
     if (needUpdateCert) {
-        cerSubject->certStatusInfo.set(CerStore::ValidationType::CRL, cert_status, crl_item->baCrlId);
+        cerSubject->certStatusByCrl.set(
+            cert_status,
+            crl_item->nextUpdate,
+            crl_item->baCrlId
+        );
     }
 
 cleanup:
@@ -353,6 +366,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
+    bool need_update;
     string s_time;
 
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(UapkiNS::CertStatus::UNDEFINED)));
@@ -360,51 +374,56 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     if (HttpHelper::isOfflineMode()) {
         SET_ERROR(RET_UAPKI_OFFLINE_MODE);
     }
+
     ret = cerSubject->getOcspUris(uris);
     if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
         SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
     }
-    shuffled_uris = rand_uris(uris);
 
-    DO(ocsp_helper.init());
-    DO(ocsp_helper.addCert(cerIssuer, cerSubject));
-    DO(ocsp_helper.genNonce(20));
-    DO(ocsp_helper.encodeRequest());
+    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    if (need_update) {
+        DO(ocsp_helper.init());
+        DO(ocsp_helper.addCert(cerIssuer, cerSubject));
+        DO(ocsp_helper.genNonce(20));
+        DO(ocsp_helper.encodeRequest());
 
-    DEBUG_OUTCON(printf("OCSP-REQUEST, hex: "); ba_print(stdout, ocsp_helper.getRequestEncoded()));
-
-    for (auto& it : shuffled_uris) {
-        DEBUG_OUTCON(printf("validate_by_ocsp(), HttpHelper::post('%s')\n", it.c_str()));
-        ret = HttpHelper::post(it.c_str(), HttpHelper::CONTENT_TYPE_OCSP_REQUEST, ocsp_helper.getRequestEncoded(), &sba_resp);
-        if (ret == RET_OK) {
-            DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
-            DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
-            break;
+        shuffled_uris = rand_uris(uris);
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
+            ret = HttpHelper::post(
+                it.c_str(),
+                HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
+                ocsp_helper.getRequestEncoded(),
+                &sba_resp
+            );
+            DEBUG_OUTPUT_OUTSTREAM(string("OCSP-response, url=") + it, sba_resp.get());
+            if (ret == RET_OK) {
+                DEBUG_OUTCON(printf("validate_by_ocsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
+                DEBUG_OUTCON(if (sba_resp.size() < 1024) { ba_print(stdout, sba_resp.get()); });
+                break;
+            }
+        }
+        if (ret != RET_OK) {
+            SET_ERROR(ret);
+        }
+        else if (sba_resp.size() == 0) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
     }
-    if (ret != RET_OK) {
-        SET_ERROR(ret);
-    }
-    else if (sba_resp.size() == 0) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
-    }
 
-    DEBUG_OUTCON(printf("OCSP-RESPONSE, hex: "); ba_print(stdout, sba_resp.get()));
-
-    ret = ocsp_helper.parseResponse(sba_resp.get());
+    ret = ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult);
     DO_JSON(json_object_set_string(joResult, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(ocsp_helper.getResponseStatus())));
 
     if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
         DO(verify_response_data(joResult, ocsp_helper, cerStore));
-
         DO(ocsp_helper.checkNonce());
 
         s_time = TimeUtils::mstimeToFormat(ocsp_helper.getProducedAt());
         DO_JSON(json_object_set_string(joResult, "producedAt", s_time.c_str()));
 
         DO(ocsp_helper.scanSingleResponses());
-        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
 
+        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
         DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(ocsp_record.status)));
         s_time = TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate);
         DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
@@ -418,13 +437,16 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
             DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
         }
 
-        cerSubject->certStatusInfo.set(CerStore::ValidationType::OCSP, ocsp_record.status, sba_resp.get());
+        if (need_update) {
+            DO(cerSubject->certStatusByOcsp.set(
+                ocsp_record.status,
+                ocsp_record.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                sba_resp.get()
+            ));
+        }
     }
 
 cleanup:
-    //if ((ret == RET_UAPKI_CONNECTION_ERROR) || (ret == RET_UAPKI_HTTP_STATUS_NOT_OK)) {
-    //    ret = RET_UAPKI_OCSP_NOT_RESPONDING;
-    //}
     return ret;
 }
 
