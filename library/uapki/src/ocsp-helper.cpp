@@ -110,10 +110,10 @@ cleanup:
 OcspHelper::OcspHelper (void)
     : m_OcspRequest(nullptr)
     , m_BasicOcspResp(nullptr)
-    , m_BaNonce(nullptr)
-    , m_BaEncoded(nullptr)
-    , m_BaTbsEncoded(nullptr)
     , m_BaBasicOcspResponse(nullptr)
+    , m_BaNonce(nullptr)
+    , m_BaRequestEncoded(nullptr)
+    , m_BaTbsRequestEncoded(nullptr)
     , m_BaTbsResponseData(nullptr)
     , m_ProducedAt(0)
     , m_ResponseStatus(ResponseStatus::UNDEFINED)
@@ -129,17 +129,19 @@ void OcspHelper::reset (void)
 {
     asn_free(get_OCSPRequest_desc(), m_OcspRequest);
     asn_free(get_BasicOCSPResponse_desc(), m_BasicOcspResp);
-    ba_free(m_BaEncoded);
-    ba_free(m_BaNonce);
     ba_free(m_BaBasicOcspResponse);
+    ba_free(m_BaNonce);
+    ba_free(m_BaRequestEncoded);
+    ba_free(m_BaTbsRequestEncoded);
     ba_free(m_BaTbsResponseData);
 
     m_OcspRecords.clear();
     m_OcspRequest = nullptr;
     m_BasicOcspResp = nullptr;
-    m_BaEncoded = nullptr;
-    m_BaNonce = nullptr;
     m_BaBasicOcspResponse = nullptr;
+    m_BaNonce = nullptr;
+    m_BaRequestEncoded = nullptr;
+    m_BaTbsRequestEncoded = nullptr;
     m_BaTbsResponseData = nullptr;
     m_ProducedAt = 0;
     m_ResponseStatus = ResponseStatus::UNDEFINED;
@@ -278,7 +280,7 @@ int OcspHelper::encodeTbsRequest (void)
 {
     if (!m_OcspRequest) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_encode_ba(get_TBSRequest_desc(), &m_OcspRequest->tbsRequest, &m_BaTbsEncoded);
+    return asn_encode_ba(get_TBSRequest_desc(), &m_OcspRequest->tbsRequest, &m_BaTbsRequestEncoded);
 }
 
 int OcspHelper::setSignature (
@@ -324,16 +326,16 @@ int OcspHelper::encodeRequest (void)
 {
     if (!m_OcspRequest || (m_OcspRequest->tbsRequest.requestList.list.count <= 0)) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaEncoded);
+    return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaRequestEncoded);
 }
 
 ByteArray* OcspHelper::getRequestEncoded (
         const bool move
 )
 {
-    ByteArray* rv_ba = m_BaEncoded;
+    ByteArray* rv_ba = m_BaRequestEncoded;
     if (move) {
-        m_BaEncoded = nullptr;
+        m_BaRequestEncoded = nullptr;
     }
     return rv_ba;
 }
@@ -368,14 +370,6 @@ int OcspHelper::checkNonce (void)
 cleanup:
     ret = (ret == RET_OK) ? RET_OK : RET_UAPKI_OCSP_RESPONSE_INVALID_NONCE;
     return ret;
-}
-
-int OcspHelper::generateOtherHash (
-        const UapkiNS::AlgorithmIdentifier& aidHash,
-        ByteArray** baEncoded
-)
-{
-    return generateOtherHash(m_BaEncoded, aidHash, baEncoded);
 }
 
 ByteArray* OcspHelper::getBasicOcspResponseEncoded (
@@ -583,7 +577,7 @@ cleanup:
     return ret;
 }
 
-int OcspHelper::generateOtherHash (
+int generateOtherHash (
         const ByteArray* baOcspResponseEncoded,
         const UapkiNS::AlgorithmIdentifier& aidHash,
         ByteArray** baEncoded

@@ -90,10 +90,10 @@ namespace Ocsp {
                     m_OcspRequest;
         BasicOCSPResponse_t*
                     m_BasicOcspResp;
-        ByteArray*  m_BaNonce;
-        ByteArray*  m_BaEncoded;
-        ByteArray*  m_BaTbsEncoded;
         ByteArray*  m_BaBasicOcspResponse;
+        ByteArray*  m_BaNonce;
+        ByteArray*  m_BaRequestEncoded;
+        ByteArray*  m_BaTbsRequestEncoded;
         ByteArray*  m_BaTbsResponseData;
         uint64_t    m_ProducedAt;
         ResponseStatus
@@ -137,10 +137,6 @@ namespace Ocsp {
             const ByteArray* baEncoded
         );
         int checkNonce (void);
-        int generateOtherHash (
-            const UapkiNS::AlgorithmIdentifier& aidHash,
-            ByteArray** baEncoded
-        );
         ByteArray* getBasicOcspResponseEncoded (
             const bool move = false
         );
@@ -167,22 +163,20 @@ namespace Ocsp {
         const ByteArray* getNonce (void) const { return m_BaNonce; }
         uint64_t getProducedAt (void) const { return m_ProducedAt; }
         ResponseStatus getResponseStatus (void) const { return m_ResponseStatus; }
-        const ByteArray* getTbsEncoded (void) const { return m_BaTbsEncoded; }
+        const ByteArray* getTbsRequestEncoded (void) const { return m_BaTbsRequestEncoded; }
         const ByteArray* getTbsResponseData (void) const { return m_BaTbsResponseData; }
 
     public:
         int addNonceToExtension (void);
         int parseOcspResponse (const ByteArray* baEncoded);
 
-    public:
-        static int generateOtherHash (
-            const ByteArray* baOcspResponseEncoded,
-            const UapkiNS::AlgorithmIdentifier& aidHash,
-            ByteArray** baEncoded
-        );
-
     };  //  end class OcspHelper
 
+    int generateOtherHash (
+        const ByteArray* baOcspResponseEncoded,
+        const UapkiNS::AlgorithmIdentifier& aidHash,
+        ByteArray** baEncoded
+    );
 
     const char* responseStatusToStr (
         const ResponseStatus status
