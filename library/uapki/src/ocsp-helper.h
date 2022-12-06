@@ -59,13 +59,13 @@ namespace Ocsp {
         UNAUTHORIZED        = 6
     };  //  end enum ResponseStatus
 
+    static const size_t NONCE_MAXLEN    = 64;
+    static const size_t NONCE_MINLEN    = 8;
+    static const uint64_t OFFSET_EXPIRE_DEFAULT = 30 * 60000;
 
     class OcspHelper
     {
     public:
-        static const size_t NONCE_MAXLEN    = 64;
-        static const size_t NONCE_MINLEN    = 8;
-
         struct OcspRecord {
             UapkiNS::CertStatus
                         status;

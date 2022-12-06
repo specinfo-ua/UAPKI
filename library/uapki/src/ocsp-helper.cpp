@@ -178,7 +178,6 @@ int OcspHelper::addSN (
     cert_id.serialNumber = (ByteArray*)baSerialNumber;
 
     DO(ocsprequest_add_certid(*m_OcspRequest, cert_id));
-    m_OcspRecords.push_back(OcspRecord());
 
 cleanup:
     ba_free(cert_id.issuerNameHash);
@@ -323,7 +322,7 @@ cleanup:
 
 int OcspHelper::encodeRequest (void)
 {
-    if (!m_OcspRequest || m_OcspRecords.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_OcspRequest || (m_OcspRequest->tbsRequest.requestList.list.count <= 0)) return RET_UAPKI_INVALID_PARAMETER;
 
     return asn_encode_ba(get_OCSPRequest_desc(), m_OcspRequest, &m_BaEncoded);
 }
@@ -357,20 +356,16 @@ cleanup:
 
 int OcspHelper::checkNonce (void)
 {
-    int ret = RET_OK;
-    ByteArray* ba_nonce = nullptr;
+    if (!m_BaNonce) return RET_OK;
+    if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (m_BaNonce == nullptr) return ret;
-
-    CHECK_PARAM(m_BasicOcspResp != nullptr);
-
-    ret = extns_get_ocsp_nonce(m_BasicOcspResp->tbsResponseData.responseExtensions, &ba_nonce);
+    UapkiNS::SmartBA sba_nonce;
+    int ret = extns_get_ocsp_nonce(m_BasicOcspResp->tbsResponseData.responseExtensions, &sba_nonce);
     if (ret == RET_OK) {
-        DO(ba_cmp(m_BaNonce, ba_nonce));
+        DO(ba_cmp(m_BaNonce, sba_nonce.get()));
     }
 
 cleanup:
-    ba_free(ba_nonce);
     ret = (ret == RET_OK) ? RET_OK : RET_UAPKI_OCSP_RESPONSE_INVALID_NONCE;
     return ret;
 }
@@ -489,28 +484,34 @@ int OcspHelper::scanSingleResponses (void)
     const TBSRequest_t* tbs_req = nullptr;
     const ResponseData_t* tbs_respdata = nullptr;
     const RevokedInfo_t* revoked_info = nullptr;
-    size_t cnt_responses;
-    uint32_t crl_reason = 0;
 
-    CHECK_PARAM(m_OcspRequest != nullptr);
-    CHECK_PARAM(m_BasicOcspResp != nullptr);
+    if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
 
-    tbs_req = &m_OcspRequest->tbsRequest;
     tbs_respdata = &m_BasicOcspResp->tbsResponseData;
-    cnt_responses = (size_t)tbs_respdata->responses.list.count;
-    if ((m_OcspRecords.size() != cnt_responses) || ((size_t)tbs_req->requestList.list.count != cnt_responses)) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+    const int cnt_responses = tbs_respdata->responses.list.count;
+    if (cnt_responses <= 0) return RET_UAPKI_INVALID_PARAMETER;
+
+    m_OcspRecords.resize((size_t)cnt_responses);
+    if (m_OcspRequest) {
+        tbs_req = &m_OcspRequest->tbsRequest;
+        if (tbs_req->requestList.list.count != cnt_responses) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+        }
     }
 
     for (size_t i = 0; i < m_OcspRecords.size(); i++) {
-        OcspRecord& ocsp_item = m_OcspRecords[i];
-        const CertID_t* req_certid = &tbs_req->requestList.list.array[i]->reqCert;
         const SingleResponse_t* resp = tbs_respdata->responses.list.array[i];
-        if (!asn_primitive_data_is_equals(&req_certid->hashAlgorithm.algorithm, &resp->certID.hashAlgorithm.algorithm)
-            || !asn_octetstring_data_is_equals(&req_certid->issuerNameHash, &resp->certID.issuerNameHash)
-            || !asn_octetstring_data_is_equals(&req_certid->issuerKeyHash, &resp->certID.issuerKeyHash)
-            || !asn_primitive_data_is_equals(&req_certid->serialNumber, &resp->certID.serialNumber)) {
-            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+        OcspRecord& ocsp_item = m_OcspRecords[i];
+        uint32_t crl_reason = 0;
+
+        if (m_OcspRequest) {
+            const CertID_t* req_certid = &tbs_req->requestList.list.array[i]->reqCert;
+            if (!asn_primitive_data_is_equals(&req_certid->hashAlgorithm.algorithm, &resp->certID.hashAlgorithm.algorithm)
+                || !asn_octetstring_data_is_equals(&req_certid->issuerNameHash, &resp->certID.issuerNameHash)
+                || !asn_octetstring_data_is_equals(&req_certid->issuerKeyHash, &resp->certID.issuerKeyHash)
+                || !asn_primitive_data_is_equals(&req_certid->serialNumber, &resp->certID.serialNumber)) {
+                SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+            }
         }
 
         switch (resp->certStatus.present) {
