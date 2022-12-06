@@ -25,11 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <time.h>
 #include "time-utils.h"
 #include "asn1-ba-utils.h"
 #include "macros-internal.h"
 #include "uapki-errors.h"
-#include <time.h>
+#include "uapki-ns.h"
+
+
+using namespace std;
 
 
 static const char* HEX_ASN1_GENTIME_2K = "180F32303030303130313030303030305A";
@@ -72,17 +76,19 @@ string TimeUtils::stimeToFormat (const char* sTime)
 int TimeUtils::stimeToMstime (const char* sTime, uint64_t& msTime)
 {
     int ret = RET_OK;
-    ByteArray* ba_time = NULL;
+    UapkiNS::SmartBA sba_time;
     uint64_t ms = 0;
 
-    if ((sTime != NULL) && (strlen(sTime) == 19) && (sTime[4] == '-') && (sTime[7] == '-')
-    && (sTime[10] == ' ') && (sTime[13] == ':') && (sTime[16] == ':')) {
-        ba_time = ba_alloc_from_hex(HEX_ASN1_GENTIME_2K);
-        if (ba_time) {
+    if (
+        sTime && (strlen(sTime) == 19) &&
+        (sTime[4] == '-') && (sTime[7] == '-') && (sTime[10] == ' ') &&
+        (sTime[13] == ':') && (sTime[16] == ':')
+    ) {
+        if (sba_time.set(ba_alloc_from_hex(HEX_ASN1_GENTIME_2K))) {
             for (size_t i = 0; i < 14; i++) {
-                ba_set_byte(ba_time, i + 2, sTime[STIME_FORMAT_INDECES[i]]);
+                ba_set_byte(sba_time.get(), i + 2, sTime[STIME_FORMAT_INDECES[i]]);
             }
-            DO(ba_decode_pkixtime(ba_time, &ms));
+            DO(ba_decode_pkixtime(sba_time.get(), &ms));
             msTime = ms;
         }
         else {
@@ -94,6 +100,5 @@ int TimeUtils::stimeToMstime (const char* sTime, uint64_t& msTime)
     }
 
 cleanup:
-    ba_free(ba_time);
     return ret;
 }
