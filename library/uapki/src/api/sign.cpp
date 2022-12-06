@@ -124,26 +124,6 @@ cleanup:
     return ret;
 }   //  parse_sign_params
 
-static vector<string> rand_uris (const vector<string>& uris)
-{
-    if (uris.size() < 2) return uris;
-
-    UapkiNS::SmartBA sba_randoms;
-    if (!sba_randoms.set(ba_alloc_by_len(uris.size() - 1))) return uris;
-
-    if (drbg_random(sba_randoms.get()) != RET_OK) return uris;
-
-    vector<string> rv_uris, src = uris;
-    const uint8_t* buf = sba_randoms.buf();
-    for (size_t i = 0; i < uris.size() - 1; i++) {
-        const size_t rnd = buf[i] % src.size();
-        rv_uris.push_back(src[rnd]);
-        src.erase(src.begin() + rnd);
-    }
-    rv_uris.push_back(src[0]);
-    return rv_uris;
-}   //  rand_uris
-
 static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
 {
     int ret = RET_OK;
@@ -158,7 +138,7 @@ static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
     DO(tspHelper.encodeRequest());
 
     if (sdoc.tspUri.empty()) {
-        const vector<string> shuffled_uris = rand_uris(sdoc.signParams->tspUris);
+        const vector<string> shuffled_uris = HttpHelper::randomURIs(sdoc.signParams->tspUris);
         for (auto& it : shuffled_uris) {
             DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
             ret = HttpHelper::post(
@@ -347,7 +327,7 @@ static int get_cert_status (SigningDoc::CadesBuilder& cadesBuilder, CerStore::It
         DO(ocsp_helper.genNonce(20));
         DO(ocsp_helper.encodeRequest());
 
-        shuffled_uris = rand_uris(uris);
+        shuffled_uris = HttpHelper::randomURIs(uris);
         for (auto& it : shuffled_uris) {
             DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
             ret = HttpHelper::post(

@@ -29,7 +29,9 @@
 #define UAPKI_HTTP_HELPER_H
 
 
-#include "uapkic.h"
+#include <string>
+#include <vector>
+#include "byte-array.h"
 
 
 class HttpHelper {
@@ -38,14 +40,34 @@ public:
     static const char* CONTENT_TYPE_OCSP_REQUEST;
     static const char* CONTENT_TYPE_TSP_REQUEST;
 
-    static int init (const bool offlineMode);
+    static int init (
+        const bool offlineMode
+    );
     static void deinit (void);
 
     static bool isOfflineMode (void);
-    static int get (const char* url, ByteArray** baResponse);
-    static int post (const char* url, const char* httpContentType, const ByteArray* baRequest, ByteArray** baResponse);
-    static int post (const char* url, const char* httpContentType,
-                    const char* userPwd, const char* authorizationBearer, const char* request, ByteArray** baResponse);
+    static int get (
+        const char* url,
+        ByteArray** baResponse
+    );
+    static int post (
+        const char* url,
+        const char* contentType,
+        const ByteArray* baRequest,
+        ByteArray** baResponse
+    );
+    static int post (
+        const char* url,
+        const char* httpContentType,
+        const char* userPwd,
+        const char* authorizationBearer,
+        const char* request,
+        ByteArray** baResponse
+    );
+
+    static std::vector<std::string> randomURIs (
+        const std::vector<std::string>& uris
+    );
 
 };  //  end class HttpHelper
 

@@ -83,26 +83,6 @@ cleanup:
     return ret;
 }
 
-static vector<string> rand_uris (const vector<string>& uris)
-{
-    if (uris.size() < 2) return uris;
-
-    UapkiNS::SmartBA sba_randoms;
-    if (!sba_randoms.set(ba_alloc_by_len(uris.size() - 1))) return uris;
-
-    if (drbg_random(sba_randoms.get()) != RET_OK) return uris;
-
-    vector<string> rv_uris, src = uris;
-    const uint8_t* buf = sba_randoms.buf();
-    for (size_t i = 0; i < uris.size() - 1; i++) {
-        const size_t rnd = buf[i] % src.size();
-        rv_uris.push_back(src[rnd]);
-        src.erase(src.begin() + rnd);
-    }
-    rv_uris.push_back(src[0]);
-    return rv_uris;
-}
-
 static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, CrlStore& crlStore,
                     const ByteArray** baCrlNumber, const uint64_t validateTime, CrlStore::Item** crlItem)
 {
@@ -137,7 +117,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
             SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
         }
 
-        const vector<string> shuffled_uris = rand_uris(uris);
+        const vector<string> shuffled_uris = HttpHelper::randomURIs(uris);
         DEBUG_OUTCON(printf("process_crl(CrlType: %d), download CRL", crl_type));
         for (auto& it : shuffled_uris) {
             DEBUG_OUTCON(printf("process_crl(), HttpHelper::get('%s')\n", it.c_str()));
@@ -387,7 +367,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
         DO(ocsp_helper.genNonce(20));
         DO(ocsp_helper.encodeRequest());
 
-        shuffled_uris = rand_uris(uris);
+        shuffled_uris = HttpHelper::randomURIs(uris);
         for (auto& it : shuffled_uris) {
             DEBUG_OUTPUT_OUTSTREAM(string("OCSP-request, url=") + it, ocsp_helper.getRequestEncoded());
             ret = HttpHelper::post(

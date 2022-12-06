@@ -25,12 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-03-31
-
 #include <string.h>
 #include "ba-utils.h"
 #include "http-helper.h"
+#include "uapkic.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 #define CURL_STATICLIB
 #include "curl/curl.h"
 
@@ -41,9 +41,12 @@
 #endif
 
 
-const char* HttpHelper::CONTENT_TYPE_APP_JSON = "Content-Type:application/json";
-const char* HttpHelper::CONTENT_TYPE_OCSP_REQUEST = "Content-Type:application/ocsp-request";
-const char* HttpHelper::CONTENT_TYPE_TSP_REQUEST = "Content-Type:application/timestamp-query";
+using namespace std;
+
+
+const char* HttpHelper::CONTENT_TYPE_APP_JSON       = "Content-Type:application/json";
+const char* HttpHelper::CONTENT_TYPE_OCSP_REQUEST   = "Content-Type:application/ocsp-request";
+const char* HttpHelper::CONTENT_TYPE_TSP_REQUEST    = "Content-Type:application/timestamp-query";
 
 
 typedef struct HTTP_HELPER_ST {
@@ -73,7 +76,9 @@ static size_t cb_curlwrite (void* dataIn, size_t size, size_t nmemb, void* userp
 }
 
 
-int HttpHelper::init (const bool offlineMode)
+int HttpHelper::init (
+        const bool offlineMode
+)
 {
     int ret = RET_OK;
     http_helper.offlineMode = offlineMode;
@@ -98,7 +103,10 @@ bool HttpHelper::isOfflineMode (void)
     return http_helper.offlineMode;
 }
 
-int HttpHelper::get (const char* url, ByteArray** baResponse)
+int HttpHelper::get (
+        const char* url,
+        ByteArray** baResponse
+)
 {
     DEBUG_OUTCON(printf("HttpHelper::get(url='%s')\n", url));
     CURL* curl;
@@ -142,9 +150,14 @@ int HttpHelper::get (const char* url, ByteArray** baResponse)
     return ret;
 }
 
-int HttpHelper::post (const char* url, const char* httpContentType, const ByteArray* baRequest, ByteArray** baResponse)
+int HttpHelper::post (
+        const char* url,
+        const char* contentType,
+        const ByteArray* baRequest,
+        ByteArray** baResponse
+)
 {
-    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', httpContentType='%s'), Request:\n", url, httpContentType); ba_print(stdout, baRequest));
+    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', contentType='%s'), Request:\n", url, contentType); ba_print(stdout, baRequest));
     CURL* curl;
     CURLcode curl_code;
     int ret;
@@ -161,7 +174,7 @@ int HttpHelper::post (const char* url, const char* httpContentType, const ByteAr
     struct curl_slist* chunk = NULL;
 
     // Add a custom header 
-    chunk = curl_slist_append(chunk, httpContentType);
+    chunk = curl_slist_append(chunk, contentType);
 
     // set our custom set of headers
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
@@ -201,11 +214,17 @@ int HttpHelper::post (const char* url, const char* httpContentType, const ByteAr
     return ret;
 }
 
-int HttpHelper::post (const char* url, const char* httpContentType,
-                    const char* userPwd, const char* authorizationBearer, const char* request, ByteArray** baResponse)
+int HttpHelper::post (
+        const char* url,
+        const char* contentType,
+        const char* userPwd,
+        const char* authorizationBearer,
+        const char* request,
+        ByteArray** baResponse
+)
 {
-    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', httpContentType='%s', userPwd='%s', authorizationBearer='%s', request='%s')\n",
-            url, httpContentType, userPwd, authorizationBearer, request));
+    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', contentType='%s', userPwd='%s', authorizationBearer='%s', request='%s')\n",
+            url, contentType, userPwd, authorizationBearer, request));
     CURL* curl;
     CURLcode curl_code;
     int ret;
@@ -230,7 +249,7 @@ int HttpHelper::post (const char* url, const char* httpContentType,
     struct curl_slist* chunk = NULL;
 
     // Add a custom header 
-    chunk = curl_slist_append(chunk, httpContentType);
+    chunk = curl_slist_append(chunk, contentType);
     if (authorizationBearer) {
         chunk = curl_slist_append(chunk, authorizationBearer);
     }
@@ -274,4 +293,26 @@ int HttpHelper::post (const char* url, const char* httpContentType,
     curl_easy_cleanup(curl);
 
     return ret;
+}
+
+vector<string> HttpHelper::randomURIs (
+        const vector<string>& uris
+)
+{
+    if (uris.size() < 2) return uris;
+
+    UapkiNS::SmartBA sba_randoms;
+    if (!sba_randoms.set(ba_alloc_by_len(uris.size() - 1))) return uris;
+
+    if (drbg_random(sba_randoms.get()) != RET_OK) return uris;
+
+    vector<string> rv_uris, src = uris;
+    const uint8_t* buf = sba_randoms.buf();
+    for (size_t i = 0; i < uris.size() - 1; i++) {
+        const size_t rnd = buf[i] % src.size();
+        rv_uris.push_back(src[rnd]);
+        src.erase(src.begin() + rnd);
+    }
+    rv_uris.push_back(src[0]);
+    return rv_uris;
 }
