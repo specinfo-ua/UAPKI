@@ -69,17 +69,19 @@ static int parse_validation_type (const string& sValidationType, CerStore::Valid
 {
     int ret = RET_OK;
 
-    if (sValidationType == string("CRL")) {
+    if (sValidationType.empty()) {
+        validationType = CerStore::ValidationType::UNDEFINED;
+    }
+    else if (sValidationType == string("CRL")) {
         validationType = CerStore::ValidationType::CRL;
     }
     else if (sValidationType == string("OCSP")) {
         validationType = CerStore::ValidationType::OCSP;
     }
-    else if (!sValidationType.empty()) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    else {
+        ret = RET_UAPKI_INVALID_PARAMETER;
     }
 
-cleanup:
     return ret;
 }
 
@@ -503,7 +505,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
             jo = json_object_get_object(joResult, "validateByCRL");
             DO(validate_by_crl(jo, cer_issuer, cer_subject, validate_time, need_updatecert));
         }
-        else {
+        else if (validation_type == CerStore::ValidationType::OCSP) {
             DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
             jo = json_object_get_object(joResult, "validateByOCSP");
             DO(validate_by_ocsp(jo, cer_issuer, cer_subject, *cer_store));
