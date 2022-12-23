@@ -30,6 +30,7 @@
 #include "cer-store.h"
 #include "asn1-ba-utils.h"
 #include "ba-utils.h"
+#include "crl-store.h"
 #include "dirent-internal.h"
 #include "dstu-ns.h"
 #include "extension-helper.h"
@@ -826,3 +827,34 @@ int CerStore::saveToFile (const Item* cerStoreItem)
     return ret;
 }
 
+void CerStore::saveStatToLog (
+        const string& message
+)
+{
+    static size_t ctr_stat = 0;
+
+    FILE* f = fopen("uapki-cer-store.log", "a");
+    if (!f) return;
+
+    uint64_t ms = TimeUtils::nowMsTime();
+    string s_line = string("*** STAT[") + to_string(ctr_stat) + string("] BEGIN *** '") + message;
+    s_line += string("' TIME ") + TimeUtils::mstimeToFormat(ms) + string(" ***\n");
+    fputs(s_line.c_str(), f);
+
+    size_t idx = 0;
+    for (const auto& it : m_Items) {
+        s_line = string("CER[") + to_string(idx++) + string("]\n");
+        s_line += string("KeyId: ") + StrUtils::hexFromBa(it->baKeyId) + string("\n");
+        s_line += string("SerialNumber: ") + StrUtils::hexFromBa(it->baSerialNumber) + string("\n");
+        s_line += string("OCSP, status: ") + CrlStore::certStatusToStr(it->certStatusByOcsp.status) + string("\n");
+        s_line += string("OCSP, validTime: ") + string(it->certStatusByOcsp.isExpired(ms) ? "IS EXPIRED " : "IS VALID   ");
+        s_line += TimeUtils::mstimeToFormat(it->certStatusByOcsp.validTime) + string("\n");
+        s_line += string("\n");
+        fputs(s_line.c_str(), f);
+    }
+
+    s_line = string("*** STAT[") + to_string(ctr_stat++) + string("] END *****\n\n");
+    fputs(s_line.c_str(), f);
+
+    fclose(f);
+}

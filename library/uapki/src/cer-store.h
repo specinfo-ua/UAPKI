@@ -181,6 +181,11 @@ private:
     int loadDir (void);
     int saveToFile (const Item* cerStoreItem);
 
+public:
+    void saveStatToLog (
+        const std::string& message
+    );
+
 };  //  end class CerStore
 
 
