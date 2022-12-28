@@ -42,7 +42,8 @@ namespace UapkiNS {
         CADES_BES       = 3,
         CADES_T         = 4,
         CADES_C         = 5,
-        CADES_Av3       = 6
+        CADES_X_LONG    = 6,
+        CADES_A_V3      = 7
     };  //  end enum SignatureFormat
 
     SignatureFormat signatureFormatFromString (const std::string& str);
