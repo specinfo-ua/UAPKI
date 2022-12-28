@@ -286,35 +286,6 @@ cleanup:
     return ret;
 }
 
-int CerStore::getCount (size_t& count)
-{
-    mutex mtx;
-    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
-    int ret = RET_OK;
-    mtx.lock();
-
-    count = m_Items.size();
-
-    mtx.unlock();
-    return ret;
-}
-
-int CerStore::getCountTrusted (size_t& count)
-{
-    mutex mtx;
-    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
-    int ret = RET_OK;
-    count = 0;
-    mtx.lock();
-
-    for (auto& it : m_Items) {
-        count += (it->trusted) ? 1 : 0;
-    }
-
-    mtx.unlock();
-    return ret;
-}
-
 int CerStore::getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem)
 {
     mutex mtx;
@@ -453,7 +424,9 @@ int CerStore::getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::load (const char* path)
+int CerStore::load (
+        const char* path
+)
 {
     mutex mtx;
     if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
@@ -468,7 +441,64 @@ int CerStore::load (const char* path)
     return ret;
 }
 
-int CerStore::getIssuerCert (const Item* cerSubject, Item** cerIssuer, bool& isSelfSigned)
+int CerStore::getChainCerts (
+        const Item* cerSubject,
+        vector<Item*>& chainCerts
+)
+{
+    int ret = RET_OK;
+    Item* cer_subject = (Item*)cerSubject;
+    Item* cer_issuer = nullptr;
+    bool is_selfsigned = false;
+
+    while (!is_selfsigned) {
+        DO(getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
+        chainCerts.push_back(cer_issuer);
+        cer_subject = cer_issuer;
+    }
+
+cleanup:
+    return ret;
+}
+
+int CerStore::getCount (
+        size_t& count
+)
+{
+    mutex mtx;
+    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
+    int ret = RET_OK;
+    mtx.lock();
+
+    count = m_Items.size();
+
+    mtx.unlock();
+    return ret;
+}
+
+int CerStore::getCountTrusted (
+        size_t& count
+)
+{
+    mutex mtx;
+    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
+    int ret = RET_OK;
+    count = 0;
+    mtx.lock();
+
+    for (auto& it : m_Items) {
+        count += (it->trusted) ? 1 : 0;
+    }
+
+    mtx.unlock();
+    return ret;
+}
+
+int CerStore::getIssuerCert (
+        const Item* cerSubject,
+        Item** cerIssuer,
+        bool& isSelfSigned
+)
 {
     int ret = RET_OK;
     ByteArray* ba_authkeyid = nullptr;
@@ -507,7 +537,10 @@ int CerStore::reload (void)
     return ret;
 }
 
-int CerStore::removeCert (const ByteArray* baCertId, const bool permanent)
+int CerStore::removeCert (
+        const ByteArray* baCertId,
+        const bool permanent
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;

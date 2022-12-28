@@ -134,8 +134,6 @@ public:
         bool& isUnique,
         const Item** cerStoreItem
     );
-    int getCount (size_t& count);
-    int getCountTrusted (size_t& count);
     int getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem);
     int getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem);
     int getCertByIndex (const size_t index, Item** cerStoreItem);
@@ -143,10 +141,29 @@ public:
     int getCertBySID (const ByteArray* baSID, Item** cerStoreItem);
     int getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem);
     int getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem);
-    int getIssuerCert (const Item* cerSubject, Item** cerIssuer, bool& isSelfSigned);
-    int load (const char* path);
+    int getChainCerts (
+        const Item* cerSubject,
+        std::vector<Item*>& chainCerts
+    );
+    int getCount (
+        size_t& count
+    );
+    int getCountTrusted (
+        size_t& count
+    );
+    int getIssuerCert (
+        const Item* cerSubject,
+        Item** cerIssuer,
+        bool& isSelfSigned
+    );
+    int load (
+        const char* path
+    );
     int reload (void);
-    int removeCert (const ByteArray* baCertId, const bool permanent);
+    int removeCert (
+        const ByteArray* baCertId,
+        const bool permanent
+    );
     void reset (void);
 
 public:
