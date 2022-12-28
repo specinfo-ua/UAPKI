@@ -86,8 +86,18 @@ namespace AttributeHelper {
 
     int encodeCertValues (const std::vector<const ByteArray*>& certValues, ByteArray** baEncoded);
     int encodeCertificateRefs (const std::vector<OtherCertId>& otherCertIds, ByteArray** baEncoded);
-    int encodeSignaturePolicy (const std::string& sigPolicyId, ByteArray** baEncoded);
-    int encodeSigningCertificate (const std::vector<EssCertId>& essCertIds, ByteArray** baEncoded);
+    int encodeSignaturePolicy (
+        const std::string& sigPolicyId,
+        ByteArray** baEncoded
+    );
+    int encodeSigningCertificate (
+        const EssCertId& essCertId,
+        ByteArray** baEncoded
+    );
+    int encodeSigningCertificate (
+        const std::vector<EssCertId>& essCertIds,
+        ByteArray** baEncoded
+    );
 
     class RevocationRefsBuilder {
     public:

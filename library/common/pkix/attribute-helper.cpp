@@ -272,7 +272,10 @@ cleanup:
     return ret;
 }
 
-int encodeSignaturePolicy (const string& sigPolicyId, ByteArray** baEncoded)
+int encodeSignaturePolicy (
+        const string& sigPolicyId,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     SignaturePolicyIdentifier_t* sig_policy = nullptr;
@@ -291,7 +294,50 @@ cleanup:
     return ret;
 }
 
-int encodeSigningCertificate (const vector<EssCertId>& essCertIds, ByteArray** baEncoded)
+int encodeSigningCertificate (
+        const EssCertId& essCertId,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    SigningCertificateV2_t* signing_certv2 = nullptr;
+    ESSCertIDv2_t* ess_certidv2 = nullptr;
+
+    ASN_ALLOC_TYPE(signing_certv2, SigningCertificateV2_t);
+
+    ASN_ALLOC_TYPE(ess_certidv2, ESSCertIDv2_t);
+
+    //  =hashAlgorithm= (default: id-sha256)
+    if (essCertId.hashAlgorithm.isPresent() && (essCertId.hashAlgorithm.algorithm != string(OID_SHA256))) {
+        ASN_ALLOC_TYPE(ess_certidv2->hashAlgorithm, AlgorithmIdentifier_t);
+        DO(Util::algorithmIdentifierToAsn1(*ess_certidv2->hashAlgorithm, essCertId.hashAlgorithm));
+    }
+
+    //  =certHash=
+    DO(asn_ba2OCTSTRING(essCertId.baHashValue, &ess_certidv2->certHash));
+
+    //  =issuerSerial= (optional)
+    if (essCertId.issuerSerial.isPresent()) {
+        ASN_ALLOC_TYPE(ess_certidv2->issuerSerial, IssuerSerial_t);
+        DO(asn_decode_ba(get_GeneralNames_desc(), &ess_certidv2->issuerSerial->issuer, essCertId.issuerSerial.baIssuer));
+        DO(asn_ba2INTEGER(essCertId.issuerSerial.baSerialNumber, &ess_certidv2->issuerSerial->serialNumber));
+    }
+
+    DO(ASN_SEQUENCE_ADD(&signing_certv2->certs.list, (ESSCertIDv2_t*)ess_certidv2));
+    ess_certidv2 = nullptr;
+
+    DO(asn_encode_ba(get_SigningCertificateV2_desc(), signing_certv2, baEncoded));
+
+cleanup:
+    asn_free(get_SigningCertificateV2_desc(), signing_certv2);
+    asn_free(get_ESSCertIDv2_desc(), ess_certidv2);
+    return ret;
+}
+
+int encodeSigningCertificate (
+        const vector<EssCertId>& essCertIds,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     SigningCertificateV2_t* signing_certv2 = nullptr;
