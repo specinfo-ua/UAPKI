@@ -51,11 +51,14 @@ public:
         OcspResponseItem (void);
         ~OcspResponseItem (void);
 
+        int set (const OcspResponseItem& src);
+
     };  //  end struct OcspResponseItem
 
     struct SignParams {
         UapkiNS::SignatureFormat
                     signatureFormat;
+        bool        isCadesFormat;
         HashAlg     hashDigest;
         HashAlg     hashSignature;
         UapkiNS::AlgorithmIdentifier
@@ -63,7 +66,7 @@ public:
         UapkiNS::AlgorithmIdentifier
                     aidSignature;
         CerStore::Item*
-                    cerStoreItem;   //  ref
+                    cerSigner;      //  ref
         ByteArray*  baKeyId;
         bool        detachedData;
         bool        includeCert;
@@ -71,21 +74,17 @@ public:
         bool        includeContentTS;
         bool        includeSignatureTS;
         bool        sidUseKeyId;
+        std::vector<std::string>
+                    tspUris;
+        const char* tspPolicy;
         UapkiNS::Attribute
                     attrSigningCert;
         UapkiNS::Attribute
                     attrSignPolicy;
-        UapkiNS::Attribute
-                    attrCertificateRefs;
-        UapkiNS::Attribute
-                    attrRevocationRefs;
-        UapkiNS::Attribute
-                    attrCertValues;
-        UapkiNS::Attribute
-                    attrRevocationValues;
-        std::vector<std::string>
-                    tspUris;
-        const char* tspPolicy;
+        std::vector<CerStore::Item*>
+                    chainCerts;     //  Chain for user certificate
+        std::vector<SigningDoc::OcspResponseItem*>
+                    ocspRespItems;  //  All responses for user-cert and chain of user-cert
 
         SignParams (void);
         ~SignParams (void);
@@ -93,40 +92,6 @@ public:
         int setSignatureFormat (const UapkiNS::SignatureFormat signatureFormat);
 
     };  //  end struct SignParams
-
-    class CadesBuilder {
-        CerStore*   m_CerStore;
-        SignParams  m_SignParams;
-        bool        m_IsCadesFormat;
-        std::vector<CerStore::Item*>
-                    m_ChainCerts;
-        std::vector<UapkiNS::EssCertId>
-                    m_EssCertids;
-        vector<OcspResponseItem*>
-                    m_OcspResponseItems;
-
-    public:
-        CadesBuilder (CerStore* iCerStore);
-        ~CadesBuilder (void);
-
-        CerStore* getCerStore (void) { return m_CerStore; }
-        std::vector<CerStore::Item*>& getChainCerts (void) { return m_ChainCerts; }
-        SignParams& getSignParams (void) { return m_SignParams; }
-        bool isCadesFormat (void) const { return m_IsCadesFormat; }
-
-        int init (void);
-        int buildChainCerts (void);
-        OcspResponseItem* addOcspResponseItem (void);
-        int process (void);
-
-    private:
-        int encodeCertValues (UapkiNS::Attribute& attr);
-        int encodeCertificateRefs (UapkiNS::Attribute& attr);
-        int encodeRevocationRefs (UapkiNS::Attribute& attr);
-        int encodeRevocationValues (UapkiNS::Attribute& attr);
-        int encodeSigningCertificate (UapkiNS::Attribute& attr);
-
-    };  //  end class CadesBuilder
 
     const SignParams*
                 signParams;     //  ref
@@ -142,8 +107,20 @@ public:
     ByteArray*  baHashSignedAttrs;
     ByteArray*  baSignature;
     std::string tspUri;
+    UapkiNS::Attribute
+                attrCertificateRefs;
+    UapkiNS::Attribute
+                attrRevocationRefs;
+    UapkiNS::Attribute
+                attrCertValues;
+    UapkiNS::Attribute
+                attrRevocationValues;
 
 private:
+    std::vector<CerStore::Item*>
+                m_ChainCerts;
+    std::vector<OcspResponseItem*>
+                m_OcspRespItems;
     std::vector<UapkiNS::Attribute*>
                 m_SignedAttrs;
     std::vector<UapkiNS::Attribute*>
@@ -158,12 +135,39 @@ public:
     int addUnsignedAttribute (const std::string& type, ByteArray* baValues);
     int buildSignedAttributes (void);
     int buildSignedData (void);
+    int buildUnsignedAttributes (void);
     int digestMessage (void);
     int digestSignature (ByteArray** baHash);
     int digestSignedAttributes (void);
     int setSignature (const ByteArray* baSignValue);
 
     ByteArray* getEncoded (void);
+
+    std::vector<CerStore::Item*>& getChainCerts (void) { return m_ChainCerts; }
+
+public:
+    static int encodeSignaturePolicy (
+        const std::string& sigPolicyiId,
+        UapkiNS::Attribute& attr
+    );
+    static int encodeSigningCertificate (
+        const UapkiNS::EssCertId& essCertId,
+        UapkiNS::Attribute& attr
+    );
+
+private:
+    int encodeCertValues (
+        UapkiNS::Attribute& attr
+    );
+    int encodeCertificateRefs (
+        UapkiNS::Attribute& attr
+    );
+    int encodeRevocationRefs (
+        UapkiNS::Attribute& attr
+    );
+    int encodeRevocationValues (
+        UapkiNS::Attribute& attr
+    );
 
 };  //  end class SigningDoc
 

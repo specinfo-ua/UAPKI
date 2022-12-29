@@ -464,7 +464,7 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
 
             if (detect_certrefs && detect_revocrefs) {
                 verifyInfo.signatureFormat = (detect_certvals && detect_revocvals)
-                    ? UapkiNS::SignatureFormat::CADES_Av3 : UapkiNS::SignatureFormat::CADES_C;
+                    ? UapkiNS::SignatureFormat::CADES_A_V3 : UapkiNS::SignatureFormat::CADES_C;
             }
         }
     }
