@@ -463,9 +463,16 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
             }
 
             if (detect_certrefs && detect_revocrefs) {
-                verifyInfo.signatureFormat = (detect_certvals && detect_revocvals)
-                    ? UapkiNS::SignatureFormat::CADES_A_V3 : UapkiNS::SignatureFormat::CADES_C;
+                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_C;
             }
+
+            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_C) && detect_certvals && detect_revocvals) {
+                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_X_LONG;
+            }
+
+            //if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_X_LONG) && detect_todo) {
+            //    verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_A_V3;
+            //}
         }
     }
 

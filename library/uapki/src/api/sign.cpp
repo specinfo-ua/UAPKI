@@ -247,7 +247,7 @@ static int add_timestamp_to_attrs (
         CerStore& cerStore,
         SigningDoc& sdoc,
         const TsAttrType tsAttrType
-)//aaa
+)
 {
     int ret = RET_OK;
     UapkiNS::Tsp::TspHelper tsp_helper;
@@ -271,6 +271,7 @@ static int add_timestamp_to_attrs (
     DO(tsp_process(sdoc, tsp_helper));
 
     DO(verify_signeddata(cerStore, sdoc, tsp_helper.getTsToken(), &cer_signer));
+    (void)sdoc.addServiceCert(cer_signer);
 
     switch (tsAttrType) {
     case TsAttrType::CONTENT_TIMESTAMP:
@@ -347,8 +348,9 @@ cleanup:
 }   //  parse_doc_from_json
 
 static int verify_ocsp_responsedata (
+        CerStore& cerStore,
         UapkiNS::Ocsp::OcspHelper& ocspClient,
-        CerStore& cerStore
+        CerStore::Item** cerResponder
 )
 {
     int ret = RET_OK;
@@ -356,7 +358,6 @@ static int verify_ocsp_responsedata (
     UapkiNS::VectorBA vba_certs;
     UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
     SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
-    CerStore::Item* cer_responder = nullptr;
 
     DO(ocspClient.getCerts(vba_certs));
     for (auto& it : vba_certs) {
@@ -367,14 +368,14 @@ static int verify_ocsp_responsedata (
 
     DO(ocspClient.getResponderId(responder_idtype, &sba_responderid));
     if (responder_idtype == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
-        DO(cerStore.getCertBySubject(sba_responderid.get(), &cer_responder));
+        DO(cerStore.getCertBySubject(sba_responderid.get(), cerResponder));
     }
     else {
         //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        DO(cerStore.getCertByKeyId(sba_responderid.get(), &cer_responder));
+        DO(cerStore.getCertByKeyId(sba_responderid.get(), cerResponder));
     }
 
-    ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
+    ret = ocspClient.verifyTbsResponseData(*cerResponder, status_sign);
     if (ret == RET_VERIFY_FAILED) {
         SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED);
     }
@@ -390,7 +391,8 @@ static int get_cert_status_by_ocsp (
         CerStore& cerStore,
         SigningDoc::SignParams& signParams,
         CerStore::Item* cerSubject,
-        vector<SigningDoc::OcspResponseItem*>& ocspRespItems
+        CerStore::Item** cerResponder,
+        SigningDoc::OcspResponseItem** ocspRespItem
 )
 {
     int ret = RET_OK;
@@ -442,7 +444,7 @@ static int get_cert_status_by_ocsp (
     DO(ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult));
 
     if (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL) {
-        DO(verify_ocsp_responsedata(ocsp_helper, cerStore));
+        DO(verify_ocsp_responsedata(cerStore, ocsp_helper, cerResponder));
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
@@ -455,12 +457,11 @@ static int get_cert_status_by_ocsp (
             ));
         }
 
-        SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
         switch (ocsp_record.status) {
         case UapkiNS::CertStatus::GOOD:
-            ocspresp_item = new SigningDoc::OcspResponseItem();
-            if (ocspresp_item) {
-                ocspRespItems.push_back(ocspresp_item);
+            *ocspRespItem = new SigningDoc::OcspResponseItem();
+            if (*ocspRespItem) {
+                SigningDoc::OcspResponseItem* ocspresp_item = *ocspRespItem;
                 ocspresp_item->baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
                 DO(ocsp_helper.getOcspIdentifier(&ocspresp_item->baOcspIdentifier));
                 DO(UapkiNS::Ocsp::generateOtherHash(
@@ -542,7 +543,21 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerSigner));
         if (sign_params.isCadesFormat) {
             UapkiNS::EssCertId ess_certid;
-            DO(get_cert_status_by_ocsp(*cer_store, sign_params, sign_params.cerSigner, sign_params.ocspRespItems));
+            CerStore::Item* cer_responder = nullptr;
+            SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
+
+            DO(get_cert_status_by_ocsp(
+                *cer_store,
+                sign_params,
+                sign_params.cerSigner,
+                &cer_responder,
+                &ocspresp_item
+            ));
+            sign_params.addServiceCert(cer_responder);
+            if (ocspresp_item) {    //  Here possible NULL, but is OK
+                sign_params.ocspRespItems.push_back(ocspresp_item);
+            }
+
             DO(sign_params.cerSigner->generateEssCertId(sign_params.aidDigest, ess_certid));
             DO(SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
             switch (sign_params.signatureFormat) {
@@ -551,7 +566,18 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             case UapkiNS::SignatureFormat::CADES_A_V3:
                 DO(cer_store->getChainCerts(sign_params.cerSigner, sign_params.chainCerts));
                 for (auto& it : sign_params.chainCerts) {
-                    DO(get_cert_status_by_ocsp(*cer_store, sign_params, it, sign_params.ocspRespItems));
+                    ocspresp_item = nullptr;
+                    DO(get_cert_status_by_ocsp(
+                        *cer_store,
+                        sign_params,
+                        it,
+                        &cer_responder,
+                        &ocspresp_item
+                    ));
+                    sign_params.addServiceCert(cer_responder);
+                    if (ocspresp_item) {    //  Here possible NULL, but is OK
+                        sign_params.ocspRespItems.push_back(ocspresp_item);
+                    }
                 }
                 break;
             }

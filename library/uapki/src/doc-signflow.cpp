@@ -43,6 +43,21 @@
 using namespace std;
 
 
+static int add_service_cert (
+        vector<CerStore::Item*>& serviceCerts,
+        CerStore::Item* cerStoreItem
+)
+{
+    for (const auto& it : serviceCerts) {
+        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == RET_OK) {
+            return false;
+        }
+    }
+
+    serviceCerts.push_back(cerStoreItem);
+    return true;
+}   //  add_service_cert
+
 static int keyid_to_sid_subjectkeyid (const ByteArray* baKeyId, ByteArray** baSubjectKeyId)
 {
     int ret = RET_OK;
@@ -117,7 +132,16 @@ SigningDoc::SignParams::~SignParams (void)
     }
 }
 
-int SigningDoc::SignParams::setSignatureFormat (const UapkiNS::SignatureFormat aSignatureFormat)
+bool SigningDoc::SignParams::addServiceCert (
+        CerStore::Item* cerStoreItem
+)
+{
+    return add_service_cert(serviceCerts, cerStoreItem);
+}
+
+int SigningDoc::SignParams::setSignatureFormat (
+        const UapkiNS::SignatureFormat aSignatureFormat
+)
 {
     switch (aSignatureFormat) {
     case UapkiNS::SignatureFormat::CADES_A_V3:      //  CADES_A_V3 > CADES_X_LONG
@@ -175,7 +199,9 @@ SigningDoc::~SigningDoc (void)
     }
 }
 
-int SigningDoc::init (const SignParams* aSignParams)
+int SigningDoc::init (
+        const SignParams* aSignParams
+)
 {
     signParams = aSignParams;
     if (!signParams) return RET_UAPKI_INVALID_PARAMETER;
@@ -208,7 +234,17 @@ cleanup:
     return ret;
 }
 
-int SigningDoc::addSignedAttribute (const string& type, ByteArray* baValues)
+bool SigningDoc::addServiceCert (
+        CerStore::Item* cerStoreItem
+)
+{
+    return add_service_cert(m_ServiceCerts, cerStoreItem);
+}
+
+int SigningDoc::addSignedAttribute (
+        const string& type,
+        ByteArray* baValues
+)
 {
     UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
     if (!attr) return RET_UAPKI_GENERAL_ERROR;
@@ -217,7 +253,10 @@ int SigningDoc::addSignedAttribute (const string& type, ByteArray* baValues)
     return RET_OK;
 }
 
-int SigningDoc::addUnsignedAttribute (const string& type, ByteArray* baValues)
+int SigningDoc::addUnsignedAttribute (
+        const string& type,
+        ByteArray* baValues
+)
 {
     UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
     if (!attr) return RET_UAPKI_GENERAL_ERROR;
@@ -277,17 +316,17 @@ int SigningDoc::buildSignedData (void)
     DO(signerInfo->setVersion(version));
 
     //  Add CAdES-unsigned attrs
-    if (attrCertificateRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(attrCertificateRefs));
+    if (m_AttrCertificateRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrCertificateRefs));
     }
-    if (attrRevocationRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(attrRevocationRefs));
+    if (m_AttrRevocationRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrRevocationRefs));
     }
-    if (attrCertValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(attrCertValues));
+    if (m_AttrCertValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrCertValues));
     }
-    if (attrRevocationValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(attrRevocationValues));
+    if (m_AttrRevocationValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrRevocationValues));
     }
 
     //  Add other unsigned attrs
@@ -313,15 +352,15 @@ int SigningDoc::buildUnsignedAttributes (void)
 
     switch (signParams->signatureFormat) {
     case UapkiNS::SignatureFormat::CADES_C:
-        DO(encodeCertificateRefs(attrCertificateRefs));
-        DO(encodeRevocationRefs(attrRevocationRefs));
+        DO(encodeCertificateRefs(m_AttrCertificateRefs));
+        DO(encodeRevocationRefs(m_AttrRevocationRefs));
         break;
     case UapkiNS::SignatureFormat::CADES_X_LONG:
     case UapkiNS::SignatureFormat::CADES_A_V3:
-        DO(encodeCertificateRefs(attrCertificateRefs));
-        DO(encodeRevocationRefs(attrRevocationRefs));
-        DO(encodeCertValues(attrCertValues));
-        DO(encodeRevocationValues(attrRevocationValues));
+        DO(encodeCertificateRefs(m_AttrCertificateRefs));
+        DO(encodeRevocationRefs(m_AttrRevocationRefs));
+        DO(encodeCertValues(m_AttrCertValues));
+        DO(encodeRevocationValues(m_AttrRevocationValues));
         break;
     default:
         break;
@@ -353,7 +392,9 @@ cleanup:
     return ret;
 }
 
-int SigningDoc::digestSignature (ByteArray** baHash)
+int SigningDoc::digestSignature (
+        ByteArray** baHash
+)
 {
     int ret = RET_OK;
 
@@ -375,7 +416,9 @@ cleanup:
     return ret;
 }
 
-int SigningDoc::setSignature (const ByteArray* baSignValue)
+int SigningDoc::setSignature (
+        const ByteArray* baSignValue
+)
 {
     int ret = RET_OK;
 

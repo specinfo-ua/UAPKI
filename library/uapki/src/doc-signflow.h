@@ -82,14 +82,21 @@ public:
         UapkiNS::Attribute
                     attrSignPolicy;
         std::vector<CerStore::Item*>
-                    chainCerts;     //  Chain for user certificate
+                    chainCerts;     //  Chain for user certificate (refs)
+        std::vector<CerStore::Item*>
+                    serviceCerts;   //  List OCSP-certificate (refs)
         std::vector<SigningDoc::OcspResponseItem*>
                     ocspRespItems;  //  All responses for user-cert and chain of user-cert
 
         SignParams (void);
         ~SignParams (void);
 
-        int setSignatureFormat (const UapkiNS::SignatureFormat signatureFormat);
+        bool addServiceCert (
+            CerStore::Item* cerStoreItem
+        );
+        int setSignatureFormat (
+            const UapkiNS::SignatureFormat signatureFormat
+        );
 
     };  //  end struct SignParams
 
@@ -107,18 +114,20 @@ public:
     ByteArray*  baHashSignedAttrs;
     ByteArray*  baSignature;
     std::string tspUri;
-    UapkiNS::Attribute
-                attrCertificateRefs;
-    UapkiNS::Attribute
-                attrRevocationRefs;
-    UapkiNS::Attribute
-                attrCertValues;
-    UapkiNS::Attribute
-                attrRevocationValues;
 
 private:
+    UapkiNS::Attribute
+                m_AttrCertificateRefs;
+    UapkiNS::Attribute
+                m_AttrRevocationRefs;
+    UapkiNS::Attribute
+                m_AttrCertValues;
+    UapkiNS::Attribute
+                m_AttrRevocationValues;
     std::vector<CerStore::Item*>
                 m_ChainCerts;
+    std::vector<CerStore::Item*>
+                m_ServiceCerts;
     std::vector<OcspResponseItem*>
                 m_OcspRespItems;
     std::vector<UapkiNS::Attribute*>
@@ -130,20 +139,36 @@ public:
     SigningDoc (void);
     ~SigningDoc (void);
 
-    int init (const SignParams* signParams);
-    int addSignedAttribute (const std::string& type, ByteArray* baValues);
-    int addUnsignedAttribute (const std::string& type, ByteArray* baValues);
+    int init (
+        const SignParams* signParams
+    );
+    bool addServiceCert (
+        CerStore::Item* cerStoreItem
+    );
+    int addSignedAttribute (
+        const std::string& type,
+        ByteArray* baValues
+    );
+    int addUnsignedAttribute (
+        const std::string& type,
+        ByteArray* baValues
+    );
     int buildSignedAttributes (void);
     int buildSignedData (void);
     int buildUnsignedAttributes (void);
     int digestMessage (void);
-    int digestSignature (ByteArray** baHash);
+    int digestSignature (
+        ByteArray** baHash
+    );
     int digestSignedAttributes (void);
-    int setSignature (const ByteArray* baSignValue);
+    int setSignature (
+        const ByteArray* baSignValue
+    );
 
     ByteArray* getEncoded (void);
 
     std::vector<CerStore::Item*>& getChainCerts (void) { return m_ChainCerts; }
+    std::vector<CerStore::Item*>& getServiceCerts (void) { return m_ServiceCerts; }
 
 public:
     static int encodeSignaturePolicy (
