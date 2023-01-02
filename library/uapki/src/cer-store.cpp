@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -60,6 +60,40 @@ using namespace std;
 static const string CER_EXT = ".cer";
 
 
+#ifdef DEBUG_CERSTOREITEM_INFO
+string debug_cerstoreitem_info_get_commonname (const Name_t& name)
+{
+    string rv_s;
+    if (name.present != Name_PR_rdnSequence) return rv_s;
+
+    for (size_t i = 0; i < name.choice.rdnSequence.list.count; i++) {
+        const RelativeDistinguishedName_t* rdname_src = name.choice.rdnSequence.list.array[i];
+        for (size_t j = 0; j < rdname_src->list.count; j++) {
+            const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
+            if (OID_is_equal_oid(&attr->type, OID_X520_CommonName)) {
+                char* s_value = nullptr;
+                int ret = asn_decode_anystring(attr->value.buf, (const size_t)attr->value.size, &s_value);
+                if (ret == RET_OK) {
+                    rv_s = string(s_value);
+                    ::free(s_value);
+                    break;
+                }
+            }
+        }
+    }
+    return rv_s;
+}   //  debug_cerstoreitem_info_get_commonname
+
+void debug_cerstoreitem_info (CerStore::Item& cerStoreItem)
+{
+    cerStoreItem.devsSubject = debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.subject);
+    cerStoreItem.devsIssuerAndSn = StrUtils::hexFromBa(cerStoreItem.baSerialNumber)
+        + string("; ") + debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.issuer);
+    cerStoreItem.devsValidity = TimeUtils::mstimeToFormat(cerStoreItem.notBefore)
+        + string(" - ") + TimeUtils::mstimeToFormat(cerStoreItem.notAfter);
+}   //  debug_cerstoreitem_info
+#endif
+
 static int encode_issuer_and_sn (const TBSCertificate_t* tbsCert, ByteArray** baIssuerAndSN)
 {
     int ret = RET_OK;
@@ -97,7 +131,9 @@ CerStore::CertStatusInfo::~CertStatusInfo (void)
     reset();
 }
 
-bool CerStore::CertStatusInfo::isExpired (const uint64_t time) const
+bool CerStore::CertStatusInfo::isExpired (
+        const uint64_t time
+) const
 {
     return (time > validTime);
 }
@@ -164,7 +200,9 @@ CerStore::Item::~Item (void)
     verifyStatus = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
 }
 
-int CerStore::Item::checkValidity (const uint64_t validateTime) const
+int CerStore::Item::checkValidity (
+        const uint64_t validateTime
+) const
 {
     if ((notBefore == 0) || (notAfter == 0)) return RET_UAPKI_TIME_ERROR;
 
@@ -183,7 +221,10 @@ int CerStore::Item::generateEssCertId (
     return CerStore::generateEssCertId(this, aidDigest, essCertId);
 }
 
-int CerStore::Item::getCrlUris (const bool isFull, vector<string>& uris) const
+int CerStore::Item::getCrlUris (
+        const bool isFull,
+        vector<string>& uris
+) const
 {
     int ret = RET_OK;
     const char* oid_extnid = isFull ? OID_X509v3_CRLDistributionPoints : OID_X509v3_FreshestCRL;
@@ -197,13 +238,17 @@ cleanup:
     return ret;
 }
 
-int CerStore::Item::getIssuerAndSN (ByteArray** baIssuerAndSN) const
+int CerStore::Item::getIssuerAndSN (
+        ByteArray** baIssuerAndSN
+) const
 {
     const int ret = encode_issuer_and_sn(&cert->tbsCertificate, baIssuerAndSN);
     return ret;
 }
 
-int CerStore::Item::getOcspUris (vector<string>& uris) const
+int CerStore::Item::getOcspUris (
+        vector<string>& uris
+) const
 {
     int ret = RET_OK;
     UapkiNS::SmartBA sba_extnvalue;
@@ -216,7 +261,9 @@ cleanup:
     return ret;
 }
 
-int CerStore::Item::getTspUris (vector<string>& uris) const
+int CerStore::Item::getTspUris (
+        vector<string>& uris
+) const
 {
     int ret = RET_OK;
     UapkiNS::SmartBA sba_extnvalue;
@@ -229,7 +276,10 @@ cleanup:
     return ret;
 }
 
-int CerStore::Item::keyUsageByBit (const uint32_t bitNum, bool& bitValue) const
+int CerStore::Item::keyUsageByBit (
+        const uint32_t bitNum,
+        bool& bitValue
+) const
 {
     const uint32_t masked_bit = (uint32_t)(1 << bitNum);
     bitValue = ((keyUsage & masked_bit) > 0);
@@ -729,6 +779,9 @@ int CerStore::parseCert (
         ba_subject = nullptr;
         s_keyalgo = nullptr;
         *item = cer_item;
+#ifdef DEBUG_CERSTOREITEM_INFO
+        debug_cerstoreitem_info(*cer_item);
+#endif
         cer_item = nullptr;
     }
 

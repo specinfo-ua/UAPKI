@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -39,6 +39,9 @@
 #include "verify-status.h"
 
 
+//#define DEBUG_CERSTOREITEM_INFO
+
+
 class CerStore {
 
 public:
@@ -61,7 +64,9 @@ public:
         );
         ~CertStatusInfo (void);
 
-        bool isExpired (const uint64_t time) const;
+        bool isExpired (
+            const uint64_t time
+        ) const;
         void reset (void);
         int set (
             const UapkiNS::CertStatus status,
@@ -72,6 +77,11 @@ public:
     };  //  end struct CertStatusInfo
 
     struct Item {
+#ifdef DEBUG_CERSTOREITEM_INFO
+        std::string devsSubject;
+        std::string devsIssuerAndSn;
+        std::string devsValidity;
+#endif
         const ByteArray*
                     baEncoded;
         const Certificate_t*
@@ -104,16 +114,29 @@ public:
         Item (void);
         ~Item (void);
 
-        int checkValidity (const uint64_t validateTime) const;
+        int checkValidity (
+            const uint64_t validateTime
+        ) const;
         int generateEssCertId (
             const UapkiNS::AlgorithmIdentifier& aidDigest,
             UapkiNS::EssCertId& essCertId
         ) const;
-        int getCrlUris (const bool isFull, std::vector<std::string>& uris) const;
-        int getIssuerAndSN (ByteArray** baIssuerAndSN) const;
-        int getOcspUris (std::vector<std::string>& uris) const;
-        int getTspUris (std::vector<std::string>& uris) const;
-        int keyUsageByBit (const uint32_t bitNum, bool& bitValue) const;
+        int getCrlUris (
+            const bool isFull, std::vector<std::string>& uris
+        ) const;
+        int getIssuerAndSN (
+            ByteArray** baIssuerAndSN
+        ) const;
+        int getOcspUris (
+            std::vector<std::string>& uris
+        ) const;
+        int getTspUris (
+            std::vector<std::string>& uris
+        ) const;
+        int keyUsageByBit (
+            const uint32_t bitNum,
+            bool& bitValue
+        ) const;
 
     };  //  end struct Item
 
