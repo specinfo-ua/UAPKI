@@ -501,8 +501,9 @@ int CerStore::getChainCerts (
     Item* cer_issuer = nullptr;
     bool is_selfsigned = false;
 
-    while (!is_selfsigned) {
+    while (true) {
         DO(getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
+        if (is_selfsigned) break;
         chainCerts.push_back(cer_issuer);
         cer_subject = cer_issuer;
     }
