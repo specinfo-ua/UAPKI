@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -48,6 +48,8 @@ static int add_service_cert (
         CerStore::Item* cerStoreItem
 )
 {
+    if (!cerStoreItem) return false;
+
     for (const auto& it : serviceCerts) {
         if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == RET_OK) {
             return false;
@@ -85,6 +87,7 @@ SigningDoc::OcspResponseItem::OcspResponseItem (void)
     : baBasicOcspResponse(nullptr)
     , baOcspIdentifier(nullptr)
     , baOcspRespHash(nullptr)
+    , cerResponder(nullptr)
 {
 }
 
@@ -100,6 +103,7 @@ int SigningDoc::OcspResponseItem::set (const OcspResponseItem& src)
     baBasicOcspResponse = ba_copy_with_alloc(src.baBasicOcspResponse, 0, 0);
     baOcspIdentifier = ba_copy_with_alloc(src.baOcspIdentifier, 0, 0);
     baOcspRespHash = ba_copy_with_alloc(src.baOcspRespHash, 0, 0);
+    cerResponder = src.cerResponder;
 
     return (baBasicOcspResponse && baOcspIdentifier && baOcspRespHash) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
@@ -107,6 +111,7 @@ int SigningDoc::OcspResponseItem::set (const OcspResponseItem& src)
 
 SigningDoc::SignParams::SignParams (void)
     : signatureFormat(UapkiNS::SignatureFormat::UNDEFINED)
+    , isCadesCXA(false)
     , isCadesFormat(false)
     , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
     , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
@@ -132,11 +137,21 @@ SigningDoc::SignParams::~SignParams (void)
     }
 }
 
-bool SigningDoc::SignParams::addServiceCert (
-        CerStore::Item* cerStoreItem
+bool SigningDoc::SignParams::addCert (
+    CerStore::Item* cerStoreItem
 )
 {
-    return add_service_cert(serviceCerts, cerStoreItem);
+    return add_service_cert(chainCerts, cerStoreItem);
+}
+
+void SigningDoc::SignParams::addOcspResponseItem (
+        OcspResponseItem* ocspRespItem
+)
+{
+    //  Here possible NULL, but is OK
+    if (ocspRespItem) {
+        ocspRespItems.push_back(ocspRespItem);
+    }
 }
 
 int SigningDoc::SignParams::setSignatureFormat (
@@ -148,12 +163,13 @@ int SigningDoc::SignParams::setSignatureFormat (
     case UapkiNS::SignatureFormat::CADES_X_LONG:    //  CADES_X_LONG > CADES_C
     case UapkiNS::SignatureFormat::CADES_C:         //  CADES_C > CADES_T
         includeCert = true;
+        isCadesCXA = true;
     case UapkiNS::SignatureFormat::CADES_T:         //  CADES_T > CADES_BES
         includeContentTS = true;
         includeSignatureTS = true;
     case UapkiNS::SignatureFormat::CADES_BES:
-        sidUseKeyId = false;
         isCadesFormat = true;
+        sidUseKeyId = false;
         break;
     case UapkiNS::SignatureFormat::CMS_SID_KEYID:
         sidUseKeyId = true;
@@ -217,10 +233,6 @@ int SigningDoc::init (
         signerInfo = builder.getSignerInfo(0);
         signerInfo->setDigestAlgorithm(signParams->aidDigest);
 
-        for (const auto& it : aSignParams->chainCerts) {
-            m_ChainCerts.push_back(it);
-        }
-
         for (const auto& it : aSignParams->ocspRespItems) {
             SigningDoc::OcspResponseItem* ocspresp_item = new SigningDoc::OcspResponseItem();
             if (!ocspresp_item) return RET_UAPKI_GENERAL_ERROR;
@@ -234,11 +246,29 @@ cleanup:
     return ret;
 }
 
-bool SigningDoc::addServiceCert (
+void SigningDoc::addCert (
         CerStore::Item* cerStoreItem
 )
 {
-    return add_service_cert(m_ServiceCerts, cerStoreItem);
+    if (!cerStoreItem) return;
+
+    for (const auto& it : signParams->chainCerts) {
+        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == RET_OK) {
+            return;
+        }
+    }
+
+    (void)add_service_cert(m_Certs, cerStoreItem);
+}
+
+void SigningDoc::addOcspResponseItem (
+        OcspResponseItem* ocspRespItem
+)
+{
+    //  Here possible NULL, but is OK
+    if (ocspRespItem) {
+        m_OcspRespItems.push_back(ocspRespItem);
+    }
 }
 
 int SigningDoc::addSignedAttribute (
@@ -349,6 +379,8 @@ cleanup:
 int SigningDoc::buildUnsignedAttributes (void)
 {
     int ret = RET_OK;
+
+    m_Certs.insert(m_Certs.begin(), signParams->chainCerts.begin(), signParams->chainCerts.end());
 
     switch (signParams->signatureFormat) {
     case UapkiNS::SignatureFormat::CADES_C:
@@ -472,9 +504,9 @@ int SigningDoc::encodeCertValues (
     int ret = RET_OK;
     vector<const ByteArray*> cert_values;
 
-    if (m_ChainCerts.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    if (m_Certs.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
-    for (const auto& it : m_ChainCerts) {
+    for (const auto& it : m_Certs) {
         cert_values.push_back(it->baEncoded);
     }
 
@@ -494,10 +526,10 @@ int SigningDoc::encodeCertificateRefs (
     vector<UapkiNS::OtherCertId> other_certids;
     size_t idx = 0;
 
-    if (m_ChainCerts.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    if (m_Certs.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
-    other_certids.resize(m_ChainCerts.size());
-    for (const auto& it : m_ChainCerts) {
+    other_certids.resize(m_Certs.size());
+    for (const auto& it : m_Certs) {
         UapkiNS::OtherCertId& dst_othercertid = other_certids[idx++];
 
         DO(::hash(signParams->hashDigest, it->baEncoded, &dst_othercertid.baHashValue));

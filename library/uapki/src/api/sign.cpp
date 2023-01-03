@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -271,7 +271,7 @@ static int add_timestamp_to_attrs (
     DO(tsp_process(sdoc, tsp_helper));
 
     DO(verify_signeddata(cerStore, sdoc, tsp_helper.getTsToken(), &cer_signer));
-    (void)sdoc.addServiceCert(cer_signer);
+    sdoc.addCert(cer_signer);
 
     switch (tsAttrType) {
     case TsAttrType::CONTENT_TIMESTAMP:
@@ -391,13 +391,13 @@ static int get_cert_status_by_ocsp (
         CerStore& cerStore,
         SigningDoc::SignParams& signParams,
         CerStore::Item* cerSubject,
-        CerStore::Item** cerResponder,
         SigningDoc::OcspResponseItem** ocspRespItem
 )
 {
     int ret = RET_OK;
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
     CerStore::Item* cer_issuer = nullptr;
+    CerStore::Item* cer_responder = nullptr;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
     bool is_selfsigned, need_update;
@@ -406,8 +406,14 @@ static int get_cert_status_by_ocsp (
     if (is_selfsigned) return RET_OK;
 
     ret = cerSubject->getOcspUris(uris);
-    if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
-        SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
+    if (ret == RET_OK) {
+        if (uris.empty()) {
+            SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
+        }
+    }
+    else {
+        ret = (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) ? RET_UAPKI_OCSP_URL_NOT_PRESENT : ret;
+        SET_ERROR(ret);
     }
 
     need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
@@ -444,7 +450,7 @@ static int get_cert_status_by_ocsp (
     DO(ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult));
 
     if (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL) {
-        DO(verify_ocsp_responsedata(cerStore, ocsp_helper, cerResponder));
+        DO(verify_ocsp_responsedata(cerStore, ocsp_helper, &cer_responder));
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
@@ -462,6 +468,7 @@ static int get_cert_status_by_ocsp (
             *ocspRespItem = new SigningDoc::OcspResponseItem();
             if (*ocspRespItem) {
                 SigningDoc::OcspResponseItem* ocspresp_item = *ocspRespItem;
+                ocspresp_item->cerResponder = cer_responder;
                 ocspresp_item->baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
                 DO(ocsp_helper.getOcspIdentifier(&ocspresp_item->baOcspIdentifier));
                 DO(UapkiNS::Ocsp::generateOtherHash(
@@ -543,43 +550,36 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerSigner));
         if (sign_params.isCadesFormat) {
             UapkiNS::EssCertId ess_certid;
-            CerStore::Item* cer_responder = nullptr;
-            SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
+            SigningDoc::OcspResponseItem* ocsprespitem_signer = nullptr;
 
             DO(get_cert_status_by_ocsp(
                 *cer_store,
                 sign_params,
                 sign_params.cerSigner,
-                &cer_responder,
-                &ocspresp_item
+                &ocsprespitem_signer
             ));
-            sign_params.addServiceCert(cer_responder);
-            if (ocspresp_item) {    //  Here possible NULL, but is OK
-                sign_params.ocspRespItems.push_back(ocspresp_item);
-            }
+            sign_params.addOcspResponseItem(ocsprespitem_signer);
 
             DO(sign_params.cerSigner->generateEssCertId(sign_params.aidDigest, ess_certid));
             DO(SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
-            switch (sign_params.signatureFormat) {
-            case UapkiNS::SignatureFormat::CADES_C:
-            case UapkiNS::SignatureFormat::CADES_X_LONG:
-            case UapkiNS::SignatureFormat::CADES_A_V3:
-                DO(cer_store->getChainCerts(sign_params.cerSigner, sign_params.chainCerts));
-                for (auto& it : sign_params.chainCerts) {
-                    ocspresp_item = nullptr;
+            if (sign_params.isCadesCXA) {
+                vector<CerStore::Item*> service_certs;
+                DO(cer_store->getChainCerts(sign_params.cerSigner, service_certs));
+                for (auto& it : service_certs) {
+                    SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
                     DO(get_cert_status_by_ocsp(
                         *cer_store,
                         sign_params,
                         it,
-                        &cer_responder,
                         &ocspresp_item
                     ));
-                    sign_params.addServiceCert(cer_responder);
-                    if (ocspresp_item) {    //  Here possible NULL, but is OK
-                        sign_params.ocspRespItems.push_back(ocspresp_item);
+                    if (sign_params.addCert(it)) {
+                        sign_params.addOcspResponseItem(ocspresp_item);
                     }
                 }
-                break;
+                if (ocsprespitem_signer) {
+                    (void)sign_params.addCert(ocsprespitem_signer->cerResponder);
+                }
             }
         }
     }
@@ -646,6 +646,40 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             if (sign_params.includeSignatureTS) {
                 DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::TIMESTAMP_TOKEN));
             }
+
+            if (sign_params.isCadesCXA) {
+                vector<CerStore::Item*> chain_servicecerts;
+                for (auto& it : sdoc.getCerts()) {
+                    DO(cer_store->getChainCerts(it, chain_servicecerts));
+                }
+                for (auto& it : chain_servicecerts) {
+                    sdoc.addCert(it);
+                }
+
+                chain_servicecerts = sdoc.getCerts();
+                for (auto& it : chain_servicecerts) {
+                    SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
+                    ret = get_cert_status_by_ocsp(
+                        *cer_store,
+                        sign_params,
+                        it,
+                        &ocspresp_item
+                    );
+                    if (ret == RET_OK) {
+                        if (ocspresp_item) {
+                            sdoc.addOcspResponseItem(ocspresp_item);
+                            sdoc.addCert(ocspresp_item->cerResponder);
+                        }
+                    }
+                    else if (ret == RET_UAPKI_OCSP_URL_NOT_PRESENT) {
+                        //  It's a nornal case - nothing
+                    }
+                    else {
+                        SET_ERROR(ret);
+                    }
+                }
+            }
+
             DO(sdoc.buildUnsignedAttributes());
             DO(sdoc.buildSignedData());
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,6 +47,8 @@ public:
         ByteArray*  baBasicOcspResponse;
         ByteArray*  baOcspIdentifier;
         ByteArray*  baOcspRespHash;
+        CerStore::Item*
+                    cerResponder;   //  ref
 
         OcspResponseItem (void);
         ~OcspResponseItem (void);
@@ -58,6 +60,7 @@ public:
     struct SignParams {
         UapkiNS::SignatureFormat
                     signatureFormat;
+        bool        isCadesCXA;
         bool        isCadesFormat;
         HashAlg     hashDigest;
         HashAlg     hashSignature;
@@ -77,22 +80,24 @@ public:
         std::vector<std::string>
                     tspUris;
         const char* tspPolicy;
+
         UapkiNS::Attribute
                     attrSigningCert;
         UapkiNS::Attribute
                     attrSignPolicy;
         std::vector<CerStore::Item*>
-                    chainCerts;     //  Chain for user certificate (refs)
-        std::vector<CerStore::Item*>
-                    serviceCerts;   //  List OCSP-certificate (refs)
-        std::vector<SigningDoc::OcspResponseItem*>
+                    chainCerts;     //  refs[] - chain certs for user certificate and OCSP-cert
+        std::vector<OcspResponseItem*>
                     ocspRespItems;  //  All responses for user-cert and chain of user-cert
 
         SignParams (void);
         ~SignParams (void);
 
-        bool addServiceCert (
+        bool addCert (
             CerStore::Item* cerStoreItem
+        );
+        void addOcspResponseItem (
+            OcspResponseItem* ocspRespItem
         );
         int setSignatureFormat (
             const UapkiNS::SignatureFormat signatureFormat
@@ -125,9 +130,7 @@ private:
     UapkiNS::Attribute
                 m_AttrRevocationValues;
     std::vector<CerStore::Item*>
-                m_ChainCerts;
-    std::vector<CerStore::Item*>
-                m_ServiceCerts;
+                m_Certs;
     std::vector<OcspResponseItem*>
                 m_OcspRespItems;
     std::vector<UapkiNS::Attribute*>
@@ -142,8 +145,11 @@ public:
     int init (
         const SignParams* signParams
     );
-    bool addServiceCert (
+    void addCert (
         CerStore::Item* cerStoreItem
+    );
+    void addOcspResponseItem (
+        OcspResponseItem* ocspRespItem
     );
     int addSignedAttribute (
         const std::string& type,
@@ -167,8 +173,7 @@ public:
 
     ByteArray* getEncoded (void);
 
-    std::vector<CerStore::Item*>& getChainCerts (void) { return m_ChainCerts; }
-    std::vector<CerStore::Item*>& getServiceCerts (void) { return m_ServiceCerts; }
+    std::vector<CerStore::Item*> getCerts (void) { return m_Certs; }
 
 public:
     static int encodeSignaturePolicy (
