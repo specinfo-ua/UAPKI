@@ -402,6 +402,8 @@ static int get_cert_status_by_ocsp (
     vector<string> shuffled_uris, uris;
     bool is_selfsigned, need_update;
 
+    DO(cerSubject->checkValidity(TimeUtils::nowMsTime()));
+
     DO(cerStore.getIssuerCert(cerSubject, &cer_issuer, is_selfsigned));
     if (is_selfsigned) return RET_OK;
 
