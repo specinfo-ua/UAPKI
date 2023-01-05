@@ -123,7 +123,6 @@ SigningDoc::SignParams::SignParams (void)
     , includeContentTS(false)
     , includeSignatureTS(false)
     , sidUseKeyId(false)
-    , tspPolicy(nullptr)
 {
 }
 

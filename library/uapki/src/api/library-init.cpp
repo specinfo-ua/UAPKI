@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,6 +30,7 @@
 #include "global-objects.h"
 #include "http-helper.h"
 #include "parson-helper.h"
+#include "tsp-helper.h"
 #include "uapki-ns.h"
 
 
@@ -138,8 +139,17 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
     int ret = RET_OK;
     LibraryConfig::TspParams tsp_params;
 
+    //  =certReq=
+    tsp_params.certReq = ParsonHelper::jsonObjectGetBoolean(joParams, "certReq", false);
+
     //  =forced=
     tsp_params.forced = ParsonHelper::jsonObjectGetBoolean(joParams, "forced", false);
+
+    //  =nonceLen=
+    tsp_params.nonceLen = ParsonHelper::jsonObjectGetUint32(joParams, "nonceLen", LibraryConfig::NONCE_LEN_DEFAULT);
+    if ((tsp_params.nonceLen < UapkiNS::Tsp::NONCE_MINLEN) || (tsp_params.nonceLen > UapkiNS::Tsp::NONCE_MAXLEN)) {
+        tsp_params.nonceLen = 0;
+    }
 
     //  =policyId=
     tsp_params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");

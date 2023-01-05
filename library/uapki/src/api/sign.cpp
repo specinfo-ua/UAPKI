@@ -135,69 +135,11 @@ cleanup:
     return ret;
 }   //  parse_sign_params
 
-static int tsp_process (SigningDoc& sdoc, UapkiNS::Tsp::TspHelper& tspHelper)
-{
-    int ret = RET_OK;
-    UapkiNS::SmartBA sba_resp, sba_tstinfo, sba_tstoken;
-
-    DO(tspHelper.genNonce(8));
-    //DO(tspHelper.setCertReq(param_certreq));
-    if (sdoc.signParams->tspPolicy) {
-        DO(tspHelper.setReqPolicy(string(sdoc.signParams->tspPolicy)));
-    }
-
-    DO(tspHelper.encodeRequest());
-
-    if (sdoc.tspUri.empty()) {
-        const vector<string> shuffled_uris = HttpHelper::randomURIs(sdoc.signParams->tspUris);
-        for (auto& it : shuffled_uris) {
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
-            ret = HttpHelper::post(
-                it.c_str(),
-                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-                tspHelper.getRequestEncoded(),
-                &sba_resp
-            );
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
-            if (ret == RET_OK) {
-                sdoc.tspUri = it.c_str();
-                break;
-            }
-        }
-    }
-    else {
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
-        ret = HttpHelper::post(
-            sdoc.tspUri.c_str(),
-            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-            tspHelper.getRequestEncoded(),
-            &sba_resp
-        );
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
-    }
-    if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
-    }
-
-    DO(tspHelper.parseResponse(sba_resp.get()));
-    if (
-        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED) &&
-        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED_WITHMODS)
-    ) {
-        SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
-    }
-
-    DO(tspHelper.tstInfoIsEqualRequest());
-
-cleanup:
-    return ret;
-}   //  tsp_process
-
 static int verify_signeddata (
-        CerStore& cerStore,
-        SigningDoc& sdoc,
-        const ByteArray* baEncoded,
-        CerStore::Item** cerSigner
+    CerStore& cerStore,
+    SigningDoc& sdoc,
+    const ByteArray* baEncoded,
+    CerStore::Item** cerSigner
 )
 {
     int ret = RET_OK;
@@ -243,6 +185,73 @@ cleanup:
     return ret;
 }   //  verify_signeddata
 
+static int tsp_process (
+        CerStore& cerStore,
+        SigningDoc& sdoc,
+        UapkiNS::Tsp::TspHelper& tspHelper
+)
+{
+    int ret = RET_OK;
+    const LibraryConfig::TspParams& tsp_params = sdoc.signParams->tsp;
+    UapkiNS::SmartBA sba_resp, sba_tstinfo, sba_tstoken;
+    CerStore::Item* cer_signer = nullptr;
+
+    if (tsp_params.nonceLen > 0) {
+        DO(tspHelper.genNonce(tsp_params.nonceLen));
+    }
+    DO(tspHelper.setCertReq(tsp_params.certReq));
+    DO(tspHelper.setReqPolicy(tsp_params.policyId));
+
+    DO(tspHelper.encodeRequest());
+
+    if (sdoc.tspUri.empty()) {
+        const vector<string> shuffled_uris = HttpHelper::randomURIs(tsp_params.uris);
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
+            ret = HttpHelper::post(
+                it.c_str(),
+                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+                tspHelper.getRequestEncoded(),
+                &sba_resp
+            );
+            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
+            if (ret == RET_OK) {
+                sdoc.tspUri = it.c_str();
+                break;
+            }
+        }
+    }
+    else {
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
+        ret = HttpHelper::post(
+            sdoc.tspUri.c_str(),
+            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+            tspHelper.getRequestEncoded(),
+            &sba_resp
+        );
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
+    }
+    if (ret != RET_OK) {
+        SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
+    }
+
+    DO(tspHelper.parseResponse(sba_resp.get()));
+    if (
+        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED) &&
+        (tspHelper.getStatus() != UapkiNS::Tsp::PkiStatus::GRANTED_WITHMODS)
+    ) {
+        SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
+    }
+
+    DO(verify_signeddata(cerStore, sdoc, tspHelper.getTsToken(), &cer_signer));
+    sdoc.addCert(cer_signer);
+
+    DO(tspHelper.tstInfoIsEqualRequest());
+
+cleanup:
+    return ret;
+}   //  tsp_process
+
 static int add_timestamp_to_attrs (
         CerStore& cerStore,
         SigningDoc& sdoc,
@@ -252,7 +261,6 @@ static int add_timestamp_to_attrs (
     int ret = RET_OK;
     UapkiNS::Tsp::TspHelper tsp_helper;
     UapkiNS::SmartBA sba_hash;
-    CerStore::Item* cer_signer;
 
     DO(tsp_helper.init());
 
@@ -268,10 +276,7 @@ static int add_timestamp_to_attrs (
         break;
     }
 
-    DO(tsp_process(sdoc, tsp_helper));
-
-    DO(verify_signeddata(cerStore, sdoc, tsp_helper.getTsToken(), &cer_signer));
-    sdoc.addCert(cer_signer);
+    DO(tsp_process(cerStore, sdoc, tsp_helper));
 
     switch (tsAttrType) {
     case TsAttrType::CONTENT_TIMESTAMP:
@@ -588,24 +593,27 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
     if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
         const LibraryConfig::TspParams& tsp_config = config->getTsp();
-        sign_params.tspPolicy = (!tsp_config.policyId.empty()) ? tsp_config.policyId.c_str() : nullptr;
+        LibraryConfig::TspParams& tsp_params = sign_params.tsp;
+        tsp_params.certReq = tsp_config.certReq;
+        tsp_params.nonceLen = tsp_config.nonceLen;
+        tsp_params.policyId = tsp_config.policyId;
         if (sign_params.cerSigner) {
             if (tsp_config.forced && !tsp_config.uris.empty()) {
-                sign_params.tspUris = tsp_config.uris;
+                tsp_params.uris = tsp_config.uris;
             }
             else {
-                ret = sign_params.cerSigner->getTspUris(sign_params.tspUris);
+                ret = sign_params.cerSigner->getTspUris(tsp_params.uris);
                 if (ret != RET_OK) {
-                    sign_params.tspUris = tsp_config.uris;
+                    tsp_params.uris = tsp_config.uris;
                     ret = RET_OK;
                 }
             }
         }
         else {
-            sign_params.tspUris = tsp_config.uris;
+            tsp_params.uris = tsp_config.uris;
         }
 
-        if (sign_params.tspUris.empty()) {
+        if (tsp_params.uris.empty()) {
             SET_ERROR(RET_UAPKI_TSP_URL_NOT_PRESENT);
         }
     }

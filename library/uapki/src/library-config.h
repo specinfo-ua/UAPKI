@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,19 +33,24 @@
 #include <vector>
 
 
-using namespace std;
-
-
 class LibraryConfig {
 public:
+    static const size_t NONCE_LEN_DEFAULT   = 8;
+
     struct TspParams {
+        bool    certReq;
         bool    forced;
-        string  policyId;
-        vector<string>
+        size_t  nonceLen;
+        std::string
+                policyId;
+        std::vector<std::string>
                 uris;
 
         TspParams (void)
-            : forced(false) {
+            : certReq(false)
+            , forced(false)
+            , nonceLen(NONCE_LEN_DEFAULT)
+        {
         }
     };  //  end struct TspParams
 
@@ -72,7 +77,9 @@ public:
     void setInitialized (bool isInitialized) { m_IsInitialized = isInitialized; }
     void setOffline (bool offline) { m_Offline = offline; }
     void setTsp (const TspParams& params) {
+        m_TspParams.certReq = params.certReq;
         m_TspParams.forced = params.forced;
+        m_TspParams.nonceLen = params.nonceLen;
         m_TspParams.policyId = params.policyId;
         m_TspParams.uris = params.uris;
     }

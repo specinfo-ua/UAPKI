@@ -28,15 +28,12 @@
 #ifndef DOC_SIGNFLOW_H
 #define DOC_SIGNFLOW_H
 
-#include "uapkic.h"
-#include "uapkif.h"
 #include "cer-store.h"
+#include "library-config.h"
 #include "ocsp-helper.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
 #include "uapki-ns.h"
-#include <string>
-#include <vector>
 
 
 class SigningDoc {
@@ -77,10 +74,8 @@ public:
         bool        includeContentTS;
         bool        includeSignatureTS;
         bool        sidUseKeyId;
-        std::vector<std::string>
-                    tspUris;
-        const char* tspPolicy;
-
+        LibraryConfig::TspParams
+                    tsp;
         UapkiNS::Attribute
                     attrSigningCert;
         UapkiNS::Attribute
