@@ -496,6 +496,9 @@ static int get_cert_status_by_ocsp (
             break;
         }
     }
+    else {
+        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_NOT_SUCCESSFUL);
+    }
 
 cleanup:
     return ret;
@@ -692,6 +695,8 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
             DO(sdoc.buildUnsignedAttributes());
             DO(sdoc.buildSignedData());
+
+            //TODO: if CADES_A_V3 then {..}
         }
     }
     else {
