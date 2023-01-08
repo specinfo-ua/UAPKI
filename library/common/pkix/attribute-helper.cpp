@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-30
+//  Last update: 2023-01-09
 
 
 #include "attribute-helper.h"
@@ -373,6 +373,178 @@ int encodeSigningCertificate (
 cleanup:
     asn_free(get_SigningCertificateV2_desc(), signing_certv2);
     asn_free(get_ESSCertIDv2_desc(), ess_certidv2);
+    return ret;
+}
+
+
+AtsHashIndexBuilder::AtsHashIndexBuilder (void)
+    : m_AtsHashIndexDefault(nullptr)
+    , m_AtsHashIndexFull(nullptr)
+    , m_BaEncoded(nullptr)
+{
+    DEBUG_OUTCON(puts("AtsHashIndexBuilder::AtsHashIndexBuilder()"));
+}
+
+AtsHashIndexBuilder::~AtsHashIndexBuilder (void)
+{
+    DEBUG_OUTCON(puts("AtsHashIndexBuilder::~AtsHashIndexBuilder()"));
+    asn_free(get_ATSHashIndexDefault_desc(), m_AtsHashIndexDefault);
+    asn_free(get_ATSHashIndexFull_desc(), m_AtsHashIndexFull);
+    ba_free(m_BaEncoded);
+}
+
+int AtsHashIndexBuilder::init (const char* hashIndAlgorithm, const ByteArray* baParameters)
+{
+    if (!hashIndAlgorithm || (strlen(hashIndAlgorithm) < 2)) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (oid_is_equal(OID_SHA256, hashIndAlgorithm)) {
+        m_AtsHashIndexDefault = (ATSHashIndexDefault_t*)calloc(1, sizeof(ATSHashIndexDefault_t));
+        return (m_AtsHashIndexDefault) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    }
+
+    m_AtsHashIndexFull = (ATSHashIndexFull_t*)calloc(1, sizeof(ATSHashIndexFull_t));
+    if (!m_AtsHashIndexFull) return RET_UAPKI_GENERAL_ERROR;
+
+    return Util::algorithmIdentifierToAsn1(m_AtsHashIndexFull->hashIndAlgorithm, hashIndAlgorithm, baParameters);
+}
+
+int AtsHashIndexBuilder::init (const AlgorithmIdentifier& hashIndAlgorithm)
+{
+    return init(hashIndAlgorithm.algorithm.c_str(), hashIndAlgorithm.baParameters);
+}
+
+int AtsHashIndexBuilder::addHashCert (const ByteArray* baCertEncoded)
+{
+    if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    CertificatesHashIndex_t& certs_hashindex = (m_AtsHashIndexDefault)
+        ? m_AtsHashIndexDefault->certificatesHashIndex : m_AtsHashIndexFull->certificatesHashIndex;
+    OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
+    if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
+
+    DO(asn_ba2OCTSTRING(baCertEncoded, octet_str));
+    DO(ASN_SEQUENCE_ADD(&certs_hashindex.list, octet_str));
+    octet_str = nullptr;
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_str);
+    return ret;
+}
+
+int AtsHashIndexBuilder::addHashCrl (const ByteArray* baCrlEncoded)
+{
+    if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    CrlsHashIndex_t& crls_hashindex = (m_AtsHashIndexDefault)
+        ? m_AtsHashIndexDefault->crlsHashIndex : m_AtsHashIndexFull->crlsHashIndex;
+    OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
+    if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
+
+    DO(asn_ba2OCTSTRING(baCrlEncoded, octet_str));
+    DO(ASN_SEQUENCE_ADD(&crls_hashindex.list, octet_str));
+    octet_str = nullptr;
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_str);
+    return ret;
+}
+
+int AtsHashIndexBuilder::addHashUnsignedAttr (const ByteArray* baAttrEncoded)
+{
+    if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    UnsignedAttrsHashIndex_t& unsattrs_hashindex = (m_AtsHashIndexDefault)
+        ? m_AtsHashIndexDefault->unsignedAttrsHashIndex : m_AtsHashIndexFull->unsignedAttrsHashIndex;
+    OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
+    if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
+
+    DO(asn_ba2OCTSTRING(baAttrEncoded, octet_str));
+    DO(ASN_SEQUENCE_ADD(&unsattrs_hashindex.list, octet_str));
+    octet_str = nullptr;
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_str);
+    return ret;
+}
+
+int AtsHashIndexBuilder::encode (void)
+{
+    int ret = RET_UAPKI_INVALID_PARAMETER;
+    if (m_AtsHashIndexDefault) {
+        ret = asn_encode_ba(get_ATSHashIndexDefault_desc(), m_AtsHashIndexDefault, &m_BaEncoded);
+    }
+    else if (m_AtsHashIndexFull) {
+        ret = asn_encode_ba(get_ATSHashIndexFull_desc(), m_AtsHashIndexFull, &m_BaEncoded);
+    }
+    return ret;
+}
+
+ByteArray* AtsHashIndexBuilder::getEncoded (const bool move)
+{
+    ByteArray* rv_ba = m_BaEncoded;
+    if (move) {
+        m_BaEncoded = nullptr;
+    }
+    return rv_ba;
+}
+
+
+AtsHashIndexParser::AtsHashIndexParser (void)
+{
+    DEBUG_OUTCON(puts("AtsHashIndexParser::AtsHashIndexParser()"));
+}
+
+AtsHashIndexParser::~AtsHashIndexParser (void)
+{
+    DEBUG_OUTCON(puts("AtsHashIndexParser::~AtsHashIndexParser()"));
+}
+
+static int parse_sequence_of_octet_string (CertificatesHashIndex_t& asnHashIndex, VectorBA& vbaResult)
+{
+    int ret = RET_OK;
+    ByteArray* ba_hash = nullptr;
+
+    for (int i = 0; i < asnHashIndex.list.count; i++) {
+        DO(asn_OCTSTRING2ba(asnHashIndex.list.array[i], &ba_hash));
+        vbaResult.push_back(ba_hash);
+        ba_hash = nullptr;
+    }
+
+cleanup:
+    ba_free(ba_hash);
+    return ret;
+}
+
+int AtsHashIndexParser::parse (const ByteArray* baEncoded)
+{
+    int ret = RET_OK;
+    ATSHashIndexDefault_t* ats_hashinddef = nullptr;
+    ATSHashIndexFull_t* ats_hashindfull = nullptr;
+
+    ats_hashindfull = (ATSHashIndexFull_t*)asn_decode_ba_with_alloc(get_ATSHashIndexFull_desc(), baEncoded);
+    if (ats_hashindfull) {
+        DO(Util::algorithmIdentifierFromAsn1(ats_hashindfull->hashIndAlgorithm, m_HashIndAlgorithm));
+        DO(parse_sequence_of_octet_string(ats_hashindfull->certificatesHashIndex, m_CertsHashIndex));
+        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashindfull->crlsHashIndex, m_CrlsHashIndex));
+        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashindfull->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
+    }
+    else {
+        ats_hashinddef = (ATSHashIndexDefault_t*)asn_decode_ba_with_alloc(get_ATSHashIndexDefault_desc(), baEncoded);
+        if (!ats_hashinddef) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+        m_HashIndAlgorithm.algorithm = string(OID_SHA256);
+        DO(parse_sequence_of_octet_string(ats_hashinddef->certificatesHashIndex, m_CertsHashIndex));
+        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashinddef->crlsHashIndex, m_CrlsHashIndex));
+        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashinddef->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
+    }
+
+cleanup:
+    asn_free(get_ATSHashIndexDefault_desc(), ats_hashinddef);
+    asn_free(get_ATSHashIndexFull_desc(), ats_hashindfull);
     return ret;
 }
 

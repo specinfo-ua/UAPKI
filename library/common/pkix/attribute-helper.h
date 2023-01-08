@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-30
+//  Last update: 2023-01-09
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -33,6 +33,7 @@
 
 #include "uapki-ns.h"
 #include "byte-array.h"
+#include "ATSHashIndex.h"
 #include "CompleteRevocationRefs.h"
 #include "CrlOcspRef.h"
 #include "RevocationValues.h"
@@ -98,6 +99,48 @@ namespace AttributeHelper {
         const std::vector<EssCertId>& essCertIds,
         ByteArray** baEncoded
     );
+
+    class AtsHashIndexBuilder {
+        ATSHashIndexDefault_t*
+                    m_AtsHashIndexDefault;
+        ATSHashIndexFull_t*
+                    m_AtsHashIndexFull;
+        ByteArray*  m_BaEncoded;
+
+    public:
+        AtsHashIndexBuilder (void);
+        ~AtsHashIndexBuilder (void);
+
+        int init (const char* hashIndAlgorithm, const ByteArray* baParameters = nullptr);
+        int init (const AlgorithmIdentifier& hashIndAlgorithm);
+        int addHashCert (const ByteArray* baCertEncoded);
+        int addHashCrl (const ByteArray* baCrlEncoded);
+        int addHashUnsignedAttr (const ByteArray* baAttrEncoded);
+
+        int encode (void);
+        ByteArray* getEncoded (const bool move = false);
+
+    };  //  AtsHashIndexBuilder
+
+    class AtsHashIndexParser {
+        AlgorithmIdentifier
+                    m_HashIndAlgorithm;
+        VectorBA    m_CertsHashIndex;
+        VectorBA    m_CrlsHashIndex;
+        VectorBA    m_UnsignedAttrsHashIndex;
+
+    public:
+        AtsHashIndexParser (void);
+        ~AtsHashIndexParser (void);
+
+        int parse (const ByteArray* baEncoded);
+
+        const VectorBA& getCertsHashIndex (void) const { return m_CertsHashIndex; }
+        const VectorBA& getCrlsHashIndex (void) const { return m_CrlsHashIndex; }
+        const AlgorithmIdentifier& getHashIndAlgorithm (void) const { return m_HashIndAlgorithm; }
+        const VectorBA& getUnsignedAttrsHashIndex (void) const { return m_UnsignedAttrsHashIndex; }
+
+    };  //  AtsHashIndexParser
 
     class RevocationRefsBuilder {
     public:
