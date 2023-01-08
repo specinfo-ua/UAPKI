@@ -930,6 +930,9 @@
     <ClInclude Include="include\SignerInfoEx.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\ATSHashIndex.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\struct\AccessDescription.c">
@@ -1821,6 +1824,12 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\SignerInfoEx.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ATSHashIndexDefault.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ATSHashIndexFull.c">
       <Filter>src\struct</Filter>
     </ClCompile>
   </ItemGroup>

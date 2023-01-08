@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright 2023 The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -44,6 +44,7 @@
 #include "asn_SEQUENCE_OF.h"
 #include "asn_SET_OF.h"
 #include "asn_system.h"
+#include "ATSHashIndex.h"
 #include "AttCertIssuer.h"
 #include "AttCertValidityPeriod.h"
 #include "AttCertVersion.h"

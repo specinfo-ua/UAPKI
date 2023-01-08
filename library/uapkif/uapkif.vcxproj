@@ -34,6 +34,7 @@
     <ClInclude Include="include\asn_SEQUENCE_OF.h" />
     <ClInclude Include="include\asn_SET_OF.h" />
     <ClInclude Include="include\asn_system.h" />
+    <ClInclude Include="include\ATSHashIndex.h" />
     <ClInclude Include="include\AttCertIssuer.h" />
     <ClInclude Include="include\AttCertValidityPeriod.h" />
     <ClInclude Include="include\AttCertVersion.h" />
@@ -379,6 +380,8 @@
     <ClCompile Include="src\struct\AdministrationDomainName.c" />
     <ClCompile Include="src\struct\AlgorithmIdentifier.c" />
     <ClCompile Include="src\struct\AlgorithmIdentifiers.c" />
+    <ClCompile Include="src\struct\ATSHashIndexDefault.c" />
+    <ClCompile Include="src\struct\ATSHashIndexFull.c" />
     <ClCompile Include="src\struct\AttCertIssuer.c" />
     <ClCompile Include="src\struct\AttCertValidityPeriod.c" />
     <ClCompile Include="src\struct\AttCertVersion.c" />
