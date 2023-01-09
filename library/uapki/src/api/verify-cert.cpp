@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -135,7 +135,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
         }
 
         bool is_unique;
-        DO(crlStore.addCrl(sba_crl.get(), false, is_unique, nullptr));
+        DO(crlStore.addCrl(sba_crl.get(), true, is_unique, nullptr));
         sba_crl.set(nullptr);
 
         crl = crlStore.getCrl(cerIssuer->baKeyId, crl_type);
@@ -345,6 +345,7 @@ cleanup:
 static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIssuer, CerStore::Item* cerSubject, CerStore& cerStore)
 {
     int ret = RET_OK;
+    const LibraryConfig::OcspParams& ocsp_params = get_config()->getOcsp();
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
@@ -366,7 +367,9 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     if (need_update) {
         DO(ocsp_helper.init());
         DO(ocsp_helper.addCert(cerIssuer, cerSubject));
-        DO(ocsp_helper.genNonce(20));
+        if (ocsp_params.nonceLen > 0) {
+            DO(ocsp_helper.genNonce(ocsp_params.nonceLen));
+        }
         DO(ocsp_helper.encodeRequest());
 
         shuffled_uris = HttpHelper::randomURIs(uris);
@@ -435,8 +438,11 @@ cleanup:
 
 int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
+    CerStore* cer_store = get_cerstore();
+    LibraryConfig* config = get_config();
+    if (!cer_store || !config) return RET_UAPKI_GENERAL_ERROR;
+
     int ret = RET_OK;
-    CerStore* cer_store = nullptr;
     CerStore::Item* cer_issuer = nullptr;
     CerStore::Item* cer_parsed = nullptr;
     CerStore::Item* cer_subject = nullptr;
@@ -448,11 +454,6 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     uint64_t validate_time = 0;
 
     DO(parse_validation_type(ParsonHelper::jsonObjectGetString(joParams, "validationType"), validation_type));
-
-    cer_store = get_cerstore();
-    if (!cer_store) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
 
     ba_encoded = json_object_get_base64(joParams, "bytes");
     if (ba_encoded) {

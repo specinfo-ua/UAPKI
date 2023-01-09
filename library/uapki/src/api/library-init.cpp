@@ -29,6 +29,7 @@
 #include "asn1-ba-utils.h"
 #include "global-objects.h"
 #include "http-helper.h"
+#include "ocsp-helper.h"
 #include "parson-helper.h"
 #include "tsp-helper.h"
 #include "uapki-ns.h"
@@ -134,9 +135,22 @@ cleanup:
     return ret;
 }   //  setup_crl_cache
 
+static int setup_ocsp (LibraryConfig& libConfig, JSON_Object* joParams)
+{
+    LibraryConfig::OcspParams ocsp_params;
+
+    //  =nonceLen=
+    ocsp_params.nonceLen = ParsonHelper::jsonObjectGetUint32(joParams, "nonceLen", LibraryConfig::OcspParams::NONCE_LEN_DEFAULT);
+    if ((ocsp_params.nonceLen < UapkiNS::Ocsp::NONCE_MINLEN) || (ocsp_params.nonceLen > UapkiNS::Ocsp::NONCE_MAXLEN)) {
+        ocsp_params.nonceLen = 0;
+    }
+
+    libConfig.setOcsp(ocsp_params);
+    return RET_OK;
+}   //  setup_ocsp
+
 static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
 {
-    int ret = RET_OK;
     LibraryConfig::TspParams tsp_params;
 
     //  =certReq=
@@ -146,7 +160,7 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
     tsp_params.forced = ParsonHelper::jsonObjectGetBoolean(joParams, "forced", false);
 
     //  =nonceLen=
-    tsp_params.nonceLen = ParsonHelper::jsonObjectGetUint32(joParams, "nonceLen", LibraryConfig::NONCE_LEN_DEFAULT);
+    tsp_params.nonceLen = ParsonHelper::jsonObjectGetUint32(joParams, "nonceLen", LibraryConfig::TspParams::NONCE_LEN_DEFAULT);
     if ((tsp_params.nonceLen < UapkiNS::Tsp::NONCE_MINLEN) || (tsp_params.nonceLen > UapkiNS::Tsp::NONCE_MAXLEN)) {
         tsp_params.nonceLen = 0;
     }
@@ -175,7 +189,7 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
     }
 
     libConfig.setTsp(tsp_params);
-    return ret;
+    return RET_OK;
 }   //  setup_tsp
 
 
@@ -221,6 +235,8 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     DO(setup_cert_cache(json_object_get_object(jo_refparams, "certCache")));
 
     DO(setup_crl_cache(json_object_get_object(jo_refparams, "crlCache")));
+
+    DO(setup_ocsp(*lib_config, json_object_get_object(jo_refparams, "ocsp")));
 
     offline = ParsonHelper::jsonObjectGetBoolean(jo_refparams, "offline", false);
     lib_config->setOffline(offline);

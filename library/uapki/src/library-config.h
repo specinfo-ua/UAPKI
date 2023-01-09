@@ -35,9 +35,20 @@
 
 class LibraryConfig {
 public:
-    static const size_t NONCE_LEN_DEFAULT   = 8;
+    struct OcspParams {
+        static const size_t NONCE_LEN_DEFAULT = 20;
+
+        size_t  nonceLen;
+
+        OcspParams (void)
+            : nonceLen (NONCE_LEN_DEFAULT)
+        {
+        }
+    };  //  end struct OcspParams
 
     struct TspParams {
+        static const size_t NONCE_LEN_DEFAULT = 8;
+
         bool    certReq;
         bool    forced;
         size_t  nonceLen;
@@ -56,6 +67,8 @@ public:
 
 private:
     bool    m_IsInitialized;
+    OcspParams
+            m_OcspParams;
     bool    m_Offline;
     TspParams
             m_TspParams;
@@ -70,18 +83,22 @@ public:
         m_IsInitialized = false;
     }
 
+    const OcspParams& getOcsp (void) const { return m_OcspParams; }
     bool getOffline (void) const { return m_Offline; }
     const TspParams& getTsp (void) const { return m_TspParams; }
     bool isInitialized (void) const { return m_IsInitialized; }
 
     void setInitialized (bool isInitialized) { m_IsInitialized = isInitialized; }
+    void setOcsp (const OcspParams& ocspParams) {
+        m_OcspParams.nonceLen = ocspParams.nonceLen;
+    }
     void setOffline (bool offline) { m_Offline = offline; }
-    void setTsp (const TspParams& params) {
-        m_TspParams.certReq = params.certReq;
-        m_TspParams.forced = params.forced;
-        m_TspParams.nonceLen = params.nonceLen;
-        m_TspParams.policyId = params.policyId;
-        m_TspParams.uris = params.uris;
+    void setTsp (const TspParams& tspParams) {
+        m_TspParams.certReq = tspParams.certReq;
+        m_TspParams.forced = tspParams.forced;
+        m_TspParams.nonceLen = tspParams.nonceLen;
+        m_TspParams.policyId = tspParams.policyId;
+        m_TspParams.uris = tspParams.uris;
     }
 
 };  //  end class LibraryConfig

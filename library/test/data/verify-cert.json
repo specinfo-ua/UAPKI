@@ -21,6 +21,9 @@
         "crlCache": {
           "path": "certs/crls/"
         },
+        "ocsp": {
+          "nonceLen": 20
+        },
         "offline": false,
         "reportTime": false
       }
