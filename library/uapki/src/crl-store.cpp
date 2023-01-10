@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -66,18 +66,22 @@ static const char* CRL_REASON_STRINGS[12] = {
 };
 
 
-static int encode_crlid (const Name_t* nameIssuer, const ByteArray* baCrlNumber, ByteArray** baIssuerAndSN)
+static int encode_crlid (
+        const TBSCertList_t* tbs,
+        const ByteArray* baCrlNumber,
+        ByteArray** baIssuerAndSN
+)
 {
     int ret = RET_OK;
     IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
 
-    CHECK_PARAM(nameIssuer != nullptr);
+    CHECK_PARAM(tbs != nullptr);
     CHECK_PARAM(baCrlNumber != nullptr);
     CHECK_PARAM(baIssuerAndSN != nullptr);
 
     CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
 
-    DO(asn_copy(get_Name_desc(), nameIssuer, &issuer_and_sn->issuer));
+    DO(asn_copy(get_Name_desc(), &tbs->issuer, &issuer_and_sn->issuer));
     DO(asn_ba2INTEGER(baCrlNumber, &issuer_and_sn->serialNumber));
 
     DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
@@ -87,13 +91,62 @@ cleanup:
     return ret;
 }   //  encode_crlid
 
+static int encode_crlidentifier (
+        const TBSCertList_t* tbs,
+        const ByteArray* baCrlNumber,
+        ByteArray** baCrlIdentifier
+)
+{
+    int ret = RET_OK;
+    CrlIdentifier_t* crl_ident = nullptr;
+    ByteArray* ba_crlissuedtime = nullptr;
+
+    CHECK_PARAM(tbs != nullptr);
+    CHECK_PARAM(baCrlIdentifier != nullptr);
+
+    CHECK_NOT_NULL(crl_ident = (CrlIdentifier_t*)calloc(1, sizeof(CrlIdentifier_t)));
+
+    DO(asn_copy(get_Name_desc(), &tbs->issuer, &crl_ident->crlissuer));
+    switch (tbs->thisUpdate.present) {
+    case PKIXTime_PR_utcTime:
+        DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.utcTime, &ba_crlissuedtime));
+        DO(asn_ba2OCTSTRING(ba_crlissuedtime, &crl_ident->crlIssuedTime));
+        break;
+    case PKIXTime_PR_generalTime:
+        DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.generalTime, &ba_crlissuedtime));
+        DO(asn_bytes2OCTSTRING(&crl_ident->crlIssuedTime, ba_get_buf_const(ba_crlissuedtime) + 2, ba_get_len(ba_crlissuedtime) - 2));
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    if (baCrlNumber) {
+        CHECK_NOT_NULL(crl_ident->crlNumber = (INTEGER_t*)calloc(1, sizeof(INTEGER_t)));
+        DO(asn_ba2INTEGER(baCrlNumber, crl_ident->crlNumber));
+    }
+
+    DO(asn_encode_ba(get_CrlIdentifier_desc(), crl_ident, baCrlIdentifier));
+
+cleanup:
+    asn_free(get_CrlIdentifier_desc(), crl_ident);
+    ba_free(ba_crlissuedtime);
+    return ret;
+}   //  encode_crlidentifier
+
 
 CrlStore::Item::Item (const CrlType iType)
-    : actuality(Actuality::UNDEFINED), type(iType)
-    , baEncoded(nullptr), crl(nullptr), baCrlId(nullptr)
-    , baIssuer(nullptr), thisUpdate(0), nextUpdate(0)
-    , baAuthorityKeyId(nullptr), baCrlNumber(nullptr), baDeltaCrl(nullptr)
+    : actuality(Actuality::UNDEFINED)
+    , type(iType)
+    , baEncoded(nullptr)
+    , crl(nullptr)
+    , baCrlId(nullptr)
+    , baIssuer(nullptr)
+    , thisUpdate(0)
+    , nextUpdate(0)
+    , baAuthorityKeyId(nullptr)
+    , baCrlNumber(nullptr)
+    , baDeltaCrl(nullptr)
     , statusSign(SIGNATURE_VERIFY::STATUS::UNDEFINED)
+    , baCrlIdentifier(nullptr)
 {}
 
 CrlStore::Item::~Item (void)
@@ -109,6 +162,7 @@ CrlStore::Item::~Item (void)
     ba_free((ByteArray*)baCrlNumber);
     ba_free((ByteArray*)baDeltaCrl);
     statusSign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    ba_free((ByteArray*)baCrlIdentifier);
 }
 
 size_t CrlStore::Item::countRevokedCerts (void) const
@@ -120,7 +174,10 @@ size_t CrlStore::Item::countRevokedCerts (void) const
     return rv_cnt;
 }
 
-int CrlStore::Item::revokedCerts (const CerStore::Item* cerSubject, vector<const RevokedCertItem*>& revokedItems)
+int CrlStore::Item::revokedCerts (
+        const CerStore::Item* cerSubject,
+        vector<const RevokedCertItem*>& revokedItems
+)
 {
     int ret = RET_OK;
     const RevokedCertificates_t* revoked_certs = nullptr;
@@ -164,7 +221,9 @@ cleanup:
     return ret;
 }
 
-int CrlStore::Item::verify (const CerStore::Item* cerIssuer)
+int CrlStore::Item::verify (
+        const CerStore::Item* cerIssuer
+)
 {
     int ret = RET_OK;
     X509Tbs_t* x509_tbs = nullptr;
@@ -440,6 +499,7 @@ int CrlStore::parseCrl (const ByteArray* baEncoded, Item** item)
     TBSCertList_t* tbs = nullptr;
     ByteArray* ba_authoritykeyid = nullptr;
     ByteArray* ba_crlid = nullptr;
+    ByteArray* ba_crlident = nullptr;
     ByteArray* ba_crlnumber = nullptr;
     ByteArray* ba_deltacrl = nullptr;
     ByteArray* ba_issuer = nullptr;
@@ -478,7 +538,8 @@ int CrlStore::parseCrl (const ByteArray* baEncoded, Item** item)
         default:
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
-        DO(encode_crlid(&tbs->issuer, ba_crlnumber, &ba_crlid));
+        DO(encode_crlid(tbs, ba_crlnumber, &ba_crlid));
+        DO(encode_crlidentifier(tbs, ba_crlnumber, &ba_crlident));
     }
     else {
         crl_type = CrlType::V1;
@@ -495,10 +556,12 @@ int CrlStore::parseCrl (const ByteArray* baEncoded, Item** item)
         crl_item->baAuthorityKeyId = ba_authoritykeyid;
         crl_item->baCrlNumber = ba_crlnumber;
         crl_item->baDeltaCrl = ba_deltacrl;
+        crl_item->baCrlIdentifier = ba_crlident;
 
         crl = nullptr;
         ba_authoritykeyid = nullptr;
         ba_crlid = nullptr;
+        ba_crlident = nullptr;
         ba_crlnumber = nullptr;
         ba_deltacrl = nullptr;
         ba_issuer = nullptr;
@@ -510,6 +573,7 @@ cleanup:
     asn_free(get_CertificateList_desc(), crl);
     ba_free(ba_authoritykeyid);
     ba_free(ba_crlid);
+    ba_free(ba_crlident);
     ba_free(ba_crlnumber);
     ba_free(ba_deltacrl);
     ba_free(ba_issuer);

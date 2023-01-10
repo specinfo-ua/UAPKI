@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -63,9 +63,16 @@ public:
                     crlReason;
         uint64_t    invalidityDate;
 
-        RevokedCertItem (const size_t iIndex, const uint64_t iRevocationDate = 0,
-                const UapkiNS::CrlReason iCrlReason = UapkiNS::CrlReason::UNDEFINED, const uint64_t iInvalidityDate = 0)
-            : index(iIndex), revocationDate(iRevocationDate), crlReason(iCrlReason), invalidityDate(iInvalidityDate)
+        RevokedCertItem (
+            const size_t iIndex,
+            const uint64_t iRevocationDate = 0,
+            const UapkiNS::CrlReason iCrlReason = UapkiNS::CrlReason::UNDEFINED,
+            const uint64_t iInvalidityDate = 0
+        )
+            : index(iIndex)
+            , revocationDate(iRevocationDate)
+            , crlReason(iCrlReason)
+            , invalidityDate(iInvalidityDate)
         {}
         uint64_t getDate (void) const { return (invalidityDate > 0) ? invalidityDate : revocationDate; }
     };  //  end struct RevokedCertItem
@@ -79,21 +86,32 @@ public:
                     crl;
         const ByteArray*
                     baCrlId;
-        ByteArray*  baIssuer;
+        const ByteArray*
+                    baIssuer;
         uint64_t    thisUpdate;
         uint64_t    nextUpdate;
-        ByteArray*  baAuthorityKeyId;
-        ByteArray*  baCrlNumber;
-        ByteArray*  baDeltaCrl;
+        const ByteArray*
+                    baAuthorityKeyId;
+        const ByteArray*
+                    baCrlNumber;
+        const ByteArray*
+                    baDeltaCrl;
         SIGNATURE_VERIFY::STATUS
                     statusSign;
+        const ByteArray*
+                    baCrlIdentifier;
 
         Item (const CrlType iType);
         ~Item (void);
 
         size_t countRevokedCerts (void) const;
-        int revokedCerts (const CerStore::Item* cerSubject, vector<const RevokedCertItem*>& revokedItems);
-        int verify (const CerStore::Item* cerIssuer);
+        int revokedCerts (
+            const CerStore::Item* cerSubject,
+            vector<const RevokedCertItem*>& revokedItems
+        );
+        int verify (
+            const CerStore::Item* cerIssuer
+        );
     };  //  end struct Item
 
 private:
