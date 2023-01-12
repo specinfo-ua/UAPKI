@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-09
+//  Last update: 2023-01-11
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -42,10 +42,23 @@
 
 namespace UapkiNS {
 
-    struct AttrCertId {
+    struct OtherHash {
         UapkiNS::AlgorithmIdentifier
                     hashAlgorithm;
         ByteArray*  baHashValue;
+
+        OtherHash (void)
+            : baHashValue(nullptr) {
+        }
+        ~OtherHash (void) {
+            ba_free(baHashValue);
+        }
+        bool isPresent (void) const {
+            return (hashAlgorithm.isPresent() && baHashValue);
+        }
+    };  //  end struct OtherHash
+
+    struct AttrCertId : public OtherHash {
         struct IssuerSerial {
             ByteArray*  baIssuer;
             ByteArray*  baSerialNumber;
@@ -60,16 +73,6 @@ namespace UapkiNS {
                 return (baIssuer && baSerialNumber);
             }
         }           issuerSerial;
-
-        AttrCertId (void)
-            : baHashValue(nullptr) {
-        }
-        ~AttrCertId (void) {
-            ba_free(baHashValue);
-        }
-        bool isPresent (void) const {
-            return (hashAlgorithm.isPresent() && baHashValue);
-        }
     };  //  end struct AttrCertId
 
     using EssCertId = AttrCertId;
