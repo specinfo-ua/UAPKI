@@ -98,6 +98,8 @@ public:
                     baDeltaCrl;
         SIGNATURE_VERIFY::STATUS
                     statusSign;
+        UapkiNS::OtherHash
+                    crlHash;
         const ByteArray*
                     baCrlIdentifier;
 
@@ -105,6 +107,10 @@ public:
         ~Item (void);
 
         size_t countRevokedCerts (void) const;
+        int getHash (
+            const UapkiNS::AlgorithmIdentifier& aidDigest,
+            const ByteArray** baHashValue
+        );
         int revokedCerts (
             const CerStore::Item* cerSubject,
             vector<const RevokedCertItem*>& revokedItems
@@ -122,25 +128,57 @@ public:
     CrlStore (void);
     ~CrlStore (void);
 
-    int addCrl (const ByteArray* baEncoded, const bool permanent, bool& isUnique, const Item** crlStoreItem);
-    int getCount (size_t& count);
-    Item* getCrl (const ByteArray* baAuthorityKeyId, const CrlType type);
-    int getCrlByCrlId (const ByteArray* baCrlId, const Item** crlStoreItem);
-    int load (const char* path);
+    int addCrl (
+        const ByteArray* baEncoded,
+        const bool permanent,
+        bool& isUnique,
+        const Item** crlStoreItem
+    );
+    int getCount (
+        size_t& count
+    );
+    Item* getCrl (
+        const ByteArray* baAuthorityKeyId,
+        const CrlType type
+    );
+    int getCrlByCrlId (
+        const ByteArray* baCrlId,
+        const Item** crlStoreItem
+    );
+    int load (
+        const char* path
+    );
     int reload (void);
     void reset (void);
 
 public:
-    static const char* certStatusToStr (const UapkiNS::CertStatus status);
-    static const char* crlReasonToStr (const UapkiNS::CrlReason reason);
-    static const RevokedCertItem* foundNearAfter (const vector<const RevokedCertItem*>& revokedItems, const uint64_t validityTime);
-    static const RevokedCertItem* foundNearBefore (const vector<const RevokedCertItem*>& revokedItems, const uint64_t validityTime);
-    static int parseCrl (const ByteArray* baEncoded, Item** crlStoreItem);
+    static const char* certStatusToStr (
+        const UapkiNS::CertStatus status
+    );
+    static const char* crlReasonToStr (
+        const UapkiNS::CrlReason reason
+    );
+    static const RevokedCertItem* foundNearAfter (
+        const vector<const RevokedCertItem*>& revokedItems,
+        const uint64_t validityTime
+    );
+    static const RevokedCertItem* foundNearBefore (
+        const vector<const RevokedCertItem*>& revokedItems,
+        const uint64_t validityTime
+    );
+    static int parseCrl (
+        const ByteArray* baEncoded,
+        Item** crlStoreItem
+    );
 
 private:
-    Item* addItem (Item* crlStoreItem);
+    Item* addItem (
+        Item* crlStoreItem
+    );
     int loadDir (void);
-    int saveToFile (const Item* crlStoreItem);
+    int saveToFile (
+        const Item* crlStoreItem
+    );
 
 };  //  end class CrlStore
 

@@ -675,8 +675,8 @@ cleanup:
 }
 
 int CerStore::issuerToGeneralNames (
-    const ByteArray* baIssuer,
-    ByteArray** baEncoded
+        const ByteArray* baIssuer,
+        ByteArray** baEncoded
 )
 {
     int ret = RET_OK;

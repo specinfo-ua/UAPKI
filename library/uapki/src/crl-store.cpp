@@ -174,6 +174,32 @@ size_t CrlStore::Item::countRevokedCerts (void) const
     return rv_cnt;
 }
 
+int CrlStore::Item::getHash (
+        const UapkiNS::AlgorithmIdentifier& aidDigest,
+        const ByteArray** baHashValue
+)
+{
+    if (!aidDigest.isPresent() || !baHashValue) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    if (!crlHash.baHashValue || (crlHash.hashAlgorithm.algorithm != aidDigest.algorithm)) {
+        const HashAlg hash_alg = hash_from_oid(aidDigest.algorithm.c_str());
+        if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+
+        ba_free(crlHash.baHashValue);
+        crlHash.baHashValue = nullptr;
+        crlHash.hashAlgorithm.clear();
+
+        DO(::hash(hash_alg, this->baEncoded, &crlHash.baHashValue));
+        crlHash.hashAlgorithm.algorithm = aidDigest.algorithm;
+    }
+
+    *baHashValue = crlHash.baHashValue;
+
+cleanup:
+    return ret;
+}
+
 int CrlStore::Item::revokedCerts (
         const CerStore::Item* cerSubject,
         vector<const RevokedCertItem*>& revokedItems
@@ -304,7 +330,12 @@ CrlStore::~CrlStore (void)
     reset();
 }
 
-int CrlStore::addCrl (const ByteArray* baEncoded, const bool permanent, bool& isUnique, const Item** crlStoreItem)
+int CrlStore::addCrl (
+        const ByteArray* baEncoded,
+        const bool permanent,
+        bool& isUnique,
+        const Item** crlStoreItem
+)
 {
     int ret = RET_OK;
     Item* crl_parsed = nullptr;
@@ -328,7 +359,9 @@ cleanup:
     return ret;
 }
 
-int CrlStore::getCount (size_t& count)
+int CrlStore::getCount (
+        size_t& count
+)
 {
     mutex mtx;
     //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
@@ -339,7 +372,10 @@ int CrlStore::getCount (size_t& count)
     return ret;
 }
 
-CrlStore::Item* CrlStore::getCrl (const ByteArray* baAuthorityKeyId, const CrlType type)
+CrlStore::Item* CrlStore::getCrl (
+        const ByteArray* baAuthorityKeyId,
+        const CrlType type
+)
 {
     mutex mtx;
     mtx.lock();
@@ -366,7 +402,10 @@ CrlStore::Item* CrlStore::getCrl (const ByteArray* baAuthorityKeyId, const CrlTy
     return rv_item;
 }
 
-int CrlStore::getCrlByCrlId (const ByteArray* baCrlId, const Item** crlStoreItem)
+int CrlStore::getCrlByCrlId (
+        const ByteArray* baCrlId,
+        const Item** crlStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CRL_NOT_FOUND;
@@ -384,7 +423,9 @@ int CrlStore::getCrlByCrlId (const ByteArray* baCrlId, const Item** crlStoreItem
     return ret;
 }
 
-int CrlStore::load (const char* path)
+int CrlStore::load (
+        const char* path
+)
 {
     mutex mtx;
     if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
@@ -422,19 +463,26 @@ void CrlStore::reset (void)
     mtx.unlock();
 }
 
-const char* CrlStore::certStatusToStr (const UapkiNS::CertStatus status)
+const char* CrlStore::certStatusToStr (
+        const UapkiNS::CertStatus status
+)
 {
     int32_t idx = (int32_t)status + 1;
     return CERT_STATUS_STRINGS[(idx < 4) ? idx : 0];
 }
 
-const char* CrlStore::crlReasonToStr (const UapkiNS::CrlReason reason)
+const char* CrlStore::crlReasonToStr (
+        const UapkiNS::CrlReason reason
+)
 {
     int32_t idx = (int32_t)reason + 1;
     return CRL_REASON_STRINGS[(idx < 12) ? idx : 0];
 }
 
-const CrlStore::RevokedCertItem* CrlStore::foundNearAfter (const vector<const RevokedCertItem*>& revokedItems, const uint64_t validityTime)
+const CrlStore::RevokedCertItem* CrlStore::foundNearAfter (
+        const vector<const RevokedCertItem*>& revokedItems,
+        const uint64_t validityTime
+)
 {
     const RevokedCertItem* rv_item = nullptr;
     if (!revokedItems.empty()) {
@@ -463,7 +511,10 @@ const CrlStore::RevokedCertItem* CrlStore::foundNearAfter (const vector<const Re
     return rv_item;
 }
 
-const CrlStore::RevokedCertItem* CrlStore::foundNearBefore (const vector<const RevokedCertItem*>& revokedItems, const uint64_t validityTime)
+const CrlStore::RevokedCertItem* CrlStore::foundNearBefore (
+        const vector<const RevokedCertItem*>& revokedItems,
+        const uint64_t validityTime
+)
 {
     const RevokedCertItem* rv_item = nullptr;
     if (!revokedItems.empty()) {
@@ -492,7 +543,10 @@ const CrlStore::RevokedCertItem* CrlStore::foundNearBefore (const vector<const R
     return rv_item;
 }
 
-int CrlStore::parseCrl (const ByteArray* baEncoded, Item** item)
+int CrlStore::parseCrl (
+        const ByteArray* baEncoded,
+        Item** item
+)
 {
     int ret = RET_OK;
     CertificateList_t* crl = nullptr;
@@ -581,7 +635,9 @@ cleanup:
     return ret;
 }
 
-CrlStore::Item* CrlStore::addItem (Item* item)
+CrlStore::Item* CrlStore::addItem (
+        Item* item
+)
 {
     mutex mtx;
     mtx.lock();
@@ -640,7 +696,9 @@ int CrlStore::loadDir (void)
     return RET_OK;
 }
 
-int CrlStore::saveToFile (const Item* crlStoreItem)
+int CrlStore::saveToFile (
+        const Item* crlStoreItem
+)
 {
     if (m_Path.empty() || ((crlStoreItem->type != CrlType::FULL) && (crlStoreItem->type != CrlType::DELTA))) return RET_OK;
 
