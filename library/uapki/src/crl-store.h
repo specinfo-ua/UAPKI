@@ -108,8 +108,7 @@ public:
 
         size_t countRevokedCerts (void) const;
         int getHash (
-            const UapkiNS::AlgorithmIdentifier& aidDigest,
-            const ByteArray** baHashValue
+            const UapkiNS::AlgorithmIdentifier& aidDigest
         );
         int revokedCerts (
             const CerStore::Item* cerSubject,

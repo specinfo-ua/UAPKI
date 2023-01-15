@@ -98,36 +98,36 @@ static int encode_crlidentifier (
 )
 {
     int ret = RET_OK;
-    CrlIdentifier_t* crl_ident = nullptr;
+    CrlIdentifier_t* crl_identifier = nullptr;
     ByteArray* ba_crlissuedtime = nullptr;
 
     CHECK_PARAM(tbs != nullptr);
     CHECK_PARAM(baCrlIdentifier != nullptr);
 
-    CHECK_NOT_NULL(crl_ident = (CrlIdentifier_t*)calloc(1, sizeof(CrlIdentifier_t)));
+    CHECK_NOT_NULL(crl_identifier = (CrlIdentifier_t*)calloc(1, sizeof(CrlIdentifier_t)));
 
-    DO(asn_copy(get_Name_desc(), &tbs->issuer, &crl_ident->crlissuer));
+    DO(asn_copy(get_Name_desc(), &tbs->issuer, &crl_identifier->crlissuer));
     switch (tbs->thisUpdate.present) {
     case PKIXTime_PR_utcTime:
         DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.utcTime, &ba_crlissuedtime));
-        DO(asn_ba2OCTSTRING(ba_crlissuedtime, &crl_ident->crlIssuedTime));
+        DO(asn_ba2OCTSTRING(ba_crlissuedtime, &crl_identifier->crlIssuedTime));
         break;
     case PKIXTime_PR_generalTime:
         DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.generalTime, &ba_crlissuedtime));
-        DO(asn_bytes2OCTSTRING(&crl_ident->crlIssuedTime, ba_get_buf_const(ba_crlissuedtime) + 2, ba_get_len(ba_crlissuedtime) - 2));
+        DO(asn_bytes2OCTSTRING(&crl_identifier->crlIssuedTime, ba_get_buf_const(ba_crlissuedtime) + 2, ba_get_len(ba_crlissuedtime) - 2));
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
     if (baCrlNumber) {
-        CHECK_NOT_NULL(crl_ident->crlNumber = (INTEGER_t*)calloc(1, sizeof(INTEGER_t)));
-        DO(asn_ba2INTEGER(baCrlNumber, crl_ident->crlNumber));
+        CHECK_NOT_NULL(crl_identifier->crlNumber = (INTEGER_t*)calloc(1, sizeof(INTEGER_t)));
+        DO(asn_ba2INTEGER(baCrlNumber, crl_identifier->crlNumber));
     }
 
-    DO(asn_encode_ba(get_CrlIdentifier_desc(), crl_ident, baCrlIdentifier));
+    DO(asn_encode_ba(get_CrlIdentifier_desc(), crl_identifier, baCrlIdentifier));
 
 cleanup:
-    asn_free(get_CrlIdentifier_desc(), crl_ident);
+    asn_free(get_CrlIdentifier_desc(), crl_identifier);
     ba_free(ba_crlissuedtime);
     return ret;
 }   //  encode_crlidentifier
@@ -175,13 +175,13 @@ size_t CrlStore::Item::countRevokedCerts (void) const
 }
 
 int CrlStore::Item::getHash (
-        const UapkiNS::AlgorithmIdentifier& aidDigest,
-        const ByteArray** baHashValue
+        const UapkiNS::AlgorithmIdentifier& aidDigest
 )
 {
-    if (!aidDigest.isPresent() || !baHashValue) return RET_UAPKI_INVALID_PARAMETER;
-
     int ret = RET_OK;
+
+    if (!aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
     if (!crlHash.baHashValue || (crlHash.hashAlgorithm.algorithm != aidDigest.algorithm)) {
         const HashAlg hash_alg = hash_from_oid(aidDigest.algorithm.c_str());
         if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
@@ -190,11 +190,9 @@ int CrlStore::Item::getHash (
         crlHash.baHashValue = nullptr;
         crlHash.hashAlgorithm.clear();
 
-        DO(::hash(hash_alg, this->baEncoded, &crlHash.baHashValue));
+        DO(::hash(hash_alg, baEncoded, &crlHash.baHashValue));
         crlHash.hashAlgorithm.algorithm = aidDigest.algorithm;
     }
-
-    *baHashValue = crlHash.baHashValue;
 
 cleanup:
     return ret;
