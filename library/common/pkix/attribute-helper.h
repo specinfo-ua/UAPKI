@@ -155,10 +155,22 @@ namespace AttributeHelper {
             CrlOcspRef (CrlOcspRef_t* iRefCrlOcspRef);
             ~CrlOcspRef (void);
 
-            int addCrlValidatedId (const ByteArray* baCrlHash, const ByteArray* baCrlIdentifier = nullptr);//TODO: param baCrlIdentifier need check
-            int addOcspResponseId (const ByteArray* baOcspIdentifier, const ByteArray* baOcspRespHash = nullptr);
-            int setOtherRevRefs (const char* otherRevRefType, const ByteArray* baOtherRevRefs);
-            int setOtherRevRefs (const std::string& otherRevRefType, const ByteArray* baOtherRevRefs);
+            int addCrlValidatedId (
+                const UapkiNS::OtherHash& crlHash,
+                const ByteArray* baCrlIdentifier = nullptr
+            );
+            int addOcspResponseId (
+                const ByteArray* baOcspIdentifier,
+                const ByteArray* baOcspRespHash = nullptr
+            );
+            int setOtherRevRefs (
+                const char* otherRevRefType,
+                const ByteArray* baOtherRevRefs
+            );
+            int setOtherRevRefs (
+                const std::string& otherRevRefType,
+                const ByteArray* baOtherRevRefs
+            );
 
         };  //  end class CrlOcspRef
 
@@ -175,10 +187,14 @@ namespace AttributeHelper {
 
         int init (void);
         int addCrlOcspRef (void);
-        CrlOcspRef* getCrlOcspRef (const size_t index = 0) const;
+        CrlOcspRef* getCrlOcspRef (
+            const size_t index = 0
+        ) const;
 
         int encode (void);
-        ByteArray* getEncoded (const bool move = false);
+        ByteArray* getEncoded (
+            const bool move = false
+        );
 
     };  //  end class RevocationRefsBuilder
 
@@ -212,7 +228,9 @@ namespace AttributeHelper {
             CrlOcspRef (void);
             ~CrlOcspRef (void);
 
-            int parse (const CrlOcspRef_t& crlOcspRef);
+            int parse (
+                const CrlOcspRef_t& crlOcspRef
+            );
 
             const std::vector<CrlOcspId>& getCrlIds (void) const { return m_CrlIds; }
             const std::vector<CrlOcspId>& getOcspIds (void) const { return m_OcspIds; }
@@ -229,8 +247,13 @@ namespace AttributeHelper {
         RevocationRefsParser (void);
         ~RevocationRefsParser (void);
 
-        int parse (const ByteArray* baEncoded);
-        int parseCrlOcspRef (const size_t index, CrlOcspRef& crlOcspRef);
+        int parse (
+            const ByteArray* baEncoded
+        );
+        int parseCrlOcspRef (
+            const size_t index,
+            CrlOcspRef& crlOcspRef
+        );
 
         const size_t getCountCrlOcspRefs (void) const { return m_CountCrlOcspRefs; }
 
@@ -247,15 +270,31 @@ namespace AttributeHelper {
         ~RevocationValuesBuilder (void);
 
         int init (void);
-        int addCrlValue (const ByteArray* baCrlEncoded);
-        int addOcspValue (const ByteArray* baBasicOcspResponseEncoded);
-        int setCrlValues (const std::vector<const ByteArray*>& abaCrlValues);
-        int setOcspValues (const std::vector<const ByteArray*>& abaOcspValues);
-        int setOtherRevVals (const char* otherRevValType, const ByteArray* baOtherRevVals);
-        int setOtherRevVals (const std::string& otherRevValType, const ByteArray* baOtherRevVals);
+        int addCrlValue (
+            const ByteArray* baCrlEncoded
+        );
+        int addOcspValue (
+            const ByteArray* baBasicOcspResponseEncoded
+        );
+        int setCrlValues (
+            const std::vector<const ByteArray*>& abaCrlValues
+        );
+        int setOcspValues (
+            const std::vector<const ByteArray*>& abaOcspValues
+        );
+        int setOtherRevVals (
+            const char* otherRevValType,
+            const ByteArray* baOtherRevVals
+        );
+        int setOtherRevVals (
+            const std::string& otherRevValType,
+            const ByteArray* baOtherRevVals
+        );
 
         int encode (void);
-        ByteArray* getEncoded (const bool move = false);
+        ByteArray* getEncoded (
+            const bool move = false
+        );
 
     };  //  end class RevocationValuesBuilder
 
@@ -268,7 +307,9 @@ namespace AttributeHelper {
         RevocationValuesParser (void);
         ~RevocationValuesParser (void);
 
-        int parse (const ByteArray* baEncoded);
+        int parse (
+            const ByteArray* baEncoded
+        );
 
         const VectorBA& getCrlVals (void) const { return m_CrlVals; }
         const VectorBA& getOcspVals (void) const { return m_OcspVals; }

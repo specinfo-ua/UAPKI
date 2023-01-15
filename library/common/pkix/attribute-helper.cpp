@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-09
+//  Last update: 2023-01-15
 
 
 #include "attribute-helper.h"
@@ -590,7 +590,9 @@ cleanup:
     return ret;
 }
 
-RevocationRefsBuilder::CrlOcspRef* RevocationRefsBuilder::getCrlOcspRef (const size_t index) const
+RevocationRefsBuilder::CrlOcspRef* RevocationRefsBuilder::getCrlOcspRef (
+        const size_t index
+) const
 {
     if (index >= m_CrlOcspRefs.size()) return nullptr;
 
@@ -604,7 +606,9 @@ int RevocationRefsBuilder::encode (void)
     return asn_encode_ba(get_CompleteRevocationRefs_desc(), m_RevRefs, &m_BaEncoded);
 }
 
-ByteArray* RevocationRefsBuilder::getEncoded (const bool move)
+ByteArray* RevocationRefsBuilder::getEncoded (
+        const bool move
+)
 {
     ByteArray* rv_ba = m_BaEncoded;
     if (move) {
@@ -624,32 +628,50 @@ RevocationRefsBuilder::CrlOcspRef::~CrlOcspRef (void)
     DEBUG_OUTCON(puts("RevocationRefsBuilder::CrlOcspRef::~CrlOcspRef()"));
 }
 
-int RevocationRefsBuilder::CrlOcspRef::addCrlValidatedId (const ByteArray* baCrlHash, const ByteArray* baCrlIdentifier)
+int RevocationRefsBuilder::CrlOcspRef::addCrlValidatedId (
+        const UapkiNS::OtherHash& crlHash,
+        const ByteArray* baCrlIdentifier
+)
 {
     int ret = RET_OK;
-    CrlValidatedID_t* crl_valid = nullptr;
+    CrlValidatedID_t* crl_validatedid = nullptr;
 
-    if (!m_RefCrlOcspRef || !baCrlHash) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_RefCrlOcspRef || !crlHash.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
     if (!m_RefCrlOcspRef->crlids) {
         ASN_ALLOC_TYPE(m_RefCrlOcspRef->crlids, CRLListID_t);
     }
 
-    ASN_ALLOC_TYPE(crl_valid, CrlValidatedID_t);
-    DO(asn_decode_ba(get_OtherHash_desc(), &crl_valid->crlHash, baCrlHash));
-    if (baCrlIdentifier) {//TODO: param baCrlIdentifier need check
-        CHECK_NOT_NULL(crl_valid->crlIdentifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baCrlIdentifier));
+    ASN_ALLOC_TYPE(crl_validatedid, CrlValidatedID_t);
+
+    //  =crlHash=
+    if (crlHash.hashAlgorithm.algorithm != string(OID_SHA1)) {
+        crl_validatedid->crlHash.present = OtherHash_PR_otherHash;
+        DO(UapkiNS::Util::algorithmIdentifierToAsn1(crl_validatedid->crlHash.choice.otherHash.hashAlgorithm, crlHash.hashAlgorithm));
+        DO(asn_ba2OCTSTRING(crlHash.baHashValue, &crl_validatedid->crlHash.choice.otherHash.hashValue));
+    }
+    else {
+        crl_validatedid->crlHash.present = OtherHash_PR_sha1Hash;
+        DO(asn_ba2OCTSTRING(crlHash.baHashValue, &crl_validatedid->crlHash.choice.sha1Hash));
     }
 
-    DO(ASN_SEQUENCE_ADD(&m_RefCrlOcspRef->crlids->crls.list, crl_valid));
-    crl_valid = nullptr;
+    //  =crlIdentifier= (optional)
+    if (baCrlIdentifier) {
+        CHECK_NOT_NULL(crl_validatedid->crlIdentifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baCrlIdentifier));
+    }
+
+    DO(ASN_SEQUENCE_ADD(&m_RefCrlOcspRef->crlids->crls.list, crl_validatedid));
+    crl_validatedid = nullptr;
 
 cleanup:
-    asn_free(get_CrlValidatedID_desc(), crl_valid);
+    asn_free(get_CrlValidatedID_desc(), crl_validatedid);
     return ret;
 }
 
-int RevocationRefsBuilder::CrlOcspRef::addOcspResponseId (const ByteArray* baOcspIdentifier, const ByteArray* baOcspRespHash)
+int RevocationRefsBuilder::CrlOcspRef::addOcspResponseId (
+        const ByteArray* baOcspIdentifier,
+        const ByteArray* baOcspRespHash
+)
 {
     int ret = RET_OK;
     OcspResponsesID_t* ocsp_respsid = nullptr;
@@ -674,7 +696,10 @@ cleanup:
     return ret;
 }
 
-int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (const char* otherRevRefType, const ByteArray* baOtherRevRefs)
+int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (
+        const char* otherRevRefType,
+        const ByteArray* baOtherRevRefs
+)
 {
     int ret = RET_OK;
 
@@ -688,7 +713,10 @@ cleanup:
     return ret;
 }
 
-int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (const string& otherRevRefType, const ByteArray* baOtherRevRefs)
+int RevocationRefsBuilder::CrlOcspRef::setOtherRevRefs (
+        const string& otherRevRefType,
+        const ByteArray* baOtherRevRefs
+)
 {
     if (otherRevRefType.empty() || !baOtherRevRefs) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -709,7 +737,9 @@ RevocationRefsParser::~RevocationRefsParser (void)
     asn_free(get_CompleteRevocationRefs_desc(), m_RevRefs);
 }
 
-int RevocationRefsParser::parse (const ByteArray* baEncoded)
+int RevocationRefsParser::parse (
+        const ByteArray* baEncoded
+)
 {
     int ret = RET_OK;
 
@@ -720,7 +750,10 @@ cleanup:
     return ret;
 }
 
-int RevocationRefsParser::parseCrlOcspRef (const size_t index, CrlOcspRef& crlOcspRef)
+int RevocationRefsParser::parseCrlOcspRef (
+        const size_t index,
+        CrlOcspRef& crlOcspRef
+)
 {
     if (index >= m_CountCrlOcspRefs) return RET_INDEX_OUT_OF_RANGE;
 
@@ -738,7 +771,9 @@ RevocationRefsParser::CrlOcspRef::~CrlOcspRef (void)
     DEBUG_OUTCON(puts("RevocationRefsParser::CrlOcspRef::~CrlOcspRef()"));
 }
 
-int RevocationRefsParser::CrlOcspRef::parse (const CrlOcspRef_t& crlOcspRef)
+int RevocationRefsParser::CrlOcspRef::parse (
+        const CrlOcspRef_t& crlOcspRef
+)
 {
     int ret = RET_OK;
     char* s_type = nullptr;
@@ -801,12 +836,14 @@ int RevocationValuesBuilder::init (void)
     return (m_RevValues) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
-int RevocationValuesBuilder::addCrlValue (const ByteArray* baCrlEncoded)
+int RevocationValuesBuilder::addCrlValue (
+        const ByteArray* baCrlEncoded
+)
 {
     int ret = RET_OK;
     CertificateList_t* crl = nullptr;
 
-    if (!m_RevValues || !baCrlEncoded) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_RevValues) return RET_UAPKI_INVALID_PARAMETER;
 
     if (!m_RevValues->crlVals) {
         void* ptr = calloc(1, sizeof(*RevocationValues_t::crlVals));
@@ -814,21 +851,25 @@ int RevocationValuesBuilder::addCrlValue (const ByteArray* baCrlEncoded)
         memcpy(&m_RevValues->crlVals, &ptr, sizeof(ptr));
     }
 
-    CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), baCrlEncoded));
-    DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
-    crl = nullptr;
+    if (baCrlEncoded) {
+        CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), baCrlEncoded));
+        DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
+        crl = nullptr;
+    }
 
 cleanup:
     asn_free(get_CertificateList_desc(), crl);
     return ret;
 }
 
-int RevocationValuesBuilder::addOcspValue (const ByteArray* baBasicOcspResponseEncoded)
+int RevocationValuesBuilder::addOcspValue (
+        const ByteArray* baBasicOcspResponseEncoded
+)
 {
     int ret = RET_OK;
     BasicOCSPResponse_t* ocsp_resp = nullptr;
 
-    if (!m_RevValues || !baBasicOcspResponseEncoded) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_RevValues) return RET_UAPKI_INVALID_PARAMETER;
 
     if (!m_RevValues->ocspVals) {
         void* ptr = calloc(1, sizeof(*RevocationValues_t::ocspVals));
@@ -836,16 +877,20 @@ int RevocationValuesBuilder::addOcspValue (const ByteArray* baBasicOcspResponseE
         memcpy(&m_RevValues->ocspVals, &ptr, sizeof(ptr));
     }
 
-    CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baBasicOcspResponseEncoded));
-    DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
-    ocsp_resp = nullptr;
+    if (baBasicOcspResponseEncoded) {
+        CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baBasicOcspResponseEncoded));
+        DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
+        ocsp_resp = nullptr;
+    }
 
 cleanup:
     asn_free(get_BasicOCSPResponse_desc(), ocsp_resp);
     return ret;
 }
 
-int RevocationValuesBuilder::setCrlValues (const vector<const ByteArray*>& abaCrlValues)
+int RevocationValuesBuilder::setCrlValues (
+        const vector<const ByteArray*>& abaCrlValues
+)
 {
     int ret = RET_OK;
     CertificateList_t* crl = nullptr;
@@ -857,11 +902,11 @@ int RevocationValuesBuilder::setCrlValues (const vector<const ByteArray*>& abaCr
     memcpy(&m_RevValues->crlVals, &ptr, sizeof(ptr));
 
     for (const auto& it : abaCrlValues) {
-        if (!it) return RET_UAPKI_INVALID_PARAMETER;
-
-        CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), it));
-        DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
-        crl = nullptr;
+        if (it) {
+            CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), it));
+            DO(ASN_SEQUENCE_ADD(&m_RevValues->crlVals->list, crl));
+            crl = nullptr;
+        }
     }
 
 cleanup:
@@ -869,7 +914,9 @@ cleanup:
     return ret;
 }
 
-int RevocationValuesBuilder::setOcspValues (const vector<const ByteArray*>& abaOcspValues)
+int RevocationValuesBuilder::setOcspValues (
+        const vector<const ByteArray*>& abaOcspValues
+)
 {
     int ret = RET_OK;
     BasicOCSPResponse_t* ocsp_resp = nullptr;
@@ -881,11 +928,11 @@ int RevocationValuesBuilder::setOcspValues (const vector<const ByteArray*>& abaO
     memcpy(&m_RevValues->ocspVals, &ptr, sizeof(ptr));
 
     for (const auto& it : abaOcspValues) {
-        if (!it) return RET_UAPKI_INVALID_PARAMETER;
-
-        CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), it));
-        DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
-        ocsp_resp = nullptr;
+        if (it) {
+            CHECK_NOT_NULL(ocsp_resp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), it));
+            DO(ASN_SEQUENCE_ADD(&m_RevValues->ocspVals->list, ocsp_resp));
+            ocsp_resp = nullptr;
+        }
     }
 
 cleanup:
@@ -893,7 +940,10 @@ cleanup:
     return ret;
 }
 
-int RevocationValuesBuilder::setOtherRevVals (const char* otherRevValType, const ByteArray* baOtherRevVals)
+int RevocationValuesBuilder::setOtherRevVals (
+        const char* otherRevValType,
+        const ByteArray* baOtherRevVals
+)
 {
     int ret = RET_OK;
 
@@ -907,7 +957,10 @@ cleanup:
     return ret;
 }
 
-int RevocationValuesBuilder::setOtherRevVals (const string& otherRevValType, const ByteArray* baOtherRevVals)
+int RevocationValuesBuilder::setOtherRevVals (
+        const string& otherRevValType,
+        const ByteArray* baOtherRevVals
+)
 {
     if (otherRevValType.empty() || !baOtherRevVals) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -921,7 +974,9 @@ int RevocationValuesBuilder::encode (void)
     return asn_encode_ba(get_RevocationValues_desc(), m_RevValues, &m_BaEncoded);
 }
 
-ByteArray* RevocationValuesBuilder::getEncoded (const bool move)
+ByteArray* RevocationValuesBuilder::getEncoded (
+        const bool move
+)
 {
     ByteArray* rv_ba = m_BaEncoded;
     if (move) {
@@ -941,7 +996,9 @@ RevocationValuesParser::~RevocationValuesParser (void)
     DEBUG_OUTCON(puts("RevocationValuesParser::~RevocationValuesParser()"));
 }
 
-int RevocationValuesParser::parse (const ByteArray* baEncoded)
+int RevocationValuesParser::parse (
+        const ByteArray* baEncoded
+)
 {
     int ret = RET_OK;
     RevocationValues_t* rev_values;
