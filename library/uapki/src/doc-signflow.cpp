@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "doc-signflow.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
 #include "attribute-utils.h"
-#include "cer-store.h"
-#include "doc-signflow.h"
 #include "oid-utils.h"
 #include "time-utils.h"
 
@@ -43,22 +42,26 @@
 using namespace std;
 
 
-static int add_service_cert (
-        vector<CerStore::Item*>& serviceCerts,
+static int add_unique_cert (
+        vector<SigningDoc::CerDataItem*>& certs,
         CerStore::Item* cerStoreItem
 )
 {
-    if (!cerStoreItem) return false;
+    if (!cerStoreItem) return RET_OK;
 
-    for (const auto& it : serviceCerts) {
-        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == RET_OK) {
-            return false;
+    for (const auto& it : certs) {
+        if (ba_cmp(cerStoreItem->baCertId, it->pcsiSubject->baCertId) == RET_OK) {
+            return RET_OK;
         }
     }
 
-    serviceCerts.push_back(cerStoreItem);
-    return true;
-}   //  add_service_cert
+    SigningDoc::CerDataItem* cdi = new SigningDoc::CerDataItem();
+    if (!cdi) return RET_UAPKI_GENERAL_ERROR;
+
+    certs.push_back(cdi);
+    cdi->pcsiSubject = cerStoreItem;
+    return RET_OK;
+}   //  add_unique_cert
 
 static int keyid_to_sid_subjectkeyid (const ByteArray* baKeyId, ByteArray** baSubjectKeyId)
 {
@@ -83,29 +86,39 @@ cleanup:
 }   //  keyid_to_sid_subjectkeyid
 
 
-SigningDoc::OcspResponseItem::OcspResponseItem (void)
-    : baBasicOcspResponse(nullptr)
+SigningDoc::CerDataItem::CerDataItem (void)
+    : pcsiSubject(nullptr)
+    , pcsiIssuer(nullptr)
+    , isSelfSigned(false)
+    , baBasicOcspResponse(nullptr)
     , baOcspIdentifier(nullptr)
     , baOcspRespHash(nullptr)
-    , cerResponder(nullptr)
+    , pcsiCrl(nullptr)
+    , pcsiResponder(nullptr)
 {
 }
 
-SigningDoc::OcspResponseItem::~OcspResponseItem (void)
+SigningDoc::CerDataItem::~CerDataItem (void)
 {
     ba_free(baBasicOcspResponse);
     ba_free(baOcspIdentifier);
     ba_free(baOcspRespHash);
 }
 
-int SigningDoc::OcspResponseItem::set (const OcspResponseItem& src)
+int SigningDoc::CerDataItem::set (const CerDataItem& src)
 {
-    baBasicOcspResponse = ba_copy_with_alloc(src.baBasicOcspResponse, 0, 0);
-    baOcspIdentifier = ba_copy_with_alloc(src.baOcspIdentifier, 0, 0);
-    baOcspRespHash = ba_copy_with_alloc(src.baOcspRespHash, 0, 0);
-    cerResponder = src.cerResponder;
+    pcsiSubject = src.pcsiSubject;
+    pcsiIssuer = src.pcsiIssuer;
+    isSelfSigned = src.isSelfSigned;
+    if (src.pcsiResponder) {
+        baBasicOcspResponse = ba_copy_with_alloc(src.baBasicOcspResponse, 0, 0);
+        baOcspIdentifier = ba_copy_with_alloc(src.baOcspIdentifier, 0, 0);
+        baOcspRespHash = ba_copy_with_alloc(src.baOcspRespHash, 0, 0);
+        pcsiResponder = src.pcsiResponder;
+        return (baBasicOcspResponse && baOcspIdentifier && baOcspRespHash) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    }
 
-    return (baBasicOcspResponse && baOcspIdentifier && baOcspRespHash) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    return RET_OK;
 }
 
 
@@ -115,7 +128,6 @@ SigningDoc::SignParams::SignParams (void)
     , isCadesFormat(false)
     , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
     , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
-    , cerSigner(nullptr)
     , baKeyId(nullptr)
     , detachedData(true)
     , includeCert(false)
@@ -129,28 +141,17 @@ SigningDoc::SignParams::SignParams (void)
 SigningDoc::SignParams::~SignParams (void)
 {
     signatureFormat = UapkiNS::SignatureFormat::UNDEFINED;
-    cerSigner = nullptr; //  This ref
     ba_free(baKeyId);
-    for (auto& it : ocspRespItems) {
+    for (auto& it : chainCerts) {
         delete it;
     }
 }
 
-bool SigningDoc::SignParams::addCert (
+int SigningDoc::SignParams::addCert (
     CerStore::Item* cerStoreItem
 )
 {
-    return add_service_cert(chainCerts, cerStoreItem);
-}
-
-void SigningDoc::SignParams::addOcspResponseItem (
-        OcspResponseItem* ocspRespItem
-)
-{
-    //  Here possible NULL, but is OK
-    if (ocspRespItem) {
-        ocspRespItems.push_back(ocspRespItem);
-    }
+    return add_unique_cert(chainCerts, cerStoreItem);
 }
 
 int SigningDoc::SignParams::setSignatureFormat (
@@ -203,7 +204,7 @@ SigningDoc::~SigningDoc (void)
     ba_free(baMessageDigest);
     ba_free(baHashSignedAttrs);
     ba_free(baSignature);
-    for (auto& it : m_OcspRespItems) {
+    for (auto& it : m_Certs) {
         delete it;
     }
     for (auto& it : m_SignedAttrs) {
@@ -232,12 +233,12 @@ int SigningDoc::init (
         signerInfo = builder.getSignerInfo(0);
         signerInfo->setDigestAlgorithm(signParams->aidDigest);
 
-        for (const auto& it : aSignParams->ocspRespItems) {
-            SigningDoc::OcspResponseItem* ocspresp_item = new SigningDoc::OcspResponseItem();
-            if (!ocspresp_item) return RET_UAPKI_GENERAL_ERROR;
+        for (const auto& it : aSignParams->chainCerts) {
+            CerDataItem* cdi = new CerDataItem();
+            if (!cdi) return RET_UAPKI_GENERAL_ERROR;
 
-            m_OcspRespItems.push_back(ocspresp_item);
-            DO(ocspresp_item->set(*it));
+            m_Certs.push_back(cdi);
+            DO(cdi->set(*it));
         }
     }
 
@@ -245,29 +246,11 @@ cleanup:
     return ret;
 }
 
-void SigningDoc::addCert (
+int SigningDoc::addCert (
         CerStore::Item* cerStoreItem
 )
 {
-    if (!cerStoreItem) return;
-
-    for (const auto& it : signParams->chainCerts) {
-        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == RET_OK) {
-            return;
-        }
-    }
-
-    (void)add_service_cert(m_Certs, cerStoreItem);
-}
-
-void SigningDoc::addOcspResponseItem (
-        OcspResponseItem* ocspRespItem
-)
-{
-    //  Here possible NULL, but is OK
-    if (ocspRespItem) {
-        m_OcspRespItems.push_back(ocspRespItem);
-    }
+    return add_unique_cert(m_Certs, cerStoreItem);
 }
 
 int SigningDoc::addSignedAttribute (
@@ -331,7 +314,7 @@ int SigningDoc::buildSignedData (void)
     uint32_t version = 0;
 
     if (!signParams->sidUseKeyId) {
-        DO(signParams->cerSigner->getIssuerAndSN(&sba_sid));
+        DO(signParams->signer.pcsiSubject->getIssuerAndSN(&sba_sid));
         DO(signerInfo->setSid(sba_sid.get()));
         version = 1;
     }
@@ -366,7 +349,7 @@ int SigningDoc::buildSignedData (void)
     DO(builder.setVersion(version));
     DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : baData));
     if (signParams->includeCert) {
-        DO(builder.addCertificate(signParams->cerSigner->baEncoded));
+        DO(builder.addCertificate(signParams->signer.pcsiSubject->baEncoded));
     }
 
     DO(builder.encode());
@@ -378,8 +361,6 @@ cleanup:
 int SigningDoc::buildUnsignedAttributes (void)
 {
     int ret = RET_OK;
-
-    m_Certs.insert(m_Certs.begin(), signParams->chainCerts.begin(), signParams->chainCerts.end());
 
     switch (signParams->signatureFormat) {
     case UapkiNS::SignatureFormat::CADES_C:
@@ -506,7 +487,7 @@ int SigningDoc::encodeCertValues (
     if (m_Certs.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     for (const auto& it : m_Certs) {
-        cert_values.push_back(it->baEncoded);
+        cert_values.push_back(it->pcsiSubject->baEncoded);
     }
 
     attr.type = string(OID_PKCS9_CERT_VALUES);
@@ -529,13 +510,14 @@ int SigningDoc::encodeCertificateRefs (
 
     other_certids.resize(m_Certs.size());
     for (const auto& it : m_Certs) {
+        const CerStore::Item& src_cer = *it->pcsiSubject;
         UapkiNS::OtherCertId& dst_othercertid = other_certids[idx++];
 
-        DO(::hash(signParams->hashDigest, it->baEncoded, &dst_othercertid.baHashValue));
+        DO(::hash(signParams->hashDigest, src_cer.baEncoded, &dst_othercertid.baHashValue));
         if (!dst_othercertid.hashAlgorithm.copy(signParams->aidDigest)) return RET_UAPKI_GENERAL_ERROR;
 
-        DO(CerStore::issuerToGeneralNames(it->baIssuer, &dst_othercertid.issuerSerial.baIssuer));
-        CHECK_NOT_NULL(dst_othercertid.issuerSerial.baSerialNumber = ba_copy_with_alloc(it->baSerialNumber, 0, 0));
+        DO(CerStore::issuerToGeneralNames(src_cer.baIssuer, &dst_othercertid.issuerSerial.baIssuer));
+        CHECK_NOT_NULL(dst_othercertid.issuerSerial.baSerialNumber = ba_copy_with_alloc(src_cer.baSerialNumber, 0, 0));
     }
 
     attr.type = string(OID_PKCS9_CERTIFICATE_REFS);
@@ -551,19 +533,56 @@ int SigningDoc::encodeRevocationRefs (
 )
 {
     int ret = RET_OK;
+    const SigningDoc::CerDataItem& signer = signParams->signer;
     UapkiNS::AttributeHelper::RevocationRefsBuilder revocrefs_builder;
+    UapkiNS::AttributeHelper::RevocationRefsBuilder::CrlOcspRef* p_crlocspref = nullptr;
+    CrlStore::Item* p_crl = nullptr;
     size_t idx = 0;
 
     DO(revocrefs_builder.init());
-    for (const auto& it : m_OcspRespItems) {
-        DO(revocrefs_builder.addCrlOcspRef());
-        UapkiNS::AttributeHelper::RevocationRefsBuilder::CrlOcspRef* crlocsp_ref = revocrefs_builder.getCrlOcspRef(idx);
-        if (!crlocsp_ref) {
-            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+
+    //  First item - cert of signer
+    DO(revocrefs_builder.addCrlOcspRef());
+    p_crlocspref = revocrefs_builder.getCrlOcspRef(idx++);
+    switch (signParams->signatureFormat) {
+    case UapkiNS::SignatureFormat::CADES_C:
+        p_crl = signer.pcsiCrl;
+        if (p_crl) {
+            DO(p_crl->getHash(signParams->aidDigest));
+            DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
         }
-        DO(crlocsp_ref->addOcspResponseId(it->baOcspIdentifier, it->baOcspRespHash));
-        idx++;
+        break;
+    case UapkiNS::SignatureFormat::CADES_X_LONG:
+    case UapkiNS::SignatureFormat::CADES_A_V3:
+        if (signer.baOcspIdentifier) {
+            DO(p_crlocspref->addOcspResponseId(signer.baOcspIdentifier, signer.baOcspRespHash));
+        }
+        break;
+    default:
+        break;
     }
+
+    //  Next certs
+    for (const auto& it : getCerts()) {
+        DO(revocrefs_builder.addCrlOcspRef());
+        p_crlocspref = revocrefs_builder.getCrlOcspRef(idx++);
+        switch (signParams->signatureFormat) {
+        case UapkiNS::SignatureFormat::CADES_C:
+            p_crl = it->pcsiCrl;
+            if (p_crl) {
+                DO(p_crl->getHash(signParams->aidDigest));
+                DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
+            }
+            break;
+        case UapkiNS::SignatureFormat::CADES_X_LONG:
+        case UapkiNS::SignatureFormat::CADES_A_V3:
+            if (it->baOcspIdentifier) {
+                DO(p_crlocspref->addOcspResponseId(it->baOcspIdentifier, it->baOcspRespHash));
+            }
+            break;
+        }
+    }
+
     DO(revocrefs_builder.encode());
 
     attr.type = string(OID_PKCS9_REVOCATION_REFS);
@@ -579,13 +598,25 @@ int SigningDoc::encodeRevocationValues (
 )
 {
     int ret = RET_OK;
+    const SigningDoc::CerDataItem& signer = signParams->signer;
     UapkiNS::AttributeHelper::RevocationValuesBuilder revocvalues_builder;
 
     DO(revocvalues_builder.init());
-    for (const auto& it : m_OcspRespItems) {
-        DO(revocvalues_builder.addOcspValue(it->baBasicOcspResponse));
-        //            (const vector<const ByteArray*>&)m_OcspValues);
+
+    switch (signParams->signatureFormat) {
+    case UapkiNS::SignatureFormat::CADES_X_LONG:
+    case UapkiNS::SignatureFormat::CADES_A_V3:
+        //  First item - cert of signer
+        DO(revocvalues_builder.addOcspValue(signer.baBasicOcspResponse));
+        //  Next certs
+        for (const auto& it : m_Certs) {
+            DO(revocvalues_builder.addOcspValue(it->baBasicOcspResponse));
+        }
+        break;
+    default:
+        break;
     }
+
     DO(revocvalues_builder.encode());
 
     attr.type = string(OID_PKCS9_REVOCATION_VALUES);

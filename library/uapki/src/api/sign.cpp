@@ -390,29 +390,189 @@ static int verify_ocsp_responsedata (
 
 cleanup:
     return ret;
-}
+}   //  verify_ocsp_responsedata
 
-static int get_cert_status_by_ocsp (
-        CerStore& cerStore,
-        SigningDoc::SignParams& signParams,
-        CerStore::Item* cerSubject,
-        SigningDoc::OcspResponseItem** ocspRespItem
+static int process_crl (
+        CrlStore& crlStore,
+        const CerStore::Item* cerIssuer,
+        const CerStore::Item* cerSubject,
+        const ByteArray** baCrlNumber,
+        const uint64_t validateTime,
+        CrlStore::Item** crlItem
 )
 {
     int ret = RET_OK;
+    const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
+    CrlStore::Item* crl = nullptr;
+    UapkiNS::SmartBA sba_crl;
+    vector<string> uris;
+
+    ret = cerSubject->getCrlUris((crl_type == CrlStore::CrlType::FULL), uris);
+    if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
+        SET_ERROR(ret);
+    }
+
+    //TODO: need added support array uris
+
+    crl = crlStore.getCrl(cerIssuer->baKeyId, crl_type);
+    if (crl) {
+        if (crl->nextUpdate < validateTime) {
+            DEBUG_OUTCON(puts("process_crl(), Need get newest CRL"));
+            crl = nullptr;
+        }
+    }
+
+    if (!crl) {
+        if (HttpHelper::isOfflineMode()) {
+            SET_ERROR(RET_UAPKI_OFFLINE_MODE);
+        }
+        if (uris.empty()) {
+            SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
+        }
+
+        const vector<string> shuffled_uris = HttpHelper::randomURIs(uris);
+        DEBUG_OUTCON(printf("process_crl(CrlType: %d), download CRL", crl_type));
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTCON(printf("process_crl(), HttpHelper::get('%s')\n", it.c_str()));
+            ret = HttpHelper::get(it.c_str(), &sba_crl);
+            if (ret == RET_OK) {
+                DEBUG_OUTCON(printf("process_crl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+                DEBUG_OUTCON(if (sba_crl.size() < 1024) { ba_print(stdout, sba_crl.get()); });
+                break;
+            }
+        }
+        if (ret != RET_OK) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
+        }
+
+        bool is_unique;
+        DO(crlStore.addCrl(sba_crl.get(), true, is_unique, nullptr));
+        sba_crl.set(nullptr);
+
+        crl = crlStore.getCrl(cerIssuer->baKeyId, crl_type);
+        if (!crl) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+
+        if (crl->nextUpdate < validateTime) {
+            DEBUG_OUTCON(puts("process_crl(), Need get newest CRL. Again... stop it!"));
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+    }
+
+    //  Check CrlNumber and DeltaCrl
+    if (!crl->baCrlNumber) {
+        SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+    }
+    if (crl_type == CrlStore::CrlType::FULL) {
+        *baCrlNumber = crl->baCrlNumber;
+    }
+    else {
+        if (ba_cmp(*baCrlNumber, crl->baDeltaCrl) != RET_OK) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+    }
+
+    DO(crl->verify(cerIssuer));
+
+    *crlItem = crl;
+
+cleanup:
+    return ret;
+}   //  process_crl
+
+static int get_cert_status_by_crl (
+        SigningDoc::CerDataItem& cerDataItem
+)
+{
+    int ret = RET_OK;
+    CerStore& cer_store = *get_cerstore();
+    CrlStore& crl_store = *get_crlstore();
+    const uint64_t validate_time = TimeUtils::nowMsTime();
+    CrlStore::Item* crl_item = nullptr;
+    vector<const CrlStore::RevokedCertItem*> revoked_items;
+    const ByteArray* ba_crlnumber = nullptr;
+    bool is_expired = false;
+    UapkiNS::CertStatus cert_status = UapkiNS::CertStatus::UNDEFINED;
+    const bool cfg_crldelta_enabled = true;
+
+    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::nowMsTime()));
+
+    DO(cer_store.getIssuerCert(cerDataItem.pcsiSubject, &cerDataItem.pcsiIssuer, cerDataItem.isSelfSigned));
+    if (cerDataItem.isSelfSigned) return RET_OK;
+
+    DO(process_crl(crl_store, cerDataItem.pcsiIssuer, cerDataItem.pcsiSubject, &ba_crlnumber, validate_time, &crl_item));
+    DEBUG_OUTCON(printf("validate_by_crl() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
+    DO(crl_item->revokedCerts(cerDataItem.pcsiSubject, revoked_items));
+
+    if (cfg_crldelta_enabled) {
+        DO(process_crl(crl_store, cerDataItem.pcsiIssuer, cerDataItem.pcsiSubject, &ba_crlnumber, validate_time, &crl_item));
+        DO(crl_item->revokedCerts(cerDataItem.pcsiSubject, revoked_items));
+    }
+
+    DEBUG_OUTCON(for (auto& it : revoked_items) {
+        printf("[%lld] revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->index, it->revocationDate, it->crlReason, it->invalidityDate);
+    });
+
+    if (revoked_items.empty()) {
+        cert_status = UapkiNS::CertStatus::GOOD;
+    }
+    else {
+        const CrlStore::RevokedCertItem* revcert_before = CrlStore::foundNearBefore(revoked_items, validate_time);
+        if (revcert_before) {
+            DEBUG_OUTCON(printf("revcert_before: [%lld]  revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n",
+                revcert_before->index, revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));
+            switch (revcert_before->crlReason)
+            {
+            case UapkiNS::CrlReason::REMOVE_FROM_CRL:
+                cert_status = UapkiNS::CertStatus::GOOD;
+                break;
+            case UapkiNS::CrlReason::UNDEFINED:
+                cert_status = UapkiNS::CertStatus::UNDEFINED;
+                break;
+            case UapkiNS::CrlReason::UNSPECIFIED:
+                cert_status = UapkiNS::CertStatus::UNKNOWN;
+                break;
+            default:
+                cert_status = UapkiNS::CertStatus::REVOKED;
+                break;
+            }
+        }
+        else {
+            cert_status = UapkiNS::CertStatus::GOOD;
+        }
+    }
+
+    cerDataItem.pcsiSubject->certStatusByCrl.set(
+        cert_status,
+        crl_item->nextUpdate,
+        crl_item->baCrlId
+    );
+    cerDataItem.pcsiCrl = crl_item;
+
+cleanup:
+    return ret;
+}   //  get_cert_status_by_crl
+
+static int get_cert_status_by_ocsp (
+        SigningDoc::SignParams& signParams,
+        SigningDoc::CerDataItem& cerDataItem
+)
+{
+    int ret = RET_OK;
+    CerStore& cer_store = *get_cerstore();
+    const LibraryConfig::OcspParams& ocsp_params = signParams.ocsp;
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
-    CerStore::Item* cer_issuer = nullptr;
-    CerStore::Item* cer_responder = nullptr;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
-    bool is_selfsigned, need_update;
+    bool need_update;
 
-    DO(cerSubject->checkValidity(TimeUtils::nowMsTime()));
+    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::nowMsTime()));
 
-    DO(cerStore.getIssuerCert(cerSubject, &cer_issuer, is_selfsigned));
-    if (is_selfsigned) return RET_OK;
+    DO(cer_store.getIssuerCert(cerDataItem.pcsiSubject, &cerDataItem.pcsiIssuer, cerDataItem.isSelfSigned));
+    if (cerDataItem.isSelfSigned) return RET_OK;
 
-    ret = cerSubject->getOcspUris(uris);
+    ret = cerDataItem.pcsiSubject->getOcspUris(uris);
     if (ret == RET_OK) {
         if (uris.empty()) {
             SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
@@ -423,11 +583,13 @@ static int get_cert_status_by_ocsp (
         SET_ERROR(ret);
     }
 
-    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    need_update = cerDataItem.pcsiSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
     if (need_update) {
         DO(ocsp_helper.init());
-        DO(ocsp_helper.addCert(cer_issuer, cerSubject));
-        DO(ocsp_helper.genNonce(20));
+        DO(ocsp_helper.addCert(cerDataItem.pcsiIssuer, cerDataItem.pcsiSubject));
+        if (ocsp_params.nonceLen > 0) {
+            DO(ocsp_helper.genNonce(ocsp_params.nonceLen));
+        }
         DO(ocsp_helper.encodeRequest());
 
         shuffled_uris = HttpHelper::randomURIs(uris);
@@ -454,16 +616,16 @@ static int get_cert_status_by_ocsp (
         }
     }
 
-    DO(ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult));
+    DO(ocsp_helper.parseResponse(need_update ? sba_resp.get() : cerDataItem.pcsiSubject->certStatusByOcsp.baResult));
 
     if (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL) {
-        DO(verify_ocsp_responsedata(cerStore, ocsp_helper, &cer_responder));
+        DO(verify_ocsp_responsedata(cer_store, ocsp_helper, &cerDataItem.pcsiResponder));
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
         const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
         if (need_update) {
-            DO(cerSubject->certStatusByOcsp.set(
+            DO(cerDataItem.pcsiSubject->certStatusByOcsp.set(
                 ocsp_record.status,
                 ocsp_record.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
                 sba_resp.get()
@@ -472,21 +634,13 @@ static int get_cert_status_by_ocsp (
 
         switch (ocsp_record.status) {
         case UapkiNS::CertStatus::GOOD:
-            *ocspRespItem = new SigningDoc::OcspResponseItem();
-            if (*ocspRespItem) {
-                SigningDoc::OcspResponseItem* ocspresp_item = *ocspRespItem;
-                ocspresp_item->cerResponder = cer_responder;
-                ocspresp_item->baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
-                DO(ocsp_helper.getOcspIdentifier(&ocspresp_item->baOcspIdentifier));
-                DO(UapkiNS::Ocsp::generateOtherHash(
-                    need_update ? sba_resp.get() : cerSubject->certStatusByOcsp.baResult,
-                    signParams.aidDigest,
-                    &ocspresp_item->baOcspRespHash
-                ));
-            }
-            else {
-                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-            }
+            cerDataItem.baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
+            DO(ocsp_helper.getOcspIdentifier(&cerDataItem.baOcspIdentifier));
+            DO(UapkiNS::Ocsp::generateOtherHash(
+                need_update ? sba_resp.get() : cerDataItem.pcsiSubject->certStatusByOcsp.baResult,
+                signParams.aidDigest,
+                &cerDataItem.baOcspRespHash
+            ));
             break;
         case UapkiNS::CertStatus::REVOKED:
             SET_ERROR(RET_UAPKI_CERT_STATUS_REVOKED);
@@ -510,7 +664,8 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     if (!config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     CerStore* cer_store = get_cerstore();
-    if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
+    CrlStore* crl_store = get_crlstore();
+    if (!cer_store || !crl_store) return RET_UAPKI_GENERAL_ERROR;
 
     CmStorageProxy* storage = CmProviders::openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
@@ -527,6 +682,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
     DO(parse_sign_params(json_object_get_object(joParams, "signParams"), sign_params));
 
+    sign_params.ocsp = config->getOcsp();
     if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
         if (config->getOffline()) {
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
@@ -557,38 +713,36 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     if ((sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
-        DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.cerSigner));
+        DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.signer.pcsiSubject));
         if (sign_params.isCadesFormat) {
             UapkiNS::EssCertId ess_certid;
-            SigningDoc::OcspResponseItem* ocsprespitem_signer = nullptr;
 
-            DO(get_cert_status_by_ocsp(
-                *cer_store,
-                sign_params,
-                sign_params.cerSigner,
-                &ocsprespitem_signer
-            ));
-            sign_params.addOcspResponseItem(ocsprespitem_signer);
+            if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
+                DO(get_cert_status_by_ocsp(sign_params, sign_params.signer));
+            }
+            else {
+                DO(get_cert_status_by_crl(sign_params.signer));
+            }
 
-            DO(sign_params.cerSigner->generateEssCertId(sign_params.aidDigest, ess_certid));
+            DO(sign_params.signer.pcsiSubject->generateEssCertId(sign_params.aidDigest, ess_certid));
             DO(SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
             if (sign_params.isCadesCXA) {
                 vector<CerStore::Item*> service_certs;
-                DO(cer_store->getChainCerts(sign_params.cerSigner, service_certs));
+                DO(cer_store->getChainCerts(sign_params.signer.pcsiSubject, service_certs));
                 for (auto& it : service_certs) {
-                    SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
-                    DO(get_cert_status_by_ocsp(
-                        *cer_store,
-                        sign_params,
-                        it,
-                        &ocspresp_item
-                    ));
-                    if (sign_params.addCert(it)) {
-                        sign_params.addOcspResponseItem(ocspresp_item);
+                    DO(sign_params.addCert(it));
+                }
+                for (auto& it : sign_params.chainCerts) {
+                    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
+                        DO(get_cert_status_by_ocsp(sign_params, *it));
+                    }
+                    else {
+                        DO(get_cert_status_by_crl(*it));
                     }
                 }
-                if (ocsprespitem_signer) {
-                    (void)sign_params.addCert(ocsprespitem_signer->cerResponder);
+
+                if (sign_params.signer.pcsiResponder) {
+                    sign_params.addCert(sign_params.signer.pcsiResponder);
                 }
             }
         }
@@ -600,12 +754,12 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         tsp_params.certReq = tsp_config.certReq;
         tsp_params.nonceLen = tsp_config.nonceLen;
         tsp_params.policyId = tsp_config.policyId;
-        if (sign_params.cerSigner) {
+        if (sign_params.signer.pcsiSubject) {
             if (tsp_config.forced && !tsp_config.uris.empty()) {
                 tsp_params.uris = tsp_config.uris;
             }
             else {
-                ret = sign_params.cerSigner->getTspUris(tsp_params.uris);
+                ret = sign_params.signer.pcsiSubject->getTspUris(tsp_params.uris);
                 if (ret != RET_OK) {
                     tsp_params.uris = tsp_config.uris;
                     ret = RET_OK;
@@ -661,34 +815,30 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             if (sign_params.isCadesCXA) {
-                vector<CerStore::Item*> chain_servicecerts;
+                vector<CerStore::Item*> chain_certs;
                 for (auto& it : sdoc.getCerts()) {
-                    DO(cer_store->getChainCerts(it, chain_servicecerts));
+                    DO(cer_store->getChainCerts(it->pcsiSubject, chain_certs));
                 }
-                for (auto& it : chain_servicecerts) {
-                    sdoc.addCert(it);
+                for (auto& it : chain_certs) {
+                    DO(sdoc.addCert(it));
                 }
 
-                chain_servicecerts = sdoc.getCerts();
-                for (auto& it : chain_servicecerts) {
-                    SigningDoc::OcspResponseItem* ocspresp_item = nullptr;
-                    ret = get_cert_status_by_ocsp(
-                        *cer_store,
-                        sign_params,
-                        it,
-                        &ocspresp_item
-                    );
-                    if (ret == RET_OK) {
-                        if (ocspresp_item) {
-                            sdoc.addOcspResponseItem(ocspresp_item);
-                            sdoc.addCert(ocspresp_item->cerResponder);
+                const vector<SigningDoc::CerDataItem*> certs = sdoc.getCerts();
+                for (auto& it : certs) {
+                    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
+                        ret = get_cert_status_by_ocsp(sign_params, *it);
+                        if (ret == RET_OK) {
+                            DO(sdoc.addCert(it->pcsiResponder));
+                        }
+                        else if (ret == RET_UAPKI_OCSP_URL_NOT_PRESENT) {
+                            //  It's a nornal case - nothing
+                        }
+                        else {
+                            SET_ERROR(ret);
                         }
                     }
-                    else if (ret == RET_UAPKI_OCSP_URL_NOT_PRESENT) {
-                        //  It's a nornal case - nothing
-                    }
                     else {
-                        SET_ERROR(ret);
+                        DO(get_cert_status_by_crl(*it));
                     }
                 }
             }

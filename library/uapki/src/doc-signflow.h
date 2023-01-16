@@ -29,6 +29,7 @@
 #define DOC_SIGNFLOW_H
 
 #include "cer-store.h"
+#include "crl-store.h"
 #include "library-config.h"
 #include "ocsp-helper.h"
 #include "signature-format.h"
@@ -40,19 +41,26 @@ class SigningDoc {
 public:
     static const size_t MAX_COUNT_DOCS  = 100;
 
-    struct OcspResponseItem {
+    struct CerDataItem {
+        CerStore::Item*
+                    pcsiSubject;
+        CerStore::Item*
+                    pcsiIssuer;
+        bool        isSelfSigned;
         ByteArray*  baBasicOcspResponse;
         ByteArray*  baOcspIdentifier;
         ByteArray*  baOcspRespHash;
+        CrlStore::Item*
+                    pcsiCrl;
         CerStore::Item*
-                    cerResponder;   //  ref
+                    pcsiResponder;
 
-        OcspResponseItem (void);
-        ~OcspResponseItem (void);
+        CerDataItem (void);
+        ~CerDataItem (void);
 
-        int set (const OcspResponseItem& src);
+        int set (const CerDataItem& src);
 
-    };  //  end struct OcspResponseItem
+    };  //  CerDataItem
 
     struct SignParams {
         UapkiNS::SignatureFormat
@@ -65,8 +73,7 @@ public:
                     aidDigest;      //  For digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
         UapkiNS::AlgorithmIdentifier
                     aidSignature;
-        CerStore::Item*
-                    cerSigner;      //  ref
+        CerDataItem signer;
         ByteArray*  baKeyId;
         bool        detachedData;
         bool        includeCert;
@@ -74,25 +81,22 @@ public:
         bool        includeContentTS;
         bool        includeSignatureTS;
         bool        sidUseKeyId;
+        LibraryConfig::OcspParams
+                    ocsp;
         LibraryConfig::TspParams
                     tsp;
         UapkiNS::Attribute
                     attrSigningCert;
         UapkiNS::Attribute
                     attrSignPolicy;
-        std::vector<CerStore::Item*>
-                    chainCerts;     //  refs[] - chain certs for user certificate and OCSP-cert
-        std::vector<OcspResponseItem*>
-                    ocspRespItems;  //  All responses for user-cert and chain of user-cert
+        std::vector<CerDataItem*>
+                    chainCerts;
 
         SignParams (void);
         ~SignParams (void);
 
-        bool addCert (
+        int addCert (
             CerStore::Item* cerStoreItem
-        );
-        void addOcspResponseItem (
-            OcspResponseItem* ocspRespItem
         );
         int setSignatureFormat (
             const UapkiNS::SignatureFormat signatureFormat
@@ -101,7 +105,7 @@ public:
     };  //  end struct SignParams
 
     const SignParams*
-                signParams;     //  ref
+                signParams;
     UapkiNS::Pkcs7::SignedDataBuilder
                 builder;
     UapkiNS::Pkcs7::SignedDataBuilder::SignerInfo*
@@ -124,10 +128,8 @@ private:
                 m_AttrCertValues;
     UapkiNS::Attribute
                 m_AttrRevocationValues;
-    std::vector<CerStore::Item*>
+    std::vector<CerDataItem*>
                 m_Certs;
-    std::vector<OcspResponseItem*>
-                m_OcspRespItems;
     std::vector<UapkiNS::Attribute*>
                 m_SignedAttrs;
     std::vector<UapkiNS::Attribute*>
@@ -140,11 +142,8 @@ public:
     int init (
         const SignParams* signParams
     );
-    void addCert (
+    int addCert (
         CerStore::Item* cerStoreItem
-    );
-    void addOcspResponseItem (
-        OcspResponseItem* ocspRespItem
     );
     int addSignedAttribute (
         const std::string& type,
@@ -168,7 +167,7 @@ public:
 
     ByteArray* getEncoded (void);
 
-    std::vector<CerStore::Item*> getCerts (void) { return m_Certs; }
+    std::vector<CerDataItem*> getCerts (void) { return m_Certs; }
 
 public:
     static int encodeSignaturePolicy (
@@ -190,7 +189,7 @@ private:
     int encodeRevocationRefs (
         UapkiNS::Attribute& attr
     );
-    int encodeRevocationValues (
+    int encodeRevocationValues (    //  Note: supported OCSP-responses only
         UapkiNS::Attribute& attr
     );
 
