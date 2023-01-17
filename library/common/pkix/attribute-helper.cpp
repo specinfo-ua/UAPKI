@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-15
+//  Last update: 2023-01-17
 
 
 #include "attribute-helper.h"
@@ -393,7 +393,10 @@ AtsHashIndexBuilder::~AtsHashIndexBuilder (void)
     ba_free(m_BaEncoded);
 }
 
-int AtsHashIndexBuilder::init (const char* hashIndAlgorithm, const ByteArray* baParameters)
+int AtsHashIndexBuilder::init (
+        const char* hashIndAlgorithm,
+        const ByteArray* baParameters
+)
 {
     if (!hashIndAlgorithm || (strlen(hashIndAlgorithm) < 2)) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -408,12 +411,16 @@ int AtsHashIndexBuilder::init (const char* hashIndAlgorithm, const ByteArray* ba
     return Util::algorithmIdentifierToAsn1(m_AtsHashIndexFull->hashIndAlgorithm, hashIndAlgorithm, baParameters);
 }
 
-int AtsHashIndexBuilder::init (const AlgorithmIdentifier& hashIndAlgorithm)
+int AtsHashIndexBuilder::init (
+        const AlgorithmIdentifier& hashIndAlgorithm
+)
 {
     return init(hashIndAlgorithm.algorithm.c_str(), hashIndAlgorithm.baParameters);
 }
 
-int AtsHashIndexBuilder::addHashCert (const ByteArray* baCertEncoded)
+int AtsHashIndexBuilder::addHashCert (
+        const ByteArray* baHash
+)
 {
     if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -423,7 +430,7 @@ int AtsHashIndexBuilder::addHashCert (const ByteArray* baCertEncoded)
     OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
     if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
 
-    DO(asn_ba2OCTSTRING(baCertEncoded, octet_str));
+    DO(asn_ba2OCTSTRING(baHash, octet_str));
     DO(ASN_SEQUENCE_ADD(&certs_hashindex.list, octet_str));
     octet_str = nullptr;
 
@@ -432,7 +439,9 @@ cleanup:
     return ret;
 }
 
-int AtsHashIndexBuilder::addHashCrl (const ByteArray* baCrlEncoded)
+int AtsHashIndexBuilder::addHashCrl (
+        const ByteArray* baHash
+)
 {
     if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -442,7 +451,7 @@ int AtsHashIndexBuilder::addHashCrl (const ByteArray* baCrlEncoded)
     OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
     if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
 
-    DO(asn_ba2OCTSTRING(baCrlEncoded, octet_str));
+    DO(asn_ba2OCTSTRING(baHash, octet_str));
     DO(ASN_SEQUENCE_ADD(&crls_hashindex.list, octet_str));
     octet_str = nullptr;
 
@@ -451,7 +460,9 @@ cleanup:
     return ret;
 }
 
-int AtsHashIndexBuilder::addHashUnsignedAttr (const ByteArray* baAttrEncoded)
+int AtsHashIndexBuilder::addHashUnsignedAttr (
+        const ByteArray* baHash
+)
 {
     if (!m_AtsHashIndexDefault && !m_AtsHashIndexFull) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -461,7 +472,7 @@ int AtsHashIndexBuilder::addHashUnsignedAttr (const ByteArray* baAttrEncoded)
     OCTET_STRING_t* octet_str = (OCTET_STRING_t*)calloc(1, sizeof(OCTET_STRING_t));
     if (!octet_str) return RET_UAPKI_GENERAL_ERROR;
 
-    DO(asn_ba2OCTSTRING(baAttrEncoded, octet_str));
+    DO(asn_ba2OCTSTRING(baHash, octet_str));
     DO(ASN_SEQUENCE_ADD(&unsattrs_hashindex.list, octet_str));
     octet_str = nullptr;
 
@@ -482,7 +493,9 @@ int AtsHashIndexBuilder::encode (void)
     return ret;
 }
 
-ByteArray* AtsHashIndexBuilder::getEncoded (const bool move)
+ByteArray* AtsHashIndexBuilder::getEncoded (
+        const bool move
+)
 {
     ByteArray* rv_ba = m_BaEncoded;
     if (move) {

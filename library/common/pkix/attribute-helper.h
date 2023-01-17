@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-11
+//  Last update: 2023-01-17
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -114,14 +114,27 @@ namespace AttributeHelper {
         AtsHashIndexBuilder (void);
         ~AtsHashIndexBuilder (void);
 
-        int init (const char* hashIndAlgorithm, const ByteArray* baParameters = nullptr);
-        int init (const AlgorithmIdentifier& hashIndAlgorithm);
-        int addHashCert (const ByteArray* baCertEncoded);
-        int addHashCrl (const ByteArray* baCrlEncoded);
-        int addHashUnsignedAttr (const ByteArray* baAttrEncoded);
+        int init (
+            const char* hashIndAlgorithm,
+            const ByteArray* baParameters = nullptr
+        );
+        int init (
+            const AlgorithmIdentifier& hashIndAlgorithm
+        );
+        int addHashCert (
+            const ByteArray* baHash
+        );
+        int addHashCrl (
+            const ByteArray* baHash
+        );
+        int addHashUnsignedAttr (
+            const ByteArray* baHash
+        );
 
         int encode (void);
-        ByteArray* getEncoded (const bool move = false);
+        ByteArray* getEncoded (
+            const bool move = false
+        );
 
     };  //  AtsHashIndexBuilder
 
