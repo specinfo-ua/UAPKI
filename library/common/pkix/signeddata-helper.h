@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-27
+//  Last update: 2023-01-20
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -66,7 +66,7 @@ namespace Pkcs7 {
     public:
         class SignerInfo {
             SignerInfo_t*
-                        m_RefSignerInfo;
+                        m_SignerInfo;
             SignerIdentifierType
                         m_SidType;
             ByteArray*  m_BaDigestAlgoEncoded;
@@ -74,31 +74,65 @@ namespace Pkcs7 {
             std::string m_SignAlgo;
 
         public:
-            SignerInfo (SignerInfo_t* iRefSignerInfo);
+            SignerInfo (
+                SignerInfo_t* iSignerInfo
+            );
             ~SignerInfo (void);
 
-            int setVersion (const uint32_t version);
-            int setSid (const ByteArray* baSID);
-            int setSidByKeyId (const ByteArray* baKeyId);
-            int setDigestAlgorithm (const UapkiNS::AlgorithmIdentifier& aidDigest);
-            int addSignedAttr (const char* type, const ByteArray* baValues);
-            int addSignedAttr (const UapkiNS::Attribute& signedAttr);
-            int setSignedAttrs (const std::vector<UapkiNS::Attribute>& signedAttrs);
+            int setVersion (
+                const uint32_t version
+            );
+            int setSid (
+                const ByteArray* baSidEncoded
+            );
+            int setSid (
+                const SignerIdentifierType sidType,
+                const ByteArray* baSidValue
+            );
+            int setDigestAlgorithm (
+                const UapkiNS::AlgorithmIdentifier& aidDigest
+            );
+            int addSignedAttr (
+                const char* type,
+                const ByteArray* baValues
+            );
+            int addSignedAttr (
+                const UapkiNS::Attribute& signedAttr
+            );
+            int setSignedAttrs (
+                const std::vector<UapkiNS::Attribute>& signedAttrs
+            );
             int encodeSignedAttrs (void);
-            int setSignature (const UapkiNS::AlgorithmIdentifier& aidSignature, const ByteArray* baSignValue);
-            int addUnsignedAttr (const UapkiNS::Attribute& unsignedAttr);
-            int setUnsignedAttrs (const std::vector<UapkiNS::Attribute>& unsignedAttrs);
+            int setSignature (
+                const UapkiNS::AlgorithmIdentifier& aidSignature,
+                const ByteArray* baSignValue
+            );
+            int addUnsignedAttr (
+                const UapkiNS::Attribute& unsignedAttr
+            );
+            int setUnsignedAttrs (
+                const std::vector<UapkiNS::Attribute>& unsignedAttrs
+            );
 
+            const SignerInfo_t* getAsn1Data (void) const { return m_SignerInfo; }
             SignerIdentifierType getSidType (void) const { return m_SidType; }
             const ByteArray* getDigestAlgoEncoded (void) const { return m_BaDigestAlgoEncoded; }
             const ByteArray* getSignedAttrsEncoded (void) const { return m_BaSignedAttrsEncoded; }
             const std::string& getSignAlgo (void) const { return m_SignAlgo; }
 
         public:
-            int addSignedAttrContentType (const char* contentType = OID_PKCS7_DATA);
-            int addSignedAttrContentType (const std::string& contentType);
-            int addSignedAttrMessageDigest (const ByteArray* baMessageDigest);
-            int addSignedAttrSigningTime (const uint64_t signingTime);
+            int addSignedAttrContentType (
+                const char* contentType = OID_PKCS7_DATA
+            );
+            int addSignedAttrContentType (
+                const std::string& contentType
+            );
+            int addSignedAttrMessageDigest (
+                const ByteArray* baMessageDigest
+            );
+            int addSignedAttrSigningTime (
+                const uint64_t signingTime
+            );
 
         };  //  end class SignerInfo
 

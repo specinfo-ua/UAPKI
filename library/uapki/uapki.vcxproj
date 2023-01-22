@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="..\common\loaders\cm-loader.cpp" />
     <ClCompile Include="..\common\pkix\aid.c" />
+    <ClCompile Include="..\common\pkix\archive-timestamp-helper.cpp" />
     <ClCompile Include="..\common\pkix\asn1-ba-utils.c" />
     <ClCompile Include="..\common\pkix\attribute-helper.cpp" />
     <ClCompile Include="..\common\pkix\attribute-utils.c" />
@@ -100,6 +101,7 @@
     <ClInclude Include="..\common\loaders\cm-loader.h" />
     <ClInclude Include="..\common\loaders\dl-macros.h" />
     <ClInclude Include="..\common\pkix\aid.h" />
+    <ClInclude Include="..\common\pkix\archive-timestamp-helper.h" />
     <ClInclude Include="..\common\pkix\asn1-ba-utils.h" />
     <ClInclude Include="..\common\pkix\attribute-helper.h" />
     <ClInclude Include="..\common\pkix\attribute-utils.h" />

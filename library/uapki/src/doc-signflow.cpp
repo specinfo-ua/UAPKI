@@ -240,6 +240,19 @@ int SigningDoc::init (
             m_Certs.push_back(cdi);
             DO(cdi->set(*it));
         }
+
+        DO(m_ArchiveTsHelper.init(
+            (signParams->signatureFormat == UapkiNS::SignatureFormat::CADES_A_V3)
+                ? &signParams->aidDigest : nullptr
+        ));
+
+        if (signParams->includeCert) {
+            const ByteArray* ba_certencoded = signParams->signer.pcsiSubject->baEncoded;
+            DO(builder.addCertificate(ba_certencoded));
+            if (m_ArchiveTsHelper.isEnabled()) {
+                DO(m_ArchiveTsHelper.addCertificate(ba_certencoded));
+            }
+        }
     }
 
 cleanup:
@@ -253,9 +266,18 @@ int SigningDoc::addCert (
     return add_unique_cert(m_Certs, cerStoreItem);
 }
 
+int SigningDoc::addArchiveAttribute (
+        const string& type,
+        const ByteArray* baValues
+)
+{
+    const UapkiNS::Attribute attr_atsv3(type, baValues);
+    return signerInfo->addUnsignedAttr(attr_atsv3);
+}
+
 int SigningDoc::addSignedAttribute (
         const string& type,
-        ByteArray* baValues
+        const ByteArray* baValues
 )
 {
     UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
@@ -267,7 +289,7 @@ int SigningDoc::addSignedAttribute (
 
 int SigningDoc::addUnsignedAttribute (
         const string& type,
-        ByteArray* baValues
+        const ByteArray* baValues
 )
 {
     UapkiNS::Attribute* attr = new UapkiNS::Attribute(type, baValues);
@@ -303,6 +325,10 @@ int SigningDoc::buildSignedAttributes (void)
 
     DO(signerInfo->encodeSignedAttrs());
 
+    if (m_ArchiveTsHelper.isEnabled()) {
+        DO(m_ArchiveTsHelper.setHashContent(contentType, baMessageDigest));
+    }
+
 cleanup:
     return ret;
 }
@@ -310,47 +336,9 @@ cleanup:
 int SigningDoc::buildSignedData (void)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_sid;
-    uint32_t version = 0;
 
-    if (!signParams->sidUseKeyId) {
-        DO(signParams->signer.pcsiSubject->getIssuerAndSN(&sba_sid));
-        DO(signerInfo->setSid(sba_sid.get()));
-        version = 1;
-    }
-    else {
-        DEBUG_OUTCON(printf("signParams->baKeyId, hex:"); ba_print(stdout, signParams->baKeyId));
-        DO(keyid_to_sid_subjectkeyid(signParams->baKeyId, &sba_sid));
-        DO(signerInfo->setSidByKeyId(sba_sid.get()));
-        version = 3;
-    }
-    DEBUG_OUTCON(printf("SigningDoc::buildSignedData(), ba_sid, hex:"); ba_print(stdout, sba_sid.get()));
-    DO(signerInfo->setVersion(version));
-
-    //  Add CAdES-unsigned attrs
-    if (m_AttrCertificateRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrCertificateRefs));
-    }
-    if (m_AttrRevocationRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrRevocationRefs));
-    }
-    if (m_AttrCertValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrCertValues));
-    }
-    if (m_AttrRevocationValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrRevocationValues));
-    }
-
-    //  Add other unsigned attrs
-    for (const auto& it : m_UnsignedAttrs) {
-        DO(signerInfo->addUnsignedAttr(*it));
-    }
-
-    DO(builder.setVersion(version));
+    DO(builder.setVersion(signerInfo->getSidType() == UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN ? 1u : 3u));
     DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : baData));
-    if (signParams->includeCert) {
-        DO(builder.addCertificate(signParams->signer.pcsiSubject->baEncoded));
-    }
 
     DO(builder.encode());
 
@@ -376,6 +364,31 @@ int SigningDoc::buildUnsignedAttributes (void)
         break;
     default:
         break;
+    }
+
+    //  Add CAdES-unsigned attrs
+    if (m_AttrCertificateRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrCertificateRefs));
+    }
+    if (m_AttrRevocationRefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrRevocationRefs));
+    }
+    if (m_AttrCertValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrCertValues));
+    }
+    if (m_AttrRevocationValues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(m_AttrRevocationValues));
+    }
+
+    //  Add other unsigned attrs
+    for (const auto& it : m_UnsignedAttrs) {
+        DO(signerInfo->addUnsignedAttr(*it));
+    }
+
+    if (m_ArchiveTsHelper.isEnabled()) {
+        DO(m_ArchiveTsHelper.setSignerInfo(signerInfo->getAsn1Data()));
+        DO(m_ArchiveTsHelper.setUnsignedAttrs(signerInfo->getAsn1Data()));
+        DO(m_ArchiveTsHelper.calcHash());
     }
 
 cleanup:
@@ -438,6 +451,30 @@ int SigningDoc::setSignature (
 
     DO(signerInfo->setSignature(signParams->aidSignature, baSignValue));
     baSignature = (ByteArray*)baSignValue;
+
+cleanup:
+    return ret;
+}
+
+int SigningDoc::setupSignerIdentifier (void)
+{
+    int ret = RET_OK;
+    UapkiNS::SmartBA sba_sid;
+    uint32_t version = 0;
+
+    if (!signParams->sidUseKeyId) {
+        DO(signParams->signer.pcsiSubject->getIssuerAndSN(&sba_sid));
+        DO(signerInfo->setSid(UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN, sba_sid.get()));
+        version = 1;
+    }
+    else {
+        DEBUG_OUTCON(printf("signParams->baKeyId, hex:"); ba_print(stdout, signParams->baKeyId));
+        DO(keyid_to_sid_subjectkeyid(signParams->baKeyId, &sba_sid));
+        DO(signerInfo->setSid(UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID, sba_sid.get()));
+        version = 3;
+    }
+    DEBUG_OUTCON(printf("SigningDoc::setupSignerIdentifier(), sba_sid, hex:"); ba_print(stdout, sba_sid.get()));
+    DO(signerInfo->setVersion(version));
 
 cleanup:
     return ret;

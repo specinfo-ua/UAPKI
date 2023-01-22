@@ -65,7 +65,7 @@ enum class TsAttrType : uint32_t {
     UNDEFINED           = 0,
     CONTENT_TIMESTAMP   = 1,
     TIMESTAMP_TOKEN     = 2,
-    RESERVED_FOR_AV3    = 3
+    ARCHIVE_TIMESTAMP   = 3
 };
 
 
@@ -272,6 +272,9 @@ static int add_timestamp_to_attrs (
         DO(sdoc.digestSignature(&sba_hash));
         DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sba_hash.get()));
         break;
+    case TsAttrType::ARCHIVE_TIMESTAMP:
+        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.getAtsHash()));
+        break;
     default:
         break;
     }
@@ -283,11 +286,15 @@ static int add_timestamp_to_attrs (
         DO(sdoc.addSignedAttribute(string(OID_PKCS9_CONTENT_TIMESTAMP), tsp_helper.getTsToken(true)));
         break;
     case TsAttrType::TIMESTAMP_TOKEN:
-        DO(sdoc.addUnsignedAttribute(string(OID_PKCS9_TIMESTAMP_TOKEN), tsp_helper.getTsToken(true)));
+        DO(sdoc.addUnsignedAttribute(OID_PKCS9_TIMESTAMP_TOKEN, tsp_helper.getTsToken(true)));
+        break;
+    case TsAttrType::ARCHIVE_TIMESTAMP:
+        DO(sdoc.addArchiveAttribute(OID_ETSI_ARCHIVE_TIMESTAMP_V3, tsp_helper.getTsToken(true)));
         break;
     default:
         break;
     }
+    
 
 cleanup:
     return ret;
@@ -787,6 +794,8 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         for (size_t i = 0; i < signing_docs.size(); i++) {
             SigningDoc& sdoc = signing_docs[i];
 
+            DO(sdoc.setupSignerIdentifier());
+
             DO(sdoc.digestMessage());
             if (sign_params.includeContentTS) {
                 //  After digestMessage and before buildSignedAttributes
@@ -844,9 +853,10 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             DO(sdoc.buildUnsignedAttributes());
+            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_A_V3) {
+                DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::ARCHIVE_TIMESTAMP));
+            }
             DO(sdoc.buildSignedData());
-
-            //TODO: if CADES_A_V3 then {..}
         }
     }
     else {

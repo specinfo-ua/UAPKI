@@ -28,6 +28,7 @@
 #ifndef DOC_SIGNFLOW_H
 #define DOC_SIGNFLOW_H
 
+#include "archive-timestamp-helper.h"
 #include "cer-store.h"
 #include "crl-store.h"
 #include "library-config.h"
@@ -120,6 +121,8 @@ public:
     std::string tspUri;
 
 private:
+    UapkiNS::Pkcs7::ArchiveTs3Helper
+                m_ArchiveTsHelper;
     UapkiNS::Attribute
                 m_AttrCertificateRefs;
     UapkiNS::Attribute
@@ -145,13 +148,17 @@ public:
     int addCert (
         CerStore::Item* cerStoreItem
     );
+    int addArchiveAttribute (
+        const std::string& type,
+        const ByteArray* baValues
+    );
     int addSignedAttribute (
         const std::string& type,
-        ByteArray* baValues
+        const ByteArray* baValues
     );
     int addUnsignedAttribute (
         const std::string& type,
-        ByteArray* baValues
+        const ByteArray* baValues
     );
     int buildSignedAttributes (void);
     int buildSignedData (void);
@@ -164,10 +171,12 @@ public:
     int setSignature (
         const ByteArray* baSignValue
     );
+    int setupSignerIdentifier (void);
 
     ByteArray* getEncoded (void);
 
     std::vector<CerDataItem*> getCerts (void) { return m_Certs; }
+    const ByteArray* getAtsHash (void) const { return m_ArchiveTsHelper.getHashValue(); }
 
 public:
     static int encodeSignaturePolicy (

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-11-06
+//  Last update: 2023-01-22
 
 #ifndef UAPKI_OIDS_H
 #define UAPKI_OIDS_H
@@ -477,7 +477,7 @@ DEFINE_OID(OID_PDS_UKRAINE_EDRPOU,          "1.2.804.2.1.1.1.11.1.4.2.1");
 DEFINE_OID(OID_PDS_UKRAINE_EDDR,            "1.2.804.2.1.1.1.11.1.4.11.1");
 //-----------------------------------------------------------------------------------------
 //ETSI
-DEFINE_OID(ETSI_ARCHIVE_TIMESTAMP_V3,       "0.4.0.1733.2.4");
+DEFINE_OID(OID_ETSI_ARCHIVE_TIMESTAMP_V3,   "0.4.0.1733.2.4");
 //-----------------------------------------------------------------------------------------
 
 

@@ -246,6 +246,9 @@
     <ClCompile Include="..\common\pkix\tsp-helper.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\archive-timestamp-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -397,6 +400,9 @@
     </ClInclude>
     <ClInclude Include="include\uapki-debug.h">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\archive-timestamp-helper.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

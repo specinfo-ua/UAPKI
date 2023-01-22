@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-27
+//  Last update: 2023-01-20
 
 
 #include "signeddata-helper.h"
@@ -252,8 +252,10 @@ cleanup:
 }
 
 
-SignedDataBuilder::SignerInfo::SignerInfo (SignerInfo_t* iRefSignerInfo)
-    : m_RefSignerInfo(iRefSignerInfo)
+SignedDataBuilder::SignerInfo::SignerInfo (
+        SignerInfo_t* iSignerInfo
+)
+    : m_SignerInfo(iSignerInfo)
     , m_SidType(SignerIdentifierType::UNDEFINED)
     , m_BaDigestAlgoEncoded(nullptr)
     , m_BaSignedAttrsEncoded(nullptr)
@@ -268,97 +270,121 @@ SignedDataBuilder::SignerInfo::~SignerInfo (void)
     ba_free(m_BaSignedAttrsEncoded);
 }
 
-int SignedDataBuilder::SignerInfo::setVersion (const uint32_t version)
+int SignedDataBuilder::SignerInfo::setVersion (
+        const uint32_t version
+)
 {
-    return asn_ulong2INTEGER(&m_RefSignerInfo->version, (unsigned long)version);
+    return asn_ulong2INTEGER(&m_SignerInfo->version, (unsigned long)version);
 }
 
-int SignedDataBuilder::SignerInfo::setSid (const ByteArray* baSID)
+int SignedDataBuilder::SignerInfo::setSid (
+        const ByteArray* baSidEncoded
+)
 {
     int ret = RET_OK;
-
-    if (!baSID) return RET_UAPKI_INVALID_PARAMETER;
-
     uint8_t tag = 0x00;
-    DO(ba_get_byte(baSID, 0, &tag));
+
+    if (!baSidEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    DO(ba_get_byte(baSidEncoded, 0, &tag));
     if (tag == 0x30) m_SidType = SignerIdentifierType::ISSUER_AND_SN;
     else if (tag == 0x80) m_SidType = SignerIdentifierType::SUBJECT_KEYID;
     else {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
-    DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_RefSignerInfo->sid, baSID));
+    DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baSidEncoded));
 
 cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::setSidByKeyId (const ByteArray* baKeyId)
+int SignedDataBuilder::SignerInfo::setSid (
+        const SignerIdentifierType sidType,
+        const ByteArray* baSidValue
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = nullptr;
+    UapkiNS::SmartBA sba_encoded;
 
-    if (!baKeyId) return RET_UAPKI_INVALID_PARAMETER;
+    if (!baSidValue) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(ba_encode_octetstring(baKeyId, &ba_encoded));
-    DO(ba_set_byte(ba_encoded, 0, 0x80));
+    switch (sidType) {
+    case SignerIdentifierType::ISSUER_AND_SN:
+        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baSidValue));
+        break;
+    case SignerIdentifierType::SUBJECT_KEYID:
+        DO(ba_encode_octetstring(baSidValue, &sba_encoded));
+        DO(ba_set_byte(sba_encoded.get(), 0, 0x80));
+        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, sba_encoded.get()));
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        break;
+    }
 
-    DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_RefSignerInfo->sid, ba_encoded));
-
-    m_SidType = SignerIdentifierType::SUBJECT_KEYID;
+    m_SidType = sidType;
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::setDigestAlgorithm (const UapkiNS::AlgorithmIdentifier& aidDigest)
+int SignedDataBuilder::SignerInfo::setDigestAlgorithm (
+        const UapkiNS::AlgorithmIdentifier& aidDigest
+)
 {
     int ret = RET_OK;
 
     if (!aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(Util::algorithmIdentifierToAsn1(m_RefSignerInfo->digestAlgorithm, aidDigest));
+    DO(Util::algorithmIdentifierToAsn1(m_SignerInfo->digestAlgorithm, aidDigest));
 
-    DO(asn_encode_ba(get_AlgorithmIdentifier_desc(), &m_RefSignerInfo->digestAlgorithm, &m_BaDigestAlgoEncoded));
+    DO(asn_encode_ba(get_AlgorithmIdentifier_desc(), &m_SignerInfo->digestAlgorithm, &m_BaDigestAlgoEncoded));
 
 cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttr (const char* type, const ByteArray* baValues)
+int SignedDataBuilder::SignerInfo::addSignedAttr (
+        const char* type,
+        const ByteArray* baValues
+)
 {
     int ret = RET_OK;
 
     if (!type || !oid_is_valid(type) || !baValues) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!m_RefSignerInfo->signedAttrs) {
-        ASN_ALLOC_TYPE(m_RefSignerInfo->signedAttrs, Attributes_t);
+    if (!m_SignerInfo->signedAttrs) {
+        ASN_ALLOC_TYPE(m_SignerInfo->signedAttrs, Attributes_t);
     }
 
-    DO(Util::addToAttributes(m_RefSignerInfo->signedAttrs, type, baValues));
+    DO(Util::addToAttributes(m_SignerInfo->signedAttrs, type, baValues));
 
 cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttr (const UapkiNS::Attribute& signedAttr)
+int SignedDataBuilder::SignerInfo::addSignedAttr (
+        const UapkiNS::Attribute& signedAttr
+)
 {
     return addSignedAttr(signedAttr.type.c_str(), signedAttr.baValues);
 }
 
-int SignedDataBuilder::SignerInfo::setSignedAttrs (const vector<UapkiNS::Attribute>& signedAttrs)
+int SignedDataBuilder::SignerInfo::setSignedAttrs (
+        const vector<UapkiNS::Attribute>& signedAttrs
+)
 {
     int ret = RET_OK;
 
     if (!signedAttrs.empty()) {
-        if (!m_RefSignerInfo->signedAttrs) {
-            ASN_ALLOC_TYPE(m_RefSignerInfo->signedAttrs, Attributes_t);
+        if (!m_SignerInfo->signedAttrs) {
+            ASN_ALLOC_TYPE(m_SignerInfo->signedAttrs, Attributes_t);
         }
 
         for (auto& it : signedAttrs) {
             if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-            DO(Util::addToAttributes(m_RefSignerInfo->signedAttrs, it));
+            DO(Util::addToAttributes(m_SignerInfo->signedAttrs, it));
         }
     }
 
@@ -368,56 +394,63 @@ cleanup:
 
 int SignedDataBuilder::SignerInfo::encodeSignedAttrs (void)
 {
-    if (!m_RefSignerInfo->signedAttrs) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_SignerInfo->signedAttrs) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_encode_ba(get_SignedAttributes_desc(), m_RefSignerInfo->signedAttrs, &m_BaSignedAttrsEncoded);
+    return asn_encode_ba(get_SignedAttributes_desc(), m_SignerInfo->signedAttrs, &m_BaSignedAttrsEncoded);
 }
 
-int SignedDataBuilder::SignerInfo::setSignature (const UapkiNS::AlgorithmIdentifier& aidSignature, const ByteArray* baSignValue)
+int SignedDataBuilder::SignerInfo::setSignature (
+        const UapkiNS::AlgorithmIdentifier& aidSignature,
+        const ByteArray* baSignValue
+)
 {
     int ret = RET_OK;
 
     if (!aidSignature.isPresent() || !baSignValue) return RET_UAPKI_INVALID_PARAMETER;
 
     //  =signatureAlgorithm=
-    DO(Util::algorithmIdentifierToAsn1(m_RefSignerInfo->signatureAlgorithm, aidSignature));
+    DO(Util::algorithmIdentifierToAsn1(m_SignerInfo->signatureAlgorithm, aidSignature));
     m_SignAlgo = aidSignature.algorithm;
 
     //  =signature=
-    DO(asn_ba2OCTSTRING(baSignValue, &m_RefSignerInfo->signature));
+    DO(asn_ba2OCTSTRING(baSignValue, &m_SignerInfo->signature));
 
 cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addUnsignedAttr (const UapkiNS::Attribute& unsignedAttr)
+int SignedDataBuilder::SignerInfo::addUnsignedAttr (
+        const UapkiNS::Attribute& unsignedAttr
+)
 {
     int ret = RET_OK;
 
     if (!unsignedAttr.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!m_RefSignerInfo->unsignedAttrs) {
-        ASN_ALLOC_TYPE(m_RefSignerInfo->unsignedAttrs, Attributes_t);
+    if (!m_SignerInfo->unsignedAttrs) {
+        ASN_ALLOC_TYPE(m_SignerInfo->unsignedAttrs, Attributes_t);
     }
 
-    DO(Util::addToAttributes(m_RefSignerInfo->unsignedAttrs, unsignedAttr));
+    DO(Util::addToAttributes(m_SignerInfo->unsignedAttrs, unsignedAttr));
 
 cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::setUnsignedAttrs (const vector<UapkiNS::Attribute>& unsignedAttrs)
+int SignedDataBuilder::SignerInfo::setUnsignedAttrs (
+        const vector<UapkiNS::Attribute>& unsignedAttrs
+)
 {
     int ret = RET_OK;
 
     if (!unsignedAttrs.empty()) {
-        if (!m_RefSignerInfo->unsignedAttrs) {
-            ASN_ALLOC_TYPE(m_RefSignerInfo->unsignedAttrs, Attributes_t);
+        if (!m_SignerInfo->unsignedAttrs) {
+            ASN_ALLOC_TYPE(m_SignerInfo->unsignedAttrs, Attributes_t);
         }
 
         for (auto& it : unsignedAttrs) {
             if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-            DO(Util::addToAttributes(m_RefSignerInfo->unsignedAttrs, it));
+            DO(Util::addToAttributes(m_SignerInfo->unsignedAttrs, it));
         }
     }
 
@@ -425,7 +458,9 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttrContentType (const char* contentType)
+int SignedDataBuilder::SignerInfo::addSignedAttrContentType (
+        const char* contentType
+)
 {
     if (!contentType || !oid_is_valid(contentType)) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -439,12 +474,16 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttrContentType (const string& contentType)
+int SignedDataBuilder::SignerInfo::addSignedAttrContentType (
+        const string& contentType
+)
 {
     return addSignedAttrContentType(contentType.c_str());
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttrMessageDigest (const ByteArray* baMessageDigest)
+int SignedDataBuilder::SignerInfo::addSignedAttrMessageDigest (
+        const ByteArray* baMessageDigest
+)
 {
     if (!baMessageDigest) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -458,7 +497,9 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::SignerInfo::addSignedAttrSigningTime (const uint64_t signingTime)
+int SignedDataBuilder::SignerInfo::addSignedAttrSigningTime (
+        const uint64_t signingTime
+)
 {
     int ret = RET_OK;
     UapkiNS::Attribute attr = UapkiNS::Attribute(string(OID_PKCS9_SIGNING_TIME));
