@@ -63,28 +63,6 @@ static int add_unique_cert (
     return RET_OK;
 }   //  add_unique_cert
 
-static int keyid_to_sid_subjectkeyid (const ByteArray* baKeyId, ByteArray** baSubjectKeyId)
-{
-    int ret = RET_OK;
-    //  Note:   SignerIdentifierIm_t - is SignerIdentifier IMPLICIT (use tag 0x80),
-    //          SignerIdentifierEx_t - is SignerIdentifier EXPLICIT (use tag 0xA0),
-    //          Here we need use implicit case SignerIdentifier
-    SignerIdentifierIm_t* sid_im = NULL;
-
-    CHECK_PARAM(baKeyId != NULL);
-    CHECK_PARAM(baSubjectKeyId != NULL);
-
-    ASN_ALLOC_TYPE(sid_im, SignerIdentifierIm_t);
-    sid_im->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
-    DO(asn_ba2OCTSTRING(baKeyId, &sid_im->choice.subjectKeyIdentifier));
-
-    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid_im, baSubjectKeyId));
-
-cleanup:
-    asn_free(get_SignerIdentifierIm_desc(), sid_im);
-    return ret;
-}   //  keyid_to_sid_subjectkeyid
-
 
 SigningDoc::CerDataItem::CerDataItem (void)
     : pcsiSubject(nullptr)
@@ -469,8 +447,7 @@ int SigningDoc::setupSignerIdentifier (void)
     }
     else {
         DEBUG_OUTCON(printf("signParams->baKeyId, hex:"); ba_print(stdout, signParams->baKeyId));
-        DO(keyid_to_sid_subjectkeyid(signParams->baKeyId, &sba_sid));
-        DO(signerInfo->setSid(UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID, sba_sid.get()));
+        DO(signerInfo->setSid(UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID, signParams->baKeyId));
         version = 3;
     }
     DEBUG_OUTCON(printf("SigningDoc::setupSignerIdentifier(), sba_sid, hex:"); ba_print(stdout, sba_sid.get()));

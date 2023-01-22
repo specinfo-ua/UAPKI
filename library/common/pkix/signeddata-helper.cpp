@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-20
+//  Last update: 2023-01-22
 
 
 #include "signeddata-helper.h"
@@ -301,21 +301,20 @@ cleanup:
 
 int SignedDataBuilder::SignerInfo::setSid (
         const SignerIdentifierType sidType,
-        const ByteArray* baSidValue
+        const ByteArray* baData
 )
 {
     int ret = RET_OK;
     UapkiNS::SmartBA sba_encoded;
 
-    if (!baSidValue) return RET_UAPKI_INVALID_PARAMETER;
+    if (!baData) return RET_UAPKI_INVALID_PARAMETER;
 
     switch (sidType) {
     case SignerIdentifierType::ISSUER_AND_SN:
-        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baSidValue));
+        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baData));
         break;
     case SignerIdentifierType::SUBJECT_KEYID:
-        DO(ba_encode_octetstring(baSidValue, &sba_encoded));
-        DO(ba_set_byte(sba_encoded.get(), 0, 0x80));
+        DO(keyIdToSid(baData, &sba_encoded));
         DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, sba_encoded.get()));
         break;
     default:
@@ -752,6 +751,28 @@ int SignedDataParser::SignerInfo::decodeAttributes (
     }
 
 cleanup:
+    return ret;
+}
+
+int keyIdToSid (const ByteArray* baKeyId, ByteArray** baSidEncoded)
+{
+    int ret = RET_OK;
+    //  Note:   SignerIdentifierIm_t - is SignerIdentifier IMPLICIT (use tag 0x80),
+    //          SignerIdentifierEx_t - is SignerIdentifier EXPLICIT (use tag 0xA0),
+    //          Here we need use implicit case SignerIdentifier
+    SignerIdentifierIm_t* sid_im = nullptr;
+
+    CHECK_PARAM(baKeyId != NULL);
+    CHECK_PARAM(baSidEncoded != NULL);
+
+    ASN_ALLOC_TYPE(sid_im, SignerIdentifierIm_t);
+    sid_im->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
+    DO(asn_ba2OCTSTRING(baKeyId, &sid_im->choice.subjectKeyIdentifier));
+
+    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid_im, baSidEncoded));
+
+cleanup:
+    asn_free(get_SignerIdentifierIm_desc(), sid_im);
     return ret;
 }
 

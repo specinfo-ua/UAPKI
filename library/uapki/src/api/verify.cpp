@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -455,11 +455,13 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
 
             bool detect_certrefs = false, detect_revocrefs = false;
             bool detect_certvals = false, detect_revocvals = false;
+            bool detect_atsv3 = false;
             for (const auto& it : signer_info.getUnsignedAttrs()) {
                 if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) detect_certrefs = true;
                 else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) detect_revocrefs = true;
                 else if (it.type == string(OID_PKCS9_CERT_VALUES)) detect_certvals = true;
                 else if (it.type == string(OID_PKCS9_REVOCATION_VALUES)) detect_revocvals = true;
+                else if (it.type == string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) detect_atsv3 = true;
             }
 
             if (detect_certrefs && detect_revocrefs) {
@@ -470,9 +472,9 @@ static int verify_signer_info (CerStore& cerStore, const ByteArray* baContent, V
                 verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_X_LONG;
             }
 
-            //if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_X_LONG) && detect_todo) {
-            //    verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_A_V3;
-            //}
+            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_X_LONG) && detect_atsv3) {
+                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_A_V3;
+            }
         }
     }
 
