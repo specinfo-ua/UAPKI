@@ -123,14 +123,6 @@ public:
 private:
     UapkiNS::Pkcs7::ArchiveTs3Helper
                 m_ArchiveTsHelper;
-    UapkiNS::Attribute
-                m_AttrCertificateRefs;
-    UapkiNS::Attribute
-                m_AttrRevocationRefs;
-    UapkiNS::Attribute
-                m_AttrCertValues;
-    UapkiNS::Attribute
-                m_AttrRevocationValues;
     std::vector<CerDataItem*>
                 m_Certs;
     std::vector<UapkiNS::Attribute*>

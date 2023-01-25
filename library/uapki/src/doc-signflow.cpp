@@ -328,34 +328,37 @@ int SigningDoc::buildUnsignedAttributes (void)
 {
     int ret = RET_OK;
 
+    UapkiNS::Attribute attr_certificaterefs, attr_revocationrefs;
+    UapkiNS::Attribute attr_certvalues, attr_revocationvalues;
+
     switch (signParams->signatureFormat) {
     case UapkiNS::SignatureFormat::CADES_C:
-        DO(encodeCertificateRefs(m_AttrCertificateRefs));
-        DO(encodeRevocationRefs(m_AttrRevocationRefs));
+        DO(encodeCertificateRefs(attr_certificaterefs));
+        DO(encodeRevocationRefs(attr_revocationrefs));
         break;
     case UapkiNS::SignatureFormat::CADES_LT:
     case UapkiNS::SignatureFormat::CADES_LTA:
-        DO(encodeCertificateRefs(m_AttrCertificateRefs));
-        DO(encodeRevocationRefs(m_AttrRevocationRefs));
-        DO(encodeCertValues(m_AttrCertValues));
-        DO(encodeRevocationValues(m_AttrRevocationValues));
+        DO(encodeCertificateRefs(attr_certificaterefs));
+        DO(encodeRevocationRefs(attr_revocationrefs));
+        DO(encodeCertValues(attr_certvalues));
+        DO(encodeRevocationValues(attr_revocationvalues));
         break;
     default:
         break;
     }
 
     //  Add CAdES-unsigned attrs
-    if (m_AttrCertificateRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrCertificateRefs));
+    if (attr_certificaterefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(attr_certificaterefs));
     }
-    if (m_AttrRevocationRefs.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrRevocationRefs));
+    if (attr_revocationrefs.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(attr_revocationrefs));
     }
-    if (m_AttrCertValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrCertValues));
+    if (attr_certvalues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(attr_certvalues));
     }
-    if (m_AttrRevocationValues.isPresent()) {
-        DO(signerInfo->addUnsignedAttr(m_AttrRevocationValues));
+    if (attr_revocationvalues.isPresent()) {
+        DO(signerInfo->addUnsignedAttr(attr_revocationvalues));
     }
 
     //  Add other unsigned attrs
