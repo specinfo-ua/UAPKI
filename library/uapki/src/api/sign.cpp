@@ -137,7 +137,6 @@ cleanup:
 
 static int verify_signeddata (
     CerStore& cerStore,
-    SigningDoc& sdoc,
     const ByteArray* baEncoded,
     CerStore::Item** cerSigner
 )
@@ -243,7 +242,7 @@ static int tsp_process (
         SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
     }
 
-    DO(verify_signeddata(cerStore, sdoc, tspHelper.getTsToken(), &cer_signer));
+    DO(verify_signeddata(cerStore, tspHelper.getTsToken(), &cer_signer));
     sdoc.addCert(cer_signer);
 
     DO(tspHelper.tstInfoIsEqualRequest());
@@ -853,7 +852,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             DO(sdoc.buildUnsignedAttributes());
-            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_A_V3) {
+            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_LTA) {
                 DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::ARCHIVE_TIMESTAMP));
             }
             DO(sdoc.buildSignedData());

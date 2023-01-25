@@ -137,12 +137,12 @@ int SigningDoc::SignParams::setSignatureFormat (
 )
 {
     switch (aSignatureFormat) {
-    case UapkiNS::SignatureFormat::CADES_A_V3:      //  CADES_A_V3 > CADES_X_LONG
-    case UapkiNS::SignatureFormat::CADES_X_LONG:    //  CADES_X_LONG > CADES_C
-    case UapkiNS::SignatureFormat::CADES_C:         //  CADES_C > CADES_T
+    case UapkiNS::SignatureFormat::CADES_LTA:   //  CADES_LTA > CADES_LT
+    case UapkiNS::SignatureFormat::CADES_LT:    //  CADES_LT > CADES_C
+    case UapkiNS::SignatureFormat::CADES_C:     //  CADES_C > CADES_T
         includeCert = true;
         isCadesCXA = true;
-    case UapkiNS::SignatureFormat::CADES_T:         //  CADES_T > CADES_BES
+    case UapkiNS::SignatureFormat::CADES_T:     //  CADES_T > CADES_BES
         includeContentTS = true;
         includeSignatureTS = true;
     case UapkiNS::SignatureFormat::CADES_BES:
@@ -220,7 +220,7 @@ int SigningDoc::init (
         }
 
         DO(m_ArchiveTsHelper.init(
-            (signParams->signatureFormat == UapkiNS::SignatureFormat::CADES_A_V3)
+            (signParams->signatureFormat == UapkiNS::SignatureFormat::CADES_LTA)
                 ? &signParams->aidDigest : nullptr
         ));
 
@@ -333,8 +333,8 @@ int SigningDoc::buildUnsignedAttributes (void)
         DO(encodeCertificateRefs(m_AttrCertificateRefs));
         DO(encodeRevocationRefs(m_AttrRevocationRefs));
         break;
-    case UapkiNS::SignatureFormat::CADES_X_LONG:
-    case UapkiNS::SignatureFormat::CADES_A_V3:
+    case UapkiNS::SignatureFormat::CADES_LT:
+    case UapkiNS::SignatureFormat::CADES_LTA:
         DO(encodeCertificateRefs(m_AttrCertificateRefs));
         DO(encodeRevocationRefs(m_AttrRevocationRefs));
         DO(encodeCertValues(m_AttrCertValues));
@@ -566,8 +566,8 @@ int SigningDoc::encodeRevocationRefs (
             DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
         }
         break;
-    case UapkiNS::SignatureFormat::CADES_X_LONG:
-    case UapkiNS::SignatureFormat::CADES_A_V3:
+    case UapkiNS::SignatureFormat::CADES_LT:
+    case UapkiNS::SignatureFormat::CADES_LTA:
         if (signer.baOcspIdentifier) {
             DO(p_crlocspref->addOcspResponseId(signer.baOcspIdentifier, signer.baOcspRespHash));
         }
@@ -588,8 +588,8 @@ int SigningDoc::encodeRevocationRefs (
                 DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
             }
             break;
-        case UapkiNS::SignatureFormat::CADES_X_LONG:
-        case UapkiNS::SignatureFormat::CADES_A_V3:
+        case UapkiNS::SignatureFormat::CADES_LT:
+        case UapkiNS::SignatureFormat::CADES_LTA:
             if (it->baOcspIdentifier) {
                 DO(p_crlocspref->addOcspResponseId(it->baOcspIdentifier, it->baOcspRespHash));
             }
@@ -618,8 +618,8 @@ int SigningDoc::encodeRevocationValues (
     DO(revocvalues_builder.init());
 
     switch (signParams->signatureFormat) {
-    case UapkiNS::SignatureFormat::CADES_X_LONG:
-    case UapkiNS::SignatureFormat::CADES_A_V3:
+    case UapkiNS::SignatureFormat::CADES_LT:
+    case UapkiNS::SignatureFormat::CADES_LTA:
         //  First item - cert of signer
         DO(revocvalues_builder.addOcspValue(signer.baBasicOcspResponse));
         //  Next certs
