@@ -31,16 +31,16 @@
 using namespace std;
 
 
+static const char* CADES_A_STR      = "CAdES-A";
 static const char* CADES_BES_STR    = "CAdES-BES";
 static const char* CADES_C_STR      = "CAdES-C";
-static const char* CADES_LT_STR     = "CAdES-LT";
-static const char* CADES_LTA_STR    = "CAdES-LTA";
 static const char* CADES_T_STR      = "CAdES-T";
+static const char* CADES_XL_STR     = "CAdES-XL";
 static const char* CMS_STR          = "CMS";
 static const char* RAW_STR          = "RAW";
 static const char* UNDEFINED_STR    = "UNDEFINED";
 
-static constexpr size_t COUNT_SIGNATURE_FORMATS = 8;
+static constexpr uint32_t COUNT_SIGNATURE_FORMATS = 8;
 static const char* SIGNATURE_FORMAT_STRINGS[COUNT_SIGNATURE_FORMATS] = {
     UNDEFINED_STR,      //  0 = UNDEFINED
     RAW_STR,            //  1 = RAW
@@ -48,8 +48,8 @@ static const char* SIGNATURE_FORMAT_STRINGS[COUNT_SIGNATURE_FORMATS] = {
     CADES_BES_STR,      //  3 = CADES_BES
     CADES_T_STR,        //  4 = CADES_T
     CADES_C_STR,        //  5 = CADES_C
-    CADES_LT_STR,       //  6 = CADES_LT
-    CADES_LTA_STR       //  7 = CADES_LTA
+    CADES_XL_STR,       //  6 = CADES_XL
+    CADES_A_STR         //  7 = CADES_A
 };
 
 
@@ -65,11 +65,11 @@ UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
     else if (str == string(CADES_C_STR)) {
         rv = SignatureFormat::CADES_C;
     }
-    else if (str == string(CADES_LT_STR)) {
-        rv = SignatureFormat::CADES_LT;
+    else if (str == string(CADES_XL_STR)) {
+        rv = SignatureFormat::CADES_XL;
     }
-    else if (str == string(CADES_LTA_STR)) {
-        rv = SignatureFormat::CADES_LTA;
+    else if (str == string(CADES_A_STR)) {
+        rv = SignatureFormat::CADES_A;
     }
     else if (str == string(CMS_STR)) {
         rv = SignatureFormat::CMS_SID_KEYID;
@@ -82,7 +82,7 @@ UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
 
 const char* UapkiNS::signatureFormatToStr (const SignatureFormat signatureFormat)
 {
-    const uint32_t idx = ((uint32_t)signatureFormat <= (uint32_t)SignatureFormat::CADES_LTA)
+    const uint32_t idx = ((uint32_t)signatureFormat < COUNT_SIGNATURE_FORMATS)
         ? (uint32_t)signatureFormat : (uint32_t)SignatureFormat::UNDEFINED;
     return SIGNATURE_FORMAT_STRINGS[idx];
 }

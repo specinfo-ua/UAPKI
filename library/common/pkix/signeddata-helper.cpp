@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-22
+//  Last update: 2023-01-27
 
 
 #include "signeddata-helper.h"
@@ -78,14 +78,19 @@ int SignedDataBuilder::init (void)
     return (m_SignedData) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
-int SignedDataBuilder::setVersion (const uint32_t version)
+int SignedDataBuilder::setVersion (
+        const uint32_t version
+)
 {
     if (!m_SignedData) return RET_UAPKI_INVALID_PARAMETER;
 
     return asn_ulong2INTEGER(&m_SignedData->version, (unsigned long)version);
 }
 
-int SignedDataBuilder::setEncapContentInfo (const char* eContentType, const ByteArray* baEncapContent)
+int SignedDataBuilder::setEncapContentInfo (
+        const char* eContentType,
+        const ByteArray* baEncapContent
+)
 {
     int ret = RET_OK;
 
@@ -101,21 +106,28 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::setEncapContentInfo (const string& eContentType, const ByteArray* baEncapContent)
+int SignedDataBuilder::setEncapContentInfo (
+        const string& eContentType,
+        const ByteArray* baEncapContent
+)
 {
     if (eContentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return setEncapContentInfo(eContentType.c_str(), baEncapContent);
 }
 
-int SignedDataBuilder::setEncapContentInfo (const EncapsulatedContentInfo& encapContentInfo)
+int SignedDataBuilder::setEncapContentInfo (
+        const EncapsulatedContentInfo& encapContentInfo
+)
 {
     if (encapContentInfo.contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return setEncapContentInfo(encapContentInfo.contentType.c_str(), encapContentInfo.baEncapContent);
 }
 
-int SignedDataBuilder::addCertificate (const ByteArray* baCertEncoded)
+int SignedDataBuilder::addCertificate (
+        const ByteArray* baCertEncoded
+)
 {
     int ret = RET_OK;
     CertificateChoices_t* cert = nullptr;
@@ -138,7 +150,9 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::addCrl (const ByteArray* baCrlEncoded)
+int SignedDataBuilder::addCrl (
+        const ByteArray* baCrlEncoded
+)
 {
     int ret = RET_OK;
     RevocationInfoChoice_t* crl = nullptr;
@@ -179,14 +193,18 @@ cleanup:
     return ret;
 }
 
-SignedDataBuilder::SignerInfo* SignedDataBuilder::getSignerInfo (const size_t index) const
+SignedDataBuilder::SignerInfo* SignedDataBuilder::getSignerInfo (
+        const size_t index
+) const
 {
     if (index >= m_SignerInfos.size()) return nullptr;
 
     return m_SignerInfos[index];
 }
 
-int SignedDataBuilder::encode (const char* contentType)
+int SignedDataBuilder::encode (
+        const char* contentType
+)
 {
     int ret = RET_OK;
     ContentInfo_t* content_info = nullptr;
@@ -206,14 +224,18 @@ cleanup:
     return ret;
 }
 
-int SignedDataBuilder::encode (const string& contentType)
+int SignedDataBuilder::encode (
+        const string& contentType
+)
 {
     if (contentType.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return encode(contentType.c_str());
 }
 
-ByteArray* SignedDataBuilder::getEncoded (const bool move)
+ByteArray* SignedDataBuilder::getEncoded (
+        const bool move
+)
 {
     ByteArray* rv_ba = m_BaEncoded;
     if (move) {
@@ -256,6 +278,8 @@ SignedDataBuilder::SignerInfo::SignerInfo (
         SignerInfo_t* iSignerInfo
 )
     : m_SignerInfo(iSignerInfo)
+    , m_SignedAttrs(nullptr)
+    , m_UnsignedAttrs(nullptr)
     , m_SidType(SignerIdentifierType::UNDEFINED)
     , m_BaDigestAlgoEncoded(nullptr)
     , m_BaSignedAttrsEncoded(nullptr)
@@ -266,6 +290,8 @@ SignedDataBuilder::SignerInfo::SignerInfo (
 SignedDataBuilder::SignerInfo::~SignerInfo (void)
 {
     DEBUG_OUTCON(puts("SignedDataBuilder::SignerInfo::~SignerInfo()"));
+    asn_free(get_Attributes_desc(), m_SignedAttrs);
+    asn_free(get_Attributes_desc(), m_UnsignedAttrs);
     ba_free(m_BaDigestAlgoEncoded);
     ba_free(m_BaSignedAttrsEncoded);
 }
@@ -353,11 +379,11 @@ int SignedDataBuilder::SignerInfo::addSignedAttr (
 
     if (!type || !oid_is_valid(type) || !baValues) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!m_SignerInfo->signedAttrs) {
-        ASN_ALLOC_TYPE(m_SignerInfo->signedAttrs, Attributes_t);
+    if (!m_SignedAttrs) {
+        ASN_ALLOC_TYPE(m_SignedAttrs, Attributes_t);
     }
 
-    DO(Util::addToAttributes(m_SignerInfo->signedAttrs, type, baValues));
+    DO(Util::addToAttributes(m_SignedAttrs, type, baValues));
 
 cleanup:
     return ret;
@@ -377,13 +403,13 @@ int SignedDataBuilder::SignerInfo::setSignedAttrs (
     int ret = RET_OK;
 
     if (!signedAttrs.empty()) {
-        if (!m_SignerInfo->signedAttrs) {
-            ASN_ALLOC_TYPE(m_SignerInfo->signedAttrs, Attributes_t);
+        if (!m_SignedAttrs) {
+            ASN_ALLOC_TYPE(m_SignedAttrs, Attributes_t);
         }
 
-        for (auto& it : signedAttrs) {
+        for (const auto& it : signedAttrs) {
             if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-            DO(Util::addToAttributes(m_SignerInfo->signedAttrs, it));
+            DO(Util::addToAttributes(m_SignedAttrs, it));
         }
     }
 
@@ -393,9 +419,18 @@ cleanup:
 
 int SignedDataBuilder::SignerInfo::encodeSignedAttrs (void)
 {
-    if (!m_SignerInfo->signedAttrs) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_SignerInfo || !m_SignedAttrs) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_encode_ba(get_SignedAttributes_desc(), m_SignerInfo->signedAttrs, &m_BaSignedAttrsEncoded);
+    int ret = RET_OK;
+
+    DO(asn_encode_ba(get_Attributes_desc(), m_SignedAttrs, &m_BaSignedAttrsEncoded));
+
+    DO(ba_set_byte(m_BaSignedAttrsEncoded, 0, 0xA0));
+    DO(asn_decode_ba(get_ANY_desc(), &m_SignerInfo->signedAttrs, m_BaSignedAttrsEncoded));
+    DO(ba_set_byte(m_BaSignedAttrsEncoded, 0, 0x31));
+
+cleanup:
+    return ret;
 }
 
 int SignedDataBuilder::SignerInfo::setSignature (
@@ -426,11 +461,11 @@ int SignedDataBuilder::SignerInfo::addUnsignedAttr (
 
     if (!unsignedAttr.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!m_SignerInfo->unsignedAttrs) {
-        ASN_ALLOC_TYPE(m_SignerInfo->unsignedAttrs, Attributes_t);
+    if (!m_UnsignedAttrs) {
+        ASN_ALLOC_TYPE(m_UnsignedAttrs, Attributes_t);
     }
 
-    DO(Util::addToAttributes(m_SignerInfo->unsignedAttrs, unsignedAttr));
+    DO(Util::addToAttributes(m_UnsignedAttrs, unsignedAttr));
 
 cleanup:
     return ret;
@@ -443,14 +478,31 @@ int SignedDataBuilder::SignerInfo::setUnsignedAttrs (
     int ret = RET_OK;
 
     if (!unsignedAttrs.empty()) {
-        if (!m_SignerInfo->unsignedAttrs) {
-            ASN_ALLOC_TYPE(m_SignerInfo->unsignedAttrs, Attributes_t);
+        if (!m_UnsignedAttrs) {
+            ASN_ALLOC_TYPE(m_UnsignedAttrs, Attributes_t);
         }
 
-        for (auto& it : unsignedAttrs) {
+        for (const auto& it : unsignedAttrs) {
             if (!it.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-            DO(Util::addToAttributes(m_SignerInfo->unsignedAttrs, it));
+            DO(Util::addToAttributes(m_UnsignedAttrs, it));
         }
+    }
+
+cleanup:
+    return ret;
+}
+
+int SignedDataBuilder::SignerInfo::encodeUnsignedAttrs (void)
+{
+    if (!m_SignerInfo) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+
+    if (m_UnsignedAttrs) {
+        UapkiNS::SmartBA sba_encoded;
+        DO(asn_encode_ba(get_Attributes_desc(), m_UnsignedAttrs, &sba_encoded));
+        DO(ba_set_byte(sba_encoded.get(), 0, 0xA1));
+        CHECK_NOT_NULL(m_SignerInfo->unsignedAttrs = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), sba_encoded.get()));
     }
 
 cleanup:
@@ -464,10 +516,10 @@ int SignedDataBuilder::SignerInfo::addSignedAttrContentType (
     if (!contentType || !oid_is_valid(contentType)) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    UapkiNS::Attribute attr = UapkiNS::Attribute(string(OID_PKCS9_CONTENT_TYPE));
+    UapkiNS::SmartBA sba_encoded;
 
-    DO(ba_encode_oid(OID_PKCS7_DATA, &attr.baValues));
-    DO(addSignedAttr(attr));
+    DO(ba_encode_oid(OID_PKCS7_DATA, &sba_encoded));
+    DO(addSignedAttr(OID_PKCS9_CONTENT_TYPE, sba_encoded.get()));
 
 cleanup:
     return ret;
@@ -662,6 +714,8 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t& signerInfo)
 {
     int ret = RET_OK;
     long version = 0;
+    Attributes_t* signed_attrs = nullptr;
+    Attributes_t* unsigned_attrs = nullptr;
 
     //  =version=
     DO(asn_INTEGER2long(&signerInfo.version, &version));
@@ -692,14 +746,14 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t& signerInfo)
     DO(Util::algorithmIdentifierFromAsn1(signerInfo.digestAlgorithm, m_DigestAlgorithm));
 
     //  =signedAttrs=
-    if (signerInfo.signedAttrs) {
-        DO(decodeAttributes(*signerInfo.signedAttrs, m_SignedAttrs));
-        DO(decodeMandatoryAttrs());
-    }
-    else {
+    if ((signerInfo.signedAttrs.size == 0) || (signerInfo.signedAttrs.buf[0] != 0xA0)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
-    DO(asn_encode_ba(get_Attributes_desc(), signerInfo.signedAttrs, &m_BaSignedAttrsEncoded));
+    CHECK_NOT_NULL(m_BaSignedAttrsEncoded = ba_alloc_from_uint8(signerInfo.signedAttrs.buf, signerInfo.signedAttrs.size));
+    DO(ba_set_byte(m_BaSignedAttrsEncoded, 0, 0x31));
+    CHECK_NOT_NULL(signed_attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), m_BaSignedAttrsEncoded));
+    DO(decodeAttributes(*signed_attrs, m_SignedAttrs));
+    DO(decodeMandatoryAttrs());
 
     //  =signatureAlgorithm=
     DO(Util::algorithmIdentifierFromAsn1(signerInfo.signatureAlgorithm, m_SignatureAlgorithm));
@@ -709,10 +763,21 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t& signerInfo)
 
     //  =unsignedAttrs= (optional)
     if (signerInfo.unsignedAttrs) {
-        DO(decodeAttributes(*signerInfo.unsignedAttrs, m_UnsignedAttrs));
+        UapkiNS::SmartBA sba_encoded;
+        if ((signerInfo.unsignedAttrs->size == 0) || (signerInfo.unsignedAttrs->buf[0] != 0xA1)) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+        if (!sba_encoded.set(ba_alloc_from_uint8(signerInfo.unsignedAttrs->buf, signerInfo.unsignedAttrs->size))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+        DO(ba_set_byte(sba_encoded.get(), 0, 0x31));
+        CHECK_NOT_NULL(unsigned_attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), sba_encoded.get()));
+        DO(decodeAttributes(*unsigned_attrs, m_UnsignedAttrs));
     }
 
 cleanup:
+    asn_free(get_Attributes_desc(), signed_attrs);
+    asn_free(get_Attributes_desc(), unsigned_attrs);
     return ret;
 }
 

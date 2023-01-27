@@ -252,9 +252,9 @@ cleanup:
 }   //  tsp_process
 
 static int add_timestamp_to_attrs (
+        const TsAttrType tsAttrType,
         CerStore& cerStore,
-        SigningDoc& sdoc,
-        const TsAttrType tsAttrType
+        SigningDoc& sdoc
 )
 {
     int ret = RET_OK;
@@ -798,7 +798,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             DO(sdoc.digestMessage());
             if (sign_params.includeContentTS) {
                 //  After digestMessage and before buildSignedAttributes
-                DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::CONTENT_TIMESTAMP));
+                DO(add_timestamp_to_attrs(TsAttrType::CONTENT_TIMESTAMP, *cer_store, sdoc));
             }
 
             DO(sdoc.buildSignedAttributes());
@@ -819,7 +819,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             vba_signatures[i] = nullptr;
             //  Add unsigned attrs before call buildSignedData
             if (sign_params.includeSignatureTS) {
-                DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::TIMESTAMP_TOKEN));
+                DO(add_timestamp_to_attrs(TsAttrType::TIMESTAMP_TOKEN, *cer_store, sdoc));
             }
 
             if (sign_params.isCadesCXA) {
@@ -852,8 +852,8 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             DO(sdoc.buildUnsignedAttributes());
-            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_LTA) {
-                DO(add_timestamp_to_attrs(*cer_store, sdoc, TsAttrType::ARCHIVE_TIMESTAMP));
+            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_A) {
+                DO(add_timestamp_to_attrs(TsAttrType::ARCHIVE_TIMESTAMP, *cer_store, sdoc));
             }
             DO(sdoc.buildSignedData());
         }

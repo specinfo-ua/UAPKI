@@ -287,7 +287,6 @@
 #include "SignerIdentifierEx.h"
 #include "SignerIdentifierIm.h"
 #include "SignerInfo.h"
-#include "SignerInfoEx.h"
 #include "SignerInfos.h"
 #include "SigningCertificateV2.h"
 #include "SigPolicyHash.h"

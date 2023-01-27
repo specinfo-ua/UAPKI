@@ -574,11 +574,11 @@ static int verify_signerinfo (
             }
 
             if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_C) && detect_certvals && detect_revocvals) {
-                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_LT;
+                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_XL;
             }
 
-            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_LT) && detect_atsv3) {
-                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_LTA;
+            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_XL) && detect_atsv3) {
+                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_A;
                 //a DO(verifyInfo.archiveTS.verifyDigest(todo));
             }
         }

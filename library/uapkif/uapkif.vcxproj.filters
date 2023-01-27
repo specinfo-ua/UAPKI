@@ -927,9 +927,6 @@
     <ClInclude Include="include\X509Tbs.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="include\SignerInfoEx.h">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="include\ATSHashIndex.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -1821,9 +1818,6 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\X509Tbs.c">
-      <Filter>src\struct</Filter>
-    </ClCompile>
-    <ClCompile Include="src\struct\SignerInfoEx.c">
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\ATSHashIndexDefault.c">

@@ -29,6 +29,7 @@
 #define UAPKI_NS_ARCHIVE_TIMESTAMP_HELPER_H
 
 
+#include "Attributes.h"
 #include "SignerInfo.h"
 #include "byte-array.h"
 #include "attribute-helper.h"
@@ -76,7 +77,7 @@ namespace Pkcs7 {
         );
         //  Step 3: ATSHashIndex (data of SignedData and SignerInfo)
         int setUnsignedAttrs (
-            const SignerInfo_t* signerInfo
+            const Attributes_t* unsignedAttrs
         );
         int addCertificate (
             const ByteArray* baCertEncoded
@@ -90,8 +91,13 @@ namespace Pkcs7 {
 
         int calcHash (void);
 
-        const ByteArray* getHashValue (void) const { return m_HashValue.get(); }
-        bool isEnabled (void) const { return (m_HashAlgo != HASH_ALG_UNDEFINED); }
+    public:
+        const ByteArray* getHashValue (void) const {
+            return m_HashValue.get();
+        }
+        bool isEnabled (void) const {
+            return (m_HashAlgo != HASH_ALG_UNDEFINED);
+        }
 
     private:
         int hashAndAdd (

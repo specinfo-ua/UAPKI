@@ -105,35 +105,35 @@ int ArchiveTs3Helper::setSignerInfo (
 
     int ret = RET_OK;
     SignerInfo_t* signer_info = (SignerInfo_t*)asn_copy_with_alloc(get_SignerInfo_desc(), signerInfo);
-    Attributes_t* unsigned_attrs = nullptr;
+    ANY_t* any_unsignedattrs = nullptr;
 
     if (!signer_info) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    unsigned_attrs = signer_info->unsignedAttrs;
+    any_unsignedattrs = signer_info->unsignedAttrs;
     signer_info->unsignedAttrs = nullptr;
 
     DO(asn_encode_ba(get_SignerInfo_desc(), signer_info, &m_Parts.signerInfo));
 
 cleanup:
-    signer_info->unsignedAttrs = unsigned_attrs;
+    signer_info->unsignedAttrs = any_unsignedattrs;
     asn_free(get_SignerInfo_desc(), signer_info);
     return ret;
 }
 
 int ArchiveTs3Helper::setUnsignedAttrs (
-        const SignerInfo_t* signerInfo
+        const Attributes_t* unsignedAttrs
 )
 {
-    if (!signerInfo || !signerInfo->unsignedAttrs) return RET_UAPKI_INVALID_PARAMETER;
+    if (!unsignedAttrs) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
     Attributes_t* unsigned_attrs = nullptr;
     Attribute_t* attr = nullptr;
     SmartBA sba_encoded;
 
-    unsigned_attrs = (Attributes_t*)asn_copy_with_alloc(get_Attributes_desc(), signerInfo->unsignedAttrs);
+    unsigned_attrs = (Attributes_t*)asn_copy_with_alloc(get_Attributes_desc(), unsignedAttrs);
     if (!unsigned_attrs) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }

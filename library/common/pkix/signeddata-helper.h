@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-22
+//  Last update: 2023-01-27
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -67,6 +67,10 @@ namespace Pkcs7 {
         class SignerInfo {
             SignerInfo_t*
                         m_SignerInfo;
+            Attributes_t*
+                        m_SignedAttrs;
+            Attributes_t*
+                        m_UnsignedAttrs;
             SignerIdentifierType
                         m_SidType;
             ByteArray*  m_BaDigestAlgoEncoded;
@@ -113,12 +117,30 @@ namespace Pkcs7 {
             int setUnsignedAttrs (
                 const std::vector<UapkiNS::Attribute>& unsignedAttrs
             );
+            int encodeUnsignedAttrs (void);
 
-            const SignerInfo_t* getAsn1Data (void) const { return m_SignerInfo; }
-            SignerIdentifierType getSidType (void) const { return m_SidType; }
-            const ByteArray* getDigestAlgoEncoded (void) const { return m_BaDigestAlgoEncoded; }
-            const ByteArray* getSignedAttrsEncoded (void) const { return m_BaSignedAttrsEncoded; }
-            const std::string& getSignAlgo (void) const { return m_SignAlgo; }
+        public:
+            const SignerInfo_t* getAsn1Data (void) const {
+                return m_SignerInfo;
+            }
+            const ByteArray* getDigestAlgoEncoded (void) const {
+                return m_BaDigestAlgoEncoded;
+            }
+            SignerIdentifierType getSidType (void) const {
+                return m_SidType;
+            }
+            const std::string& getSignAlgo (void) const {
+                return m_SignAlgo;
+            }
+            const Attributes_t* getSignedAttrs (void) const {
+                return m_SignedAttrs;
+            }
+            const ByteArray* getSignedAttrsEncoded (void) const {
+                return m_BaSignedAttrsEncoded;
+            }
+            const Attributes_t* getUnsignedAttrs (void) const {
+                return m_UnsignedAttrs;
+            }
 
         public:
             int addSignedAttrContentType (
@@ -148,18 +170,40 @@ namespace Pkcs7 {
         ~SignedDataBuilder (void);
 
         int init (void);
-        int setVersion (const uint32_t version);
-        int setEncapContentInfo (const char* eContentType, const ByteArray* baEncapContent);
-        int setEncapContentInfo (const std::string& eContentType, const ByteArray* baEncapContent);
-        int setEncapContentInfo (const EncapsulatedContentInfo& encapContentInfo);
-        int addCertificate (const ByteArray* baCertEncoded);
-        int addCrl (const ByteArray* baCrlEncoded);
+        int setVersion (
+            const uint32_t version
+        );
+        int setEncapContentInfo (
+            const char* eContentType,
+            const ByteArray* baEncapContent
+        );
+        int setEncapContentInfo (
+            const std::string& eContentType,
+            const ByteArray* baEncapContent
+        );
+        int setEncapContentInfo (
+            const EncapsulatedContentInfo& encapContentInfo
+        );
+        int addCertificate (
+            const ByteArray* baCertEncoded
+        );
+        int addCrl (
+            const ByteArray* baCrlEncoded
+        );
         int addSignerInfo (void);
-        SignerInfo* getSignerInfo (const size_t index = 0) const;
+        SignerInfo* getSignerInfo (
+            const size_t index = 0
+        ) const;
 
-        int encode (const char* contentType = OID_PKCS7_SIGNED_DATA);
-        int encode (const std::string& contentType);
-        ByteArray* getEncoded (const bool move = false);
+        int encode (
+            const char* contentType = OID_PKCS7_SIGNED_DATA
+        );
+        int encode (
+            const std::string& contentType
+        );
+        ByteArray* getEncoded (
+            const bool move = false
+        );
 
     private:
         int collectDigestAlgorithms (void);
@@ -206,18 +250,40 @@ namespace Pkcs7 {
 
             int parse (const SignerInfo_t& signerInfo);
 
-            uint32_t getVersion (void) const { return m_Version; }
-            SignerIdentifierType getSidType (void) const { return m_SidType; }
-            const ByteArray* getSid (void) const { return m_BaSid; }
-            const AlgorithmIdentifier& getDigestAlgorithm (void) const { return m_DigestAlgorithm; }
-            const std::vector<Attribute>& getSignedAttrs (void) const { return m_SignedAttrs; }
-            const AlgorithmIdentifier& getSignatureAlgorithm (void) const { return m_SignatureAlgorithm; }
-            const ByteArray* getSignature (void) const { return m_BaSignature; }
-            const std::vector<Attribute>& getUnsignedAttrs (void) const { return m_UnsignedAttrs; }
-
-            const ByteArray* getSignedAttrsEncoded (void) const { return m_BaSignedAttrsEncoded; }
-            const std::string& getContentType (void) const { return m_MandatoryAttrs.contentType; }
-            const ByteArray* getMessageDigest (void) const { return m_MandatoryAttrs.baMessageDigest; }
+        public:
+            uint32_t getVersion (void) const {
+                return m_Version;
+            }
+            SignerIdentifierType getSidType (void) const {
+                return m_SidType;
+            }
+            const ByteArray* getSid (void) const {
+                return m_BaSid;
+            }
+            const AlgorithmIdentifier& getDigestAlgorithm (void) const {
+                return m_DigestAlgorithm;
+            }
+            const std::vector<Attribute>& getSignedAttrs (void) const {
+                return m_SignedAttrs;
+            }
+            const AlgorithmIdentifier& getSignatureAlgorithm (void) const {
+                return m_SignatureAlgorithm;
+            }
+            const ByteArray* getSignature (void) const {
+                return m_BaSignature;
+            }
+            const std::vector<Attribute>& getUnsignedAttrs (void) const {
+                return m_UnsignedAttrs;
+            }
+            const ByteArray* getSignedAttrsEncoded (void) const {
+                return m_BaSignedAttrsEncoded;
+            }
+            const std::string& getContentType (void) const {
+                return m_MandatoryAttrs.contentType;
+            }
+            const ByteArray* getMessageDigest (void) const {
+                return m_MandatoryAttrs.baMessageDigest;
+            }
 
         private:
             int decodeMandatoryAttrs (void);
@@ -236,16 +302,30 @@ namespace Pkcs7 {
 
         int parse (const ByteArray* baEncoded);
         int parseSignerInfo (const size_t index, SignerInfo& signerInfo);
-
-        uint32_t getVersion (void) const { return m_Version; }
-        const std::vector<std::string>& getDigestAlgorithms (void) const { return m_DigestAlgorithms; }
-        const EncapsulatedContentInfo& getEncapContentInfo (void) const { return m_EncapContentInfo; }
-        const VectorBA& getCerts (void) const { return m_Certs; }
-        VectorBA& getCerts (void) { return m_Certs; }
-        const VectorBA& getCrls (void) const { return m_Crls; }
-        const size_t getCountSignerInfos (void) const { return m_CountSignerInfos; }
-
         bool isContainDigestAlgorithm (const AlgorithmIdentifier& digestAlgorithm);
+
+    public:
+        uint32_t getVersion (void) const {
+            return m_Version;
+        }
+        const std::vector<std::string>& getDigestAlgorithms (void) const {
+            return m_DigestAlgorithms;
+        }
+        const EncapsulatedContentInfo& getEncapContentInfo (void) const {
+            return m_EncapContentInfo;
+        }
+        const VectorBA& getCerts (void) const {
+            return m_Certs;
+        }
+        VectorBA& getCerts (void) {
+            return m_Certs;
+        }
+        const VectorBA& getCrls (void) const {
+            return m_Crls;
+        }
+        const size_t getCountSignerInfos (void) const {
+            return m_CountSignerInfos;
+        }
 
     public:
         static int decodeDigestAlgorithms (

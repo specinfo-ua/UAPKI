@@ -137,12 +137,12 @@ int SigningDoc::SignParams::setSignatureFormat (
 )
 {
     switch (aSignatureFormat) {
-    case UapkiNS::SignatureFormat::CADES_LTA:   //  CADES_LTA > CADES_LT
-    case UapkiNS::SignatureFormat::CADES_LT:    //  CADES_LT > CADES_C
-    case UapkiNS::SignatureFormat::CADES_C:     //  CADES_C > CADES_T
+    case UapkiNS::SignatureFormat::CADES_A:     //  CADES_A  >  CADES_XL
+    case UapkiNS::SignatureFormat::CADES_XL:    //  CADES_XL >  CADES_C
+    case UapkiNS::SignatureFormat::CADES_C:     //  CADES_C  >  CADES_T
         includeCert = true;
         isCadesCXA = true;
-    case UapkiNS::SignatureFormat::CADES_T:     //  CADES_T > CADES_BES
+    case UapkiNS::SignatureFormat::CADES_T:     //  CADES_T  >  CADES_BES
         includeContentTS = true;
         includeSignatureTS = true;
     case UapkiNS::SignatureFormat::CADES_BES:
@@ -220,7 +220,7 @@ int SigningDoc::init (
         }
 
         DO(m_ArchiveTsHelper.init(
-            (signParams->signatureFormat == UapkiNS::SignatureFormat::CADES_LTA)
+            (signParams->signatureFormat == UapkiNS::SignatureFormat::CADES_A)
                 ? &signParams->aidDigest : nullptr
         ));
 
@@ -313,10 +313,13 @@ cleanup:
 
 int SigningDoc::buildSignedData (void)
 {
+    if (!signerInfo) return RET_UAPKI_INVALID_PARAMETER;
+
     int ret = RET_OK;
 
     DO(builder.setVersion(signerInfo->getSidType() == UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN ? 1u : 3u));
     DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : baData));
+    DO(signerInfo->encodeUnsignedAttrs());
 
     DO(builder.encode());
 
@@ -336,8 +339,8 @@ int SigningDoc::buildUnsignedAttributes (void)
         DO(encodeCertificateRefs(attr_certificaterefs));
         DO(encodeRevocationRefs(attr_revocationrefs));
         break;
-    case UapkiNS::SignatureFormat::CADES_LT:
-    case UapkiNS::SignatureFormat::CADES_LTA:
+    case UapkiNS::SignatureFormat::CADES_XL:
+    case UapkiNS::SignatureFormat::CADES_A:
         DO(encodeCertificateRefs(attr_certificaterefs));
         DO(encodeRevocationRefs(attr_revocationrefs));
         DO(encodeCertValues(attr_certvalues));
@@ -368,7 +371,7 @@ int SigningDoc::buildUnsignedAttributes (void)
 
     if (m_ArchiveTsHelper.isEnabled()) {
         DO(m_ArchiveTsHelper.setSignerInfo(signerInfo->getAsn1Data()));
-        DO(m_ArchiveTsHelper.setUnsignedAttrs(signerInfo->getAsn1Data()));
+        DO(m_ArchiveTsHelper.setUnsignedAttrs(signerInfo->getUnsignedAttrs()));
         DO(m_ArchiveTsHelper.calcHash());
     }
 
@@ -569,8 +572,8 @@ int SigningDoc::encodeRevocationRefs (
             DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
         }
         break;
-    case UapkiNS::SignatureFormat::CADES_LT:
-    case UapkiNS::SignatureFormat::CADES_LTA:
+    case UapkiNS::SignatureFormat::CADES_XL:
+    case UapkiNS::SignatureFormat::CADES_A:
         if (signer.baOcspIdentifier) {
             DO(p_crlocspref->addOcspResponseId(signer.baOcspIdentifier, signer.baOcspRespHash));
         }
@@ -591,8 +594,8 @@ int SigningDoc::encodeRevocationRefs (
                 DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
             }
             break;
-        case UapkiNS::SignatureFormat::CADES_LT:
-        case UapkiNS::SignatureFormat::CADES_LTA:
+        case UapkiNS::SignatureFormat::CADES_XL:
+        case UapkiNS::SignatureFormat::CADES_A:
             if (it->baOcspIdentifier) {
                 DO(p_crlocspref->addOcspResponseId(it->baOcspIdentifier, it->baOcspRespHash));
             }
@@ -621,8 +624,8 @@ int SigningDoc::encodeRevocationValues (
     DO(revocvalues_builder.init());
 
     switch (signParams->signatureFormat) {
-    case UapkiNS::SignatureFormat::CADES_LT:
-    case UapkiNS::SignatureFormat::CADES_LTA:
+    case UapkiNS::SignatureFormat::CADES_XL:
+    case UapkiNS::SignatureFormat::CADES_A:
         //  First item - cert of signer
         DO(revocvalues_builder.addOcspValue(signer.baBasicOcspResponse));
         //  Next certs
