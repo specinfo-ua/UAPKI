@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-17
+//  Last update: 2023-01-30
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -37,7 +37,6 @@
 #include "CompleteRevocationRefs.h"
 #include "CrlOcspRef.h"
 #include "RevocationValues.h"
-#include <vector>
 
 
 namespace UapkiNS {
@@ -88,8 +87,18 @@ namespace AttributeHelper {
     int decodeSigningCertificate (const ByteArray* baEncoded, std::vector<EssCertId>& essCertIds);
     int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime);
 
-    int encodeCertValues (const std::vector<const ByteArray*>& certValues, ByteArray** baEncoded);
-    int encodeCertificateRefs (const std::vector<OtherCertId>& otherCertIds, ByteArray** baEncoded);
+    int encodeAttribute (
+        const UapkiNS::Attribute& attr,
+        ByteArray** baEncoded
+    );
+    int encodeCertValues (
+        const std::vector<const ByteArray*>& certValues,
+        ByteArray** baEncoded
+    );
+    int encodeCertificateRefs (
+        const std::vector<OtherCertId>& otherCertIds,
+        ByteArray** baEncoded
+    );
     int encodeSignaturePolicy (
         const std::string& sigPolicyId,
         ByteArray** baEncoded
@@ -151,10 +160,18 @@ namespace AttributeHelper {
 
         int parse (const ByteArray* baEncoded);
 
-        const VectorBA& getCertsHashIndex (void) const { return m_CertsHashIndex; }
-        const VectorBA& getCrlsHashIndex (void) const { return m_CrlsHashIndex; }
-        const AlgorithmIdentifier& getHashIndAlgorithm (void) const { return m_HashIndAlgorithm; }
-        const VectorBA& getUnsignedAttrsHashIndex (void) const { return m_UnsignedAttrsHashIndex; }
+        const VectorBA& getCertsHashIndex (void) const {
+            return m_CertsHashIndex;
+        }
+        const VectorBA& getCrlsHashIndex (void) const {
+            return m_CrlsHashIndex;
+        }
+        const AlgorithmIdentifier& getHashIndAlgorithm (void) const {
+            return m_HashIndAlgorithm;
+        }
+        const VectorBA& getUnsignedAttrsHashIndex (void) const {
+            return m_UnsignedAttrsHashIndex;
+        }
 
     };  //  AtsHashIndexParser
 

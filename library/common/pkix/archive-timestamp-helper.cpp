@@ -231,8 +231,8 @@ int ArchiveTs3Helper::calcHash (void)
     DO(ba_copy(m_Parts.atsHashIndex.get(), 0, len, sba_concatdata.get(), offset));
 
     DEBUG_OUTCON(printf("ArchiveTs3Helper::calcHash(), sba_concatdata, hex: ");  ba_print(stdout, sba_concatdata.get()));
-
     DO(::hash(m_HashAlgo, sba_concatdata.get(), &m_HashValue));
+    DEBUG_OUTCON(printf("ArchiveTs3Helper::calcHash(), m_HashValue, hex: ");  ba_print(stdout, m_HashValue.get()));
 
 cleanup:
     return ret;
@@ -243,11 +243,13 @@ int ArchiveTs3Helper::hashAndAdd (
         const ByteArray* baData
 )
 {
+    DEBUG_OUTCON(printf("ArchiveTs3Helper::hashAndAdd(), baData, hex: ");  ba_print(stdout, baData));
     if (!baData) return RET_OK;
 
     ByteArray* ba_hash = nullptr;
     const int ret = ::hash(m_HashAlgo, baData, &ba_hash);
     if (ret == RET_OK) {
+        DEBUG_OUTCON(printf("ArchiveTs3Helper::hashAndAdd(), ba_hash, hex: ");  ba_print(stdout, ba_hash));
         hashes.push_back(ba_hash);
     }
     return ret;

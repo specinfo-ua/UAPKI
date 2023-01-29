@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-17
+//  Last update: 2023-01-30
 
 
 #include "attribute-helper.h"
@@ -208,7 +208,31 @@ int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime)
     return ba_decode_pkixtime(baEncoded, &signingTime);
 }
 
-int encodeCertValues (const vector<const ByteArray*>& certValues, ByteArray** baEncoded)
+int encodeAttribute (
+        const Attribute& attribute,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    Attribute_t* attr = nullptr;
+
+    if (!attribute.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(attr, Attribute_t);
+
+    DO(Util::attributeToAsn1(*attr, attribute));
+
+    DO(asn_encode_ba(get_Attribute_desc(), attr, baEncoded));
+
+cleanup:
+    asn_free(get_Attribute_desc(), attr);
+    return ret;
+}
+
+int encodeCertValues (
+        const vector<const ByteArray*>& certValues,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     Certificates_t* cert_values = nullptr;
@@ -231,7 +255,10 @@ cleanup:
     return ret;
 }
 
-int encodeCertificateRefs (const vector<OtherCertId>& otherCertIds, ByteArray** baEncoded)
+int encodeCertificateRefs (
+        const vector<OtherCertId>& otherCertIds,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     CompleteCertificateRefs_t* cert_refs = nullptr;
