@@ -74,7 +74,7 @@
         "dataTbs": [
           {
             "id": "doc-0", // Обов'язковий, ідентифікатор даних
-            "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i" // обов'язковий, дані для підпису у кодировці base64
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==" // обов'язковий, дані для підпису у кодировці base64
           }
         ]
       }

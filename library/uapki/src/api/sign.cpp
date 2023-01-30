@@ -69,7 +69,11 @@ enum class TsAttrType : uint32_t {
 };
 
 
-static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlgo, ByteArray** baKeyId)
+static int get_info_signalgo_and_keyid (
+        CmStorageProxy& storage,
+        string& signAlgo,
+        ByteArray** baKeyId
+)
 {
     string s_keyinfo;
     UapkiNS::SmartBA sba_keyid;
@@ -105,9 +109,12 @@ static int get_info_signalgo_and_keyid (CmStorageProxy& storage, string& signAlg
 
     ret = (*baKeyId) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
     return ret;
-}
+}   //  get_info_signalgo_and_keyid
 
-static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams& signParams)
+static int parse_sign_params (
+        JSON_Object* joSignParams,
+        UapkiNS::Doc::Sign::SigningDoc::SignParams& signParams
+)
 {
     int ret = RET_OK;
 
@@ -125,7 +132,7 @@ static int parse_sign_params (JSON_Object* joSignParams, SigningDoc::SignParams&
 
     if (ParsonHelper::jsonObjectHasValue(joSignParams, "signaturePolicy", JSONObject)) {
         JSON_Object* jo_sigpolicy = json_object_get_object(joSignParams, "signaturePolicy");
-        DO(SigningDoc::encodeSignaturePolicy(
+        DO(UapkiNS::Doc::Sign::SigningDoc::encodeSignaturePolicy(
             ParsonHelper::jsonObjectGetString(jo_sigpolicy, "sigPolicyId"),
             signParams.attrSignPolicy
         ));
@@ -136,9 +143,9 @@ cleanup:
 }   //  parse_sign_params
 
 static int verify_signeddata (
-    CerStore& cerStore,
-    const ByteArray* baEncoded,
-    CerStore::Item** cerSigner
+        CerStore& cerStore,
+        const ByteArray* baEncoded,
+        CerStore::Item** cerSigner
 )
 {
     int ret = RET_OK;
@@ -186,7 +193,7 @@ cleanup:
 
 static int tsp_process (
         CerStore& cerStore,
-        SigningDoc& sdoc,
+        UapkiNS::Doc::Sign::SigningDoc& sdoc,
         UapkiNS::Tsp::TspHelper& tspHelper
 )
 {
@@ -254,7 +261,7 @@ cleanup:
 static int add_timestamp_to_attrs (
         const TsAttrType tsAttrType,
         CerStore& cerStore,
-        SigningDoc& sdoc
+        UapkiNS::Doc::Sign::SigningDoc& sdoc
 )
 {
     int ret = RET_OK;
@@ -265,7 +272,7 @@ static int add_timestamp_to_attrs (
 
     switch (tsAttrType) {
     case TsAttrType::CONTENT_TIMESTAMP:
-        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.baMessageDigest));
+        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.messageDigest.get()));
         break;
     case TsAttrType::TIMESTAMP_TOKEN:
         DO(sdoc.digestSignature(&sba_hash));
@@ -300,7 +307,7 @@ cleanup:
 }   //  add_timestamp_to_attrs
 
 static int parse_docattrs_from_json (
-        SigningDoc& sdoc,
+        UapkiNS::Doc::Sign::SigningDoc& sdoc,
         JSON_Object* joDoc,
         const string& keyAttributes
 )
@@ -335,7 +342,7 @@ cleanup:
 }   //  parse_docattr_from_json
 
 static int parse_doc_from_json (
-        SigningDoc& sdoc,
+        UapkiNS::Doc::Sign::SigningDoc& sdoc,
         JSON_Object* joDoc
 )
 {
@@ -343,8 +350,7 @@ static int parse_doc_from_json (
 
     sdoc.id = ParsonHelper::jsonObjectGetString(joDoc, "id");
     sdoc.isDigest = ParsonHelper::jsonObjectGetBoolean(joDoc, "isDigest", false);
-    sdoc.baData = json_object_get_base64(joDoc, "bytes");
-    if (sdoc.id.empty() || (ba_get_len(sdoc.baData) == 0)) return RET_UAPKI_INVALID_PARAMETER;
+    if (sdoc.id.empty() || !sdoc.data.set(json_object_get_base64(joDoc, "bytes"))) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
     if (sdoc.signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
@@ -488,7 +494,7 @@ cleanup:
 }   //  process_crl
 
 static int get_cert_status_by_crl (
-        SigningDoc::CerDataItem& cerDataItem
+        UapkiNS::Doc::Sign::SigningDoc::CerDataItem& cerDataItem
 )
 {
     int ret = RET_OK;
@@ -561,8 +567,8 @@ cleanup:
 }   //  get_cert_status_by_crl
 
 static int get_cert_status_by_ocsp (
-        SigningDoc::SignParams& signParams,
-        SigningDoc::CerDataItem& cerDataItem
+        UapkiNS::Doc::Sign::SigningDoc::SignParams& signParams,
+        UapkiNS::Doc::Sign::SigningDoc::CerDataItem& cerDataItem
 )
 {
     int ret = RET_OK;
@@ -640,12 +646,12 @@ static int get_cert_status_by_ocsp (
 
         switch (ocsp_record.status) {
         case UapkiNS::CertStatus::GOOD:
-            cerDataItem.baBasicOcspResponse = ocsp_helper.getBasicOcspResponseEncoded(true);
-            DO(ocsp_helper.getOcspIdentifier(&cerDataItem.baOcspIdentifier));
+            (void)cerDataItem.basicOcspResponse.set(ocsp_helper.getBasicOcspResponseEncoded(true));
+            DO(ocsp_helper.getOcspIdentifier(&cerDataItem.ocspIdentifier));
             DO(UapkiNS::Ocsp::generateOtherHash(
                 need_update ? sba_resp.get() : cerDataItem.pcsiSubject->certStatusByOcsp.baResult,
                 signParams.aidDigest,
-                &cerDataItem.baOcspRespHash
+                &cerDataItem.ocspRespHash
             ));
             break;
         case UapkiNS::CertStatus::REVOKED:
@@ -664,7 +670,10 @@ cleanup:
     return ret;
 }   //  get_cert_status_by_ocsp
 
-int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_sign (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
     LibraryConfig* config = get_config();
     if (!config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
@@ -678,11 +687,11 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
     int ret = RET_OK;
-    SigningDoc::SignParams sign_params;
+    UapkiNS::Doc::Sign::SigningDoc::SignParams sign_params;
     size_t cnt_docs = 0;
     JSON_Array* ja_results = nullptr;
     JSON_Array* ja_sources = nullptr;
-    vector<SigningDoc> signing_docs;
+    vector<UapkiNS::Doc::Sign::SigningDoc> signing_docs;
     vector<ByteArray*> refba_hashes;
     UapkiNS::VectorBA vba_signatures;
 
@@ -697,11 +706,11 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
     ja_sources = json_object_get_array(joParams, "dataTbs");
     cnt_docs = json_array_get_count(ja_sources);
-    if ((cnt_docs == 0) || (cnt_docs > SigningDoc::MAX_COUNT_DOCS)) {
+    if ((cnt_docs == 0) || (cnt_docs > UapkiNS::Doc::Sign::SigningDoc::MAX_COUNT_DOCS)) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO(get_info_signalgo_and_keyid(*storage, sign_params.aidSignature.algorithm, &sign_params.baKeyId));
+    DO(get_info_signalgo_and_keyid(*storage, sign_params.aidSignature.algorithm, &sign_params.keyId));
     sign_params.hashSignature = hash_from_oid(sign_params.aidSignature.algorithm.c_str());
     if (sign_params.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -719,7 +728,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     if ((sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
-        DO(cer_store->getCertByKeyId(sign_params.baKeyId, &sign_params.signer.pcsiSubject));
+        DO(cer_store->getCertByKeyId(sign_params.keyId.get(), &sign_params.signer.pcsiSubject));
         if (sign_params.isCadesFormat) {
             UapkiNS::EssCertId ess_certid;
 
@@ -731,7 +740,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             DO(sign_params.signer.pcsiSubject->generateEssCertId(sign_params.aidDigest, ess_certid));
-            DO(SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
+            DO(UapkiNS::Doc::Sign::SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
             if (sign_params.isCadesCXA) {
                 vector<CerStore::Item*> service_certs;
                 DO(cer_store->getChainCerts(sign_params.signer.pcsiSubject, service_certs));
@@ -784,14 +793,14 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     signing_docs.resize(cnt_docs);
     //  Parse and load all TBS-data
     for (size_t i = 0; i < signing_docs.size(); i++) {
-        SigningDoc& sdoc = signing_docs[i];
+        UapkiNS::Doc::Sign::SigningDoc& sdoc = signing_docs[i];
         DO(sdoc.init(&sign_params));
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
     }
 
     if (sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) {
         for (size_t i = 0; i < signing_docs.size(); i++) {
-            SigningDoc& sdoc = signing_docs[i];
+            UapkiNS::Doc::Sign::SigningDoc& sdoc = signing_docs[i];
 
             DO(sdoc.setupSignerIdentifier());
 
@@ -803,7 +812,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
 
             DO(sdoc.buildSignedAttributes());
             DO(sdoc.digestSignedAttributes());
-            refba_hashes.push_back(sdoc.baHashSignedAttrs);
+            refba_hashes.push_back(sdoc.hashSignedAttrs.get());
         }
 
         DO(storage->keySign(
@@ -814,7 +823,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         ));
 
         for (size_t i = 0; i < signing_docs.size(); i++) {
-            SigningDoc& sdoc = signing_docs[i];
+            UapkiNS::Doc::Sign::SigningDoc& sdoc = signing_docs[i];
             DO(sdoc.setSignature(vba_signatures[i]));
             vba_signatures[i] = nullptr;
             //  Add unsigned attrs before call buildSignedData
@@ -831,7 +840,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
                     DO(sdoc.addCert(it));
                 }
 
-                const vector<SigningDoc::CerDataItem*> certs = sdoc.getCerts();
+                const vector<UapkiNS::Doc::Sign::SigningDoc::CerDataItem*> certs = sdoc.getCerts();
                 for (auto& it : certs) {
                     if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
                         ret = get_cert_status_by_ocsp(sign_params, *it);
@@ -860,9 +869,9 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     }
     else {
         for (size_t i = 0; i < signing_docs.size(); i++) {
-            SigningDoc& sdoc = signing_docs[i];
+            UapkiNS::Doc::Sign::SigningDoc& sdoc = signing_docs[i];
             DO(sdoc.digestMessage());
-            refba_hashes.push_back(sdoc.baMessageDigest);
+            refba_hashes.push_back(sdoc.messageDigest.get());
         }
 
         DO(storage->keySign(
@@ -873,7 +882,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
         ));
 
         for (size_t i = 0; i < signing_docs.size(); i++) {
-            signing_docs[i].baSignature = vba_signatures[i];
+            (void)signing_docs[i].signature.set(vba_signatures[i]);
             vba_signatures[i] = nullptr;
         }
     }
@@ -882,7 +891,7 @@ int uapki_sign (JSON_Object* joParams, JSON_Object* joResult)
     ja_results = json_object_get_array(joResult, "signatures");
     for (size_t i = 0; i < signing_docs.size(); i++) {
         JSON_Object* jo_doc = nullptr;
-        SigningDoc& sdoc = signing_docs[i];
+        UapkiNS::Doc::Sign::SigningDoc& sdoc = signing_docs[i];
         DO_JSON(json_array_append_value(ja_results, json_value_init_object()));
         if ((jo_doc = json_array_get_object(ja_results, i)) == nullptr) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);

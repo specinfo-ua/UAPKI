@@ -38,6 +38,13 @@
 #include "uapki-ns.h"
 
 
+namespace UapkiNS {
+
+namespace Doc {
+
+namespace Sign {
+
+
 class SigningDoc {
 public:
     static const size_t MAX_COUNT_DOCS  = 100;
@@ -48,9 +55,9 @@ public:
         CerStore::Item*
                     pcsiIssuer;
         bool        isSelfSigned;
-        ByteArray*  baBasicOcspResponse;
-        ByteArray*  baOcspIdentifier;
-        ByteArray*  baOcspRespHash;
+        SmartBA     basicOcspResponse;
+        SmartBA     ocspIdentifier;
+        SmartBA     ocspRespHash;
         CrlStore::Item*
                     pcsiCrl;
         CerStore::Item*
@@ -64,18 +71,18 @@ public:
     };  //  CerDataItem
 
     struct SignParams {
-        UapkiNS::SignatureFormat
+        SignatureFormat
                     signatureFormat;
         bool        isCadesCXA;
         bool        isCadesFormat;
         HashAlg     hashDigest;
         HashAlg     hashSignature;
-        UapkiNS::AlgorithmIdentifier
+        AlgorithmIdentifier
                     aidDigest;      //  For digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
-        UapkiNS::AlgorithmIdentifier
+        AlgorithmIdentifier
                     aidSignature;
         CerDataItem signer;
-        ByteArray*  baKeyId;
+        SmartBA     keyId;
         bool        detachedData;
         bool        includeCert;
         bool        includeTime;
@@ -86,10 +93,8 @@ public:
                     ocsp;
         LibraryConfig::TspParams
                     tsp;
-        UapkiNS::Attribute
-                    attrSigningCert;
-        UapkiNS::Attribute
-                    attrSignPolicy;
+        Attribute   attrSigningCert;
+        Attribute   attrSignPolicy;
         std::vector<CerDataItem*>
                     chainCerts;
 
@@ -100,34 +105,34 @@ public:
             CerStore::Item* cerStoreItem
         );
         int setSignatureFormat (
-            const UapkiNS::SignatureFormat signatureFormat
+            const SignatureFormat signatureFormat
         );
 
     };  //  end struct SignParams
 
     const SignParams*
                 signParams;
-    UapkiNS::Pkcs7::SignedDataBuilder
+    Pkcs7::SignedDataBuilder
                 builder;
-    UapkiNS::Pkcs7::SignedDataBuilder::SignerInfo*
+    Pkcs7::SignedDataBuilder::SignerInfo*
                 signerInfo;
     std::string id;
     std::string contentType;
     bool        isDigest;
-    ByteArray*  baData;
-    ByteArray*  baMessageDigest;
-    ByteArray*  baHashSignedAttrs;
-    ByteArray*  baSignature;
+    SmartBA     data;
+    SmartBA     messageDigest;
+    SmartBA     hashSignedAttrs;
+    SmartBA     signature;
     std::string tspUri;
 
 private:
-    UapkiNS::Pkcs7::ArchiveTs3Helper
+    Pkcs7::ArchiveTs3Helper
                 m_ArchiveTsHelper;
     std::vector<CerDataItem*>
                 m_Certs;
-    std::vector<UapkiNS::Attribute*>
+    std::vector<Attribute*>
                 m_SignedAttrs;
-    std::vector<UapkiNS::Attribute*>
+    std::vector<Attribute*>
                 m_UnsignedAttrs;
 
 public:
@@ -167,34 +172,45 @@ public:
 
     ByteArray* getEncoded (void);
 
-    std::vector<CerDataItem*> getCerts (void) { return m_Certs; }
-    const ByteArray* getAtsHash (void) const { return m_ArchiveTsHelper.getHashValue(); }
+    std::vector<CerDataItem*> getCerts (void) {
+        return m_Certs;
+    }
+    const ByteArray* getAtsHash (void) const {
+        return m_ArchiveTsHelper.getHashValue();
+    }
 
 public:
     static int encodeSignaturePolicy (
         const std::string& sigPolicyiId,
-        UapkiNS::Attribute& attr
+        Attribute& attr
     );
     static int encodeSigningCertificate (
-        const UapkiNS::EssCertId& essCertId,
-        UapkiNS::Attribute& attr
+        const EssCertId& essCertId,
+        Attribute& attr
     );
 
 private:
     int encodeCertValues (
-        UapkiNS::Attribute& attr
+        Attribute& attr
     );
     int encodeCertificateRefs (
-        UapkiNS::Attribute& attr
+        Attribute& attr
     );
     int encodeRevocationRefs (
-        UapkiNS::Attribute& attr
+        Attribute& attr
     );
     int encodeRevocationValues (    //  Note: supported OCSP-responses only
-        UapkiNS::Attribute& attr
+        Attribute& attr
     );
 
 };  //  end class SigningDoc
+
+
+}   //  end namespace Sign
+
+}   //  end namespace Doc
+
+}   //  end namespace UapkiNS
 
 
 #endif

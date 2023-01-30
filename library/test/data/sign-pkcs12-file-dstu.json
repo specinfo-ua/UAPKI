@@ -102,7 +102,7 @@
         "dataTbs": [
           {
             "id": "doc-0", // Обов'язковий, ідентифікатор даних
-            "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i", // обов'язковий, дані для підпису у кодировці base64
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==", // обов'язковий, дані для підпису у кодировці base64
             "signedAttributes": [
               {
                 "type": "1.2.3.4.1",
@@ -148,7 +148,7 @@
         "dataTbs": [
           //{
           //  "id": "doc-0",
-          //  "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i"
+          //  "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=="
           //},
           {
             "id": "doc-1",
@@ -180,7 +180,7 @@
         "dataTbs": [
           {
             "id": "doc-0-epes",
-            "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i"
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=="
           },
           {
             "id": "doc-1",
@@ -224,7 +224,7 @@
         "dataTbs": [
           {
             "id": "doc-0-data",
-            "bytes": "QWxpY2UgYW5kIEJvYgpodHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9BbGljZV9hbmRfQm9i"
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=="
           },
           {
             "id": "doc-1-digest-of-data-instead-data",
