@@ -591,6 +591,8 @@ int SigningDoc::encodeRevocationRefs (
                 DO(p_crlocspref->addOcspResponseId(it->ocspIdentifier.get(), it->ocspRespHash.get()));
             }
             break;
+        default:
+            break;
         }
     }
 

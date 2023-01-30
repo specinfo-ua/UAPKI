@@ -33,7 +33,7 @@
 
 
 static const char* LIB_NAME     = "UAPKI";
-static const char* LIB_VERSION  = "2.0.7";
+static const char* LIB_VERSION  = "2.0.8";
 
 
 int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
