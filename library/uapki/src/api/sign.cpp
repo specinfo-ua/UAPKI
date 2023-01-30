@@ -28,7 +28,7 @@
 #include "api-json-internal.h"
 #include "attribute-helper.h"
 #include "cm-providers.h"
-#include "doc-signflow.h"
+#include "doc-sign.h"
 #include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"
@@ -163,10 +163,10 @@ static int verify_signeddata (
 
     switch (signer_info.getSidType()) {
     case UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        DO(cerStore.getCertBySID(signer_info.getSid(), cerSigner));
+        DO(cerStore.getCertBySID(signer_info.getSidEncoded(), cerSigner));
         break;
     case UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        DO(cerStore.getCertByKeyId(signer_info.getSid(), cerSigner));
+        DO(cerStore.getCertByKeyId(signer_info.getSidEncoded(), cerSigner));
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);

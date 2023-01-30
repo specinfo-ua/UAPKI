@@ -28,6 +28,7 @@
 #include "api-json-internal.h"
 #include "archive-timestamp-helper.h"
 #include "attribute-helper.h"
+#include "doc-verify.h"
 #include "global-objects.h"
 #include "parson-helper.h"
 #include "signature-format.h"
@@ -53,96 +54,6 @@
 using namespace std;
 
 
-struct AttrTimeStamp {
-    string      policy;
-    string      hashAlgo;
-    UapkiNS::SmartBA
-                hashedMessage;
-    uint64_t    msGenTime;
-    CerStore::Item*
-                signerCertId;
-    SIGNATURE_VERIFY::STATUS
-                statusDigest;
-    SIGNATURE_VERIFY::STATUS
-                statusSignature;
-
-    AttrTimeStamp (void)
-        : msGenTime(0)
-        , signerCertId(0)
-        , statusDigest(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-        , statusSignature(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-    {}
-
-    ~AttrTimeStamp (void)
-    {}
-
-    bool isPresent (void) const
-    {
-        return (!policy.empty() && !hashAlgo.empty() && (hashedMessage.size() > 0));
-    }
-
-    int verifyDigest (const ByteArray* baData)
-    {
-        UapkiNS::SmartBA sba_hash;
-
-        const int ret = ::hash(hash_from_oid(hashAlgo.c_str()), baData, &sba_hash);
-        if (ret != RET_OK) {
-            statusDigest = SIGNATURE_VERIFY::STATUS::FAILED;
-            return RET_OK;
-        }
-
-        statusDigest = (ba_cmp(hashedMessage.get(), sba_hash.get()) == 0)
-            ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
-        return RET_OK;
-    }
-
-    int verifySignature (void) {
-        return RET_OK;
-    }
-};  //  end struct AttrTimeStamp
-
-
-struct VerifyInfo {
-    UapkiNS::Pkcs7::SignedDataParser::SignerInfo
-                signerInfo;
-    CerStore::Item*
-                cerStoreItem;
-    SIGNATURE_VERIFY::STATUS
-                statusSignature;
-    SIGNATURE_VERIFY::STATUS
-                statusMessageDigest;
-    bool        isDigest;
-    uint64_t    signingTime;
-    UapkiNS::SignatureFormat
-                signatureFormat;
-    vector<UapkiNS::EssCertId>
-                essCerts;
-    SIGNATURE_VERIFY::STATUS
-                statusEssCert;
-    string      sigPolicyId;
-    AttrTimeStamp
-                contentTS;
-    AttrTimeStamp
-                signatureTS;
-    AttrTimeStamp
-                archiveTS;
-
-    VerifyInfo (void)
-        : cerStoreItem(nullptr)
-        , statusSignature(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-        , statusMessageDigest(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-        , statusEssCert(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-        , isDigest(false)
-        , signingTime(0)
-        , signatureFormat(UapkiNS::SignatureFormat::UNDEFINED)
-    {}
-    ~VerifyInfo (void)
-    {
-        cerStoreItem = nullptr;
-    }
-};  //  end struct VerifyInfo
-
-
 struct VerifyOptions {
     bool    encodeCert;
     bool    validateCertByOCSP;
@@ -161,7 +72,7 @@ static int add_certs_to_store (
     int ret = RET_OK;
 
     DEBUG_OUTCON(size_t cnt_certs = 0; cerStore.getCount(cnt_certs);
-        printf("add_certs_to_store(), count certs in cert-store (before): %zu\n", cnt_certs));
+        printf("add_certs_to_store(), count added_certs in cert-store (before): %zu\n", cnt_certs));
     for (size_t i = 0; i < vbaCerts.size(); i++) {
         bool is_unique;
         const CerStore::Item* cer_item = nullptr;
@@ -170,142 +81,11 @@ static int add_certs_to_store (
         certs.push_back(cer_item);
     }
     DEBUG_OUTCON(cerStore.getCount(cnt_certs);
-        printf("add_certs_to_store(), count certs in cert-store (after): %zu\n", cnt_certs));
+        printf("add_certs_to_store(), count added_certs in cert-store (after): %zu\n", cnt_certs));
 
 cleanup:
     return ret;
 }   //  add_certs_to_store
-
-static int verify_signeddata (
-        CerStore& cerStore,
-        UapkiNS::Pkcs7::SignedDataParser& sdata_parser,
-        CerStore::Item** cerSigner
-)
-{
-    int ret = RET_OK;
-    UapkiNS::Pkcs7::SignedDataParser::SignerInfo signer_info;
-
-    if (sdata_parser.getCountSignerInfos() == 0) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    for (auto& it : sdata_parser.getCerts()) {
-        bool is_unique;
-        DO(cerStore.addCert(it, false, false, false, is_unique, nullptr));
-        it = nullptr;
-    }
-
-    DO(sdata_parser.parseSignerInfo(0, signer_info));
-    if (!sdata_parser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
-        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
-    }
-
-    switch (signer_info.getSidType()) {
-    case UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        DO(cerStore.getCertBySID(signer_info.getSid(), cerSigner));
-        break;
-    case UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        DO(cerStore.getCertByKeyId(signer_info.getSid(), cerSigner));
-        break;
-    default:
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    ret = verify_signature(
-        signer_info.getSignatureAlgorithm().algorithm.c_str(),
-        signer_info.getSignedAttrsEncoded(),
-        false,
-        (*cerSigner)->baSPKI,
-        signer_info.getSignature()
-    );
-
-cleanup:
-    return ret;
-}   //  verify_signeddata
-
-static int decode_attr_timestamp (
-        const ByteArray* baValues,
-        AttrTimeStamp& attrTS
-)
-{
-    int ret = RET_OK;
-    UapkiNS::Tsp::TsTokenParser tstoken_parser;
-
-    DO(tstoken_parser.parse(baValues));
-    attrTS.policy = tstoken_parser.getPolicyId();
-    attrTS.hashAlgo = tstoken_parser.getHashAlgo();
-    (void)attrTS.hashedMessage.set(tstoken_parser.getHashedMessage(true));
-    attrTS.msGenTime = tstoken_parser.getGenTime();
-
-    ret = verify_signeddata(
-        *get_cerstore(),
-        tstoken_parser.getSignedDataParser(),
-        &attrTS.signerCertId
-    );
-    switch (ret) {
-    case RET_OK:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::VALID;
-        break;
-    case RET_VERIFY_FAILED:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::INVALID;
-        break;
-    case RET_UAPKI_CERT_NOT_FOUND:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::NOT_PRESENT;
-        break;
-    default:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::FAILED;
-    }
-
-cleanup:
-    return ret;
-}   //  decode_attr_timestamp
-
-static int decode_signed_attrs (
-        const vector<UapkiNS::Attribute>& signedAattrs,
-        VerifyInfo& verifyInfo
-)
-{
-    int ret = RET_OK;
-
-    verifyInfo.statusEssCert = SIGNATURE_VERIFY::STATUS::NOT_PRESENT;
-    for (const auto& it : signedAattrs) {
-        if (it.type == string(OID_PKCS9_SIGNING_TIME)) {
-            DO(UapkiNS::AttributeHelper::decodeSigningTime(it.baValues, verifyInfo.signingTime));
-        }
-        else if (it.type == string(OID_PKCS9_SIG_POLICY_ID)) {
-            DO(UapkiNS::AttributeHelper::decodeSignaturePolicy(it.baValues, verifyInfo.sigPolicyId));
-        }
-        else if (it.type == string(OID_PKCS9_CONTENT_TIMESTAMP)) {
-            DO(decode_attr_timestamp(it.baValues, verifyInfo.contentTS));
-        }
-        else if (it.type == string(OID_PKCS9_SIGNING_CERTIFICATE_V2)) {
-            DO(UapkiNS::AttributeHelper::decodeSigningCertificate(it.baValues, verifyInfo.essCerts));
-        }
-    }
-
-cleanup:
-    return ret;
-}   //  decode_signed_attrs
-
-static int decode_unsigned_attrs (
-        const vector<UapkiNS::Attribute>& unsignedAttrs,
-        VerifyInfo& verifyInfo
-)
-{
-    int ret = RET_OK;
-
-    for (const auto& it : unsignedAttrs) {
-        if (it.type == string(OID_PKCS9_TIMESTAMP_TOKEN)) {
-            DO(decode_attr_timestamp(it.baValues, verifyInfo.signatureTS));
-        }
-        else if (it.type == string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
-            DO(decode_attr_timestamp(it.baValues, verifyInfo.archiveTS));
-        }
-    }
-
-cleanup:
-    return ret;
-}   //  decode_unsigned_attrs
 
 static void parse_verify_options (
         JSON_Object* joOptions,
@@ -320,7 +100,7 @@ static void parse_verify_options (
 static int result_attr_timestamp_to_json (
         JSON_Object* joResult,
         const char* attrName,
-        const AttrTimeStamp& attrTS
+        const UapkiNS::Doc::Verify::AttrTimeStamp& attrTS
 )
 {
     int ret = RET_OK;
@@ -331,10 +111,12 @@ static int result_attr_timestamp_to_json (
         DO_JSON(json_object_set_string(jo_attrts, "genTime", TimeUtils::mstimeToFormat(attrTS.msGenTime).c_str()));
         DO_JSON(json_object_set_string(jo_attrts, "policyId", attrTS.policy.c_str()));
         DO_JSON(json_object_set_string(jo_attrts, "hashAlgo", attrTS.hashAlgo.c_str()));
-        DO_JSON(json_object_set_base64(jo_attrts, "hashedMessage", attrTS.hashedMessage.get()));
+        DO(json_object_set_base64(jo_attrts, "hashedMessage", attrTS.hashedMessage.get()));
         DO_JSON(json_object_set_string(jo_attrts, "statusDigest", SIGNATURE_VERIFY::toStr(attrTS.statusDigest)));
-        DO_JSON(json_object_set_string(jo_attrts, "statusSignature", SIGNATURE_VERIFY::toStr(attrTS.statusSignature)));//aa
-        DO(json_object_set_base64(jo_attrts, "signerCertId", attrTS.signerCertId->baCertId));
+        DO_JSON(json_object_set_string(jo_attrts, "statusSignature", SIGNATURE_VERIFY::toStr(attrTS.statusSignature)));
+        if (attrTS.signerCertId) {
+            DO(json_object_set_base64(jo_attrts, "signerCertId", attrTS.signerCertId->baCertId));
+        }
     }
 
 cleanup:
@@ -366,26 +148,26 @@ cleanup:
 
 static int result_sign_info_to_json (
         JSON_Object* joSignInfo,
-        VerifyInfo& verifyInfo
+        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifyInfo
 )
 {
     int ret = RET_OK;
     SIGNATURE_VALIDATION::STATUS status = SIGNATURE_VALIDATION::STATUS::UNDEFINED;
     bool is_valid = false;
 
-    DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.cerStoreItem->baCertId));
+    DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.getSignerCertId()));
 
-    is_valid = (verifyInfo.statusSignature == SIGNATURE_VERIFY::STATUS::VALID)
-        && (verifyInfo.statusMessageDigest == SIGNATURE_VERIFY::STATUS::VALID);
-    if (is_valid && (verifyInfo.statusEssCert != SIGNATURE_VERIFY::STATUS::NOT_PRESENT)) {
-        is_valid = (verifyInfo.statusEssCert == SIGNATURE_VERIFY::STATUS::VALID);
+    is_valid = (verifyInfo.getStatusSignature() == SIGNATURE_VERIFY::STATUS::VALID)
+        && (verifyInfo.getStatusMessageDigest() == SIGNATURE_VERIFY::STATUS::VALID);
+    if (is_valid && (verifyInfo.getStatusEssCert() != SIGNATURE_VERIFY::STATUS::NOT_PRESENT)) {
+        is_valid = (verifyInfo.getStatusEssCert() == SIGNATURE_VERIFY::STATUS::VALID);
     }
-    if (is_valid && verifyInfo.contentTS.isPresent()) {
-        is_valid = (verifyInfo.contentTS.statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
+    if (is_valid && verifyInfo.getContentTS().isPresent()) {
+        is_valid = (verifyInfo.getContentTS().statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
         //TODO: verifyInfo.contentTS->statusSignature
     }
-    if (is_valid && verifyInfo.signatureTS.isPresent()) {
-        is_valid = (verifyInfo.signatureTS.statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
+    if (is_valid && verifyInfo.getSignatureTS().isPresent()) {
+        is_valid = (verifyInfo.getSignatureTS().statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
         //TODO: verifyInfo.signatureTS->statusSignature
     }
 
@@ -393,22 +175,22 @@ static int result_sign_info_to_json (
     //TODO: check options.validateCertByCRL and options.validateCertByOCSP
     //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
 
-    DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", UapkiNS::signatureFormatToStr(verifyInfo.signatureFormat)));
+    DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", UapkiNS::signatureFormatToStr(verifyInfo.getSignatureFormat())));
     DO_JSON(json_object_set_string(joSignInfo, "status", SIGNATURE_VALIDATION::toStr(status)));
-    DO_JSON(json_object_set_string(joSignInfo, "statusSignature", SIGNATURE_VERIFY::toStr(verifyInfo.statusSignature)));
-    DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", SIGNATURE_VERIFY::toStr(verifyInfo.statusMessageDigest)));
-    DO_JSON(json_object_set_string(joSignInfo, "statusEssCert", SIGNATURE_VERIFY::toStr(verifyInfo.statusEssCert)));
-    if (verifyInfo.signingTime > 0) {
-        DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtils::mstimeToFormat(verifyInfo.signingTime).c_str()));
+    DO_JSON(json_object_set_string(joSignInfo, "statusSignature", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusSignature())));
+    DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusMessageDigest())));
+    DO_JSON(json_object_set_string(joSignInfo, "statusEssCert", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusEssCert())));
+    if (verifyInfo.getSigningTime() > 0) {
+        DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtils::mstimeToFormat(verifyInfo.getSigningTime()).c_str()));
     }
-    if (!verifyInfo.sigPolicyId.empty()) {
-        DO_JSON(json_object_dotset_string(joSignInfo, "signaturePolicy.sigPolicyId", verifyInfo.sigPolicyId.c_str()));
+    if (!verifyInfo.getSigPolicyId().empty()) {
+        DO_JSON(json_object_dotset_string(joSignInfo, "signaturePolicy.sigPolicyId", verifyInfo.getSigPolicyId().c_str()));
     }
-    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "contentTS", verifyInfo.contentTS));
-    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "signatureTS", verifyInfo.signatureTS));
-    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "archiveTS", verifyInfo.archiveTS));
-    DO(result_attributes_to_json(joSignInfo, "signedAttributes", verifyInfo.signerInfo.getSignedAttrs()));
-    DO(result_attributes_to_json(joSignInfo, "unsignedAttributes", verifyInfo.signerInfo.getUnsignedAttrs()));
+    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "contentTS", verifyInfo.getContentTS()));
+    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "signatureTS", verifyInfo.getSignatureTS()));
+    DO_JSON(result_attr_timestamp_to_json(joSignInfo, "archiveTS", verifyInfo.getArchiveTS()));
+    DO(result_attributes_to_json(joSignInfo, "signedAttributes", verifyInfo.getSignerInfo().getSignedAttrs()));
+    DO(result_attributes_to_json(joSignInfo, "unsignedAttributes", verifyInfo.getSignerInfo().getUnsignedAttrs()));
 
 cleanup:
     return ret;
@@ -418,7 +200,7 @@ static int result_to_json (
         JSON_Object* joResult,
         const UapkiNS::Pkcs7::SignedDataParser& signedData,
         vector<const CerStore::Item*>& certs,
-        vector<VerifyInfo>& verifyInfos
+        vector<UapkiNS::Doc::Verify::VerifiedSignerInfo>& verifyInfos
 )
 {
     int ret = RET_OK;
@@ -455,140 +237,7 @@ cleanup:
     return ret;
 }   //  result_to_json
 
-static int verify_signing_certificate_v2(
-        VerifyInfo& verifyInfo
-)
-{
-    if (verifyInfo.essCerts.empty()) return RET_OK;
-
-    //  Process simple case: present only the one ESSCertIDv2
-    int ret = RET_OK;
-    UapkiNS::SmartBA sba_certhash;
-
-    const UapkiNS::EssCertId& ess_certid = verifyInfo.essCerts[0];
-    const HashAlg hash_algo = hash_from_oid(ess_certid.hashAlgorithm.algorithm.c_str());
-    if (hash_algo == HASH_ALG_UNDEFINED) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
-
-    DO(::hash(hash_algo, verifyInfo.cerStoreItem->baEncoded, &sba_certhash));
-    verifyInfo.statusEssCert = (ba_cmp(sba_certhash.get(), ess_certid.baHashValue) == 0)
-        ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
-
-cleanup:
-    return ret;
-}   //  verify_signing_certificate_v2
-
-static int verify_signerinfo (
-        CerStore& cerStore,
-        const ByteArray* baContent,
-        VerifyInfo& verifyInfo
-)
-{
-    int ret = RET_OK;
-    UapkiNS::Pkcs7::SignedDataParser::SignerInfo& signer_info = verifyInfo.signerInfo;
-    UapkiNS::SmartBA sba_calcdigest;
-
-    switch (signer_info.getSidType()) {
-    case UapkiNS::Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        DO(cerStore.getCertBySID(signer_info.getSid(), &verifyInfo.cerStoreItem));
-        break;
-    case UapkiNS::Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        DO(cerStore.getCertByKeyId(signer_info.getSid(), &verifyInfo.cerStoreItem));
-        verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CMS_SID_KEYID;
-        break;
-    default:
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    //  Verify signed attributes
-    ret = verify_signature(
-        signer_info.getSignatureAlgorithm().algorithm.c_str(),
-        signer_info.getSignedAttrsEncoded(),
-        false,
-        verifyInfo.cerStoreItem->baSPKI,
-        signer_info.getSignature()
-    );
-    switch (ret) {
-    case RET_OK:
-        verifyInfo.statusSignature = SIGNATURE_VERIFY::STATUS::VALID;
-        break;
-    case RET_VERIFY_FAILED:
-        verifyInfo.statusSignature = SIGNATURE_VERIFY::STATUS::INVALID;
-        break;
-    default:
-        verifyInfo.statusSignature = SIGNATURE_VERIFY::STATUS::FAILED;
-    }
-
-    //  Validity messageDigest
-    if (!verifyInfo.isDigest) {
-        DO(::hash(hash_from_oid(
-            signer_info.getDigestAlgorithm().algorithm.c_str()),
-            baContent,
-            &sba_calcdigest)
-        );
-        verifyInfo.statusMessageDigest = (ba_cmp(sba_calcdigest.get(), signer_info.getMessageDigest()) == 0)
-            ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
-    }
-    else {
-        verifyInfo.statusMessageDigest = (ba_cmp(baContent, signer_info.getMessageDigest()) == 0)
-            ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
-    }
-
-    //  Decode attributes
-    DO(decode_signed_attrs(signer_info.getSignedAttrs(), verifyInfo));
-    DO(decode_unsigned_attrs(signer_info.getUnsignedAttrs(), verifyInfo));
-
-    //  Process attributes
-    if (!verifyInfo.essCerts.empty()) {
-        DO(verify_signing_certificate_v2(verifyInfo));
-        if (verifyInfo.signatureFormat != UapkiNS::SignatureFormat::CMS_SID_KEYID) {
-            verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_BES;
-        }
-    }
-    if (verifyInfo.contentTS.isPresent()) {
-        DO(verifyInfo.contentTS.verifyDigest(baContent));
-    }
-    if (verifyInfo.signatureTS.isPresent()) {
-        DO(verifyInfo.signatureTS.verifyDigest(signer_info.getSignature()));
-    }
-
-    //  Determine signatureFormat for CAdES
-    if (verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) {
-        if (verifyInfo.contentTS.isPresent() && verifyInfo.signatureTS.isPresent()) {
-            verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_T;
-
-            bool detect_certrefs = false, detect_revocrefs = false;
-            bool detect_certvals = false, detect_revocvals = false;
-            bool detect_atsv3 = false;
-            for (const auto& it : signer_info.getUnsignedAttrs()) {
-                if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) detect_certrefs = true;
-                else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) detect_revocrefs = true;
-                else if (it.type == string(OID_PKCS9_CERT_VALUES)) detect_certvals = true;
-                else if (it.type == string(OID_PKCS9_REVOCATION_VALUES)) detect_revocvals = true;
-                else if (it.type == string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) detect_atsv3 = true;
-            }
-
-            if (detect_certrefs && detect_revocrefs) {
-                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_C;
-            }
-
-            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_C) && detect_certvals && detect_revocvals) {
-                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_XL;
-            }
-
-            if ((verifyInfo.signatureFormat == UapkiNS::SignatureFormat::CADES_XL) && detect_atsv3) {
-                verifyInfo.signatureFormat = UapkiNS::SignatureFormat::CADES_A;
-                //a DO(verifyInfo.archiveTS.verifyDigest(todo));
-            }
-        }
-    }
-
-cleanup:
-    return ret;
-}   //  verify_signerinfo
-
-static int verify_cms (
+static int verify_p7s (
         const ByteArray* baSignature,
         const ByteArray* baContent,
         const bool isDigest,
@@ -601,8 +250,9 @@ static int verify_cms (
     CerStore* cer_store = nullptr;
     //VerifyOptions options;
     const ByteArray* ref_content = nullptr;
-    vector<const CerStore::Item*> certs;
-    vector<VerifyInfo> verify_infos;
+    vector<const CerStore::Item*> added_certs;
+    vector<const CrlStore::Item*> added_crls;
+    vector<UapkiNS::Doc::Verify::VerifiedSignerInfo> verified_sinfos;
 
     cer_store = get_cerstore();
     if (!cer_store) {
@@ -619,28 +269,32 @@ static int verify_cms (
     ref_content = (sdata_parser.getEncapContentInfo().baEncapContent)
         ? sdata_parser.getEncapContentInfo().baEncapContent : baContent;
     
-    DO(add_certs_to_store(*cer_store, sdata_parser.getCerts(), certs));
+    DO(add_certs_to_store(*cer_store, sdata_parser.getCerts(), added_certs));
 
     //  For each signer_info
-    verify_infos.resize(sdata_parser.getCountSignerInfos());
+    verified_sinfos.resize(sdata_parser.getCountSignerInfos());
     for (size_t idx = 0; idx < sdata_parser.getCountSignerInfos(); idx++) {
-        VerifyInfo& verify_info = verify_infos[idx];
+        UapkiNS::Doc::Verify::VerifiedSignerInfo& verified_sinfo = verified_sinfos[idx];
 
-        DO(sdata_parser.parseSignerInfo(idx, verify_info.signerInfo));
+        DO(verified_sinfo.init(cer_store, isDigest));
 
-        if (!sdata_parser.isContainDigestAlgorithm(verify_info.signerInfo.getDigestAlgorithm())) {
+        DO(sdata_parser.parseSignerInfo(idx, verified_sinfo.getSignerInfo()));
+
+        if (!sdata_parser.isContainDigestAlgorithm(verified_sinfo.getSignerInfo().getDigestAlgorithm())) {
             SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
         }
 
-        verify_info.isDigest = isDigest;
-        DO(verify_signerinfo(*cer_store, ref_content, verify_info));
+        DO(verified_sinfo.verifySignerInfo(ref_content));
+        if (verified_sinfo.getSignatureFormat() == UapkiNS::SignatureFormat::CADES_A) {
+            DO(verified_sinfo.verifyArchiveTS(added_certs, added_crls));
+        }
     }
 
-    DO(result_to_json(joResult, sdata_parser, certs, verify_infos));
+    DO(result_to_json(joResult, sdata_parser, added_certs, verified_sinfos));
 
 cleanup:
     return ret;
-}   //  verify_cms
+}   //  verify_p7s
 
 static int verify_raw (
         const ByteArray* baSignature,
@@ -730,7 +384,7 @@ int uapki_verify_signature (
     is_raw = (jo_signparams != nullptr) || (jo_signerpubkey != nullptr);
 
     if (!is_raw) {
-        DO(verify_cms(sba_signature.get(), sba_content.get(), is_digest, jo_options, joResult));
+        DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, jo_options, joResult));
     }
     else {
         if ((sba_content.size() == 0) || (jo_signparams == nullptr) || (jo_signerpubkey == nullptr)) {

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-27
+//  Last update: 2023-01-30
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -224,41 +224,46 @@ namespace Pkcs7 {
 
     public:
         class SignerInfo {
+            const SignerInfo_t*
+                        m_SignerInfo;
             uint32_t    m_Version;
             SignerIdentifierType
                         m_SidType;
-            ByteArray*  m_BaSid;
+            SmartBA     m_SidEncoded;
             AlgorithmIdentifier
                         m_DigestAlgorithm;
             std::vector<Attribute>
                         m_SignedAttrs;
             AlgorithmIdentifier
                         m_SignatureAlgorithm;
-            ByteArray*  m_BaSignature;
+            SmartBA     m_Signature;
             std::vector<Attribute>
                         m_UnsignedAttrs;
 
-            ByteArray*  m_BaSignedAttrsEncoded;
+            SmartBA     m_SignedAttrsEncoded;
             struct MandatoryAttrs {
                 std::string contentType;
-                ByteArray*  baMessageDigest;
+                SmartBA     messageDigest;
             }           m_MandatoryAttrs;
 
         public:
             SignerInfo (void);
             ~SignerInfo (void);
 
-            int parse (const SignerInfo_t& signerInfo);
+            int parse (const SignerInfo_t* signerInfo);
 
         public:
+            const SignerInfo_t* getAsn1Data (void) const {
+                return m_SignerInfo;
+            }
             uint32_t getVersion (void) const {
                 return m_Version;
             }
             SignerIdentifierType getSidType (void) const {
                 return m_SidType;
             }
-            const ByteArray* getSid (void) const {
-                return m_BaSid;
+            const ByteArray* getSidEncoded (void) const {
+                return m_SidEncoded.get();
             }
             const AlgorithmIdentifier& getDigestAlgorithm (void) const {
                 return m_DigestAlgorithm;
@@ -270,19 +275,19 @@ namespace Pkcs7 {
                 return m_SignatureAlgorithm;
             }
             const ByteArray* getSignature (void) const {
-                return m_BaSignature;
+                return m_Signature.get();
             }
             const std::vector<Attribute>& getUnsignedAttrs (void) const {
                 return m_UnsignedAttrs;
             }
             const ByteArray* getSignedAttrsEncoded (void) const {
-                return m_BaSignedAttrsEncoded;
+                return m_SignedAttrsEncoded.get();
             }
             const std::string& getContentType (void) const {
                 return m_MandatoryAttrs.contentType;
             }
             const ByteArray* getMessageDigest (void) const {
-                return m_MandatoryAttrs.baMessageDigest;
+                return m_MandatoryAttrs.messageDigest.get();
             }
 
         private:

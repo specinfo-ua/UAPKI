@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "doc-signflow.h"
+#include "doc-sign.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
 #include "attribute-utils.h"
@@ -194,10 +194,10 @@ SigningDoc::~SigningDoc (void)
 }
 
 int SigningDoc::init (
-        const SignParams* aSignParams
+        const SignParams* iSignParams
 )
 {
-    signParams = aSignParams;
+    signParams = iSignParams;
     if (!signParams) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
@@ -211,7 +211,7 @@ int SigningDoc::init (
         signerInfo = builder.getSignerInfo(0);
         signerInfo->setDigestAlgorithm(signParams->aidDigest);
 
-        for (const auto& it : aSignParams->chainCerts) {
+        for (const auto& it : iSignParams->chainCerts) {
             CerDataItem* cdi = new CerDataItem();
             if (!cdi) return RET_UAPKI_GENERAL_ERROR;
 

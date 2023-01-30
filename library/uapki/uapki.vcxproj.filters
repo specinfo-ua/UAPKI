@@ -27,7 +27,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\doc-signflow.cpp">
+    <ClCompile Include="src\doc-sign.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\verify-status.cpp">
@@ -249,12 +249,15 @@
     <ClCompile Include="..\common\pkix\archive-timestamp-helper.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="src\doc-verify.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="src\doc-signflow.h">
+    <ClInclude Include="src\doc-sign.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\verify-status.h">
@@ -403,6 +406,9 @@
     </ClInclude>
     <ClInclude Include="..\common\pkix\archive-timestamp-helper.h">
       <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="src\doc-verify.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

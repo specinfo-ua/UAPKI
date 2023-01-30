@@ -81,6 +81,7 @@
     <ClCompile Include="src\api\session-select-key.cpp" />
     <ClCompile Include="src\api\verify.cpp" />
     <ClCompile Include="src\cm-storage-proxy.cpp" />
+    <ClCompile Include="src\doc-verify.cpp" />
     <ClCompile Include="src\global-objects.cpp" />
     <ClCompile Include="src\signature-format.cpp" />
     <ClCompile Include="src\store-utils.cpp" />
@@ -88,7 +89,7 @@
     <ClCompile Include="src\cm-providers.cpp" />
     <ClCompile Include="src\crl-store.cpp" />
     <ClCompile Include="src\dirent-internal.c" />
-    <ClCompile Include="src\doc-signflow.cpp" />
+    <ClCompile Include="src\doc-sign.cpp" />
     <ClCompile Include="src\ocsp-helper.cpp" />
     <ClCompile Include="src\str-utils.cpp" />
     <ClCompile Include="src\time-utils.cpp" />
@@ -133,6 +134,7 @@
     <ClInclude Include="include\uapki-export.h" />
     <ClInclude Include="src\api\api-json-internal.h" />
     <ClInclude Include="src\cm-storage-proxy.h" />
+    <ClInclude Include="src\doc-verify.h" />
     <ClInclude Include="src\library-config.h" />
     <ClInclude Include="src\signature-format.h" />
     <ClInclude Include="src\store-utils.h" />
@@ -144,7 +146,7 @@
     <ClInclude Include="src\ocsp-helper.h" />
     <ClInclude Include="src\str-utils.h" />
     <ClInclude Include="src\time-utils.h" />
-    <ClInclude Include="src\doc-signflow.h" />
+    <ClInclude Include="src\doc-sign.h" />
     <ClInclude Include="src\verify-status.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -268,7 +270,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DEBUG_CERSTOREITEM_INFO;UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>

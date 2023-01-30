@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-27
+//  Last update: 2023-01-30
 
 
 #include "signeddata-helper.h"
@@ -638,7 +638,7 @@ int SignedDataParser::parseSignerInfo (const size_t index, SignerInfo& signerInf
 {
     if (index >= m_CountSignerInfos) return RET_INDEX_OUT_OF_RANGE;
 
-    return signerInfo.parse(*m_SignedData->signerInfos.list.array[index]);
+    return signerInfo.parse(m_SignedData->signerInfos.list.array[index]);
 }
 
 int SignedDataParser::decodeDigestAlgorithms (
@@ -691,34 +691,29 @@ cleanup:
 
 
 SignedDataParser::SignerInfo::SignerInfo (void)
-    : m_Version(0)
+    : m_SignerInfo(nullptr)
+    , m_Version(0)
     , m_SidType(SignerIdentifierType::UNDEFINED)
-    , m_BaSid(nullptr)
-    , m_BaSignature(nullptr)
-    , m_BaSignedAttrsEncoded(nullptr)
 {
     DEBUG_OUTCON(puts("SignedDataParser::SignerInfo::SignerInfo()"));
-    m_MandatoryAttrs.baMessageDigest = nullptr;
 }
 
 SignedDataParser::SignerInfo::~SignerInfo (void)
 {
     DEBUG_OUTCON(puts("SignedDataParser::SignerInfo::~SignerInfo()"));
-    ba_free(m_BaSid);
-    ba_free(m_BaSignature);
-    ba_free(m_BaSignedAttrsEncoded);
-    ba_free(m_MandatoryAttrs.baMessageDigest);
 }
 
-int SignedDataParser::SignerInfo::parse (const SignerInfo_t& signerInfo)
+int SignedDataParser::SignerInfo::parse (const SignerInfo_t* signerInfo)
 {
     int ret = RET_OK;
     long version = 0;
     Attributes_t* signed_attrs = nullptr;
     Attributes_t* unsigned_attrs = nullptr;
 
+    if (!signerInfo) return RET_UAPKI_INVALID_PARAMETER;
+
     //  =version=
-    DO(asn_INTEGER2long(&signerInfo.version, &version));
+    DO(asn_INTEGER2long(&signerInfo->version, &version));
     m_Version = (uint32_t)version;
     if ((version != 1) && (version != 3)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT_VERSION);
@@ -727,53 +722,60 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t& signerInfo)
     //  =sid=
     if (version == 1) {
         //  It's issuerAndSerialNumber
-        if (signerInfo.sid.size < 7) {
+        if (signerInfo->sid.size < 7) {
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
-        CHECK_NOT_NULL(m_BaSid = ba_alloc_from_uint8(signerInfo.sid.buf, (size_t)signerInfo.sid.size));
+        (void)m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf, (size_t)signerInfo->sid.size));
         m_SidType = SignerIdentifierType::ISSUER_AND_SN;
     }
     else {
         //  It's subjectKeyIdentifier
-        if ((signerInfo.sid.size < 18) || (signerInfo.sid.size > 66)) {
+        if ((signerInfo->sid.size < 18) || (signerInfo->sid.size > 66)) {
             SET_ERROR(RET_UAPKI_INVALID_KEY_ID);
         }
-        CHECK_NOT_NULL(m_BaSid = ba_alloc_from_uint8(signerInfo.sid.buf + 2, (size_t)signerInfo.sid.size - 2));
+        (void)m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf + 2, (size_t)signerInfo->sid.size - 2));
         m_SidType = SignerIdentifierType::SUBJECT_KEYID;
+    }
+    if (!m_SidEncoded.buf()) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
     //  =digestAlgorithm=
-    DO(Util::algorithmIdentifierFromAsn1(signerInfo.digestAlgorithm, m_DigestAlgorithm));
+    DO(Util::algorithmIdentifierFromAsn1(signerInfo->digestAlgorithm, m_DigestAlgorithm));
 
     //  =signedAttrs=
-    if ((signerInfo.signedAttrs.size == 0) || (signerInfo.signedAttrs.buf[0] != 0xA0)) {
+    if ((signerInfo->signedAttrs.size == 0) || (signerInfo->signedAttrs.buf[0] != 0xA0)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
-    CHECK_NOT_NULL(m_BaSignedAttrsEncoded = ba_alloc_from_uint8(signerInfo.signedAttrs.buf, signerInfo.signedAttrs.size));
-    DO(ba_set_byte(m_BaSignedAttrsEncoded, 0, 0x31));
-    CHECK_NOT_NULL(signed_attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), m_BaSignedAttrsEncoded));
+    if (!m_SignedAttrsEncoded.set(ba_alloc_from_uint8(signerInfo->signedAttrs.buf, signerInfo->signedAttrs.size))) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+    DO(ba_set_byte(m_SignedAttrsEncoded.get(), 0, 0x31));
+    CHECK_NOT_NULL(signed_attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), m_SignedAttrsEncoded.get()));
     DO(decodeAttributes(*signed_attrs, m_SignedAttrs));
     DO(decodeMandatoryAttrs());
 
     //  =signatureAlgorithm=
-    DO(Util::algorithmIdentifierFromAsn1(signerInfo.signatureAlgorithm, m_SignatureAlgorithm));
+    DO(Util::algorithmIdentifierFromAsn1(signerInfo->signatureAlgorithm, m_SignatureAlgorithm));
 
     //  =signature=
-    DO(asn_OCTSTRING2ba(&signerInfo.signature, &m_BaSignature));
+    DO(asn_OCTSTRING2ba(&signerInfo->signature, &m_Signature));
 
     //  =unsignedAttrs= (optional)
-    if (signerInfo.unsignedAttrs) {
+    if (signerInfo->unsignedAttrs) {
         UapkiNS::SmartBA sba_encoded;
-        if ((signerInfo.unsignedAttrs->size == 0) || (signerInfo.unsignedAttrs->buf[0] != 0xA1)) {
+        if ((signerInfo->unsignedAttrs->size == 0) || (signerInfo->unsignedAttrs->buf[0] != 0xA1)) {
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
-        if (!sba_encoded.set(ba_alloc_from_uint8(signerInfo.unsignedAttrs->buf, signerInfo.unsignedAttrs->size))) {
+        if (!sba_encoded.set(ba_alloc_from_uint8(signerInfo->unsignedAttrs->buf, signerInfo->unsignedAttrs->size))) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
         }
         DO(ba_set_byte(sba_encoded.get(), 0, 0x31));
         CHECK_NOT_NULL(unsigned_attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), sba_encoded.get()));
         DO(decodeAttributes(*unsigned_attrs, m_UnsignedAttrs));
     }
+
+    m_SignerInfo = signerInfo;
 
 cleanup:
     asn_free(get_Attributes_desc(), signed_attrs);
@@ -790,10 +792,10 @@ int SignedDataParser::SignerInfo::decodeMandatoryAttrs (void)
             DO(AttributeHelper::decodeContentType(it.baValues, m_MandatoryAttrs.contentType));
         }
         else if (it.type == string(OID_PKCS9_MESSAGE_DIGEST)) {
-            DO(AttributeHelper::decodeMessageDigest(it.baValues, &m_MandatoryAttrs.baMessageDigest));
+            DO(AttributeHelper::decodeMessageDigest(it.baValues, &m_MandatoryAttrs.messageDigest));
         }
     }
-    if (m_MandatoryAttrs.contentType.empty() || (ba_get_len(m_MandatoryAttrs.baMessageDigest) == 0)) {
+    if (m_MandatoryAttrs.contentType.empty() || (m_MandatoryAttrs.messageDigest.size() == 0)) {
         SET_ERROR(RET_UAPKI_INVALID_ATTRIBUTE);
     }
 

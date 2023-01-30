@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DOC_SIGNFLOW_H
-#define DOC_SIGNFLOW_H
+#ifndef DOC_SIGN_H
+#define DOC_SIGN_H
 
 #include "archive-timestamp-helper.h"
 #include "cer-store.h"
@@ -135,7 +135,7 @@ public:
     ~SigningDoc (void);
 
     int init (
-        const SignParams* signParams
+        const SignParams* iSignParams
     );
     int addCert (
         CerStore::Item* cerStoreItem
