@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-30
+//  Last update: 2023-02-01
 
 
 #include "signeddata-helper.h"
@@ -829,8 +829,8 @@ int keyIdToSid (const ByteArray* baKeyId, ByteArray** baSidEncoded)
     //          Here we need use implicit case SignerIdentifier
     SignerIdentifierIm_t* sid_im = nullptr;
 
-    CHECK_PARAM(baKeyId != NULL);
-    CHECK_PARAM(baSidEncoded != NULL);
+    CHECK_PARAM(baKeyId != nullptr);
+    CHECK_PARAM(baSidEncoded != nullptr);
 
     ASN_ALLOC_TYPE(sid_im, SignerIdentifierIm_t);
     sid_im->present = SignerIdentifierIm_PR_subjectKeyIdentifier;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-04-25
+//  Last update: 2023-02-01
 
 #ifndef UAPKI_NS_CIPHER_HELPER_H
 #define UAPKI_NS_CIPHER_HELPER_H
@@ -33,6 +33,7 @@
 
 #include "uapki-ns.h"
 #include "oids.h"
+#include "uapkic.h"
 #include "uapkif.h"
 
 

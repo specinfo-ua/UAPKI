@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,8 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- //  Last update: 2022-07-14
+//  Last update: 2023-02-01
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #define DEFINE_OID(OID_NAME,OID_VAL) const char *OID_NAME = OID_VAL

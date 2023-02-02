@@ -25,13 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-22
+//  Last update: 2023-02-01
 
 #ifndef UAPKI_OIDS_H
 #define UAPKI_OIDS_H
 
 
-#include "uapkic.h"
+#include <stdbool.h>
 
 
 #ifdef __cplusplus

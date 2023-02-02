@@ -29,10 +29,10 @@
 #define DOC_SIGN_H
 
 #include "archive-timestamp-helper.h"
+#include "attribute-helper.h"
 #include "cer-store.h"
 #include "crl-store.h"
 #include "library-config.h"
-#include "ocsp-helper.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
 #include "uapki-ns.h"
