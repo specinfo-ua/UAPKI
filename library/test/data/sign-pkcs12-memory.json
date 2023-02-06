@@ -1,5 +1,5 @@
 {
-  "comment": "Generate PKCS7/CAdES-signature",
+  "comment": "Generate PKCS7/CAdES-signature, updated 2023-02-06",
   "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
   "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
   "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
@@ -35,15 +35,15 @@
       }
     },
     {
-      "comment": "Відкриття носія ключів",
+      "comment": "Відкриття носія ключів із пам'яті (файл: test-dstu-2023.p12)",
       "method": "OPEN",
       "parameters": {
         "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
         "storage": "memory", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо контейнер ключів зберігається у пам'яті, то використовуються будь-яка строка (наприклад "memory").
-        "password": "Test", // Для PKCS12 обов'язковий, пароль
+        "password": "testpassword", // Для PKCS12 обов'язковий, пароль
         "mode": "RO", // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
         "openParams": {
-          "bytes": "MIIE4wIBAzCCBIAGCSqGSIb3DQEHAaCCBHEEggRtMIIEaTCCBGUGCSqGSIb3DQEHAaCCBFYEggRSMIIETjCCAfIGCyqGSIb3DQEMCgECoIIBrjCCAaowgbAGCSqGSIb3DQEFDTCBojBDBgkqhkiG9w0BBQwwNgQgV2qtQEAUEBJFxL/32RCWEbbCCSPZVOg8v0dHKqxU/T8CAicQMA4GCiqGJAIBAQEBAQIFADBbBgsqhiQCAQEBAQEBAzBMBAgamOsuY5vEygRAqdbrRfE8cIKAxJZ7Ix9erfZY66TANykdONlr8CXKThf46XINxhW0OiiXXwvB3qNkOLVk6iwXn9ASPm24+sV5BASB9JWXxCMdTHbHO/3cV2Rh26FCT/x6vQx5ramNwAwWms1sKB+FiCilrgDAqj23ccPlsE82mLZ5Ui3oACHIs/XJarRskrkj2W9DLTIQb8+eL7hrZ4MClwVO+Kmx+W+U0fWiKHT6t/XhlGJSlhg66J3fRRT6nAxFpHOaxi4fe+MwsLKyiP7WZjvUxsZSZDJQn+heTeeB3a0PKdqnPWdnCBOTRIYGfZO1aTh5qvXOhxwQUWuKnFare5VbNbxsC3JiWCoNQNdJCe4ZVbQlBun4YziMNxGiGWB007x85TgY07fkrh0lX85zSgYSIMVSg+eagdkA/5O2i94xMTAvBgkqhkiG9w0BCRUxIgQgW8bAbuHgDBcA6Sqnqa11+C08t6m2bjqYAjIJskUTMVwwggJUBgsqhkiG9w0BDAoBAqCCAhAwggIMMIGwBgkqhkiG9w0BBQ0wgaIwQwYJKoZIhvcNAQUMMDYEILBoPpAJ3D81IH/906O/9Uzget6oMKvhOckDE9dVM2vRAgInEDAOBgoqhiQCAQEBAQECBQAwWwYLKoYkAgEBAQEBAQMwTAQIqPLW3Ud0X18EQKnW60XxPHCCgMSWeyMfXq32WOukwDcpHTjZa/Alyk4X+OlyDcYVtDool18Lwd6jZDi1ZOosF5/QEj5tuPrFeQQEggFVm31YVohnsVa+L95jmxmCZ0CHuAJNn1anriubn5IGI4MRoH9ofgfC/ISo3wqKrAQAQdC/4NAyTdMQ7uMAqSptSyqSGFMboCDwv/YHz1ceoHF1+SVkySrP5EOGgrF0VBFsVzXbFCPcytgPYdgF0PAHbLZipENMz0Mf9nzoWAQzpEaz/zYXUhYBaPZNnUqRqtLu2BlW0Bz+lhIVco47cv1FtpBm6a7k0LSN8eOI34aDM50Lmw6D+RBZ9d/UlbDL2HSiSlXKn18IhSPPzqEw9CDKfoIoHX6N7pFFjCHWCm9wd/bfm6N7ricb5+DN5vFwW8zC12cuPZTIwwn3+IRdIQxsMeLLUGtYC/CmiZZ7eECF5X1gW5FashzpIl753+RQnSfqtjbuKWFgR4PwRgbFxK3bRO1qzn4PCC3sw5gZMZnxzCW88i1QIF9QIrO9y5L8frf3jzfKllgxMTAvBgkqhkiG9w0BCRUxIgQgaxt3wNGhtgRzqY3W1P5TAnQq7eEB2qIfLIOmfM3tt4IwWjAyMA4GCiqGJAIBAQEBAgEFAAQgJxu4d1YOPccXGhs2E7d6iwxt/AyeHg9jZIJ897zLflYEIMuXfe6AaRLQIwS6zphOifYjYzNMUGw+MTvyMsX+IPnZAgInEA=="
+          "bytes": "MIIE4wIBAzCCBIAGCSqGSIb3DQEHAaCCBHEEggRtMIIEaTCCBGUGCSqGSIb3DQEHAaCCBFYEggRSMIIETjCCAfIGCyqGSIb3DQEMCgECoIIBrjCCAaowgbAGCSqGSIb3DQEFDTCBojBDBgkqhkiG9w0BBQwwNgQgMJ575Iz7TneJILzOoyJ4dr43Ea4rqb75eSCSdRAT9ZsCAicQMA4GCiqGJAIBAQEBAQIFADBbBgsqhiQCAQEBAQEBAzBMBAjuEMs7VffM1gRAqdbrRfE8cIKAxJZ7Ix9erfZY66TANykdONlr8CXKThf46XINxhW0OiiXXwvB3qNkOLVk6iwXn9ASPm24+sV5BASB9NM73PzQNan9/Z8LWFSlHiH+H0YSfa+K95nJVR1/+IEZAeAhBpeLEJ7dXI8lubLoi+RLsVUBcAQ8/ezVC98M2pOV0d4QjxpabEKQ60wX7L2sTCX0gI+6PAZmaeQzdQIQjAwmbFw4Tcmn1FQGbb6PhI7Mk59HGTATJVJHxkV0jkgj6Y2YlLh8PEDESeFueDV0ZoY6qneC66pp+gpwfsAP3Qkv/VehwGJ4SzTw8R0BBk254h7UYbnEF9a1BkaAoR7cOoas5UDow7tT7G/r4dO8A85kVRfjJxVwvz+OspUTfNTYM9vq8Z80VJ0a7XWc64bBN5GlW/wxMTAvBgkqhkiG9w0BCRUxIgQg7VLRnpRZ7JmtOFOmrUxx6yWsTIq5JDii44idOsBEF08wggJUBgsqhkiG9w0BDAoBAqCCAhAwggIMMIGwBgkqhkiG9w0BBQ0wgaIwQwYJKoZIhvcNAQUMMDYEIJEDWCsAiSbnGVzoW91spF95wPWE6E7Hhbq8FgHY+b/pAgInEDAOBgoqhiQCAQEBAQECBQAwWwYLKoYkAgEBAQEBAQMwTAQIpWA7eLfA1xwEQKnW60XxPHCCgMSWeyMfXq32WOukwDcpHTjZa/Alyk4X+OlyDcYVtDool18Lwd6jZDi1ZOosF5/QEj5tuPrFeQQEggFVK3WENGlwJ6lW0BwGw5gibO+AA+RjJSbpUHvthGb1chw9ZDxFsSDVD9mET75TFgKgpIMDRuWSht1KGkQj4zTIlEyG6PKIgWIy6KcXducDC1fEPbYsGbgFv+D2jXpl/Fs5LOTbJ4boyoY5GCgpKsczUHSt2X0RR7MUlIsMJrMLdPsq+2uz/L9PYulmLd3JMu81YgtJC8nHAm2fD1DDd8h9T/1vVrunFaxJ4a/hAcLPJuo3YqG+ZeXXlzcX87J3iwoMWnh+ryuF5FLKtfRUOQsWUq1JEiYiVPfF7J3HZPlV8lc0FWBGyDYx5SRvyBlQJ1g3QFYqJo6xYrYYVN8rVcwNiMiS4WUqsz3OPECTUyK7Pfwi4faFmeMj4t4ZdpRmxGjDY2qfvNW8jDIsvSjX+yrAvMYslaK+Y1Q4dRODyYOzpPpflmY4prqwDRXAQXRBKS0zx3tqkXkxMTAvBgkqhkiG9w0BCRUxIgQgVUA7DHRTQvH5OWBu87bzZ93ZQk4F2csWqJ3FfkdebrwwWjAyMA4GCiqGJAIBAQEBAgEFAAQg9SQSXJHMfBVTXQmrY62SKZ/bnGO9K+tSdzz8MaA+Gs4EIMn1Er6cChjwO5Ym/7/0TJUr0VRo8Y6Cr5k0etmylmjNAgInEA=="
         }
       }
     },
@@ -55,15 +55,19 @@
       "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
       "method": "SELECT_KEY",
       "parameters": {
-        "id": "5BC6C06EE1E00C1700E92AA7A9AD75F82D3CB7A9B66E3A98023209B24513315C" // обов'язковий, ідентифікатор ключа
+        "id": "ED52D19E9459EC99AD3853A6AD4C71EB25AC4C8AB92438A2E3889D3AC044174F" // Actual key (SIGN) for 'test-dstu-2023.p12'
       }
     },
     {
-      "comment": "формування підпису. Параметри наступні: CMS, attached data",
+      "comment": "формування підпису. Параметри наступні: CAdES, attached data",
       "method": "SIGN",
       "parameters": {
         "signParams": {
-          "signatureFormat": "CAdES-BES",
+          "signatureFormat": "CAdES-BES", // Обов'язковий. Підтримує формати CAdES-BES/CAdES-T/CAdES-C/CAdES-XL/CAdES-A/CMS/RAW.
+          //"signatureFormat": "CAdES-T",
+          //"signatureFormat": "CAdES-C",
+          //"signatureFormat": "CAdES-XL",
+          //"signatureFormat": "CAdES-A",
           "signAlgo": "1.2.804.2.1.1.1.1.3.1.1", // Опціональний, якщо не вказаний, то використовується перший алгоритм підпису із списку signAlgo для ключа
           //"digestAlgo": "1.2.804.2.1.1.1.1.2.1", // Опціональний
           "detachedData": false, // Опціональний, по замовчанню true (дані не інкапсулюються)

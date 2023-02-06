@@ -1,5 +1,5 @@
 {
-  "comment": "Open key-storage",
+  "comment": "Test GET_CSR, updated 2023-02-06",
   "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
   "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
   "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
@@ -56,7 +56,8 @@
       "method": "OPEN",
       "parameters": {
         "provider": "PKCS12",
-        "storage": "new-dstu.p12",
+        "storage": "test-dstu-2023.p12", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
+        //"storage": "test-dstu-augusto.p12",
         //"storage": "Key-6.pfx",
         //"storage": "test.jks",
         "password": "testpassword",
@@ -67,13 +68,15 @@
       "comment": "Отримання переліку ключів на відкритому носії",
       "method": "KEYS"
     },
-    //{ First key autoselected
-    //  "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
-    //  "method": "SELECT_KEY",
-    //  "parameters": {
-    //    "id": "place keyid here" // обов'язкове, ідентифікатор ключа
-    //  }
-    //},
+    {
+      "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
+      "method": "SELECT_KEY",
+      "parameters": {
+        "id": "ED52D19E9459EC99AD3853A6AD4C71EB25AC4C8AB92438A2E3889D3AC044174F" // Actual key (SIGN) for 'test-dstu-2023.p12'
+        //"id": "55403B0C745342F1F939606EF3B6F367DDD9424E05D9CB16A89DC57E475E6EBC" // Actual key (KEP) for 'test-dstu-2023.p12'
+        //"id": "BCB3BE7274D075DD52252B67D74AA281D568B8A05B0DF8F3D5C7F69D00BC1370" // Actual key for 'test-dstu-augusto.p12'
+      }
+    },
     {
       "comment": "Створення запиту на сертифікат для поточного ключа",
       "method": "GET_CSR",
