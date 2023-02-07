@@ -720,11 +720,11 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t* signerInfo)
     }
 
     //  =sid=
-    if (version == 1) {
+    if (signerInfo->sid.size < 7) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    if (signerInfo->sid.buf[0] == 0x30) {
         //  It's issuerAndSerialNumber
-        if (signerInfo->sid.size < 7) {
-            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-        }
         (void)m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf, (size_t)signerInfo->sid.size));
         m_SidType = SignerIdentifierType::ISSUER_AND_SN;
     }
