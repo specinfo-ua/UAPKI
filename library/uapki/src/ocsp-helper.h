@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,7 +29,6 @@
 #define UAPKI_NS_OCSP_HELPER_H
 
 
-#include <vector>
 #include "byte-array.h"
 #include "cer-store.h"
 #include "crl-store.h"
@@ -156,7 +155,7 @@ namespace Ocsp {
         int scanSingleResponses (void);
         int verifyTbsResponseData (
             const CerStore::Item* cerResponder,
-            SIGNATURE_VERIFY::STATUS& statusSign
+            SignatureVerifyStatus& statusSign
         );
 
         const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };

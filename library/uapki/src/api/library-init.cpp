@@ -267,19 +267,30 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
     ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline);
 
+    DO_JSON(json_object_set_value(joResult, "ocsp", json_value_init_object()));
+    jo_category = json_object_get_object(joResult, "ocsp");
+    if (jo_category) {
+        const LibraryConfig::OcspParams& ocsp_params = lib_config->getOcsp();
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "nonceLen", (uint32_t)ocsp_params.nonceLen));
+    }
+
     DO_JSON(json_object_set_value(joResult, "tsp", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "tsp");
     if (jo_category) {
         const LibraryConfig::TspParams& tsp_params = lib_config->getTsp();
         string s_url;
-        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "forced", tsp_params.forced));
-        DO_JSON(json_object_set_string(jo_category, "policyId", tsp_params.policyId.c_str()));
+
         for (auto& it : tsp_params.uris) {
             s_url += it + ";";
         }
         if (!s_url.empty()) {
             s_url.pop_back();
         }
+
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "certReq", tsp_params.certReq));
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "forced", tsp_params.forced));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "nonceLen", (uint32_t)tsp_params.nonceLen));
+        DO_JSON(json_object_set_string(jo_category, "policyId", tsp_params.policyId.c_str()));
         DO_JSON(json_object_set_string(jo_category, "url", s_url.c_str()));
     }
 

@@ -44,6 +44,14 @@ namespace Doc {
 namespace Verify {
 
 
+enum class ValidationStatus : uint32_t {
+    UNDEFINED       = 0,
+    INDETERMINATE   = 1,
+    TOTAL_FAILED    = 2,
+    TOTAL_VALID     = 3
+};  //  end enum ValidationStatus
+
+
 struct AttrTimeStamp {
     std::string policy;
     std::string hashAlgo;
@@ -51,9 +59,9 @@ struct AttrTimeStamp {
     uint64_t    msGenTime;
     CerStore::Item*
                 signerCertId;
-    SIGNATURE_VERIFY::STATUS
+    DigestVerifyStatus
                 statusDigest;
-    SIGNATURE_VERIFY::STATUS
+    SignatureVerifyStatus
                 statusSignature;
 
     AttrTimeStamp (void);
@@ -70,9 +78,11 @@ class VerifiedSignerInfo {
                 m_SignerInfo;
     CerStore::Item*
                 m_CerStoreItem;
-    SIGNATURE_VERIFY::STATUS
+    ValidationStatus
+                m_ValidationStatus;
+    SignatureVerifyStatus
                 m_StatusSignature;
-    SIGNATURE_VERIFY::STATUS
+    DigestVerifyStatus
                 m_StatusMessageDigest;
     bool        m_IsDigest;
     uint64_t    m_SigningTime;
@@ -80,7 +90,7 @@ class VerifiedSignerInfo {
                 m_SignatureFormat;
     std::vector<EssCertId>
                 m_EssCerts;
-    SIGNATURE_VERIFY::STATUS
+    DataVerifyStatus
                 m_StatusEssCert;
     std::string m_SigPolicyId;
     AttrTimeStamp
@@ -100,6 +110,8 @@ public:
         CerStore* iCerStore,
         const bool isDigest
     );
+    const char* getValidationStatus (void) const;
+    int validate (void);
     int verifyArchiveTS (
         std::vector<const CerStore::Item*>& certs,
         std::vector<const CrlStore::Item*>& crls
@@ -136,13 +148,13 @@ public:
     uint64_t getSigningTime (void) const {
         return m_SigningTime;
     }
-    SIGNATURE_VERIFY::STATUS getStatusEssCert (void) const {
+    DataVerifyStatus getStatusEssCert (void) const {
         return m_StatusEssCert;
     }
-    SIGNATURE_VERIFY::STATUS getStatusMessageDigest (void) const {
+    DigestVerifyStatus getStatusMessageDigest (void) const {
         return m_StatusMessageDigest;
     }
-    SIGNATURE_VERIFY::STATUS getStatusSignature (void) const {
+    SignatureVerifyStatus getStatusSignature (void) const {
         return m_StatusSignature;
     }
 
@@ -161,6 +173,10 @@ private:
 int decodeAttrTimestamp (
     const ByteArray* baValues,
     AttrTimeStamp& attrTS
+);
+
+const char* validationStatusToStr (
+    const ValidationStatus status
 );
 
 int verifySignedData (

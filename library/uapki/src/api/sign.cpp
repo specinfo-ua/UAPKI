@@ -373,8 +373,8 @@ static int verify_ocsp_responsedata (
     int ret = RET_OK;
     UapkiNS::SmartBA sba_responderid;
     UapkiNS::VectorBA vba_certs;
-    UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
-    SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    UapkiNS::Ocsp::ResponderIdType responderid_type = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
+    UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
 
     DO(ocspClient.getCerts(vba_certs));
     for (auto& it : vba_certs) {
@@ -383,12 +383,12 @@ static int verify_ocsp_responsedata (
         it = nullptr;
     }
 
-    DO(ocspClient.getResponderId(responder_idtype, &sba_responderid));
-    if (responder_idtype == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
+    DO(ocspClient.getResponderId(responderid_type, &sba_responderid));
+    if (responderid_type == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
         DO(cerStore.getCertBySubject(sba_responderid.get(), cerResponder));
     }
     else {
-        //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
+        //  responderid_type == OcspHelper::ResponderIdType::BY_KEY
         DO(cerStore.getCertByKeyId(sba_responderid.get(), cerResponder));
     }
 

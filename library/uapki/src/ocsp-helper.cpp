@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,6 +36,8 @@
 #include "uapki-ns-util.h"
 #include "verify-utils.h"
 
+
+using namespace std;
 
 namespace UapkiNS {
 
@@ -286,7 +288,7 @@ int OcspHelper::encodeTbsRequest (void)
 int OcspHelper::setSignature (
         const UapkiNS::AlgorithmIdentifier& aidSignature,
         const ByteArray* baSignValue,
-        const std::vector<ByteArray*>& certs
+        const vector<ByteArray*>& certs
 )
 {
     int ret = RET_OK;
@@ -540,14 +542,14 @@ cleanup:
 
 int OcspHelper::verifyTbsResponseData (
         const CerStore::Item* cerResponder,
-        SIGNATURE_VERIFY::STATUS& statusSign
+        SignatureVerifyStatus& statusSign
 )
 {
     int ret = RET_OK;
     ByteArray* ba_signature = nullptr;
     char* s_signalgo = nullptr;
 
-    statusSign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    statusSign = SignatureVerifyStatus::UNDEFINED;
     if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
 
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
@@ -562,13 +564,13 @@ int OcspHelper::verifyTbsResponseData (
     ret = verify_signature(s_signalgo, m_BaTbsResponseData, false, cerResponder->baSPKI, ba_signature);
     switch (ret) {
     case RET_OK:
-        statusSign = SIGNATURE_VERIFY::STATUS::VALID;
+        statusSign = SignatureVerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        statusSign = SIGNATURE_VERIFY::STATUS::INVALID;
+        statusSign = SignatureVerifyStatus::INVALID;
         break;
     default:
-        statusSign = SIGNATURE_VERIFY::STATUS::FAILED;
+        statusSign = SignatureVerifyStatus::FAILED;
     }
 
 cleanup:

@@ -58,11 +58,16 @@ namespace Doc {
 namespace Verify {
 
 
+static const char* VALIDATION_STATUS_STRINGS[4] = {
+    "UNDEFINED", "INDETERMINATE", "TOTAL-FAILED", "TOTAL-VALID"
+};
+
+
 AttrTimeStamp::AttrTimeStamp (void)
     : msGenTime(0)
     , signerCertId(0)
-    , statusDigest(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-    , statusSignature(SIGNATURE_VERIFY::STATUS::UNDEFINED)
+    , statusDigest(DigestVerifyStatus::UNDEFINED)
+    , statusSignature(SignatureVerifyStatus::UNDEFINED)
 {}
 
 AttrTimeStamp::~AttrTimeStamp (void)
@@ -79,12 +84,12 @@ int AttrTimeStamp::verifyDigest (const ByteArray* baData)
 
     const int ret = ::hash(hash_from_oid(hashAlgo.c_str()), baData, &sba_hash);
     if (ret != RET_OK) {
-        statusDigest = SIGNATURE_VERIFY::STATUS::FAILED;
+        statusDigest = DigestVerifyStatus::FAILED;
         return RET_OK;
     }
 
     statusDigest = (ba_cmp(hashedMessage.get(), sba_hash.get()) == 0)
-        ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
+        ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     return RET_OK;
 }
 
@@ -92,9 +97,10 @@ int AttrTimeStamp::verifyDigest (const ByteArray* baData)
 VerifiedSignerInfo::VerifiedSignerInfo (void)
     : m_CerStore(nullptr)
     , m_CerStoreItem(nullptr)
-    , m_StatusSignature(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-    , m_StatusMessageDigest(SIGNATURE_VERIFY::STATUS::UNDEFINED)
-    , m_StatusEssCert(SIGNATURE_VERIFY::STATUS::UNDEFINED)
+    , m_ValidationStatus(ValidationStatus::UNDEFINED)
+    , m_StatusSignature(SignatureVerifyStatus::UNDEFINED)
+    , m_StatusMessageDigest(DigestVerifyStatus::UNDEFINED)
+    , m_StatusEssCert(DataVerifyStatus::UNDEFINED)
     , m_IsDigest(false)
     , m_SigningTime(0)
     , m_SignatureFormat(SignatureFormat::UNDEFINED)
@@ -113,6 +119,36 @@ int VerifiedSignerInfo::init (
     m_CerStore = iCerStore;
     m_IsDigest = isDigest;
     return (m_CerStore) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
+}
+
+const char* VerifiedSignerInfo::getValidationStatus (void) const {
+    return validationStatusToStr(m_ValidationStatus);
+}
+
+int VerifiedSignerInfo::validate (void)
+{
+    int ret = RET_OK;
+    bool is_valid = false;
+
+    is_valid = (getStatusSignature() == SignatureVerifyStatus::VALID)
+        && (getStatusMessageDigest() == DigestVerifyStatus::VALID);
+    if (is_valid && (getStatusEssCert() != DataVerifyStatus::NOT_PRESENT)) {
+        is_valid = (getStatusEssCert() == DataVerifyStatus::VALID);
+    }
+    if (is_valid && getContentTS().isPresent()) {
+        is_valid = (getContentTS().statusDigest == DigestVerifyStatus::VALID);
+        //TODO: contentTS->statusSignature
+    }
+    if (is_valid && getSignatureTS().isPresent()) {
+        is_valid = (getSignatureTS().statusDigest == DigestVerifyStatus::VALID);
+        //TODO: signatureTS->statusSignature
+    }
+
+    m_ValidationStatus = is_valid ? ValidationStatus::TOTAL_VALID : ValidationStatus::TOTAL_FAILED;
+    //TODO: check options.validateCertByCRL and options.validateCertByOCSP
+    //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
+
+    return ret;
 }
 
 int VerifiedSignerInfo::verifyArchiveTS (
@@ -146,7 +182,7 @@ int VerifiedSignerInfo::verifyArchiveTS (
     DEBUG_OUTCON(printf("VerifiedSignerInfo::verifyArchiveTS(), calculated hash-value, hex: ");  ba_print(stdout, m_ArchiveTsHelper.getHashValue()));
 
     m_ArchiveTS.statusDigest = (ba_cmp(m_ArchiveTS.hashedMessage.get(), m_ArchiveTsHelper.getHashValue()) == 0)
-        ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
+        ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID;
 
 cleanup:
     return ret;
@@ -181,13 +217,13 @@ int VerifiedSignerInfo::verifySignerInfo (
     );
     switch (ret) {
     case RET_OK:
-        m_StatusSignature = SIGNATURE_VERIFY::STATUS::VALID;
+        m_StatusSignature = SignatureVerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        m_StatusSignature = SIGNATURE_VERIFY::STATUS::INVALID;
+        m_StatusSignature = SignatureVerifyStatus::INVALID;
         break;
     default:
-        m_StatusSignature = SIGNATURE_VERIFY::STATUS::FAILED;
+        m_StatusSignature = SignatureVerifyStatus::FAILED;
     }
 
     //  Validity messageDigest
@@ -198,11 +234,11 @@ int VerifiedSignerInfo::verifySignerInfo (
             &sba_calcdigest)
         );
         m_StatusMessageDigest = (ba_cmp(sba_calcdigest.get(), m_SignerInfo.getMessageDigest()) == 0)
-            ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
     else {
         m_StatusMessageDigest = (ba_cmp(baContent, m_SignerInfo.getMessageDigest()) == 0)
-            ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
 
     //  Decode attributes
@@ -263,7 +299,7 @@ int VerifiedSignerInfo::decodeSignedAttrs (
 {
     int ret = RET_OK;
 
-    m_StatusEssCert = SIGNATURE_VERIFY::STATUS::NOT_PRESENT;
+    m_StatusEssCert = DataVerifyStatus::NOT_PRESENT;
     for (const auto& it : signedAattrs) {
         if (it.type == string(OID_PKCS9_SIGNING_TIME)) {
             DO(AttributeHelper::decodeSigningTime(it.baValues, m_SigningTime));
@@ -318,7 +354,7 @@ int VerifiedSignerInfo::verifySigningCertificateV2 (void)
 
     DO(::hash(hash_algo, m_CerStoreItem->baEncoded, &sba_certhash));
     m_StatusEssCert = (ba_cmp(sba_certhash.get(), ess_certid.baHashValue) == 0)
-        ? SIGNATURE_VERIFY::STATUS::VALID : SIGNATURE_VERIFY::STATUS::INVALID;
+        ? DataVerifyStatus::VALID : DataVerifyStatus::INVALID;
 
 cleanup:
     return ret;
@@ -346,21 +382,28 @@ int decodeAttrTimestamp (
     );
     switch (ret) {
     case RET_OK:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::VALID;
+        attrTS.statusSignature = SignatureVerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::INVALID;
+        attrTS.statusSignature = SignatureVerifyStatus::INVALID;
         break;
     case RET_UAPKI_CERT_NOT_FOUND:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::NOT_PRESENT;
+        attrTS.statusSignature = SignatureVerifyStatus::INDETERMINATE;
         break;
     default:
-        attrTS.statusSignature = SIGNATURE_VERIFY::STATUS::FAILED;
+        attrTS.statusSignature = SignatureVerifyStatus::FAILED;
     }
 
 cleanup:
     return ret;
 }   //  decodeAttrTimestamp
+
+const char* validationStatusToStr (
+        const ValidationStatus status
+)
+{
+    return VALIDATION_STATUS_STRINGS[((uint32_t)status < 4) ? (uint32_t)status : 0];
+}   //  validationStatusToStr
 
 int verifySignedData (
         CerStore& cerStore,

@@ -112,8 +112,8 @@ static int result_attr_timestamp_to_json (
         DO_JSON(json_object_set_string(jo_attrts, "policyId", attrTS.policy.c_str()));
         DO_JSON(json_object_set_string(jo_attrts, "hashAlgo", attrTS.hashAlgo.c_str()));
         DO(json_object_set_base64(jo_attrts, "hashedMessage", attrTS.hashedMessage.get()));
-        DO_JSON(json_object_set_string(jo_attrts, "statusDigest", SIGNATURE_VERIFY::toStr(attrTS.statusDigest)));
-        DO_JSON(json_object_set_string(jo_attrts, "statusSignature", SIGNATURE_VERIFY::toStr(attrTS.statusSignature)));
+        DO_JSON(json_object_set_string(jo_attrts, "statusDigest", UapkiNS::verifyStatusToStr(attrTS.statusDigest)));
+        DO_JSON(json_object_set_string(jo_attrts, "statusSignature", UapkiNS::verifyStatusToStr(attrTS.statusSignature)));
         if (attrTS.signerCertId) {
             DO(json_object_set_base64(jo_attrts, "signerCertId", attrTS.signerCertId->baCertId));
         }
@@ -152,34 +152,16 @@ static int result_sign_info_to_json (
 )
 {
     int ret = RET_OK;
-    SIGNATURE_VALIDATION::STATUS status = SIGNATURE_VALIDATION::STATUS::UNDEFINED;
-    bool is_valid = false;
 
     DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.getSignerCertId()));
 
-    is_valid = (verifyInfo.getStatusSignature() == SIGNATURE_VERIFY::STATUS::VALID)
-        && (verifyInfo.getStatusMessageDigest() == SIGNATURE_VERIFY::STATUS::VALID);
-    if (is_valid && (verifyInfo.getStatusEssCert() != SIGNATURE_VERIFY::STATUS::NOT_PRESENT)) {
-        is_valid = (verifyInfo.getStatusEssCert() == SIGNATURE_VERIFY::STATUS::VALID);
-    }
-    if (is_valid && verifyInfo.getContentTS().isPresent()) {
-        is_valid = (verifyInfo.getContentTS().statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
-        //TODO: verifyInfo.contentTS->statusSignature
-    }
-    if (is_valid && verifyInfo.getSignatureTS().isPresent()) {
-        is_valid = (verifyInfo.getSignatureTS().statusDigest == SIGNATURE_VERIFY::STATUS::VALID);
-        //TODO: verifyInfo.signatureTS->statusSignature
-    }
-
-    status = is_valid ? SIGNATURE_VALIDATION::STATUS::TOTAL_VALID : SIGNATURE_VALIDATION::STATUS::TOTAL_FAILED;
-    //TODO: check options.validateCertByCRL and options.validateCertByOCSP
-    //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
+    DO(verifyInfo.validate());
 
     DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", UapkiNS::signatureFormatToStr(verifyInfo.getSignatureFormat())));
-    DO_JSON(json_object_set_string(joSignInfo, "status", SIGNATURE_VALIDATION::toStr(status)));
-    DO_JSON(json_object_set_string(joSignInfo, "statusSignature", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusSignature())));
-    DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusMessageDigest())));
-    DO_JSON(json_object_set_string(joSignInfo, "statusEssCert", SIGNATURE_VERIFY::toStr(verifyInfo.getStatusEssCert())));
+    DO_JSON(json_object_set_string(joSignInfo, "status", verifyInfo.getValidationStatus()));
+    DO_JSON(json_object_set_string(joSignInfo, "statusSignature", UapkiNS::verifyStatusToStr(verifyInfo.getStatusSignature())));
+    DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", UapkiNS::verifyStatusToStr(verifyInfo.getStatusMessageDigest())));
+    DO_JSON(json_object_set_string(joSignInfo, "statusEssCert", UapkiNS::verifyStatusToStr(verifyInfo.getStatusEssCert())));
     if (verifyInfo.getSigningTime() > 0) {
         DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtils::mstimeToFormat(verifyInfo.getSigningTime()).c_str()));
     }
@@ -309,7 +291,7 @@ static int verify_raw (
     CerStore::Item* cer_item = nullptr;
     CerStore::Item* cer_parsed = nullptr;
     UapkiNS::SmartBA sba_pubdata;
-    SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
     bool is_digitalsign = true;
 
     const string s_signalgo = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
@@ -339,15 +321,15 @@ static int verify_raw (
         (cer_item) ? cer_item->baSPKI : sba_pubdata.get(), baSignature);
     switch (ret) {
     case RET_OK:
-        status_sign = SIGNATURE_VERIFY::STATUS::VALID;
+        status_sign = UapkiNS::SignatureVerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        status_sign = SIGNATURE_VERIFY::STATUS::INVALID;
+        status_sign = UapkiNS::SignatureVerifyStatus::INVALID;
         break;
     default:
-        status_sign = SIGNATURE_VERIFY::STATUS::FAILED;
+        status_sign = UapkiNS::SignatureVerifyStatus::FAILED;
     }
-    DO_JSON(json_object_set_string(joResult, "statusSignature", SIGNATURE_VERIFY::toStr(status_sign)));
+    DO_JSON(json_object_set_string(joResult, "statusSignature", UapkiNS::verifyStatusToStr(status_sign)));
 
     ret = RET_OK;
 
@@ -374,7 +356,7 @@ int uapki_verify_signature (
     jo_options = json_object_get_object(joParams, "options");
     jo_signature = json_object_get_object(joParams, "signature");
     is_digest = ParsonHelper::jsonObjectGetBoolean(jo_signature, "isDigest", false);
-    sba_content.set(json_object_get_base64(jo_signature, "content"));
+    (void)sba_content.set(json_object_get_base64(jo_signature, "content"));
     if (!sba_signature.set(json_object_get_base64(jo_signature, "bytes"))) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }

@@ -176,7 +176,7 @@ CerStore::Item::Item (void)
     , notAfter(0)
     , keyUsage(0)
     , trusted(false)
-    , verifyStatus(CERTIFICATE_VERIFY::STATUS::UNDEFINED)
+    , verifyStatus(VerifyStatus::UNDEFINED)
     , certStatusByCrl(ValidationType::CRL)
     , certStatusByOcsp(ValidationType::OCSP)
 {
@@ -197,7 +197,7 @@ CerStore::Item::~Item (void)
     notBefore = 0;
     notAfter = 0;
     keyUsage = 0;
-    verifyStatus = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
+    verifyStatus = VerifyStatus::UNDEFINED;
 }
 
 int CerStore::Item::checkValidity (
@@ -842,6 +842,21 @@ cleanup:
     ba_free(ba_serialnum);
     ba_free(ba_keyid);
     return ret;
+}
+
+const char* CerStore::verifyStatusToStr (
+        const VerifyStatus status
+)
+{
+    static const char* VERIFY_STATUS_STRINGS[6] = {
+        "UNDEFINED",
+        "INDETERMINATE",
+        "FAILED",
+        "INVALID",
+        "VALID WITHOUT KEYUSAGE",
+        "VALID"
+    };
+    return VERIFY_STATUS_STRINGS[((uint32_t)status < 6) ? (uint32_t)status : 0];
 }
 
 CerStore::Item* CerStore::addItem (Item* item)

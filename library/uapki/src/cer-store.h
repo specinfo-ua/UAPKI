@@ -29,14 +29,12 @@
 #define UAPKI_CER_STORE_H
 
 
-#include <string>
-#include <vector>
 #include "uapkic.h"
 #include "uapkif.h"
+#include "uapki-ns.h"
 #include "attribute-helper.h"
 #include "uapki-export.h"
 #include "uapki-ns.h"
-#include "verify-status.h"
 
 
 //#define DEBUG_CERSTOREITEM_INFO
@@ -50,6 +48,15 @@ public:
         CRL         = 1,
         OCSP        = 2
     };  //  end enum ValidationType
+
+    enum class VerifyStatus : uint32_t {
+        UNDEFINED               = 0,
+        INDETERMINATE           = 1,
+        FAILED                  = 2,
+        INVALID                 = 3,
+        VALID_WITHOUT_KEYUSAGE  = 4,
+        VALID                   = 5
+    };  //  end enum VerifyStatus
 
     struct CertStatusInfo {
         const ValidationType
@@ -104,7 +111,7 @@ public:
         uint64_t    notAfter;
         uint32_t    keyUsage;
         bool        trusted;
-        CERTIFICATE_VERIFY::STATUS
+        VerifyStatus
                     verifyStatus;
         CertStatusInfo
                     certStatusByCrl;
@@ -213,6 +220,9 @@ public:
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,
         ByteArray** baKeyId
+    );
+    static const char* verifyStatusToStr (
+        const VerifyStatus status
     );
 
 private:

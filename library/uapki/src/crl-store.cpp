@@ -145,7 +145,7 @@ CrlStore::Item::Item (const CrlType iType)
     , baAuthorityKeyId(nullptr)
     , baCrlNumber(nullptr)
     , baDeltaCrl(nullptr)
-    , statusSign(SIGNATURE_VERIFY::STATUS::UNDEFINED)
+    , statusSign(CerStore::VerifyStatus::UNDEFINED)
     , baCrlIdentifier(nullptr)
 {}
 
@@ -161,7 +161,7 @@ CrlStore::Item::~Item (void)
     ba_free((ByteArray*)baAuthorityKeyId);
     ba_free((ByteArray*)baCrlNumber);
     ba_free((ByteArray*)baDeltaCrl);
-    statusSign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    statusSign = CerStore::VerifyStatus::UNDEFINED;
     ba_free((ByteArray*)baCrlIdentifier);
 }
 
@@ -257,7 +257,7 @@ int CrlStore::Item::verify (
 
     CHECK_PARAM(cerIssuer != nullptr);
 
-    if (statusSign == SIGNATURE_VERIFY::STATUS::UNDEFINED) {
+    if (statusSign == CerStore::VerifyStatus::UNDEFINED) {
         CHECK_NOT_NULL(x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded));
         CHECK_NOT_NULL(ba_tbs = ba_alloc_from_uint8(x509_tbs->tbsData.buf, x509_tbs->tbsData.size));
 
@@ -273,13 +273,13 @@ int CrlStore::Item::verify (
         ret = verify_signature(s_signalgo, ba_tbs, false, cerIssuer->baSPKI, ba_signature);
         switch (ret) {
         case RET_OK:
-            statusSign = SIGNATURE_VERIFY::STATUS::VALID;
+            statusSign = CerStore::VerifyStatus::VALID;
             break;
         case RET_VERIFY_FAILED:
-            statusSign = SIGNATURE_VERIFY::STATUS::INVALID;
+            statusSign = CerStore::VerifyStatus::INVALID;
             break;
         default:
-            statusSign = SIGNATURE_VERIFY::STATUS::FAILED;
+            statusSign = CerStore::VerifyStatus::FAILED;
         }
     }
     else {

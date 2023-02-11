@@ -165,7 +165,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
     DO(json_object_set_base64(joResult, "crlId", crl->baCrlId));
 
     ret = crl->verify(cerIssuer);
-    DO_JSON(json_object_set_string(joResult, "statusSignature", SIGNATURE_VERIFY::toStr(crl->statusSign)));
+    DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(crl->statusSign)));
     if (ret != RET_OK) {
         SET_ERROR(ret);
     }
@@ -287,14 +287,14 @@ static int verify_cert_sign (const CerStore::Item* cerIssuer, CerStore::Item* ce
 {
     int ret = RET_OK;
     bool is_digitalsign = false;
-    CERTIFICATE_VERIFY::STATUS status = CERTIFICATE_VERIFY::STATUS::UNDEFINED;
+    CerStore::VerifyStatus status = CerStore::VerifyStatus::UNDEFINED;
 
     ret = CerStoreUtils::verify(cerSubject, cerIssuer);
-    status = (ret == RET_OK) ? CERTIFICATE_VERIFY::STATUS::VALID
-        : ((ret == RET_VERIFY_FAILED) ? CERTIFICATE_VERIFY::STATUS::INVALID : CERTIFICATE_VERIFY::STATUS::FAILED);
-    if (status == CERTIFICATE_VERIFY::STATUS::VALID) {
+    status = (ret == RET_OK) ? CerStore::VerifyStatus::VALID
+        : ((ret == RET_VERIFY_FAILED) ? CerStore::VerifyStatus::INVALID : CerStore::VerifyStatus::FAILED);
+    if (status == CerStore::VerifyStatus::VALID) {
         DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
-        status = (is_digitalsign) ? CERTIFICATE_VERIFY::STATUS::VALID : CERTIFICATE_VERIFY::STATUS::VALID_WITHOUT_KEYUSAGE;
+        status = (is_digitalsign) ? CerStore::VerifyStatus::VALID : CerStore::VerifyStatus::VALID_WITHOUT_KEYUSAGE;
     }
 
     cerSubject->verifyStatus = status;
@@ -309,7 +309,7 @@ static int verify_response_data (JSON_Object* joResult, UapkiNS::Ocsp::OcspHelpe
     UapkiNS::SmartBA sba_responderid;
     UapkiNS::VectorBA vba_certs;
     UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
-    SIGNATURE_VERIFY::STATUS status_sign = SIGNATURE_VERIFY::STATUS::UNDEFINED;
+    UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
     CerStore::Item* cer_responder = nullptr;
 
     DO(ocspClient.getCerts(vba_certs));
@@ -330,7 +330,7 @@ static int verify_response_data (JSON_Object* joResult, UapkiNS::Ocsp::OcspHelpe
     }
 
     ret = ocspClient.verifyTbsResponseData(cer_responder, status_sign);
-    DO_JSON(json_object_set_string(joResult, "statusSignature", SIGNATURE_VERIFY::toStr(status_sign)));
+    DO_JSON(json_object_set_string(joResult, "statusSignature", UapkiNS::verifyStatusToStr(status_sign)));
     if (ret == RET_VERIFY_FAILED) {
         SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED);
     }
@@ -490,10 +490,10 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", is_expired));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", is_selfsigned));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cer_subject->trusted));
-    if (cer_subject->verifyStatus == CERTIFICATE_VERIFY::STATUS::UNDEFINED) {
+    if (cer_subject->verifyStatus == CerStore::VerifyStatus::UNDEFINED) {
         DO(verify_cert_sign(cer_issuer, cer_subject));
     }
-    DO_JSON(json_object_set_string(joResult, "statusSignature", CERTIFICATE_VERIFY::toStr(cer_subject->verifyStatus)));
+    DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(cer_subject->verifyStatus)));
 
     if (!is_selfsigned) {
         DO(json_object_set_base64(joResult, "issuerCertId", cer_issuer->baCertId));
