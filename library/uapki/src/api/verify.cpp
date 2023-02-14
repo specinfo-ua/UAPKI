@@ -55,11 +55,44 @@ using namespace std;
 
 
 struct VerifyOptions {
-    bool    encodeCert;
-    bool    validateCertByOCSP;
-    bool    validateCertByCRL;
+    CerStore::ValidationType
+            validationType;
+    uint64_t
+            validateTime;
+    //  options
+    bool    forceOcsp;
+    bool    offlineCrl;
+
     VerifyOptions (void)
-        : encodeCert(true), validateCertByOCSP(false), validateCertByCRL(false) {}
+        : validationType(CerStore::ValidationType::UNDEFINED)
+        , validateTime(0)
+        , forceOcsp(false)
+        , offlineCrl(false) {
+    }
+
+    int parse (JSON_Object* joParams) {
+        validationType = CerStore::validationTypeFromStr(
+            ParsonHelper::jsonObjectGetString(joParams, "validationType")
+        );
+        if (validationType == CerStore::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
+
+        const string s_validatetime = ParsonHelper::jsonObjectGetString(joParams, "validateTime");
+        if (s_validatetime.empty()) {
+            validateTime = TimeUtils::nowMsTime();
+        }
+        else {
+            const int ret = TimeUtils::stimeToMstime(s_validatetime.c_str(), validateTime);
+            if (ret != RET_OK) return RET_UAPKI_INVALID_PARAMETER;
+        }
+
+        JSON_Object* jo_options = json_object_get_object(joParams, "options");
+        if (jo_options) {
+            forceOcsp = ParsonHelper::jsonObjectGetBoolean(jo_options, "forceOCSP", false);
+            offlineCrl = ParsonHelper::jsonObjectGetBoolean(jo_options, "offlineCRL", false);
+        }
+
+        return RET_OK;
+    }
 };  //  end struct VerifyOptions
 
 
@@ -86,16 +119,6 @@ static int add_certs_to_store (
 cleanup:
     return ret;
 }   //  add_certs_to_store
-
-static void parse_verify_options (
-        JSON_Object* joOptions,
-        VerifyOptions& options
-)
-{
-    options.encodeCert = ParsonHelper::jsonObjectGetBoolean(joOptions, "encodeCert", true);
-    options.validateCertByOCSP = ParsonHelper::jsonObjectGetBoolean(joOptions, "validateCertByOCSP", false);
-    options.validateCertByCRL = ParsonHelper::jsonObjectGetBoolean(joOptions, "validateCertByCRL", false);
-}   //  parse_verify_options
 
 static int result_attr_timestamp_to_json (
         JSON_Object* joResult,
@@ -223,14 +246,13 @@ static int verify_p7s (
         const ByteArray* baSignature,
         const ByteArray* baContent,
         const bool isDigest,
-        JSON_Object* joOptions,
+        VerifyOptions verifyOptions,
         JSON_Object* joResult
 )
 {
     int ret = RET_OK;
     UapkiNS::Pkcs7::SignedDataParser sdata_parser;
     CerStore* cer_store = nullptr;
-    //VerifyOptions options;
     const ByteArray* ref_content = nullptr;
     vector<const CerStore::Item*> added_certs;
     vector<const CrlStore::Item*> added_crls;
@@ -240,8 +262,6 @@ static int verify_p7s (
     if (!cer_store) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
-
-    //parse_verify_options(joOptions, options);
 
     DO(sdata_parser.parse(baSignature));
     if (sdata_parser.getCountSignerInfos() == 0) {
@@ -347,13 +367,11 @@ int uapki_verify_signature (
     int ret = RET_OK;
     UapkiNS::SmartBA sba_content;
     UapkiNS::SmartBA sba_signature;
-    JSON_Object* jo_options = nullptr;
     JSON_Object* jo_signature = nullptr;
     JSON_Object* jo_signparams = nullptr;
     JSON_Object* jo_signerpubkey = nullptr;
     bool is_digest, is_raw = false;
 
-    jo_options = json_object_get_object(joParams, "options");
     jo_signature = json_object_get_object(joParams, "signature");
     is_digest = ParsonHelper::jsonObjectGetBoolean(jo_signature, "isDigest", false);
     (void)sba_content.set(json_object_get_base64(jo_signature, "content"));
@@ -366,7 +384,9 @@ int uapki_verify_signature (
     is_raw = (jo_signparams != nullptr) || (jo_signerpubkey != nullptr);
 
     if (!is_raw) {
-        DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, jo_options, joResult));
+        VerifyOptions verify_options;
+        //DO(verify_options.parse(joParams));
+        DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, verify_options, joResult));
     }
     else {
         if ((sba_content.size() == 0) || (jo_signparams == nullptr) || (jo_signerpubkey == nullptr)) {

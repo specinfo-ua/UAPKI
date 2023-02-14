@@ -844,6 +844,23 @@ cleanup:
     return ret;
 }
 
+CerStore::ValidationType& CerStore::validationTypeFromStr (
+        const string& validationType
+)
+{
+    ValidationType rv_type = ValidationType::UNDEFINED;
+    if (validationType.empty() || (validationType == string("NONE"))) {
+        rv_type = ValidationType::NONE;
+    }
+    else if (validationType == string("CRL")) {
+        rv_type = ValidationType::CRL;
+    }
+    else if (validationType == string("OCSP")) {
+        rv_type = ValidationType::OCSP;
+    }
+    return rv_type;
+}
+
 const char* CerStore::verifyStatusToStr (
         const VerifyStatus status
 )

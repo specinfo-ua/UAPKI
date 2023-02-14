@@ -34,7 +34,6 @@
 #include "uapki-ns.h"
 #include "attribute-helper.h"
 #include "uapki-export.h"
-#include "uapki-ns.h"
 
 
 //#define DEBUG_CERSTOREITEM_INFO
@@ -45,8 +44,9 @@ class CerStore {
 public:
     enum class ValidationType : uint32_t {
         UNDEFINED   = 0,
-        CRL         = 1,
-        OCSP        = 2
+        NONE        = 1,
+        CRL         = 2,
+        OCSP        = 3
     };  //  end enum ValidationType
 
     enum class VerifyStatus : uint32_t {
@@ -220,6 +220,9 @@ public:
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,
         ByteArray** baKeyId
+    );
+    static ValidationType& validationTypeFromStr (
+        const std::string& validationType
     );
     static const char* verifyStatusToStr (
         const VerifyStatus status

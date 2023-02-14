@@ -65,26 +65,6 @@ static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore
     return (issuer_is_expired || subject_is_expired);
 }
 
-static int parse_validation_type (const string& sValidationType, CerStore::ValidationType& validationType)
-{
-    int ret = RET_OK;
-
-    if (sValidationType.empty()) {
-        validationType = CerStore::ValidationType::UNDEFINED;
-    }
-    else if (sValidationType == string("CRL")) {
-        validationType = CerStore::ValidationType::CRL;
-    }
-    else if (sValidationType == string("OCSP")) {
-        validationType = CerStore::ValidationType::OCSP;
-    }
-    else {
-        ret = RET_UAPKI_INVALID_PARAMETER;
-    }
-
-    return ret;
-}
-
 static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, CrlStore& crlStore,
                     const ByteArray** baCrlNumber, const uint64_t validateTime, CrlStore::Item** crlItem)
 {
@@ -449,11 +429,15 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     ByteArray* ba_certid = nullptr;
     ByteArray* ba_encoded = nullptr;
     string s_validatetime;
-    CerStore::ValidationType validation_type = CerStore::ValidationType::UNDEFINED;
+    const CerStore::ValidationType validation_type = CerStore::validationTypeFromStr(
+        ParsonHelper::jsonObjectGetString(joParams, "validationType")
+    );
     bool is_expired = false, is_selfsigned = false, need_updatecert = false;
     uint64_t validate_time = 0;
 
-    DO(parse_validation_type(ParsonHelper::jsonObjectGetString(joParams, "validationType"), validation_type));
+    if (validation_type == CerStore::ValidationType::UNDEFINED) {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
 
     ba_encoded = json_object_get_base64(joParams, "bytes");
     if (ba_encoded) {
