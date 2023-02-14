@@ -178,10 +178,15 @@ static int result_sign_info_to_json (
 
     DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.getSignerCertId()));
 
-    DO(verifyInfo.validate());
+    verifyInfo.validate();
 
     DO_JSON(json_object_set_string(joSignInfo, "signatureFormat", UapkiNS::signatureFormatToStr(verifyInfo.getSignatureFormat())));
     DO_JSON(json_object_set_string(joSignInfo, "status", verifyInfo.getValidationStatus()));
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validSignatures", verifyInfo.isValidSignatures()));
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validDigests", verifyInfo.isValidDigests()));
+    if (verifyInfo.getBestSignatureTime() > 0) {
+        DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtils::mstimeToFormat(verifyInfo.getBestSignatureTime()).c_str()));
+    }
     DO_JSON(json_object_set_string(joSignInfo, "statusSignature", UapkiNS::verifyStatusToStr(verifyInfo.getStatusSignature())));
     DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", UapkiNS::verifyStatusToStr(verifyInfo.getStatusMessageDigest())));
     DO_JSON(json_object_set_string(joSignInfo, "statusEssCert", UapkiNS::verifyStatusToStr(verifyInfo.getStatusEssCert())));
@@ -205,7 +210,8 @@ static int result_to_json (
         JSON_Object* joResult,
         const UapkiNS::Pkcs7::SignedDataParser& signedData,
         vector<const CerStore::Item*>& certs,
-        vector<UapkiNS::Doc::Verify::VerifiedSignerInfo>& verifyInfos
+        vector<UapkiNS::Doc::Verify::VerifiedSignerInfo>& verifyInfos,
+        const VerifyOptions& verifyOptions
 )
 {
     int ret = RET_OK;
@@ -228,8 +234,7 @@ static int result_to_json (
         }
     }
 
-    {
-        //  =signatureInfos=
+    {   //  =signatureInfos=
         DO_JSON(json_object_set_value(joResult, "signatureInfos", json_value_init_array()));
         JSON_Array* ja_signinfos = json_object_get_array(joResult, "signatureInfos");
         for (size_t i = 0; i < verifyInfos.size(); i++) {
@@ -237,6 +242,11 @@ static int result_to_json (
             DO(result_sign_info_to_json(json_array_get_object(ja_signinfos, i), verifyInfos[i]));
         }
     }
+
+    //  =validateTime=
+    DO_JSON(json_object_set_string(joResult, "validateTime",
+        TimeUtils::mstimeToFormat(verifyOptions.validateTime).c_str())
+    );
 
 cleanup:
     return ret;
@@ -246,7 +256,7 @@ static int verify_p7s (
         const ByteArray* baSignature,
         const ByteArray* baContent,
         const bool isDigest,
-        VerifyOptions verifyOptions,
+        const VerifyOptions& verifyOptions,
         JSON_Object* joResult
 )
 {
@@ -292,7 +302,7 @@ static int verify_p7s (
         }
     }
 
-    DO(result_to_json(joResult, sdata_parser, added_certs, verified_sinfos));
+    DO(result_to_json(joResult, sdata_parser, added_certs, verified_sinfos, verifyOptions));
 
 cleanup:
     return ret;
@@ -385,7 +395,7 @@ int uapki_verify_signature (
 
     if (!is_raw) {
         VerifyOptions verify_options;
-        //DO(verify_options.parse(joParams));
+        DO(verify_options.parse(joParams));
         DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, verify_options, joResult));
     }
     else {

@@ -75,7 +75,11 @@ AttrTimeStamp::~AttrTimeStamp (void)
 
 bool AttrTimeStamp::isPresent (void) const
 {
-    return (!policy.empty() && !hashAlgo.empty() && (hashedMessage.size() > 0));
+    return (
+        !policy.empty() && 
+        !hashAlgo.empty() &&
+        (hashedMessage.size() > 0)
+    );
 }
 
 int AttrTimeStamp::verifyDigest (const ByteArray* baData)
@@ -96,14 +100,17 @@ int AttrTimeStamp::verifyDigest (const ByteArray* baData)
 
 VerifiedSignerInfo::VerifiedSignerInfo (void)
     : m_CerStore(nullptr)
+    , m_IsDigest(false)
     , m_CerStoreItem(nullptr)
     , m_ValidationStatus(ValidationStatus::UNDEFINED)
     , m_StatusSignature(SignatureVerifyStatus::UNDEFINED)
     , m_StatusMessageDigest(DigestVerifyStatus::UNDEFINED)
     , m_StatusEssCert(DataVerifyStatus::UNDEFINED)
-    , m_IsDigest(false)
     , m_SigningTime(0)
     , m_SignatureFormat(SignatureFormat::UNDEFINED)
+    , m_IsValidSignatures(false)
+    , m_IsValidDigests(false)
+    , m_BestSignatureTime(0)
 {}
 
 VerifiedSignerInfo::~VerifiedSignerInfo (void)
@@ -125,30 +132,54 @@ const char* VerifiedSignerInfo::getValidationStatus (void) const {
     return validationStatusToStr(m_ValidationStatus);
 }
 
-int VerifiedSignerInfo::validate (void)
+void VerifiedSignerInfo::validate (void)
 {
-    int ret = RET_OK;
-    bool is_valid = false;
-
-    is_valid = (getStatusSignature() == SignatureVerifyStatus::VALID)
-        && (getStatusMessageDigest() == DigestVerifyStatus::VALID);
-    if (is_valid && (getStatusEssCert() != DataVerifyStatus::NOT_PRESENT)) {
-        is_valid = (getStatusEssCert() == DataVerifyStatus::VALID);
-    }
-    if (is_valid && getContentTS().isPresent()) {
-        is_valid = (getContentTS().statusDigest == DigestVerifyStatus::VALID);
-        //TODO: contentTS->statusSignature
-    }
-    if (is_valid && getSignatureTS().isPresent()) {
-        is_valid = (getSignatureTS().statusDigest == DigestVerifyStatus::VALID);
-        //TODO: signatureTS->statusSignature
+    //  Check mandatory elements
+    m_IsValidSignatures = (getStatusSignature() == SignatureVerifyStatus::VALID);
+    m_IsValidDigests = (getStatusMessageDigest() == DigestVerifyStatus::VALID);
+    if (m_IsValidSignatures && m_IsValidDigests) {
+        m_BestSignatureTime = m_SigningTime;
     }
 
-    m_ValidationStatus = is_valid ? ValidationStatus::TOTAL_VALID : ValidationStatus::TOTAL_FAILED;
+    //  Check attribute EssCert
+    if (getStatusEssCert() != DataVerifyStatus::NOT_PRESENT) {
+        m_IsValidDigests &= (getStatusEssCert() == DataVerifyStatus::VALID);
+    }
+
+    {   //  Check Content-Timestamp
+        const AttrTimeStamp& attr_conts = getContentTS();
+        if (attr_conts.isPresent()) {
+            m_IsValidSignatures &= attr_conts.isValidSignature();
+            m_IsValidDigests &= attr_conts.isValidDigest();
+            if (m_IsValidSignatures && m_IsValidDigests) {
+                m_BestSignatureTime = attr_conts.msGenTime;
+            }
+        }
+    }
+
+    {   //  Check Signature-Timestamp
+        const AttrTimeStamp& attr_sigts = getSignatureTS();
+        if (attr_sigts.isPresent()) {
+            m_IsValidSignatures &= attr_sigts.isValidSignature();
+            m_IsValidDigests &= attr_sigts.isValidDigest();
+            if (m_IsValidSignatures && m_IsValidDigests) {
+                m_BestSignatureTime = attr_sigts.msGenTime;
+            }
+        }
+    }
+
+    {   //  Check Archive-Timestamp
+        const AttrTimeStamp& attr_arcts = getArchiveTS();
+        if (attr_arcts.isPresent()) {
+            m_IsValidSignatures &= attr_arcts.isValidSignature();
+            m_IsValidDigests &= attr_arcts.isValidDigest();
+        }
+    }
+
+    m_ValidationStatus = (m_IsValidSignatures && m_IsValidDigests)
+        ? ValidationStatus::TOTAL_VALID : ValidationStatus::TOTAL_FAILED;
     //TODO: check options.validateCertByCRL and options.validateCertByOCSP
     //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
-
-    return ret;
 }
 
 int VerifiedSignerInfo::verifyArchiveTS (

@@ -68,12 +68,19 @@ struct AttrTimeStamp {
     ~AttrTimeStamp (void);
 
     bool isPresent (void) const;
+    bool isValidDigest (void) const {
+        return (statusDigest == DigestVerifyStatus::VALID);
+    }
+    bool isValidSignature (void) const {
+        return (statusSignature == SignatureVerifyStatus::VALID);
+    }
     int  verifyDigest (const ByteArray* baData);
 
 };  //  end struct AttrTimeStamp
 
 class VerifiedSignerInfo {
     CerStore*   m_CerStore;
+    bool        m_IsDigest;
     Pkcs7::SignedDataParser::SignerInfo
                 m_SignerInfo;
     CerStore::Item*
@@ -84,10 +91,7 @@ class VerifiedSignerInfo {
                 m_StatusSignature;
     DigestVerifyStatus
                 m_StatusMessageDigest;
-    bool        m_IsDigest;
     uint64_t    m_SigningTime;
-    SignatureFormat
-                m_SignatureFormat;
     std::vector<EssCertId>
                 m_EssCerts;
     DataVerifyStatus
@@ -101,6 +105,11 @@ class VerifiedSignerInfo {
                 m_ArchiveTS;
     Pkcs7::ArchiveTs3Helper
                 m_ArchiveTsHelper;
+    SignatureFormat
+                m_SignatureFormat;
+    bool        m_IsValidSignatures;
+    bool        m_IsValidDigests;
+    uint64_t    m_BestSignatureTime;
 
 public:
     VerifiedSignerInfo (void);
@@ -111,7 +120,7 @@ public:
         const bool isDigest
     );
     const char* getValidationStatus (void) const;
-    int validate (void);
+    void validate (void);
     int verifyArchiveTS (
         std::vector<const CerStore::Item*>& certs,
         std::vector<const CrlStore::Item*>& crls
@@ -123,6 +132,9 @@ public:
 public:
     const AttrTimeStamp& getArchiveTS (void) const {
         return m_ArchiveTS;
+    }
+    uint64_t getBestSignatureTime (void) const {
+        return m_BestSignatureTime;
     }
     CerStore* getCerStore (void) const {
         return m_CerStore;
@@ -156,6 +168,12 @@ public:
     }
     SignatureVerifyStatus getStatusSignature (void) const {
         return m_StatusSignature;
+    }
+    bool isValidDigests (void) const {
+        return m_IsValidDigests;
+    }
+    bool isValidSignatures (void) const {
+        return m_IsValidSignatures;
     }
 
 private:
