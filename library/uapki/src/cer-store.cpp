@@ -286,6 +286,57 @@ int CerStore::Item::keyUsageByBit (
     return RET_OK;
 }
 
+int CerStore::Item::verify (const CerStore::Item* cerIssuer)
+{
+    verifyStatus = VerifyStatus::INDETERMINATE;
+    if (!cerIssuer) return RET_OK;
+
+    int ret = RET_OK;
+    X509Tbs_t* x509_cert = nullptr;
+    UapkiNS::SmartBA sba_signvalue, sba_tbs;
+    char* s_signalgo = nullptr;
+
+    CHECK_NOT_NULL(x509_cert = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded));
+    if (!sba_tbs.set(ba_alloc_from_uint8(x509_cert->tbsData.buf, x509_cert->tbsData.size))) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+
+    DO(asn_oid_to_text(&cert->signatureAlgorithm.algorithm, &s_signalgo));
+    if (algoKeyId == HASH_ALG_GOST34311) {
+        DO(asn_decodevalue_bitstring_encap_octet(&cert->signature, &sba_signvalue));
+    }
+    else {
+        DO(asn_BITSTRING2ba(&cert->signature, &sba_signvalue));
+    }
+
+    
+    ret = verify_signature(s_signalgo, sba_tbs.get(), false, cerIssuer->baSPKI, sba_signvalue.get());
+    switch (ret) {
+    case RET_OK:
+        verifyStatus = VerifyStatus::VALID;
+        break;
+    case RET_VERIFY_FAILED:
+        verifyStatus = VerifyStatus::INVALID;
+        break;
+    default:
+        verifyStatus = VerifyStatus::FAILED;
+        break;
+    }
+
+    if (verifyStatus == VerifyStatus::VALID) {
+        bool is_digitalsign = false;
+        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
+        if (!is_digitalsign) {
+            verifyStatus = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
+        }
+    }
+
+cleanup:
+    asn_free(get_X509Tbs_desc(), x509_cert);
+    ::free(s_signalgo);
+    return ret;
+}
+
 
 
 CerStore::CerStore (void)
@@ -552,16 +603,16 @@ int CerStore::getIssuerCert (
 )
 {
     int ret = RET_OK;
-    ByteArray* ba_authkeyid = nullptr;
+    UapkiNS::SmartBA sba_authkeyid;
 
     CHECK_PARAM(cerSubject != nullptr);
     CHECK_PARAM(cerIssuer != nullptr);
 
-    DO(extns_get_authority_keyid(cerSubject->cert->tbsCertificate.extensions, &ba_authkeyid));
+    DO(extns_get_authority_keyid(cerSubject->cert->tbsCertificate.extensions, &sba_authkeyid));
 
-    if (ba_cmp(cerSubject->baKeyId, ba_authkeyid) != 0) {
+    if (ba_cmp(cerSubject->baKeyId, sba_authkeyid.get()) != 0) {
         isSelfSigned = false;
-        ret = getCertByKeyId(ba_authkeyid, cerIssuer);
+        ret = getCertByKeyId(sba_authkeyid.get(), cerIssuer);
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
         }
@@ -572,7 +623,6 @@ int CerStore::getIssuerCert (
     }
 
 cleanup:
-    ba_free(ba_authkeyid);
     return ret;
 }
 
@@ -844,7 +894,7 @@ cleanup:
     return ret;
 }
 
-CerStore::ValidationType& CerStore::validationTypeFromStr (
+CerStore::ValidationType CerStore::validationTypeFromStr (
         const string& validationType
 )
 {

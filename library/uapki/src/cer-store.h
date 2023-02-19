@@ -144,6 +144,7 @@ public:
             const uint32_t bitNum,
             bool& bitValue
         ) const;
+        int verify (const CerStore::Item* cerIssuer);
 
     };  //  end struct Item
 
@@ -221,7 +222,7 @@ public:
         ByteArray** baSerialNumber,
         ByteArray** baKeyId
     );
-    static ValidationType& validationTypeFromStr (
+    static ValidationType validationTypeFromStr (
         const std::string& validationType
     );
     static const char* verifyStatusToStr (

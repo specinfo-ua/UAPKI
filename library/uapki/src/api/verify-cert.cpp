@@ -252,7 +252,7 @@ static int responderid_to_json (JSON_Object* joResult, const UapkiNS::Ocsp::Resp
         DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), *name));
         break;
     case UapkiNS::Ocsp::ResponderIdType::BY_KEY:
-        DO_JSON(json_object_set_hex(joResult, "responderId", baResponderId));
+        DO(json_object_set_hex(joResult, "responderId", baResponderId));
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);

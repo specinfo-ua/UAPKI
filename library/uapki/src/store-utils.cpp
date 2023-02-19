@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -245,6 +245,34 @@ cleanup:
     ::free(s_oid);
     ::free(s_value);
     return ret;
+}
+
+int CerStoreUtils::rdnameFromName (
+        const Name_t& name,
+        const char* type,
+        string& value
+)
+{
+    if (name.present != Name_PR_rdnSequence) return RET_UAPKI_INVALID_STRUCT;
+    if (!type) return RET_UAPKI_INVALID_PARAMETER;
+
+    for (size_t i = 0; i < name.choice.rdnSequence.list.count; i++) {
+        const RelativeDistinguishedName_t* rdname_src = name.choice.rdnSequence.list.array[i];
+        for (size_t j = 0; j < rdname_src->list.count; j++) {
+            const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
+            if (OID_is_equal_oid(&attr->type, type)) {
+                char* s_value = nullptr;
+                const int ret = asn_decode_anystring(attr->value.buf, (const size_t)attr->value.size, &s_value);
+                if (ret != RET_OK) return ret;
+
+                value = string(s_value);
+                ::free(s_value);
+                break;
+            }
+        }
+    }
+
+    return RET_OK;
 }
 
 int CerStoreUtils::signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)

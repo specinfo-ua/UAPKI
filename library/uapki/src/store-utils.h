@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,8 +29,6 @@
 #define UAPKI_STORE_UTILS_H
 
 
-#include "uapkic.h"
-#include "uapkif.h"
 #include "cer-store.h"
 #include "crl-store.h"
 #include "parson.h"
@@ -41,6 +39,11 @@ namespace CerStoreUtils {
     int detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
     int extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned);
     int nameToJson (JSON_Object* joResult, const Name_t& name);
+    int rdnameFromName (
+        const Name_t& name,
+        const char* type,
+        std::string& value
+    );
     int signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
     int spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded);
     int validityToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
