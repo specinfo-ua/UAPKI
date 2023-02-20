@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -38,10 +38,15 @@
 #define FILE_MARKER "api/add-cert.cpp"
 
 
-static int add_cert_to_store (CerStore& cerStore, const ByteArray* baEncoded, bool isPermanent, JSON_Object* joResult)
+static int add_cert_to_store (
+        CerStore& cerStore,
+        const ByteArray* baEncoded,
+        bool isPermanent,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    const CerStore::Item* cer_item = nullptr;
+    CerStore::Item* cer_item = nullptr;
     bool is_unique;
 
     DO(cerStore.addCert(baEncoded, false, isPermanent, false, is_unique, &cer_item));

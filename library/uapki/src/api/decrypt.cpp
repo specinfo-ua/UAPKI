@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,14 +47,17 @@
 using namespace std;
 
 
-static int add_certs_to_store (CerStore& cerStore, const vector<ByteArray*>& vbaCerts)
+static int add_certs_to_store (
+        CerStore& cerStore,
+        const vector<ByteArray*>& vbaCerts
+)
 {
     int ret = RET_OK;
 
     DEBUG_OUTCON({ size_t cnt_certs; cerStore.getCount(cnt_certs); printf("add_certs_to_store(), certs (before): %d\n", (int)cnt_certs); });
     for (auto& it : vbaCerts) {
         bool is_unique;
-        const CerStore::Item* cer_item = nullptr;
+        CerStore::Item* cer_item = nullptr;
         DO(cerStore.addCert(it, true, false, false, is_unique, &cer_item));
         //TODO: out certId
     }

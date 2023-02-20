@@ -163,7 +163,7 @@ public:
         const bool permanent,
         const bool trusted,
         bool& isUnique,
-        const Item** cerStoreItem
+        Item** cerStoreItem
     );
     int getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem);
     int getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem);

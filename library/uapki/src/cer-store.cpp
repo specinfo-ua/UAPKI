@@ -354,12 +354,12 @@ int CerStore::addCert (
         const bool permanent,
         const bool trusted,
         bool& isUnique,
-        const Item** cerStoreItem
+        Item** cerStoreItem
 )
 {
     int ret = RET_OK;
     Item* cer_parsed = nullptr;
-    const Item* cer_added = nullptr;
+    Item* cer_added = nullptr;
 
     DO(parseCert(baEncoded, &cer_parsed));
     cer_parsed->trusted = trusted;
