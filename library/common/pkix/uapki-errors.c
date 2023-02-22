@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-12-05
+//  Last update: 2023-02-21
 
 #include <stddef.h>
 
@@ -203,8 +203,8 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "ATTRIBUTE_NOT_PRESENT",        //  (UAPKI_ERROR_NAME_CODE | 0x00000035)
     "EXTENSION_NOT_PRESENT",        //  (UAPKI_ERROR_NAME_CODE | 0x00000036)
     "EXTENSION_NOT_SET_CRITICAL",   //  (UAPKI_ERROR_NAME_CODE | 0x00000037)
-    "",
-    "",
+    "INVALID_COUNT_ITEMS",          //  (UAPKI_ERROR_NAME_CODE | 0x00000038)
+    "INVALID_DIGEST",               //  (UAPKI_ERROR_NAME_CODE | 0x00000039)
     "",
     "",
     "",

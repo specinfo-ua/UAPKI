@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-12-02
+//  Last update: 2023-02-21
 
 #ifndef _UAPKI_ERRORS_H_
 #define _UAPKI_ERRORS_H_
@@ -103,6 +103,8 @@
 #define RET_UAPKI_ATTRIBUTE_NOT_PRESENT                               (UAPKI_ERROR_NAME_CODE | 0x00000035)
 #define RET_UAPKI_EXTENSION_NOT_PRESENT                               (UAPKI_ERROR_NAME_CODE | 0x00000036)
 #define RET_UAPKI_EXTENSION_NOT_SET_CRITICAL                          (UAPKI_ERROR_NAME_CODE | 0x00000037)
+#define RET_UAPKI_INVALID_COUNT_ITEMS                                 (UAPKI_ERROR_NAME_CODE | 0x00000038)
+#define RET_UAPKI_INVALID_DIGEST                                      (UAPKI_ERROR_NAME_CODE | 0x00000039)
 
 
 #define RET_UAPKI_CERT_STORE_LOAD_ERROR                               (UAPKI_ERROR_NAME_CODE | 0x00000040)
