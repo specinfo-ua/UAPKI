@@ -79,13 +79,34 @@ namespace UapkiNS {
 
 namespace AttributeHelper {
 
-    int decodeCertValues (const ByteArray* baEncoded, std::vector<ByteArray*>& certValues);
-    int decodeCertificateRefs (const ByteArray* baEncoded, std::vector<OtherCertId>& otherCertIds);
-    int decodeContentType (const ByteArray* baEncoded, std::string& contentType);
-    int decodeMessageDigest (const ByteArray* baEncoded, ByteArray** baMessageDigest);
-    int decodeSignaturePolicy (const ByteArray* baEncoded, std::string& sigPolicyId);
-    int decodeSigningCertificate (const ByteArray* baEncoded, std::vector<EssCertId>& essCertIds);
-    int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime);
+    int decodeCertValues (
+        const ByteArray* baEncoded,
+        std::vector<ByteArray*>& certValues
+    );
+    int decodeCertificateRefs (
+        const ByteArray* baEncoded,
+        std::vector<OtherCertId>& otherCertIds
+    );
+    int decodeContentType (
+        const ByteArray* baEncoded,
+        std::string& contentType
+    );
+    int decodeMessageDigest (
+        const ByteArray* baEncoded,
+        ByteArray** baMessageDigest
+    );
+    int decodeSignaturePolicy (
+        const ByteArray* baEncoded,
+        std::string& sigPolicyId
+    );
+    int decodeSigningCertificate (
+        const ByteArray* baEncoded,
+        std::vector<EssCertId>& essCertIds
+    );
+    int decodeSigningTime (
+        const ByteArray* baEncoded,
+        uint64_t& signingTime
+    );
 
     int encodeAttribute (
         const UapkiNS::Attribute& attr,

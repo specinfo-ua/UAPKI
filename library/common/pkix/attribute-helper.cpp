@@ -57,7 +57,10 @@ namespace UapkiNS {
 namespace AttributeHelper {
 
 
-int decodeCertValues (const ByteArray* baEncoded, vector<ByteArray*>& certValues)
+int decodeCertValues (
+        const ByteArray* baEncoded,
+        vector<ByteArray*>& certValues
+)
 {
     int ret = RET_OK;
     Certificates_t* cert_values = nullptr;
@@ -76,7 +79,10 @@ cleanup:
     return ret;
 }
 
-int decodeCertificateRefs (const ByteArray* baEncoded, vector<OtherCertId>& otherCertIds)
+int decodeCertificateRefs (
+        const ByteArray* baEncoded,
+        vector<OtherCertId>& otherCertIds
+)
 {
     int ret = RET_OK;
     CompleteCertificateRefs_t* cert_refs = nullptr;
@@ -117,7 +123,10 @@ cleanup:
     return ret;
 }
 
-int decodeContentType (const ByteArray* baEncoded, string& contentType)
+int decodeContentType (
+        const ByteArray* baEncoded,
+        string& contentType
+)
 {
     int ret = RET_OK;
     char* s_contenttype = nullptr;
@@ -130,12 +139,18 @@ cleanup:
     return ret;
 }
 
-int decodeMessageDigest (const ByteArray* baEncoded, ByteArray** baMessageDigest)
+int decodeMessageDigest (
+        const ByteArray* baEncoded,
+        ByteArray** baMessageDigest
+)
 {
     return ba_decode_octetstring(baEncoded, baMessageDigest);
 }
 
-int decodeSignaturePolicy (const ByteArray* baEncoded, string& sigPolicyId)
+int decodeSignaturePolicy (
+        const ByteArray* baEncoded,
+        string& sigPolicyId
+)
 {
     //  Note: current implementation ignore params sigPolicyHash and sigPolicyQualifiers (rfc3126)
     int ret = RET_OK;
@@ -163,7 +178,10 @@ cleanup:
     return ret;
 }
 
-int decodeSigningCertificate (const ByteArray* baEncoded, vector<EssCertId>& essCertIds)
+int decodeSigningCertificate (
+        const ByteArray* baEncoded,
+        vector<EssCertId>& essCertIds
+)
 {
     int ret = RET_OK;
     SigningCertificateV2_t* signing_cert = nullptr;
@@ -203,7 +221,10 @@ cleanup:
     return ret;
 }
 
-int decodeSigningTime (const ByteArray* baEncoded, uint64_t& signingTime)
+int decodeSigningTime (
+        const ByteArray* baEncoded,
+        uint64_t& signingTime
+)
 {
     return ba_decode_pkixtime(baEncoded, &signingTime);
 }
