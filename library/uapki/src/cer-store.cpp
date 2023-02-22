@@ -98,8 +98,7 @@ static int encode_issuer_and_sn (const TBSCertificate_t* tbsCert, ByteArray** ba
     int ret = RET_OK;
     IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
 
-    CHECK_PARAM(tbsCert != nullptr);
-    CHECK_PARAM(baIssuerAndSN != nullptr);
+    if (!tbsCert || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
 
     CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
 
@@ -724,6 +723,29 @@ cleanup:
     return ret;
 }
 
+int CerStore::encodeIssuerAndSN (
+        const ByteArray* baIssuer,
+        const ByteArray* baSerialNumber,
+        ByteArray** baIssuerAndSN
+)
+{
+    int ret = RET_OK;
+    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
+
+    if (!baIssuer || !baSerialNumber || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
+
+    DO(asn_decode_ba(get_Name_desc(), &issuer_and_sn->issuer, baIssuer));
+    DO(asn_ba2INTEGER(baSerialNumber, &issuer_and_sn->serialNumber));
+
+    DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
+
+cleanup:
+    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
+    return ret;
+}
+
 int CerStore::generateEssCertId (
         const Item* cerStoreItem,
         const UapkiNS::AlgorithmIdentifier& aidDigest,
@@ -745,6 +767,37 @@ int CerStore::generateEssCertId (
     CHECK_NOT_NULL(essCertId.issuerSerial.baSerialNumber = ba_copy_with_alloc(cerStoreItem->baSerialNumber, 0, 0));
 
 cleanup:
+    return ret;
+}
+
+int CerStore::issuerFromGeneralNames (
+        const ByteArray* baEncoded,
+        ByteArray** baIssuer
+)
+{
+    int ret = RET_OK;
+    GeneralNames_t* general_names = nullptr;
+    bool is_found = false;
+
+    if (!baEncoded || !baIssuer) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(general_names = (GeneralNames_t*)asn_decode_ba_with_alloc(get_GeneralNames_desc(), baEncoded));
+
+    for (int i = 0; i < general_names->list.count; i++) {
+        GeneralName_t& general_name = *general_names->list.array[i];
+        if (general_name.present == GeneralName_PR_directoryName) {
+            DO(asn_encode_ba(get_Name_desc(), &general_name.choice.directoryName, baIssuer));
+            is_found = true;
+            break;
+        }
+    }
+
+    if (!is_found) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+cleanup:
+    asn_free(get_GeneralNames_desc(), general_names);
     return ret;
 }
 

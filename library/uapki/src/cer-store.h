@@ -214,10 +214,19 @@ public:
         const ByteArray* baPubkey,
         ByteArray** baKeyId
     );
+    static int encodeIssuerAndSN (
+        const ByteArray* baIssuer,
+        const ByteArray* baSerialNumber,
+        ByteArray** baIssuerAndSN
+    );
     static int generateEssCertId (
         const Item* cerStoreItem,
         const UapkiNS::AlgorithmIdentifier& aidDigest,
         UapkiNS::EssCertId& essCertId
+    );
+    static int issuerFromGeneralNames (
+        const ByteArray* baEncoded,
+        ByteArray** baIssuer
     );
     static int issuerToGeneralNames (
         const ByteArray* baIssuer,
