@@ -40,7 +40,6 @@
 #include "str-utils.h"
 #include "time-utils.h"
 #include "uapki-errors.h"
-#include "uapki-ns.h"
 #include "verify-utils.h"
 
 
@@ -438,7 +437,31 @@ int CerStore::getCertByIndex (const size_t index, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertByKeyId (const ByteArray* baKeyId, Item** cerStoreItem)
+int CerStore::getCertByIssuerAndSn (
+        const ByteArray* baIssuer,
+        const ByteArray* baSerialNumber,
+        Item** cerStoreItem
+)
+{
+    mutex mtx;
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
+    mtx.lock();
+    for (auto& it : m_Items) {
+        if ((ba_cmp(baSerialNumber, it->baSerialNumber) == RET_OK) && (ba_cmp(baIssuer, it->baIssuer) == RET_OK)) {
+            *cerStoreItem = it;
+            ret = RET_OK;
+            break;
+        }
+    }
+
+    mtx.unlock();
+    return ret;
+}
+
+int CerStore::getCertByKeyId (
+        const ByteArray* baKeyId,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -456,27 +479,30 @@ int CerStore::getCertByKeyId (const ByteArray* baKeyId, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertBySID (const ByteArray* baSID, Item** cerStoreItem)
+int CerStore::getCertBySID (
+        const ByteArray* baSID,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_OK;
-    ByteArray* ba_issuer = nullptr;
-    ByteArray* ba_serialnum = nullptr;
-    ByteArray* ba_keyid = nullptr;
+    UapkiNS::SmartBA sba_issuer, sba_keyid, sba_serialnum;
 
-    ret = parseSID(baSID, &ba_issuer, &ba_serialnum, &ba_keyid);
+    ret = parseSID(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
     if (ret != RET_OK) return ret;
 
-    if (ba_keyid != nullptr) {
-        ret = getCertByKeyId(ba_keyid, cerStoreItem);
-        ba_free(ba_keyid);
+    if (sba_keyid.size() > 0) {
+        ret = getCertByKeyId(sba_keyid.get(), cerStoreItem);
         return ret;
     }
 
     ret = RET_UAPKI_CERT_NOT_FOUND;
     mtx.lock();
     for (auto& it : m_Items) {
-        if ((ba_cmp(ba_serialnum, it->baSerialNumber) == RET_OK) && (ba_cmp(ba_issuer, it->baIssuer) == RET_OK)) {
+        if (
+            (ba_cmp(sba_serialnum.get(), it->baSerialNumber) == RET_OK) &&
+            (ba_cmp(sba_issuer.get(), it->baIssuer) == RET_OK)
+        ) {
             *cerStoreItem = it;
             ret = RET_OK;
             break;
@@ -484,8 +510,6 @@ int CerStore::getCertBySID (const ByteArray* baSID, Item** cerStoreItem)
     }
 
     mtx.unlock();
-    ba_free(ba_issuer);
-    ba_free(ba_serialnum);
     return ret;
 }
 

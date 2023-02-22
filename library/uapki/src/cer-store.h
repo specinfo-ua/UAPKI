@@ -168,8 +168,19 @@ public:
     int getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem);
     int getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem);
     int getCertByIndex (const size_t index, Item** cerStoreItem);
-    int getCertByKeyId (const ByteArray* baKeyId, Item** cerStoreItem);
-    int getCertBySID (const ByteArray* baSID, Item** cerStoreItem);
+    int getCertByIssuerAndSn (
+        const ByteArray* baIssuer,
+        const ByteArray* baSerialNumber,
+        Item** cerStoreItem
+    );
+    int getCertByKeyId (
+        const ByteArray* baKeyId,
+        Item** cerStoreItem
+    );
+    int getCertBySID (
+        const ByteArray* baSID,
+        Item** cerStoreItem
+    );
     int getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem);
     int getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem);
     int getChainCerts (
