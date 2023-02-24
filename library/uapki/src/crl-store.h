@@ -151,6 +151,12 @@ public:
     static const char* crlReasonToStr (
         const UapkiNS::CrlReason reason
     );
+    static int decodeCrlIdentifier (
+        const ByteArray* baEncoded,
+        ByteArray** baIssuer,
+        uint64_t& issuedTime,
+        ByteArray** baCrlNumber
+    );
     static const RevokedCertItem* foundNearAfter (
         const std::vector<const RevokedCertItem*>& revokedItems,
         const uint64_t validityTime

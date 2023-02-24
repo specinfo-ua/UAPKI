@@ -477,6 +477,32 @@ const char* CrlStore::crlReasonToStr (
     return CRL_REASON_STRINGS[(idx < 12) ? idx : 0];
 }
 
+int CrlStore::decodeCrlIdentifier (
+        const ByteArray* baEncoded,
+        ByteArray** baIssuer,
+        uint64_t& msIssuedTime,
+        ByteArray** baCrlNumber
+)
+{
+    int ret = RET_OK;
+    CrlIdentifier_t* crl_identifier = nullptr;
+
+    CHECK_NOT_NULL(crl_identifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baEncoded));
+
+    //  =crlIssuer=
+    DO(asn_encode_ba(get_Name_desc(), &crl_identifier->crlissuer, baIssuer));
+    //  =crlIssuedTime=
+    DO(asn_decodevalue_utctime(&crl_identifier->crlIssuedTime, &msIssuedTime));
+    //  =crlNumber= (optional)
+    if (crl_identifier->crlNumber) {
+        DO(asn_INTEGER2ba(crl_identifier->crlNumber, baCrlNumber));
+    }
+
+cleanup:
+    asn_free(get_CrlIdentifier_desc(), crl_identifier);
+    return ret;
+}
+
 const CrlStore::RevokedCertItem* CrlStore::foundNearAfter (
         const vector<const RevokedCertItem*>& revokedItems,
         const uint64_t validityTime
