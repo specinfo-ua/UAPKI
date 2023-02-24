@@ -417,7 +417,39 @@ cleanup:
 }
 
 
-int CrlStoreUtils::infoToJson (JSON_Object* joResult, const CrlStore::Item* crlStoreItem)
+int CrlStoreUtils::crlIdentifierToJson (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    CrlIdentifier_t* crl_identifier = nullptr;
+    uint64_t ms_issuedtime = 0;
+
+    CHECK_NOT_NULL(crl_identifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baEncoded));
+
+    //  =crlIssuer=
+    DO_JSON(json_object_set_value(joResult, "crlIssuer", json_value_init_object()));
+    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "crlIssuer"), crl_identifier->crlissuer));
+    //  =crlIssuedTime=
+    DO(asn_decodevalue_utctime(&crl_identifier->crlIssuedTime, &ms_issuedtime));
+    DO_JSON(json_object_set_string(joResult, "crlIssuedTime", TimeUtils::mstimeToFormat(ms_issuedtime).c_str()));
+    //  =crlNumber= (optional)
+    if (crl_identifier->crlNumber) {
+        UapkiNS::SmartBA sba_number;
+        DO(asn_INTEGER2ba(crl_identifier->crlNumber, &sba_number));
+        DO(json_object_set_hex(joResult, "crlNumber", sba_number.get()));
+    }
+
+cleanup:
+    asn_free(get_CrlIdentifier_desc(), crl_identifier);
+    return ret;
+}
+
+int CrlStoreUtils::infoToJson (
+        JSON_Object* joResult,
+        const CrlStore::Item* crlStoreItem
+)
 {
     int ret = RET_OK;
     uint32_t cnt_revcerts = 0;
@@ -434,24 +466,26 @@ int CrlStoreUtils::infoToJson (JSON_Object* joResult, const CrlStore::Item* crlS
     s_time = TimeUtils::mstimeToFormat(crlStoreItem->nextUpdate);
     DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
 
-
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countRevokedCerts", (uint32_t)crlStoreItem->countRevokedCerts()));
 
     if (crlStoreItem->baAuthorityKeyId) {
-        DO_JSON(json_object_set_hex(joResult, "authorityKeyId", crlStoreItem->baAuthorityKeyId));
+        DO(json_object_set_hex(joResult, "authorityKeyId", crlStoreItem->baAuthorityKeyId));
     }
 
-    DO_JSON(json_object_set_hex(joResult, "crlNumber", crlStoreItem->baCrlNumber));
+    DO(json_object_set_hex(joResult, "crlNumber", crlStoreItem->baCrlNumber));
 
     if (crlStoreItem->baDeltaCrl) {
-        DO_JSON(json_object_set_hex(joResult, "deltaCrlIndicator", crlStoreItem->baDeltaCrl));
+        DO(json_object_set_hex(joResult, "deltaCrlIndicator", crlStoreItem->baDeltaCrl));
     }
 
 cleanup:
     return ret;
 }
 
-int CrlStoreUtils::revokedCertsToJson (JSON_Array* jaResult, const CrlStore::Item* crlStoreItem)
+int CrlStoreUtils::revokedCertsToJson (
+        JSON_Array* jaResult,
+        const CrlStore::Item* crlStoreItem
+)
 {
     int ret = RET_OK;
     const RevokedCertificates_t* revoked_certs = nullptr;

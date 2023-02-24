@@ -54,8 +54,18 @@ namespace CerStoreUtils {
 
 namespace CrlStoreUtils {
 
-    int infoToJson (JSON_Object* joResult, const CrlStore::Item* crlStoreItem);
-    int revokedCertsToJson (JSON_Array* jaResult, const CrlStore::Item* crlStoreItem);
+    int crlIdentifierToJson (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+    );
+    int infoToJson (
+        JSON_Object* joResult,
+        const CrlStore::Item* crlStoreItem
+    );
+    int revokedCertsToJson (
+        JSON_Array* jaResult,
+        const CrlStore::Item* crlStoreItem
+    );
 
 }
 
