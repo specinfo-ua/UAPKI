@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-30
+//  Last update: 2023-02-24
 
 
 #include "attribute-helper.h"
@@ -145,6 +145,36 @@ int decodeMessageDigest (
 )
 {
     return ba_decode_octetstring(baEncoded, baMessageDigest);
+}
+
+int decodeOtherHash (
+        const ByteArray* baEncoded,
+        OtherHash& otherHash
+)
+{
+    int ret = RET_OK;
+    OtherHash_t* other_hash;
+
+    CHECK_NOT_NULL(other_hash = (OtherHash_t*)asn_decode_ba_with_alloc(get_OtherHash_desc(), baEncoded));
+
+    switch (other_hash->present) {
+    case OtherHash_PR_sha1Hash:
+        //  =sha1Hash= (default: id-sha1)
+        otherHash.hashAlgorithm.algorithm = string(OID_SHA1);
+        DO(asn_OCTSTRING2ba(&other_hash->choice.sha1Hash, &otherHash.baHashValue));
+        break;
+    case OtherHash_PR_otherHash:
+        //  =otherHash=
+        DO(Util::algorithmIdentifierFromAsn1(other_hash->choice.otherHash.hashAlgorithm, otherHash.hashAlgorithm));
+        DO(asn_OCTSTRING2ba(&other_hash->choice.otherHash.hashValue, &otherHash.baHashValue));
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+cleanup:
+    asn_free(get_OtherHash_desc(), other_hash);
+    return ret;
 }
 
 int decodeSignaturePolicy (

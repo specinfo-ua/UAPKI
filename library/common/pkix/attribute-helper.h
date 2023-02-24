@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-30
+//  Last update: 2023-02-24
 
 #ifndef UAPKI_NS_ATTRIBUTE_HELPER_H
 #define UAPKI_NS_ATTRIBUTE_HELPER_H
@@ -94,6 +94,10 @@ namespace AttributeHelper {
     int decodeMessageDigest (
         const ByteArray* baEncoded,
         ByteArray** baMessageDigest
+    );
+    int decodeOtherHash (
+        const ByteArray* baEncoded,
+        OtherHash& otherHash
     );
     int decodeSignaturePolicy (
         const ByteArray* baEncoded,
