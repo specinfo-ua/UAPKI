@@ -247,6 +247,40 @@ cleanup:
     return ret;
 }
 
+int CerStoreUtils::ocspIdentifierToJson (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    OcspIdentifier_t* ocsp_identifier = nullptr;
+    UapkiNS::SmartBA sba_keyid;
+    uint64_t ms_producedat = 0;
+
+    CHECK_NOT_NULL(ocsp_identifier = (OcspIdentifier_t*)asn_decode_ba_with_alloc(get_OcspIdentifier_desc(), baEncoded));
+
+    //  =ocspResponderID=
+    switch (ocsp_identifier->ocspResponderID.present) {
+    case ResponderID_PR_byName:
+        DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
+        DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), ocsp_identifier->ocspResponderID.choice.byName));
+        break;
+    case ResponderID_PR_byKey:
+        DO(asn_OCTSTRING2ba(&ocsp_identifier->ocspResponderID.choice.byKey, &sba_keyid));
+        DO(json_object_set_hex(joResult, "responderId", sba_keyid.get()));
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    //  =producedAt=
+    DO(asn_decodevalue_gentime(&ocsp_identifier->producedAt, &ms_producedat));
+    DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtils::mstimeToFormat(ms_producedat).c_str()));
+
+cleanup:
+    asn_free(get_OcspIdentifier_desc(), ocsp_identifier);
+    return ret;
+}
+
 int CerStoreUtils::rdnameFromName (
         const Name_t& name,
         const char* type,
