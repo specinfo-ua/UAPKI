@@ -219,6 +219,22 @@ cleanup:
     return ret;
 }
 
+int CerStoreUtils::nameToJson (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    Name_t* name = nullptr;
+
+    CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baEncoded));
+
+    DO(nameToJson(joResult, *name));
+
+cleanup:
+    asn_free(get_Name_desc(), name);
+    return ret;
+}
 
 int CerStoreUtils::nameToJson (JSON_Object* joResult, const Name_t& name)
 {
