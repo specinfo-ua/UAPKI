@@ -58,14 +58,43 @@ namespace Doc {
 namespace Verify {
 
 
-static const char* VALIDATION_STATUS_STRINGS[4] = {
-    "UNDEFINED", "INDETERMINATE", "TOTAL-FAILED", "TOTAL-VALID"
-};
+struct CollectVerifyStatus {
+    bool    values[6];
+
+    CollectVerifyStatus (void) {
+        values[0] = values[1] = values[2] = values[3] = values[4] = values[5] = false;
+    }
+
+    bool isDeterminate (void) {
+        return (
+            !values[(uint32_t)VerifyStatus::UNDEFINED] &&
+            !values[(uint32_t)VerifyStatus::NOT_PRESENT] &&
+            !values[(uint32_t)VerifyStatus::FAILED] &&
+            !values[(uint32_t)VerifyStatus::INVALID] &&
+            values[(uint32_t)VerifyStatus::INDETERMINATE]
+            );
+    }
+
+    bool isValid (void) {
+        return (
+            !values[(uint32_t)VerifyStatus::UNDEFINED] &&
+            !values[(uint32_t)VerifyStatus::NOT_PRESENT] &&
+            !values[(uint32_t)VerifyStatus::INDETERMINATE] &&
+            !values[(uint32_t)VerifyStatus::FAILED] &&
+            !values[(uint32_t)VerifyStatus::INVALID] &&
+            values[(uint32_t)VerifyStatus::VALID]
+            );
+    }
+
+    void set(const VerifyStatus status) {
+        values[(uint32_t)status] = true;
+    }
+};  //  end class CollectVerifyStatus
 
 
 AttrTimeStamp::AttrTimeStamp (void)
     : msGenTime(0)
-    , signerCertId(0)
+    , csiSigner(nullptr)
     , statusDigest(DigestVerifyStatus::UNDEFINED)
     , statusSignature(SignatureVerifyStatus::UNDEFINED)
 {}
@@ -82,18 +111,304 @@ bool AttrTimeStamp::isPresent (void) const
     );
 }
 
-int AttrTimeStamp::verifyDigest (const ByteArray* baData)
+int AttrTimeStamp::parse (
+        const ByteArray* baEncoded
+)
 {
-    SmartBA sba_hash;
+    const int ret = tsTokenParser.parse(baEncoded);
+    if (ret != RET_OK) return ret;
 
-    const int ret = ::hash(hash_from_oid(hashAlgo.c_str()), baData, &sba_hash);
-    if (ret != RET_OK) {
-        statusDigest = DigestVerifyStatus::FAILED;
+    policy = tsTokenParser.getPolicyId();
+    hashAlgo = tsTokenParser.getHashAlgo();
+    (void)hashedMessage.set(tsTokenParser.getHashedMessage(true));
+    msGenTime = tsTokenParser.getGenTime();
+    return RET_OK;
+}
+
+int AttrTimeStamp::verifyDigest (
+        const ByteArray* baData,
+        const bool isDigest
+)
+{
+    if (!baData) {
+        statusDigest = DigestVerifyStatus::INDETERMINATE;
         return RET_OK;
     }
 
-    statusDigest = (ba_cmp(hashedMessage.get(), sba_hash.get()) == 0)
-        ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
+    if (!isDigest) {
+        const HashAlg hash_alg = hash_from_oid(hashAlgo.c_str());
+        if (hash_alg == HASH_ALG_UNDEFINED) {
+            statusDigest = DigestVerifyStatus::FAILED;
+            return RET_UAPKI_UNSUPPORTED_ALG;
+        }
+
+        SmartBA sba_hash;
+        const int ret = ::hash(hash_alg, baData, &sba_hash);
+        if (ret != RET_OK) {
+            statusDigest = DigestVerifyStatus::FAILED;
+            return ret;
+        }
+
+        statusDigest = (ba_cmp(hashedMessage.get(), sba_hash.get()) == 0)
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
+    }
+    else {
+        statusDigest = (ba_cmp(hashedMessage.get(), baData) == 0)
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
+    }
+
+    return (statusDigest == DigestVerifyStatus::VALID) ? RET_OK : RET_UAPKI_INVALID_DIGEST;
+}
+
+
+CadesXlInfo::CadesXlInfo (void)
+    : isPresentCertRefs(false)
+    , isPresentRevocRefs(false)
+    , isPresentCertVals(false)
+    , isPresentRevocVals(false)
+    , statusCertRefs(DigestVerifyStatus::UNDEFINED)
+{
+}
+
+int CadesXlInfo::parseCertValues (
+        const ByteArray* baValues
+)
+{
+    const int ret = AttributeHelper::decodeCertValues(baValues, certValues);
+    isPresentCertVals = (ret == RET_OK);
+    return ret;
+}
+
+int CadesXlInfo::parseCertificateRefs (
+        const ByteArray* baValues
+)
+{
+    const int ret = AttributeHelper::decodeCertificateRefs(baValues, certRefs);
+    isPresentCertRefs = (ret == RET_OK);
+    statusCertRefs = (isPresentCertRefs) ? DataVerifyStatus::INDETERMINATE : DataVerifyStatus::FAILED;
+    return ret;
+}
+
+int CadesXlInfo::parseRevocationRefs (
+        const ByteArray* baValues
+)
+{
+    const int ret = revocationRefsParser.parse(baValues);
+    isPresentRevocRefs = (ret == RET_OK);
+    return ret;
+}
+
+int CadesXlInfo::parseRevocationValues (
+        const ByteArray* baValues
+)
+{
+    const int ret = revocationValuesParser.parse(baValues);
+    isPresentRevocVals = (ret == RET_OK);
+    return ret;
+}
+
+int CadesXlInfo::verifyCertRefs (
+        CerStore* cerStore
+)
+{
+    if (!isPresentCertRefs) return RET_OK;
+
+    if (isPresentCertVals) {
+        if (certValues.size() != certRefs.size()) {
+            statusCertRefs = DigestVerifyStatus::INVALID;
+            return RET_UAPKI_INVALID_COUNT_ITEMS;
+        }
+    }
+
+    statusesCertRefs.resize(certRefs.size());
+    for (auto& it : statusesCertRefs) {
+        it = DigestVerifyStatus::UNDEFINED;
+    }
+
+    size_t cnt_passed = 0, idx = 0;
+    for (const auto& it : certRefs) {
+        DigestVerifyStatus& status = statusesCertRefs[idx];
+
+        const HashAlg hash_alg = hash_from_oid(it.hashAlgorithm.algorithm.c_str());
+        if (hash_alg == HASH_ALG_UNDEFINED) {
+            statusCertRefs = status = DigestVerifyStatus::FAILED;
+            return RET_UAPKI_UNSUPPORTED_ALG;
+        }
+
+        int ret = RET_OK;
+        const ByteArray* refba_cert = nullptr;
+        CerStore::Item* cer_item = nullptr;
+        if (isPresentCertVals) {
+            refba_cert = certValues[idx];
+        }
+        else {
+            UapkiNS::SmartBA sba_issuer;
+            ret = CerStore::issuerFromGeneralNames(it.issuerSerial.baIssuer, &sba_issuer);
+            if (ret != RET_OK) {
+                statusCertRefs = status = DigestVerifyStatus::FAILED;
+                return ret;
+            }
+
+            ret = cerStore->getCertByIssuerAndSn(sba_issuer.get(), it.issuerSerial.baSerialNumber, &cer_item);
+            if (ret == RET_OK) {
+                refba_cert = cer_item->baEncoded;
+            }
+            else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
+                ByteArray* ba_iasn = nullptr;
+                ret = CerStore::encodeIssuerAndSN(sba_issuer.get(), it.issuerSerial.baSerialNumber, &ba_iasn);
+                if (ret != RET_OK) {
+                    statusCertRefs = status = DigestVerifyStatus::FAILED;
+                    return ret;
+                }
+
+                status = DigestVerifyStatus::INDETERMINATE;
+                expectedCertsByIssuerAndSN.push_back(ba_iasn);
+                continue;
+            }
+            else {
+                statusCertRefs = status = DigestVerifyStatus::FAILED;
+                return ret;
+            }
+        }
+
+        UapkiNS::SmartBA sba_hash;
+        ret = ::hash(hash_alg, refba_cert, &sba_hash);
+        if (ret != RET_OK) {
+            statusCertRefs = status = DigestVerifyStatus::FAILED;
+            return ret;
+        }
+
+        if (ba_cmp(it.baHashValue, sba_hash.get()) == 0) {
+            status = DigestVerifyStatus::VALID;
+            cnt_passed++;
+        }
+        else {
+            statusCertRefs = status = DigestVerifyStatus::INVALID;
+        }
+
+        idx++;
+    }
+
+    if (certRefs.size() == cnt_passed) {
+        statusCertRefs = DigestVerifyStatus::VALID;
+    }
+    return RET_OK;
+}
+
+
+CertChainItem::CertChainItem (
+        const CertEntity iCertEntity,
+        CerStore::Item* iCsiSubject
+)
+    : m_CertEntity(iCertEntity)
+    , m_CsiSubject(iCsiSubject)
+    , m_CertSource(CertSource::UNDEFINED)
+    , m_CsiIssuer(nullptr)
+    , m_IsExpired(true)
+    , m_IsSelfSigned(false)
+    , m_CertStatus(UapkiNS::CertStatus::UNDEFINED)
+{
+}
+
+CertChainItem::~CertChainItem (void)
+{
+}
+
+int CertChainItem::checkValidityTime (
+        const uint64_t validateTime
+)
+{
+    const int ret = m_CsiSubject->checkValidity(validateTime);
+    m_IsExpired = (ret != RET_OK);
+    return ret;
+}
+
+int CertChainItem::decodeName (void)
+{
+    return CerStoreUtils::rdnameFromName(
+        m_CsiSubject->cert->tbsCertificate.subject,
+        OID_X520_CommonName,
+        m_CommonName
+    );
+}
+
+int CertChainItem::decodeOcspResponse (
+        const ByteArray* baOcspResponse
+)
+{
+    //m_OcspResponse()
+    return 0;
+}
+
+void CertChainItem::setCertSource (
+        const CertSource certSource
+)
+{
+    m_CertSource = certSource;
+}
+
+void CertChainItem::setCertStatus (const UapkiNS::CertStatus certStatus)
+{
+    m_CertStatus = certStatus;
+}
+
+void CertChainItem::setIssuerAndVerify (
+        CerStore::Item* csiIssuer,
+        const bool isSelfSigned
+)
+{
+    m_CsiIssuer = csiIssuer;
+    m_IsSelfSigned = isSelfSigned;
+    if (m_CsiIssuer) {
+        (void)m_CsiSubject->verify(m_CsiIssuer);
+    }
+}
+
+
+ExpectedCertItem::ExpectedCertItem (
+        const CertEntity iCertEntity
+)
+    : m_CertEntity(iCertEntity)
+    , m_IdType(IdType::UNDEFINED)
+{
+}
+
+ExpectedCertItem::~ExpectedCertItem (void)
+{
+}
+
+int ExpectedCertItem::setResponderId (
+        const bool isKeyId,
+        const ByteArray* baResponderId
+)
+{
+    if (!baResponderId) return RET_UAPKI_INVALID_PARAMETER;
+
+    SmartBA& rsba_dst = (isKeyId) ? m_KeyId : m_Name;
+    if (!rsba_dst.set(ba_copy_with_alloc(baResponderId, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+
+    m_IdType = IdType::ORS_IDTYPE;
+    return RET_OK;
+}
+
+int ExpectedCertItem::setSignerIdentifier (
+        const ByteArray* baKeyIdOrSN,
+        const ByteArray* baName
+)
+{
+    if (!baKeyIdOrSN) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!baName) {
+        if (!m_KeyId.set(ba_copy_with_alloc(baKeyIdOrSN, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+    }
+    else {
+        if (
+            !m_SerialNumber.set(ba_copy_with_alloc(baKeyIdOrSN, 0, 0)) ||
+            !m_Name.set(ba_copy_with_alloc(baName, 0, 0))
+        ) return RET_UAPKI_GENERAL_ERROR;
+    }
+
+    m_IdType = IdType::CER_IDTYPE;
     return RET_OK;
 }
 
@@ -101,7 +416,8 @@ int AttrTimeStamp::verifyDigest (const ByteArray* baData)
 VerifiedSignerInfo::VerifiedSignerInfo (void)
     : m_CerStore(nullptr)
     , m_IsDigest(false)
-    , m_CerStoreItem(nullptr)
+    , m_LastError(RET_OK)
+    , m_CsiSigner(nullptr)
     , m_ValidationStatus(ValidationStatus::UNDEFINED)
     , m_StatusSignature(SignatureVerifyStatus::UNDEFINED)
     , m_StatusMessageDigest(DigestVerifyStatus::UNDEFINED)
@@ -115,7 +431,13 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
 
 VerifiedSignerInfo::~VerifiedSignerInfo (void)
 {
-    m_CerStoreItem = nullptr;
+    m_CsiSigner = nullptr;
+    for (auto& it : m_CertChainItems) {
+        delete it;
+    }
+    for (auto& it : m_ExpectedCertItems) {
+        delete it;
+    }
 }
 
 int VerifiedSignerInfo::init (
@@ -128,110 +450,314 @@ int VerifiedSignerInfo::init (
     return (m_CerStore) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
 }
 
+int VerifiedSignerInfo::addCertValidationItem (
+        const CertEntity certEntity,
+        CerStore::Item* cerStoreItem
+)
+{
+    for (const auto& it : m_CertChainItems) {
+        if (ba_cmp(cerStoreItem->baCertId, it->getSubjectCertId()) == 0) return RET_OK;
+    }
+
+    CertChainItem* certvalid_item = new CertChainItem(certEntity, cerStoreItem);
+    if (!certvalid_item) return RET_UAPKI_GENERAL_ERROR;
+
+    m_CertChainItems.push_back(certvalid_item);
+    return certvalid_item->decodeName();
+}
+
+int VerifiedSignerInfo::addExpectedCertItem (
+        const CertEntity certEntity,
+        const ByteArray* baSidEncoded
+)
+{
+    SmartBA sba_keyid, sba_name, sba_serialnumber;
+    const int ret = CerStore::parseSID(baSidEncoded, &sba_name, &sba_serialnumber, &sba_keyid);
+    if (ret != RET_OK) return ret;
+
+    const bool is_keyid = (sba_keyid.size() > 0);
+    for (const auto& it : m_ExpectedCertItems) {
+        if (is_keyid) {
+            if (ba_cmp(sba_keyid.get(), it->getKeyId()) == 0) return RET_OK;
+        }
+        else {
+            switch (it->getIdType()) {
+            case ExpectedCertItem::IdType::CER_IDTYPE:
+                if (
+                    (ba_cmp(sba_name.get(), it->getName()) == 0) &&
+                    (ba_cmp(sba_serialnumber.get(), it->getSerialNumber()) == 0)
+                ) return RET_OK;
+                break;
+            case ExpectedCertItem::IdType::ORS_IDTYPE:
+                if ((ba_cmp(sba_name.get(), it->getName()) == 0)) return RET_OK;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    ExpectedCertItem* expcert_item = new ExpectedCertItem(certEntity);
+    if (!expcert_item) return RET_UAPKI_GENERAL_ERROR;
+
+    m_ExpectedCertItems.push_back(expcert_item);
+    return expcert_item->setSignerIdentifier((is_keyid) ? sba_keyid.get() : sba_serialnumber.get(), sba_name.get());
+}
+
+int VerifiedSignerInfo::certValuesToStore (void)
+{
+    for (const auto& it : m_CadesXlInfo.certValues) {
+        bool is_unique;
+        CerStore::Item* cer_item = nullptr;
+        const int ret = m_CerStore->addCert(it, true, false, false, is_unique, &cer_item);
+        if (ret != RET_OK) return ret;
+
+        m_AddedCerts.push_back(cer_item);
+        m_CadesXlInfo.addedCerts.push_back(cer_item);
+    }
+    return RET_OK;
+}
+
+void VerifiedSignerInfo::determineSignatureFormat (void)
+{
+    if (m_SignatureFormat == SignatureFormat::CADES_BES) {
+        if (m_ContentTS.isPresent() && m_SignatureTS.isPresent()) {
+            m_SignatureFormat = SignatureFormat::CADES_T;
+            if (m_CadesXlInfo.isPresentCadesC()) {
+                m_SignatureFormat = SignatureFormat::CADES_C;
+                if (m_CadesXlInfo.isPresentCadesXL()) {
+                    m_SignatureFormat = SignatureFormat::CADES_XL;
+                    if (m_ArchiveTS.isPresent()) {
+                        m_SignatureFormat = SignatureFormat::CADES_A;
+                    }
+                }
+            }
+        }
+    }
+}
+
 const char* VerifiedSignerInfo::getValidationStatus (void) const {
     return validationStatusToStr(m_ValidationStatus);
 }
 
-void VerifiedSignerInfo::validate (void)
+int VerifiedSignerInfo::parseAttributes (void)
 {
+    int ret = parseSignedAttrs(m_SignerInfo.getSignedAttrs());
+    if (ret != RET_OK) return ret;
+
+    ret = parseUnsignedAttrs(m_SignerInfo.getUnsignedAttrs());
+    return ret;
+}
+
+int VerifiedSignerInfo::validateStatuses (void)
+{
+    CollectVerifyStatus collect_digests, collect_signatures;
+
     //  Check mandatory elements
-    m_IsValidSignatures = (getStatusSignature() == SignatureVerifyStatus::VALID);
-    m_IsValidDigests = (getStatusMessageDigest() == DigestVerifyStatus::VALID);
-    if (m_IsValidSignatures && m_IsValidDigests) {
+    collect_signatures.set(getStatusSignature());
+    collect_digests.set(getStatusMessageDigest());
+    if (collect_signatures.isValid() && collect_digests.isValid()) {
         m_BestSignatureTime = m_SigningTime;
     }
 
     //  Check attribute EssCert
     if (getStatusEssCert() != DataVerifyStatus::NOT_PRESENT) {
-        m_IsValidDigests &= (getStatusEssCert() == DataVerifyStatus::VALID);
+        collect_digests.set(getStatusEssCert());
     }
 
-    {   //  Check Content-Timestamp
-        const AttrTimeStamp& attr_conts = getContentTS();
-        if (attr_conts.isPresent()) {
-            m_IsValidSignatures &= attr_conts.isValidSignature();
-            m_IsValidDigests &= attr_conts.isValidDigest();
-            if (m_IsValidSignatures && m_IsValidDigests) {
-                m_BestSignatureTime = attr_conts.msGenTime;
-            }
+    //  Check Content-Timestamp
+    if (m_ContentTS.isPresent()) {
+        collect_signatures.set(m_ContentTS.statusSignature);
+        collect_digests.set(m_ContentTS.statusDigest);
+        if (collect_signatures.isValid() && collect_digests.isValid()) {
+            m_BestSignatureTime = m_ContentTS.msGenTime;
         }
     }
 
-    {   //  Check Signature-Timestamp
-        const AttrTimeStamp& attr_sigts = getSignatureTS();
-        if (attr_sigts.isPresent()) {
-            m_IsValidSignatures &= attr_sigts.isValidSignature();
-            m_IsValidDigests &= attr_sigts.isValidDigest();
-            if (m_IsValidSignatures && m_IsValidDigests) {
-                m_BestSignatureTime = attr_sigts.msGenTime;
-            }
+    //  Check Signature-Timestamp
+    if (m_SignatureTS.isPresent()) {
+        collect_signatures.set(m_SignatureTS.statusSignature);
+        collect_digests.set(m_SignatureTS.statusDigest);
+        if (collect_signatures.isValid() && collect_digests.isValid()) {
+            m_BestSignatureTime = m_SignatureTS.msGenTime;
         }
     }
 
-    {   //  Check Archive-Timestamp
-        const AttrTimeStamp& attr_arcts = getArchiveTS();
-        if (attr_arcts.isPresent()) {
-            m_IsValidSignatures &= attr_arcts.isValidSignature();
-            m_IsValidDigests &= attr_arcts.isValidDigest();
-        }
+    //  Check attributes for CADES-C and higher
+    if (m_SignatureFormat >= SignatureFormat::CADES_C) {
+        collect_digests.set(m_CadesXlInfo.statusCertRefs);
     }
 
-    m_ValidationStatus = (m_IsValidSignatures && m_IsValidDigests)
-        ? ValidationStatus::TOTAL_VALID : ValidationStatus::TOTAL_FAILED;
-    //TODO: check options.validateCertByCRL and options.validateCertByOCSP
-    //      added status SIGNATURE_VALIDATION::STATUS::INDETERMINATE
+    //  Check Archive-Timestamp
+    if (m_ArchiveTS.isPresent()) {
+        collect_signatures.set(m_ArchiveTS.statusSignature);
+        collect_digests.set(m_ArchiveTS.statusDigest);
+    }
+
+    m_IsValidSignatures = collect_signatures.isValid();
+    m_IsValidDigests = collect_digests.isValid();
+    if (m_IsValidSignatures && m_IsValidDigests) {
+        m_ValidationStatus = ValidationStatus::TOTAL_VALID;
+    }
+    else if (collect_signatures.isDeterminate() || collect_digests.isDeterminate()) {
+        m_ValidationStatus = ValidationStatus::INDETERMINATE;
+    }
+    else {
+        m_ValidationStatus = ValidationStatus::TOTAL_FAILED;
+    }
+
+    return RET_OK;
 }
 
 int VerifiedSignerInfo::verifyArchiveTS (
-        vector<const CerStore::Item*>& certs,
-        vector<const CrlStore::Item*>& crls
+        const vector<CerStore::Item*>& certs,
+        const vector<CrlStore::Item*>& crls
 )
 {
     int ret = RET_OK;
 
-    DO(m_ArchiveTsHelper.init((const AlgorithmIdentifier*)&m_SignerInfo.getDigestAlgorithm()));
+    if (m_SignatureFormat == SignatureFormat::CADES_A) {
+        DO(m_ArchiveTsHelper.init((const AlgorithmIdentifier*)&m_SignerInfo.getDigestAlgorithm()));
 
-    DO(m_ArchiveTsHelper.setHashContent(m_SignerInfo.getContentType(), m_SignerInfo.getMessageDigest()));
+        DO(m_ArchiveTsHelper.setHashContent(m_SignerInfo.getContentType(), m_SignerInfo.getMessageDigest()));
 
-    DO(m_ArchiveTsHelper.setSignerInfo(m_SignerInfo.getAsn1Data()));
+        DO(m_ArchiveTsHelper.setSignerInfo(m_SignerInfo.getAsn1Data()));
 
-    for (const auto& it : certs) {
-        DO(m_ArchiveTsHelper.addCertificate(it->baEncoded));
-    }
-    for (const auto& it : crls) {
-        DO(m_ArchiveTsHelper.addCrl(it->baEncoded));
-    }
-    for (const auto& it : m_SignerInfo.getUnsignedAttrs()) {
-        if (it.type != string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
-            SmartBA sba_encoded;
-            DO(AttributeHelper::encodeAttribute(it, &sba_encoded));
-            DO(m_ArchiveTsHelper.addUnsignedAttr(sba_encoded.get()));
+        for (const auto& it : certs) {
+            DO(m_ArchiveTsHelper.addCertificate(it->baEncoded));
+        }
+        for (const auto& it : crls) {
+            DO(m_ArchiveTsHelper.addCrl(it->baEncoded));
+        }
+        for (const auto& it : m_SignerInfo.getUnsignedAttrs()) {
+            if (it.type != string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
+                SmartBA sba_encoded;
+                DO(AttributeHelper::encodeAttribute(it, &sba_encoded));
+                DO(m_ArchiveTsHelper.addUnsignedAttr(sba_encoded.get()));
+            }
+        }
+
+        DO(m_ArchiveTsHelper.calcHash());
+        DEBUG_OUTCON(printf("VerifiedSignerInfo::verifyArchiveTS(), calculated hash-value, hex: ");  ba_print(stdout, m_ArchiveTsHelper.getHashValue()));
+
+        m_ArchiveTS.statusDigest = (ba_cmp(m_ArchiveTS.hashedMessage.get(), m_ArchiveTsHelper.getHashValue()) == 0)
+            ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID;
+
+        ret = verifyAttrTimestamp(m_ArchiveTS);
+        if (ret != RET_OK) {
+            m_LastError = ret;
         }
     }
-
-    DO(m_ArchiveTsHelper.calcHash());
-    DEBUG_OUTCON(printf("VerifiedSignerInfo::verifyArchiveTS(), calculated hash-value, hex: ");  ba_print(stdout, m_ArchiveTsHelper.getHashValue()));
-
-    m_ArchiveTS.statusDigest = (ba_cmp(m_ArchiveTS.hashedMessage.get(), m_ArchiveTsHelper.getHashValue()) == 0)
-        ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID;
 
 cleanup:
     return ret;
 }
 
-int VerifiedSignerInfo::verifySignerInfo (
+int VerifiedSignerInfo::verifyCertificateRefs (void)
+{
+    if (m_SignatureFormat < SignatureFormat::CADES_C) return RET_OK;
+
+    int ret = m_CadesXlInfo.verifyCertRefs(m_CerStore);
+    if (ret != RET_OK) {
+        m_LastError = ret;
+    }
+    else {
+        if (!m_CadesXlInfo.expectedCertsByIssuerAndSN.empty()) {
+            m_LastError = RET_UAPKI_CERT_NOT_FOUND;
+        }
+    }
+
+    for (const auto& it : m_CadesXlInfo.expectedCertsByIssuerAndSN) {
+        ret = addExpectedCertItem(CertEntity::UNDEFINED, it);
+        if (ret != RET_OK) break;
+    }
+
+    return ret;
+}
+
+int VerifiedSignerInfo::verifyContentTS (
         const ByteArray* baContent
 )
 {
     int ret = RET_OK;
-    SmartBA sba_calcdigest;
+    if (m_ContentTS.isPresent()) {
+        ret = m_ContentTS.verifyDigest(baContent, m_IsDigest);
+        if (ret != RET_OK) {
+            m_LastError = ret;
+        }
+        ret = verifyAttrTimestamp(m_ContentTS);
+        if (ret != RET_OK) {
+            m_LastError = ret;
+        }
+    }
+    return ret;
+}
 
+int VerifiedSignerInfo::verifyMessageDigest (
+        const ByteArray* baContent
+)
+{
+    if (!baContent) {
+        m_LastError = RET_UAPKI_CONTENT_NOT_PRESENT;
+        m_StatusMessageDigest = DigestVerifyStatus::INDETERMINATE;
+        return RET_OK;
+    }
+
+    if (!m_IsDigest) {
+        const HashAlg hash_alg = hash_from_oid(m_SignerInfo.getDigestAlgorithm().algorithm.c_str());
+        if (hash_alg == HASH_ALG_UNDEFINED) {
+            m_LastError = RET_UAPKI_UNSUPPORTED_ALG;
+            m_StatusMessageDigest = DigestVerifyStatus::FAILED;
+            return RET_OK;
+        }
+
+        SmartBA sba_hash;
+        const int ret = ::hash(hash_alg, baContent, &sba_hash);
+        if (ret != RET_OK) {
+            m_StatusMessageDigest = DigestVerifyStatus::FAILED;
+            return ret;
+        }
+
+        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), sba_hash.get()) == 0)
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
+    }
+    else {
+        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), baContent) == 0)
+            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
+    }
+
+    return RET_OK;
+}
+
+int VerifiedSignerInfo::verifySignatureTS (void)
+{
+    int ret = RET_OK;
+    if (m_SignatureTS.isPresent()) {
+        ret = m_SignatureTS.verifyDigest(m_SignerInfo.getSignature());
+        if (ret != RET_OK) {
+            m_LastError = ret;
+        }
+        ret = verifyAttrTimestamp(m_SignatureTS);
+        if (ret != RET_OK) {
+            m_LastError = ret;
+        }
+    }
+    return ret;
+}
+
+int VerifiedSignerInfo::verifySignedAttribute (void)
+{
+    int ret = RET_OK;
+
+    //  Get signer certificate
     switch (m_SignerInfo.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        DO(m_CerStore->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CerStoreItem));
+        ret = m_CerStore->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
+        m_SignatureFormat = (m_StatusEssCert == DataVerifyStatus::INDETERMINATE)
+            ? SignatureFormat::CADES_BES : SignatureFormat::CMS_SID_KEYID;
         break;
     case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        DO(m_CerStore->getCertByKeyId(m_SignerInfo.getSidEncoded(), &m_CerStoreItem));
+        ret = m_CerStore->getCertByKeyId(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
         m_SignatureFormat = SignatureFormat::CMS_SID_KEYID;
         break;
     default:
@@ -239,13 +765,16 @@ int VerifiedSignerInfo::verifySignerInfo (
     }
 
     //  Verify signed attributes
-    ret = verify_signature(
-        m_SignerInfo.getSignatureAlgorithm().algorithm.c_str(),
-        m_SignerInfo.getSignedAttrsEncoded(),
-        false,
-        m_CerStoreItem->baSPKI,
-        m_SignerInfo.getSignature()
-    );
+    if (ret == RET_OK) {
+        DO(addCertValidationItem(CertEntity::SIGNER, m_CsiSigner));
+        ret = verify_signature(
+            m_SignerInfo.getSignatureAlgorithm().algorithm.c_str(),
+            m_SignerInfo.getSignedAttrsEncoded(),
+            false,
+            m_CsiSigner->baSPKI,
+            m_SignerInfo.getSignature()
+        );
+    }
     switch (ret) {
     case RET_OK:
         m_StatusSignature = SignatureVerifyStatus::VALID;
@@ -253,78 +782,49 @@ int VerifiedSignerInfo::verifySignerInfo (
     case RET_VERIFY_FAILED:
         m_StatusSignature = SignatureVerifyStatus::INVALID;
         break;
+    case RET_UAPKI_CERT_NOT_FOUND:
+        m_LastError = RET_UAPKI_CERT_NOT_FOUND;
+        m_StatusSignature = SignatureVerifyStatus::INDETERMINATE;
+        DO(addExpectedCertItem(CertEntity::SIGNER, m_SignerInfo.getSidEncoded()));
+        break;
     default:
         m_StatusSignature = SignatureVerifyStatus::FAILED;
-    }
-
-    //  Validity messageDigest
-    if (!m_IsDigest) {
-        DO(::hash(hash_from_oid(
-            m_SignerInfo.getDigestAlgorithm().algorithm.c_str()),
-            baContent,
-            &sba_calcdigest)
-        );
-        m_StatusMessageDigest = (ba_cmp(sba_calcdigest.get(), m_SignerInfo.getMessageDigest()) == 0)
-            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
-    }
-    else {
-        m_StatusMessageDigest = (ba_cmp(baContent, m_SignerInfo.getMessageDigest()) == 0)
-            ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
-    }
-
-    //  Decode attributes
-    DO(decodeSignedAttrs(m_SignerInfo.getSignedAttrs()));
-    DO(decodeUnsignedAttrs(m_SignerInfo.getUnsignedAttrs()));
-
-    //  Process attributes
-    if (!m_EssCerts.empty()) {
-        DO(verifySigningCertificateV2());
-        if (m_SignatureFormat != SignatureFormat::CMS_SID_KEYID) {
-            m_SignatureFormat = SignatureFormat::CADES_BES;
-        }
-    }
-    if (m_ContentTS.isPresent()) {
-        DO(m_ContentTS.verifyDigest(baContent));
-    }
-    if (m_SignatureTS.isPresent()) {
-        DO(m_SignatureTS.verifyDigest(m_SignerInfo.getSignature()));
-    }
-
-    //  Determine signatureFormat for CAdES
-    if (m_SignatureFormat == SignatureFormat::CADES_BES) {
-        if (m_ContentTS.isPresent() && m_SignatureTS.isPresent()) {
-            m_SignatureFormat = SignatureFormat::CADES_T;
-
-            bool detect_certrefs = false, detect_revocrefs = false;
-            bool detect_certvals = false, detect_revocvals = false;
-            bool detect_atsv3 = false;
-            for (const auto& it : m_SignerInfo.getUnsignedAttrs()) {
-                if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) detect_certrefs = true;
-                else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) detect_revocrefs = true;
-                else if (it.type == string(OID_PKCS9_CERT_VALUES)) detect_certvals = true;
-                else if (it.type == string(OID_PKCS9_REVOCATION_VALUES)) detect_revocvals = true;
-                else if (it.type == string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) detect_atsv3 = true;
-            }
-
-            if (detect_certrefs && detect_revocrefs) {
-                m_SignatureFormat = SignatureFormat::CADES_C;
-            }
-
-            if ((m_SignatureFormat == SignatureFormat::CADES_C) && detect_certvals && detect_revocvals) {
-                m_SignatureFormat = SignatureFormat::CADES_XL;
-            }
-
-            if ((m_SignatureFormat == SignatureFormat::CADES_XL) && detect_atsv3) {
-                m_SignatureFormat = SignatureFormat::CADES_A;
-            }
-        }
     }
 
 cleanup:
     return ret;
 }
 
-int VerifiedSignerInfo::decodeSignedAttrs (
+int VerifiedSignerInfo::verifySigningCertificateV2 (void)
+{
+    if (m_StatusEssCert == DataVerifyStatus::NOT_PRESENT) return RET_OK;
+
+    //  Process simple case: present only the one ESSCertIDv2
+    const EssCertId& ess_certid = m_EssCerts[0];
+    const HashAlg hash_alg = hash_from_oid(ess_certid.hashAlgorithm.algorithm.c_str());
+    if (hash_alg == HASH_ALG_UNDEFINED) {
+        m_StatusEssCert = DigestVerifyStatus::FAILED;
+        return RET_UAPKI_UNSUPPORTED_ALG;
+    }
+
+    if (m_CsiSigner) {
+        SmartBA sba_hash;
+        const int ret = ::hash(hash_alg, m_CsiSigner->baEncoded, &sba_hash);
+        if (ret != RET_OK) {
+            m_StatusEssCert = DigestVerifyStatus::FAILED;
+            return ret;
+        }
+        m_StatusEssCert = (ba_cmp(sba_hash.get(), ess_certid.baHashValue) == 0)
+            ? DataVerifyStatus::VALID : DataVerifyStatus::INVALID;
+    }
+    else {
+        m_StatusEssCert = DataVerifyStatus::INDETERMINATE;
+    }
+
+    return RET_OK;
+}
+
+int VerifiedSignerInfo::parseSignedAttrs (
         const vector<Attribute>& signedAattrs
 )
 {
@@ -339,10 +839,11 @@ int VerifiedSignerInfo::decodeSignedAttrs (
             DO(AttributeHelper::decodeSignaturePolicy(it.baValues, m_SigPolicyId));
         }
         else if (it.type == string(OID_PKCS9_CONTENT_TIMESTAMP)) {
-            DO(decodeAttrTimestamp(it.baValues, m_ContentTS));
+            DO(m_ContentTS.parse(it.baValues));
         }
         else if (it.type == string(OID_PKCS9_SIGNING_CERTIFICATE_V2)) {
             DO(AttributeHelper::decodeSigningCertificate(it.baValues, m_EssCerts));
+            m_StatusEssCert = DataVerifyStatus::INDETERMINATE;
         }
     }
 
@@ -350,18 +851,31 @@ cleanup:
     return ret;
 }
 
-int VerifiedSignerInfo::decodeUnsignedAttrs (
+int VerifiedSignerInfo::parseUnsignedAttrs (
         const vector<Attribute>& unsignedAttrs
 )
 {
     int ret = RET_OK;
 
+    m_CadesXlInfo.statusCertRefs = DataVerifyStatus::NOT_PRESENT;
     for (const auto& it : unsignedAttrs) {
         if (it.type == string(OID_PKCS9_TIMESTAMP_TOKEN)) {
-            DO(decodeAttrTimestamp(it.baValues, m_SignatureTS));
+            DO(m_SignatureTS.parse(it.baValues));
+        }
+        else if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) {
+            DO(m_CadesXlInfo.parseCertificateRefs(it.baValues));
+        }
+        else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) {
+            DO(m_CadesXlInfo.parseRevocationRefs(it.baValues));
+        }
+        else if (it.type == string(OID_PKCS9_CERT_VALUES)) {
+            DO(m_CadesXlInfo.parseCertValues(it.baValues));
+        }
+        else if (it.type == string(OID_PKCS9_REVOCATION_VALUES)) {
+            DO(m_CadesXlInfo.parseRevocationValues(it.baValues));
         }
         else if (it.type == string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
-            DO(decodeAttrTimestamp(it.baValues, m_ArchiveTS));
+            DO(m_ArchiveTS.parse(it.baValues));
         }
     }
 
@@ -369,48 +883,52 @@ cleanup:
     return ret;
 }
 
-int VerifiedSignerInfo::verifySigningCertificateV2 (void)
-{
-    if (m_EssCerts.empty()) return RET_OK;
-
-    //  Process simple case: present only the one ESSCertIDv2
-    int ret = RET_OK;
-    SmartBA sba_certhash;
-
-    const EssCertId& ess_certid = m_EssCerts[0];
-    const HashAlg hash_algo = hash_from_oid(ess_certid.hashAlgorithm.algorithm.c_str());
-    if (hash_algo == HASH_ALG_UNDEFINED) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
-
-    DO(::hash(hash_algo, m_CerStoreItem->baEncoded, &sba_certhash));
-    m_StatusEssCert = (ba_cmp(sba_certhash.get(), ess_certid.baHashValue) == 0)
-        ? DataVerifyStatus::VALID : DataVerifyStatus::INVALID;
-
-cleanup:
-    return ret;
-}
-
-
-int decodeAttrTimestamp (
-        const ByteArray* baValues,
+int VerifiedSignerInfo::verifyAttrTimestamp (
         AttrTimeStamp& attrTS
 )
 {
     int ret = RET_OK;
-    Tsp::TsTokenParser tstoken_parser;
+    Pkcs7::SignedDataParser& sdata_parser = attrTS.tsTokenParser.getSignedDataParser();
+    Pkcs7::SignedDataParser::SignerInfo signer_info;
 
-    DO(tstoken_parser.parse(baValues));
-    attrTS.policy = tstoken_parser.getPolicyId();
-    attrTS.hashAlgo = tstoken_parser.getHashAlgo();
-    (void)attrTS.hashedMessage.set(tstoken_parser.getHashedMessage(true));
-    attrTS.msGenTime = tstoken_parser.getGenTime();
+    if (sdata_parser.getCountSignerInfos() == 0) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
 
-    ret = verifySignedData(
-        *get_cerstore(),
-        tstoken_parser.getSignedDataParser(),
-        &attrTS.signerCertId
-    );
+    for (auto& it : sdata_parser.getCerts()) {
+        bool is_unique;
+        CerStore::Item* cer_item = nullptr;
+        DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
+        it = nullptr;
+        m_AddedCerts.push_back(cer_item);
+    }
+
+    DO(sdata_parser.parseSignerInfo(0, signer_info));
+    if (!sdata_parser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
+        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+    }
+
+    switch (signer_info.getSidType()) {
+    case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
+        ret = m_CerStore->getCertBySID(signer_info.getSidEncoded(), &attrTS.csiSigner);
+        break;
+    case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
+        ret = m_CerStore->getCertByKeyId(signer_info.getSidEncoded(), &attrTS.csiSigner);
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+    if (ret == RET_OK) {
+        DO(addCertValidationItem(CertEntity::SIGNER, attrTS.csiSigner));
+        ret = verify_signature(
+            signer_info.getSignatureAlgorithm().algorithm.c_str(),
+            signer_info.getSignedAttrsEncoded(),
+            false,
+            attrTS.csiSigner->baSPKI,
+            signer_info.getSignature()
+        );
+    }
     switch (ret) {
     case RET_OK:
         attrTS.statusSignature = SignatureVerifyStatus::VALID;
@@ -419,7 +937,9 @@ int decodeAttrTimestamp (
         attrTS.statusSignature = SignatureVerifyStatus::INVALID;
         break;
     case RET_UAPKI_CERT_NOT_FOUND:
+        m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         attrTS.statusSignature = SignatureVerifyStatus::INDETERMINATE;
+        DO(addExpectedCertItem(CertEntity::SIGNER, signer_info.getSidEncoded()));
         break;
     default:
         attrTS.statusSignature = SignatureVerifyStatus::FAILED;
@@ -427,61 +947,134 @@ int decodeAttrTimestamp (
 
 cleanup:
     return ret;
-}   //  decodeAttrTimestamp
+}
+
+
+VerifySignedDoc::VerifySignedDoc (
+        CerStore* iCerStore,
+        CrlStore* iCrlStore,
+        const UapkiNS::Doc::Verify::VerifyOptions& iVerifyOptions
+)
+    : cerStore(iCerStore)
+    , crlStore(iCrlStore)
+    , verifyOptions(iVerifyOptions)
+    , refContent(nullptr)
+{
+}
+
+VerifySignedDoc::~VerifySignedDoc (void)
+{
+}
+
+int VerifySignedDoc::parse (const ByteArray* baSignature)
+{
+    const int ret = sdataParser.parse(baSignature);
+    if (ret != RET_OK) return ret;
+    return (sdataParser.getCountSignerInfos() > 0) ? RET_OK : RET_UAPKI_INVALID_STRUCT;
+}
+
+void VerifySignedDoc::getContent (const ByteArray* baContent)
+{
+    refContent = (sdataParser.getEncapContentInfo().baEncapContent)
+        ? sdataParser.getEncapContentInfo().baEncapContent : baContent;
+}
+
+int VerifySignedDoc::addCertsToStore (void)
+{
+    int ret = RET_OK;
+    UapkiNS::VectorBA& vba_certs = sdataParser.getCerts();
+
+    for (size_t i = 0; i < vba_certs.size(); i++) {
+        bool is_unique;
+        CerStore::Item* cer_item = nullptr;
+        DO(cerStore->addCert(vba_certs[i], false, false, false, is_unique, &cer_item));
+        vba_certs[i] = nullptr;
+        addedCerts.push_back(cer_item);
+    }
+
+cleanup:
+    return ret;
+}
+
+void VerifySignedDoc::detectCertSources (void)
+{
+    for (auto& it_vsi : verifiedSignerInfos) {
+        for (auto& it_cci : it_vsi.getCertChainItems()) {
+            //  Search in common certs
+            bool is_found = false;
+            for (const auto& it_acert : addedCerts) {
+                if (ba_cmp(it_cci->getSubjectCertId(), it_acert->baCertId) == 0) {
+                    is_found = true;
+                    break;
+                }
+            }
+
+            //  Search in certs from SignerInfo
+            if (!is_found) {
+                for (const auto& it_acert : it_vsi.getAddedCerts()) {
+                    if (ba_cmp(it_cci->getSubjectCertId(), it_acert->baCertId) == 0) {
+                        is_found = true;
+                        break;
+                    }
+                }
+            }
+
+            it_cci->setCertSource((is_found) ? CertSource::SIGNATURE : CertSource::STORE);
+        }
+    }
+}
+
+int VerifySignedDoc::getLastError (void)
+{
+    for (const auto& it : verifiedSignerInfos) {
+        const int ret = it.getLastError();
+        if (ret != RET_OK) return ret;
+    }
+    return RET_OK;
+}
+
+
+const char* certEntityToStr (
+        const CertEntity certEntity
+)
+{
+    static const char* CERT_ENTITY_STRINGS[8] = {
+        "UNDEFINED",
+        "SIGNER",
+        "INDETERMINATE",
+        "CRL",
+        "OCSP",
+        "TSP",
+        "CA",
+        "ROOT"
+    };
+    return CERT_ENTITY_STRINGS[((uint32_t)certEntity < 8) ? (uint32_t)certEntity : 0];
+}   //  certEntityToStr
+
+const char* certSourceToStr (
+        const CertSource certSource
+)
+{
+    static const char* CERT_SOURCE_STRINGS[3] = {
+        "UNDEFINED",
+        "SIGNATURE",
+        "STORE"
+    };
+    return CERT_SOURCE_STRINGS[((uint32_t)certSource < 3) ? (uint32_t)certSource : 0];
+}   //  certSourceToStr
 
 const char* validationStatusToStr (
         const ValidationStatus status
 )
 {
+    static const char* VALIDATION_STATUS_STRINGS[4] = {
+        "UNDEFINED",
+        "INDETERMINATE",
+        "TOTAL-FAILED",
+        "TOTAL-VALID"
+    };
     return VALIDATION_STATUS_STRINGS[((uint32_t)status < 4) ? (uint32_t)status : 0];
 }   //  validationStatusToStr
-
-int verifySignedData (
-        CerStore& cerStore,
-        Pkcs7::SignedDataParser& sdataParser,
-        CerStore::Item** cerSigner
-)
-{
-    int ret = RET_OK;
-    Pkcs7::SignedDataParser::SignerInfo signer_info;
-
-    if (sdataParser.getCountSignerInfos() == 0) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    for (auto& it : sdataParser.getCerts()) {
-        bool is_unique;
-        DO(cerStore.addCert(it, false, false, false, is_unique, nullptr));
-        it = nullptr;
-    }
-
-    DO(sdataParser.parseSignerInfo(0, signer_info));
-    if (!sdataParser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
-        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
-    }
-
-    switch (signer_info.getSidType()) {
-    case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        DO(cerStore.getCertBySID(signer_info.getSidEncoded(), cerSigner));
-        break;
-    case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        DO(cerStore.getCertByKeyId(signer_info.getSidEncoded(), cerSigner));
-        break;
-    default:
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    ret = verify_signature(
-        signer_info.getSignatureAlgorithm().algorithm.c_str(),
-        signer_info.getSignedAttrsEncoded(),
-        false,
-        (*cerSigner)->baSPKI,
-        signer_info.getSignature()
-    );
-
-cleanup:
-    return ret;
-}   //  verifySignedData
 
 
 }   //  end namespace Verify
