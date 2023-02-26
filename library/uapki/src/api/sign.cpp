@@ -69,6 +69,16 @@ enum class TsAttrType : uint32_t {
 };
 
 
+struct SignOptions {
+    bool ignoreCertStatus;
+
+    SignOptions (void)
+        : ignoreCertStatus(false)
+    {}
+
+};  //  end struct SignOptions
+
+
 static int get_info_signalgo_and_keyid (
         CmStorageProxy& storage,
         string& signAlgo,
@@ -110,6 +120,22 @@ static int get_info_signalgo_and_keyid (
     ret = (*baKeyId) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
     return ret;
 }   //  get_info_signalgo_and_keyid
+
+static void parse_sign_options (
+        JSON_Object* joSignOptions,
+        UapkiNS::Doc::Sign::SigningDoc::SignParams& signParams,
+        SignOptions& signOptions
+)
+{
+    if (joSignOptions) {
+        if (
+            (signParams.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) ||
+            (signParams.signatureFormat == UapkiNS::SignatureFormat::CADES_T)
+        ) {
+            signOptions.ignoreCertStatus = ParsonHelper::jsonObjectGetBoolean(joSignOptions, "ignoreCertStatus", false);
+        }
+    }
+}   //  parse_sign_options
 
 static int parse_sign_params (
         JSON_Object* joSignParams,
@@ -687,6 +713,7 @@ int uapki_sign (
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
     int ret = RET_OK;
+    SignOptions sign_options;
     UapkiNS::Doc::Sign::SigningDoc::SignParams sign_params;
     size_t cnt_docs = 0;
     JSON_Array* ja_results = nullptr;
@@ -696,6 +723,7 @@ int uapki_sign (
     UapkiNS::VectorBA vba_signatures;
 
     DO(parse_sign_params(json_object_get_object(joParams, "signParams"), sign_params));
+    parse_sign_options(json_object_get_object(joParams, "options"), sign_params, sign_options);
 
     sign_params.ocsp = config->getOcsp();
     if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
@@ -730,15 +758,16 @@ int uapki_sign (
     if ((sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
         DO(cer_store->getCertByKeyId(sign_params.keyId.get(), &sign_params.signer.pcsiSubject));
         if (sign_params.isCadesFormat) {
+            if (!sign_options.ignoreCertStatus) {
+                if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
+                    DO(get_cert_status_by_ocsp(sign_params, sign_params.signer));
+                }
+                else {
+                    DO(get_cert_status_by_crl(sign_params.signer));
+                }
+            }
+
             UapkiNS::EssCertId ess_certid;
-
-            if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
-                DO(get_cert_status_by_ocsp(sign_params, sign_params.signer));
-            }
-            else {
-                DO(get_cert_status_by_crl(sign_params.signer));
-            }
-
             DO(sign_params.signer.pcsiSubject->generateEssCertId(sign_params.aidDigest, ess_certid));
             DO(UapkiNS::Doc::Sign::SigningDoc::encodeSigningCertificate(ess_certid, sign_params.attrSigningCert));
             if (sign_params.isCadesCXA) {

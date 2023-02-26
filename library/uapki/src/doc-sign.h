@@ -68,7 +68,7 @@ public:
 
         int set (const CerDataItem& src);
 
-    };  //  CerDataItem
+    };  //  end struct CerDataItem
 
     struct SignParams {
         SignatureFormat
