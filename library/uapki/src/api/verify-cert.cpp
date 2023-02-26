@@ -263,26 +263,6 @@ cleanup:
     return ret;
 }
 
-static int verify_cert_sign (const CerStore::Item* cerIssuer, CerStore::Item* cerSubject)
-{
-    int ret = RET_OK;
-    bool is_digitalsign = false;
-    CerStore::VerifyStatus status = CerStore::VerifyStatus::UNDEFINED;
-
-    ret = CerStoreUtils::verify(cerSubject, cerIssuer);
-    status = (ret == RET_OK) ? CerStore::VerifyStatus::VALID
-        : ((ret == RET_VERIFY_FAILED) ? CerStore::VerifyStatus::INVALID : CerStore::VerifyStatus::FAILED);
-    if (status == CerStore::VerifyStatus::VALID) {
-        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
-        status = (is_digitalsign) ? CerStore::VerifyStatus::VALID : CerStore::VerifyStatus::VALID_WITHOUT_KEYUSAGE;
-    }
-
-    cerSubject->verifyStatus = status;
-
-cleanup:
-    return ret;
-}
-
 static int verify_response_data (JSON_Object* joResult, UapkiNS::Ocsp::OcspHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
@@ -475,7 +455,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", is_selfsigned));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cer_subject->trusted));
     if (cer_subject->verifyStatus == CerStore::VerifyStatus::UNDEFINED) {
-        DO(verify_cert_sign(cer_issuer, cer_subject));
+        DO(cer_subject->verify(cer_issuer));
     }
     DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(cer_subject->verifyStatus)));
 

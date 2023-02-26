@@ -59,8 +59,6 @@ namespace CerStoreUtils {
     int spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded);
     int validityToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
 
-    int verify (const CerStore::Item* cerSubject, const CerStore::Item* cerIssuer);
-
 }
 
 namespace CrlStoreUtils {

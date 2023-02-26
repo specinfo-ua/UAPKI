@@ -434,38 +434,6 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::verify (const CerStore::Item* cerSubject, const CerStore::Item* cerIssuer)
-{
-    int ret = RET_OK;
-    X509Tbs_t* x509_cert = nullptr;
-    ByteArray* ba_signvalue = nullptr;
-    ByteArray* ba_tbs = nullptr;
-    char* s_signalgo = nullptr;
-
-    CHECK_PARAM(cerSubject != nullptr);
-    CHECK_PARAM(cerIssuer != nullptr);
-
-    CHECK_NOT_NULL(x509_cert = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), cerSubject->baEncoded));
-    CHECK_NOT_NULL(ba_tbs = ba_alloc_from_uint8(x509_cert->tbsData.buf, x509_cert->tbsData.size));
-
-    DO(asn_oid_to_text(&cerSubject->cert->signatureAlgorithm.algorithm, &s_signalgo));
-    if (cerSubject->algoKeyId == HASH_ALG_GOST34311) {
-        DO(asn_decodevalue_bitstring_encap_octet(&cerSubject->cert->signature, &ba_signvalue));
-    }
-    else {
-        DO(asn_BITSTRING2ba(&cerSubject->cert->signature, &ba_signvalue));
-    }
-
-    ret = verify_signature(s_signalgo, ba_tbs, false, cerIssuer->baSPKI, ba_signvalue);
-
-cleanup:
-    asn_free(get_X509Tbs_desc(), x509_cert);
-    ba_free(ba_signvalue);
-    ba_free(ba_tbs);
-    ::free(s_signalgo);
-    return ret;
-}
-
 
 int CrlStoreUtils::crlIdentifierToJson (
         JSON_Object* joResult,
