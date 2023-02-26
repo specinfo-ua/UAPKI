@@ -523,6 +523,7 @@ static int get_cert_status_by_crl (
         UapkiNS::Doc::Sign::SigningDoc::CerDataItem& cerDataItem
 )
 {
+    //puts("TRACE: get_cert_status_by_crl()");
     int ret = RET_OK;
     CerStore& cer_store = *get_cerstore();
     CrlStore& crl_store = *get_crlstore();
@@ -597,6 +598,7 @@ static int get_cert_status_by_ocsp (
         UapkiNS::Doc::Sign::SigningDoc::CerDataItem& cerDataItem
 )
 {
+    //puts("TRACE: get_cert_status_by_ocsp()");
     int ret = RET_OK;
     CerStore& cer_store = *get_cerstore();
     const LibraryConfig::OcspParams& ocsp_params = signParams.ocsp;
@@ -759,11 +761,13 @@ int uapki_sign (
         DO(cer_store->getCertByKeyId(sign_params.keyId.get(), &sign_params.signer.pcsiSubject));
         if (sign_params.isCadesFormat) {
             if (!sign_options.ignoreCertStatus) {
-                if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
-                    DO(get_cert_status_by_ocsp(sign_params, sign_params.signer));
+                if ((sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_C) ||
+                    ((sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) && config->getOffline())
+                ) {
+                    DO(get_cert_status_by_crl(sign_params.signer));
                 }
                 else {
-                    DO(get_cert_status_by_crl(sign_params.signer));
+                    DO(get_cert_status_by_ocsp(sign_params, sign_params.signer));
                 }
             }
 
