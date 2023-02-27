@@ -45,8 +45,9 @@ public:
     enum class ValidationType : uint32_t {
         UNDEFINED   = 0,
         NONE        = 1,
-        CRL         = 2,
-        OCSP        = 3
+        CHAIN       = 2,
+        CRL         = 3,
+        OCSP        = 4
     };  //  end enum ValidationType
 
     enum class VerifyStatus : uint32_t {

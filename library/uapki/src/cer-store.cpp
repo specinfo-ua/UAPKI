@@ -979,6 +979,9 @@ CerStore::ValidationType CerStore::validationTypeFromStr (
     if (validationType.empty() || (validationType == string("NONE"))) {
         rv_type = ValidationType::NONE;
     }
+    else if (validationType == string("CHAIN")) {
+        rv_type = ValidationType::CHAIN;
+    }
     else if (validationType == string("CRL")) {
         rv_type = ValidationType::CRL;
     }
