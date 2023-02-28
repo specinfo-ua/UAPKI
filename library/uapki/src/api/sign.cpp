@@ -351,7 +351,7 @@ static int parse_docattrs_from_json (
         JSON_Object* jo_attr = json_array_get_object(ja_attrs, i);
         const string s_type = ParsonHelper::jsonObjectGetString(jo_attr, "type");
         sba_values.set(json_object_get_base64(jo_attr, "bytes"));
-        if (s_type.empty() || !oid_is_valid(s_type.c_str()) || (sba_values.size() == 0)) {
+        if (s_type.empty() || !oid_is_valid(s_type.c_str()) || sba_values.empty()) {
             return RET_UAPKI_INVALID_PARAMETER;
         }
         if (is_signedattrs) {
@@ -651,7 +651,7 @@ static int get_cert_status_by_ocsp (
         if (ret != RET_OK) {
             SET_ERROR(ret);
         }
-        else if (sba_resp.size() == 0) {
+        else if (sba_resp.empty()) {
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
     }

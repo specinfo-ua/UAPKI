@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-01
+//  Last update: 2023-02-28
 
 
 #include "signeddata-helper.h"
@@ -795,7 +795,7 @@ int SignedDataParser::SignerInfo::decodeMandatoryAttrs (void)
             DO(AttributeHelper::decodeMessageDigest(it.baValues, &m_MandatoryAttrs.messageDigest));
         }
     }
-    if (m_MandatoryAttrs.contentType.empty() || (m_MandatoryAttrs.messageDigest.size() == 0)) {
+    if (m_MandatoryAttrs.contentType.empty() || m_MandatoryAttrs.messageDigest.empty()) {
         SET_ERROR(RET_UAPKI_INVALID_ATTRIBUTE);
     }
 

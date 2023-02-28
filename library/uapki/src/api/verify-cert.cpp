@@ -351,7 +351,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
         if (ret != RET_OK) {
             SET_ERROR(ret);
         }
-        else if (sba_resp.size() == 0) {
+        else if (sba_resp.empty()) {
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
     }

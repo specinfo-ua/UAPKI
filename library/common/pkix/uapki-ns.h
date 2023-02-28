@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2022-07-28
 
 #ifndef UAPKI_NS_H
 #define UAPKI_NS_H
@@ -176,24 +175,42 @@ namespace UapkiNS {
         ~SmartBA (void) {
             clear();
         }
-        ByteArray*& operator* (void) { return m_Ba; }
-        ByteArray** operator& (void) { return &m_Ba; }
-        uint8_t* buf (void) const { return ba_get_buf(m_Ba); }
-        ByteArray* get (void) const { return m_Ba; }
+        ByteArray*& operator* (void) {
+            return m_Ba;
+        }
+        ByteArray** operator& (void) {
+            return &m_Ba;
+        }
+        uint8_t* buf (void) const {
+            return ba_get_buf(m_Ba);
+        }
         void clear (void) {
             ba_free(m_Ba);
             m_Ba = nullptr;
         }
+        bool empty (void) const {
+            return (size() == 0);
+        }
+        ByteArray* get (void) const {
+            return m_Ba;
+        }
+        ByteArray* pop (void) {
+            ByteArray* rv_ba = m_Ba;
+            m_Ba = nullptr;
+            return rv_ba;
+        }
         bool reset (ByteArray* ba) {
             clear();
             m_Ba = ba;
-            return (m_Ba != nullptr);
+            return (m_Ba);
         }
         bool set (ByteArray* ba) {
             m_Ba = ba;
-            return (m_Ba != nullptr);
+            return (m_Ba);
         }
-        size_t size (void) const { return ba_get_len(m_Ba); }
+        size_t size (void) const {
+            return ba_get_len(m_Ba);
+        }
     };  //  end class SmartBA
 
     class VectorBA : public std::vector<ByteArray*> {
