@@ -162,6 +162,7 @@ int CerStore::CertStatusInfo::set (
 CerStore::Item::Item (void)
     : baEncoded(nullptr)
     , cert(nullptr)
+    , baAuthorityKeyId(nullptr)
     , baCertId(nullptr)
     , keyAlgo(nullptr)
     , baSerialNumber(nullptr)
@@ -184,6 +185,7 @@ CerStore::Item::~Item (void)
 {
     ba_free((ByteArray*)baEncoded);
     asn_free(get_Certificate_desc(), (Certificate_t*)cert);
+    ba_free((ByteArray*)baAuthorityKeyId);
     ba_free((ByteArray*)baCertId);
     ba_free((ByteArray*)baSerialNumber);
     ba_free((ByteArray*)baKeyId);
@@ -625,17 +627,13 @@ int CerStore::getIssuerCert (
         bool& isSelfSigned
 )
 {
+    if (!cerSubject || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
+
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_authkeyid;
 
-    CHECK_PARAM(cerSubject != nullptr);
-    CHECK_PARAM(cerIssuer != nullptr);
-
-    DO(extns_get_authority_keyid(cerSubject->cert->tbsCertificate.extensions, &sba_authkeyid));
-
-    if (ba_cmp(cerSubject->baKeyId, sba_authkeyid.get()) != 0) {
+    if (ba_cmp(cerSubject->baKeyId, cerSubject->baAuthorityKeyId) != 0) {
         isSelfSigned = false;
-        ret = getCertByKeyId(sba_authkeyid.get(), cerIssuer);
+        ret = getCertByKeyId(cerSubject->baAuthorityKeyId, cerIssuer);
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
         }
@@ -835,13 +833,14 @@ int CerStore::parseCert (
 {
     int ret = RET_OK;
     Certificate_t* cert = nullptr;
-    ByteArray* ba_certid = nullptr;
-    ByteArray* ba_issuer = nullptr;
-    ByteArray* ba_keyid = nullptr;
-    ByteArray* ba_pubkey = nullptr;
-    ByteArray* ba_serialnum = nullptr;
-    ByteArray* ba_spki = nullptr;
-    ByteArray* ba_subject = nullptr;
+    UapkiNS::SmartBA sba_authkeyid;
+    UapkiNS::SmartBA sba_certid;
+    UapkiNS::SmartBA sba_issuer;
+    UapkiNS::SmartBA sba_keyid;
+    UapkiNS::SmartBA sba_pubkey;
+    UapkiNS::SmartBA sba_serialnum;
+    UapkiNS::SmartBA sba_spki;
+    UapkiNS::SmartBA sba_subject;
     Item* cer_item = nullptr;
     HashAlg algo_keyid = HASH_ALG_SHA1;
     uint64_t not_after = 0, not_before = 0;
@@ -853,24 +852,24 @@ int CerStore::parseCert (
 
     CHECK_NOT_NULL(cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), baEncoded));
 
-    DO(asn_INTEGER2ba(&cert->tbsCertificate.serialNumber, &ba_serialnum));
-    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.issuer, &ba_issuer));
+    DO(asn_INTEGER2ba(&cert->tbsCertificate.serialNumber, &sba_serialnum));
+    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.issuer, &sba_issuer));
     DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notBefore, &not_before));
     DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notAfter, &not_after));
-    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &ba_subject));
-    DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &ba_spki));
+    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &sba_subject));
+    DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &sba_spki));
     DO(asn_oid_to_text(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, &s_keyalgo));
     if (DstuNS::isDstu4145family(s_keyalgo)) {
         algo_keyid = HASH_ALG_GOST34311;
         //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
-        DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
+        DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
     }
     else {
-        DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &ba_pubkey));
+        DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
     }
 
-    DO(calcKeyId(algo_keyid, ba_pubkey, &ba_keyid));
-    DO(encode_issuer_and_sn(&cert->tbsCertificate, &ba_certid));
+    DO(calcKeyId(algo_keyid, sba_pubkey.get(), &sba_keyid));
+    DO(encode_issuer_and_sn(&cert->tbsCertificate, &sba_certid));
 
     if (cert->tbsCertificate.extensions) {
         ret = extns_get_key_usage(cert->tbsCertificate.extensions, &key_usage);
@@ -880,48 +879,42 @@ int CerStore::parseCert (
                 ret = RET_OK;
             }
         }
+        //  Required attribute authorityKeyIdentifier
+        DO(extns_get_authority_keyid(cert->tbsCertificate.extensions, &sba_authkeyid));
     }
 
     cer_item = new Item();
     if (cer_item) {
         cer_item->baEncoded = baEncoded;
         cer_item->cert = cert;
-        cer_item->baCertId = ba_certid;
+        cer_item->baAuthorityKeyId = sba_authkeyid.pop();
+        cer_item->baCertId = sba_certid.pop();
         cer_item->keyAlgo = s_keyalgo;
-        cer_item->baSerialNumber = ba_serialnum;
-        cer_item->baKeyId = ba_keyid;
-        cer_item->baIssuer = ba_issuer;
-        cer_item->baSubject = ba_subject;
-        cer_item->baSPKI = ba_spki;
+        cer_item->baSerialNumber = sba_serialnum.pop();
+        cer_item->baKeyId = sba_keyid.pop();
+        cer_item->baIssuer = sba_issuer.pop();
+        cer_item->baSubject = sba_subject.pop();
+        cer_item->baSPKI = sba_spki.pop();
         cer_item->algoKeyId = algo_keyid;
         cer_item->notBefore = not_before;
         cer_item->notAfter = not_after;
         cer_item->keyUsage = key_usage;
 
         cert = nullptr;
-        ba_certid = nullptr;
-        ba_serialnum = nullptr;
-        ba_issuer = nullptr;
-        ba_keyid = nullptr;
-        ba_spki = nullptr;
-        ba_subject = nullptr;
         s_keyalgo = nullptr;
+
         *item = cer_item;
 #ifdef DEBUG_CERSTOREITEM_INFO
         debug_cerstoreitem_info(*cer_item);
 #endif
         cer_item = nullptr;
     }
+    else {
+        ret = RET_UAPKI_GENERAL_ERROR;
+    }
 
 cleanup:
     asn_free(get_Certificate_desc(), cert);
-    ba_free(ba_certid);
-    ba_free(ba_issuer);
-    ba_free(ba_keyid);
-    ba_free(ba_pubkey);
-    ba_free(ba_serialnum);
-    ba_free(ba_spki);
-    ba_free(ba_subject);
     ::free(s_keyalgo);
     delete cer_item;
     return ret;

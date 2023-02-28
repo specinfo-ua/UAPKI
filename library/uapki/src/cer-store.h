@@ -95,6 +95,8 @@ public:
         const Certificate_t*
                     cert;
         const ByteArray*
+                    baAuthorityKeyId;
+        const ByteArray*
                     baCertId;
         const char* keyAlgo;
         const ByteArray*
