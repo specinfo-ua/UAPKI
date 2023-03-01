@@ -284,7 +284,6 @@
 #include "SignedAttributes.h"
 #include "SignedData.h"
 #include "SignerIdentifier.h"
-#include "SignerIdentifierEx.h"
 #include "SignerIdentifierIm.h"
 #include "SignerInfo.h"
 #include "SignerInfos.h"

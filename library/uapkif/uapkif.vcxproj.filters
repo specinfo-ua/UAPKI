@@ -777,9 +777,6 @@
     <ClInclude Include="include\SignerIdentifier.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="include\SignerIdentifierEx.h">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="include\SignerIdentifierIm.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -1560,9 +1557,6 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\SignerIdentifier.c">
-      <Filter>src\struct</Filter>
-    </ClCompile>
-    <ClCompile Include="src\struct\SignerIdentifierEx.c">
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\SignerIdentifierIm.c">
