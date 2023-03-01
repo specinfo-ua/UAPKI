@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-01-30
+//  Last update: 2023-03-01
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -344,7 +344,10 @@ namespace Pkcs7 {
 
     };  //  end class SignedDataParser
 
-    int keyIdToSid (const ByteArray* baKeyId, ByteArray** baSidEncoded);
+    int keyIdToSid (
+        const ByteArray* baKeyId,
+        ByteArray** baSidEncoded
+    );
 
 }   //  end namespace Pkcs7
 

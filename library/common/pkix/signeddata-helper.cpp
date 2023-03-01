@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-28
+//  Last update: 2023-03-01
 
 
 #include "signeddata-helper.h"
@@ -725,7 +725,6 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t* signerInfo)
     }
     if (signerInfo->sid.buf[0] == 0x30) {
         //  It's issuerAndSerialNumber
-        (void)m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf, (size_t)signerInfo->sid.size));
         m_SidType = SignerIdentifierType::ISSUER_AND_SN;
     }
     else {
@@ -733,10 +732,9 @@ int SignedDataParser::SignerInfo::parse (const SignerInfo_t* signerInfo)
         if ((signerInfo->sid.size < 18) || (signerInfo->sid.size > 66)) {
             SET_ERROR(RET_UAPKI_INVALID_KEY_ID);
         }
-        (void)m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf + 2, (size_t)signerInfo->sid.size - 2));
         m_SidType = SignerIdentifierType::SUBJECT_KEYID;
     }
-    if (!m_SidEncoded.buf()) {
+    if (!m_SidEncoded.set(ba_alloc_from_uint8(signerInfo->sid.buf, (size_t)signerInfo->sid.size))) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
@@ -821,25 +819,24 @@ cleanup:
     return ret;
 }
 
-int keyIdToSid (const ByteArray* baKeyId, ByteArray** baSidEncoded)
+int keyIdToSid (
+        const ByteArray* baKeyId,
+        ByteArray** baSidEncoded
+)
 {
     int ret = RET_OK;
-    //  Note:   SignerIdentifierIm_t - is SignerIdentifier IMPLICIT (use tag 0x80),
-    //          SignerIdentifierEx_t - is SignerIdentifier EXPLICIT (use tag 0xA0),
-    //          Here we need use implicit case SignerIdentifier
-    SignerIdentifierIm_t* sid_im = nullptr;
+    SignerIdentifierIm_t* sid = nullptr;
 
-    CHECK_PARAM(baKeyId != nullptr);
-    CHECK_PARAM(baSidEncoded != nullptr);
+    if ((ba_get_len(baKeyId) == 0) || !baSidEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    ASN_ALLOC_TYPE(sid_im, SignerIdentifierIm_t);
-    sid_im->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
-    DO(asn_ba2OCTSTRING(baKeyId, &sid_im->choice.subjectKeyIdentifier));
+    ASN_ALLOC_TYPE(sid, SignerIdentifierIm_t);
+    sid->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
+    DO(asn_ba2OCTSTRING(baKeyId, &sid->choice.subjectKeyIdentifier));
 
-    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid_im, baSidEncoded));
+    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid, baSidEncoded));
 
 cleanup:
-    asn_free(get_SignerIdentifierIm_desc(), sid_im);
+    asn_free(get_SignerIdentifierIm_desc(), sid);
     return ret;
 }
 

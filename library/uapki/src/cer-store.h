@@ -190,6 +190,11 @@ public:
         const Item* cerSubject,
         std::vector<Item*>& chainCerts
     );
+    int getChainCerts (
+        const Item* cerSubject,
+        std::vector<Item*>& chainCerts,
+        const ByteArray** baIssuerKeyId
+    );
     int getCount (
         size_t& count
     );
@@ -235,12 +240,20 @@ public:
         const ByteArray* baIssuer,
         ByteArray** baEncoded
     );
+    static int keyIdFromSid (
+        const ByteArray* baSidEncoded,
+        ByteArray** baKeyId
+    );
+    static int keyIdToSid (
+        const ByteArray* baKeyId,
+        ByteArray** baSidEncoded
+    );
     static int parseCert (
         const ByteArray* baEncoded,
         Item** cerStoreItem
     );
-    static int parseSID (
-        const ByteArray* baSID,
+    static int parseSID (//TODO: rename to parseSid
+        const ByteArray* baSidEncoded,
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,
         ByteArray** baKeyId

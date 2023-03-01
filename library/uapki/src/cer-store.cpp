@@ -588,6 +588,35 @@ cleanup:
     return ret;
 }
 
+int CerStore::getChainCerts (
+        const Item* cerSubject,
+        std::vector<Item*>& chainCerts,
+        const ByteArray** baIssuerKeyId
+)
+{
+    int ret = RET_OK;
+    Item* cer_subject = (Item*)cerSubject;
+    Item* cer_issuer = nullptr;
+    bool is_selfsigned = false;
+
+    while (true) {
+        ret = getIssuerCert(cer_subject, &cer_issuer, is_selfsigned);
+        if (ret == RET_OK) {
+            if (is_selfsigned) break;
+            chainCerts.push_back(cer_issuer);
+            cer_subject = cer_issuer;
+        }
+        else {
+            if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
+                *baIssuerKeyId = cer_subject->baAuthorityKeyId;
+            }
+            break;
+        }
+    }
+
+    return ret;
+}
+
 int CerStore::getCount (
         size_t& count
 )
@@ -630,7 +659,6 @@ int CerStore::getIssuerCert (
     if (!cerSubject || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-
     if (ba_cmp(cerSubject->baKeyId, cerSubject->baAuthorityKeyId) != 0) {
         isSelfSigned = false;
         ret = getCertByKeyId(cerSubject->baAuthorityKeyId, cerIssuer);
@@ -643,7 +671,6 @@ int CerStore::getIssuerCert (
         *cerIssuer = (Item*)cerSubject;
     }
 
-cleanup:
     return ret;
 }
 
@@ -826,6 +853,50 @@ cleanup:
     return ret;
 }
 
+int CerStore::keyIdFromSid (
+        const ByteArray* baSidEncoded,
+        ByteArray** baKeyId
+)
+{
+    int ret = RET_OK;
+    SignerIdentifierIm_t* sid = nullptr;
+
+    if ((ba_get_len(baSidEncoded) < 3) || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(sid = (SignerIdentifierIm_t*)asn_decode_ba_with_alloc(get_SignerIdentifierIm_desc(), baSidEncoded));
+    if (sid->present == SignerIdentifierIm_PR_subjectKeyIdentifier) {
+        DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
+    }
+    else {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+cleanup:
+    asn_free(get_SignerIdentifierIm_desc(), sid);
+    return ret;
+}
+
+int CerStore::keyIdToSid (
+        const ByteArray* baKeyId,
+        ByteArray** baSidEncoded
+)
+{
+    int ret = RET_OK;
+    SignerIdentifierIm_t* sid = nullptr;
+
+    if ((ba_get_len(baKeyId) == 0) || !baSidEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(sid, SignerIdentifierIm_t);
+    sid->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
+    DO(asn_ba2OCTSTRING(baKeyId, &sid->choice.subjectKeyIdentifier));
+
+    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid, baSidEncoded));
+
+cleanup:
+    asn_free(get_SignerIdentifierIm_desc(), sid);
+    return ret;
+}
+
 int CerStore::parseCert (
         const ByteArray* baEncoded,
         Item** item
@@ -921,46 +992,40 @@ cleanup:
 }
 
 int CerStore::parseSID (
-        const ByteArray* baSID,
+        const ByteArray* baSidEncoded,
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,
         ByteArray** baKeyId
 )
 {
     int ret = RET_OK;
-    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
+    SignerIdentifierIm_t* sid = nullptr;
     ByteArray* ba_issuer = nullptr;
     ByteArray* ba_serialnum = nullptr;
-    ByteArray* ba_keyid = nullptr;
-    uint8_t tag = 0x00;
 
-    CHECK_PARAM(ba_get_len(baSID) > 0);
-    CHECK_PARAM(baIssuer != nullptr);
-    CHECK_PARAM(baSerialNumber != nullptr);
-    CHECK_PARAM(baKeyId != nullptr);
+    if ((ba_get_len(baSidEncoded) < 3) || !baIssuer || !baSerialNumber || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(ba_get_byte(baSID, 0, &tag));
-    if (tag == 0x30) {
-        CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)asn_decode_ba_with_alloc(get_IssuerAndSerialNumber_desc(), baSID));
-        DO(asn_encode_ba(get_Name_desc(), &issuer_and_sn->issuer, &ba_issuer));
-        DO(asn_INTEGER2ba(&issuer_and_sn->serialNumber, &ba_serialnum));
+    CHECK_NOT_NULL(sid = (SignerIdentifierIm_t*)asn_decode_ba_with_alloc(get_SignerIdentifierIm_desc(), baSidEncoded));
+    switch (sid->present) {
+    case SignerIdentifierIm_PR_issuerAndSerialNumber:
+        DO(asn_encode_ba(get_Name_desc(), &sid->choice.issuerAndSerialNumber.issuer, &ba_issuer));
+        DO(asn_INTEGER2ba(&sid->choice.issuerAndSerialNumber.serialNumber, &ba_serialnum));
         *baIssuer = ba_issuer;
         *baSerialNumber = ba_serialnum;
         ba_issuer = nullptr;
         ba_serialnum = nullptr;
-    }
-    else if (tag == 0x80) {
-        DO(ba_decode_octetstring(baSID, baKeyId));
-    }
-    else {
-        ret = RET_UAPKI_INVALID_STRUCT;
+        break;
+    case SignerIdentifierIm_PR_subjectKeyIdentifier:
+        DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
+        break;
+    default:
+        break;
     }
 
 cleanup:
-    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
+    asn_free(get_SignerIdentifierIm_desc(), sid);
     ba_free(ba_issuer);
     ba_free(ba_serialnum);
-    ba_free(ba_keyid);
     return ret;
 }
 
