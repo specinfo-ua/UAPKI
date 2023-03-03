@@ -359,10 +359,10 @@ static int result_verifyinfo_to_json (
     DO(result_attr_timestamp_to_json(joSignInfo, "signatureTS", verifyInfo.getSignatureTS()));
     DO_JSON(json_object_set_string(joSignInfo, "statusCertificateRefs", UapkiNS::verifyStatusToStr(verifyInfo.getCadesXlInfo().statusCertRefs)));
     DO(result_certificaterefs_to_json(joSignInfo, verifyInfo.getCadesXlInfo()));
-    if (!verifyInfo.getCertValues().empty()) {
+    if (!verifyInfo.getListAddedCerts().certValues.empty()) {
         json_object_set_value(joSignInfo, "certValues", json_value_init_array());
         JSON_Array* ja_certids = json_object_get_array(joSignInfo, "certValues");
-        for (const auto& it : verifyInfo.getCertValues()) {
+        for (const auto& it : verifyInfo.getListAddedCerts().certValues) {
             DO_JSON(json_array_append_base64(ja_certids, it->baCertId));
         }
     }
@@ -372,15 +372,18 @@ static int result_verifyinfo_to_json (
     DO(result_attributes_to_json(joSignInfo, "signedAttributes", verifyInfo.getSignerInfo().getSignedAttrs()));
     DO(result_attributes_to_json(joSignInfo, "unsignedAttributes", verifyInfo.getSignerInfo().getUnsignedAttrs()));
 
-    //if ((verifyOptions.validationType != CerStore::ValidationType::UNDEFINED) && !verifyInfo.getCertChainItems().empty()) {
-    //    size_t idx = 0;
-    //    DO_JSON(json_object_set_value(joSignInfo, "certificateChain", json_value_init_array()));
-    //    JSON_Array* ja_certchainitems = json_object_get_array(joSignInfo, "certificateChain");
-    //    for (const auto& it : verifyInfo.getCertChainItems()) {
-    //        DO_JSON(json_array_append_value(ja_certchainitems, json_value_init_object()));
-    //        DO(result_certchainitem_to_json(json_array_get_object(ja_certchainitems, idx++), *it));
-    //    }
-    //}
+    if (
+        (verifyOptions.validationType != CerStore::ValidationType::UNDEFINED) &&
+        !verifyInfo.getCertChainItems().empty()
+    ) {
+        size_t idx = 0;
+        DO_JSON(json_object_set_value(joSignInfo, "certificateChain", json_value_init_array()));
+        JSON_Array* ja_certchainitems = json_object_get_array(joSignInfo, "certificateChain");
+        for (const auto& it : verifyInfo.getCertChainItems()) {
+            DO_JSON(json_array_append_value(ja_certchainitems, json_value_init_object()));
+            DO(result_certchainitem_to_json(json_array_get_object(ja_certchainitems, idx++), *it));
+        }
+    }
 
     if (!verifyInfo.getExpectedCertItems().empty()) {
         size_t idx = 0;
@@ -443,16 +446,18 @@ cleanup:
     return ret;
 }   //  result_to_json
 
-/*static int validate_certs (
+/*static int validate_certs(
         UapkiNS::Doc::Verify::VerifySignedDoc& verifySDoc
 )
 {
     int ret = RET_OK;
+    const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySDoc.verifyOptions;
+
     //TODO
 
 cleanup:
     return ret;
-}*/
+}   //  validate_certs*/
 
 static int verify_p7s (
         const ByteArray* baSignature,
@@ -497,17 +502,20 @@ static int verify_p7s (
 
         verified_sinfo.determineSignatureFormat();
         DO(verified_sinfo.certValuesToStore());
-        DO(verified_sinfo.verifyContentTS(verify_sdoc.refContent));
-        DO(verified_sinfo.verifySignatureTS());
+        DO(verified_sinfo.verifyContentTimeStamp(verify_sdoc.refContent));
+        DO(verified_sinfo.verifySignatureTimeStamp());
         DO(verified_sinfo.verifyCertificateRefs());
-        DO(verified_sinfo.verifyArchiveTS(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
+        DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
 
+        if (verifyOptions.validationType >= CerStore::ValidationType::CHAIN) {
+            DO(verified_sinfo.buildCertChain());
+        }
         DO(verified_sinfo.validateStatuses());
     }
 
-    //verify_sdoc.detectCertSources();
-
     //DO(validate_certs(verify_sdoc));
+
+    verify_sdoc.detectCertSources();
 
     DO(result_to_json(joResult, verify_sdoc));
 
@@ -608,7 +616,7 @@ int uapki_verify_signature (
         DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, verify_options, joResult));
     }
     else {
-        if ((sba_content.size() == 0) || (jo_signparams == nullptr) || (jo_signerpubkey == nullptr)) {
+        if (sba_content.empty() || (jo_signparams == nullptr) || (jo_signerpubkey == nullptr)) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
         DO(verify_raw(sba_signature.get(), sba_content.get(), is_digest, jo_signparams, jo_signerpubkey, joResult));

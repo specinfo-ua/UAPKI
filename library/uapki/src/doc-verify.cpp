@@ -86,10 +86,23 @@ struct CollectVerifyStatus {
             );
     }
 
-    void set(const VerifyStatus status) {
+    void set (const VerifyStatus status) {
         values[(uint32_t)status] = true;
     }
 };  //  end class CollectVerifyStatus
+
+
+static bool add_cert_to_vector_if_unique (
+        vector<CerStore::Item*>& cerStoreItems,
+        CerStore::Item* cerStoreItem
+)
+{
+    for (const auto& it : cerStoreItems) {
+        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == 0) return true;
+    }
+    cerStoreItems.push_back(cerStoreItem);
+    return false;
+}   //  add_cert_to_vector_if_unique
 
 
 AttrTimeStamp::AttrTimeStamp (void)
@@ -347,21 +360,26 @@ void CertChainItem::setCertSource (
     m_CertSource = certSource;
 }
 
-void CertChainItem::setCertStatus (const UapkiNS::CertStatus certStatus)
+void CertChainItem::setCertStatus (
+        const UapkiNS::CertStatus certStatus
+)
 {
     m_CertStatus = certStatus;
 }
 
 void CertChainItem::setIssuerAndVerify (
-        CerStore::Item* csiIssuer,
-        const bool isSelfSigned
+        CerStore::Item* csiIssuer
 )
 {
-    m_CsiIssuer = csiIssuer;
-    m_IsSelfSigned = isSelfSigned;
-    if (m_CsiIssuer) {
-        (void)m_CsiSubject->verify(m_CsiIssuer);
+    if (csiIssuer) {
+        m_CsiIssuer = csiIssuer;
     }
+    else {
+        m_CertEntity = CertEntity::ROOT;
+        m_CsiIssuer = m_CsiSubject;
+        m_IsSelfSigned = true;
+    }
+    (void)m_CsiSubject->verify(m_CsiIssuer);
 }
 
 
@@ -450,20 +468,25 @@ int VerifiedSignerInfo::init (
     return (m_CerStore) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
 }
 
-int VerifiedSignerInfo::addCertValidationItem (
+int VerifiedSignerInfo::addCertChainItem (
         const CertEntity certEntity,
-        CerStore::Item* cerStoreItem
+        CerStore::Item* cerStoreItem,
+        CertChainItem** certChainItem
 )
 {
     for (const auto& it : m_CertChainItems) {
-        if (ba_cmp(cerStoreItem->baCertId, it->getSubjectCertId()) == 0) return RET_OK;
+        if (ba_cmp(cerStoreItem->baCertId, it->getSubjectCertId()) == 0) {
+            *certChainItem = it;
+            return RET_OK;
+        }
     }
 
-    CertChainItem* certvalid_item = new CertChainItem(certEntity, cerStoreItem);
-    if (!certvalid_item) return RET_UAPKI_GENERAL_ERROR;
+    CertChainItem* certchain_item = new CertChainItem(certEntity, cerStoreItem);
+    *certChainItem = certchain_item;
+    if (!certchain_item) return RET_UAPKI_GENERAL_ERROR;
 
-    m_CertChainItems.push_back(certvalid_item);
-    return certvalid_item->decodeName();
+    m_CertChainItems.push_back(certchain_item);
+    return certchain_item->decodeName();
 }
 
 int VerifiedSignerInfo::addExpectedCertItem (
@@ -504,6 +527,76 @@ int VerifiedSignerInfo::addExpectedCertItem (
     return expcert_item->setSignerIdentifier((is_keyid) ? sba_keyid.get() : sba_serialnumber.get(), sba_name.get());
 }
 
+int VerifiedSignerInfo::buildCertChain (void)
+{
+    int ret = RET_OK;
+    vector<CerStore::Item*> tsp_certs;
+
+    //  Build chain for Singer
+    if (m_CsiSigner) {
+        const ByteArray* ba_keyid_certnotfound = nullptr;
+        vector<CerStore::Item*> chain_certs;
+        CertChainItem* added_cci = nullptr;
+
+        DO(addCertChainItem(CertEntity::SIGNER, m_CsiSigner, &added_cci));
+        ret = m_CerStore->getChainCerts(m_CsiSigner, chain_certs, &ba_keyid_certnotfound);
+        if (ret == RET_OK) {
+            for (const auto& it : chain_certs) {
+                added_cci->setIssuerAndVerify(it);
+                DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
+            }
+            added_cci->setIssuerAndVerify(nullptr);
+        }
+        else {
+            m_LastError = ret;
+            if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
+                UapkiNS::SmartBA sba_sid;
+                DO(CerStore::keyIdToSid(ba_keyid_certnotfound, &sba_sid));
+                DO(addExpectedCertItem(CertEntity::INTERMEDIATE, sba_sid.get()));
+                for (const auto& it : chain_certs) {
+                    added_cci->setIssuerAndVerify(it);
+                    DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
+                }
+            }
+        }
+    }
+
+    //  Build chain for TSP
+    for (const auto& it : m_ListAddedCerts.tsp) {
+        (void)add_cert_to_vector_if_unique(tsp_certs, it);
+    }
+    for (const auto& it_tsp : tsp_certs) {
+        const ByteArray* ba_keyid_certnotfound = nullptr;
+        vector<CerStore::Item*> chain_certs;
+        CertChainItem* added_cci = nullptr;
+
+        DO(addCertChainItem(CertEntity::TSP, it_tsp, &added_cci));
+        ret = m_CerStore->getChainCerts(it_tsp, chain_certs, &ba_keyid_certnotfound);
+        if (ret == RET_OK) {
+            for (const auto& it : chain_certs) {
+                added_cci->setIssuerAndVerify(it);
+                DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
+            }
+            added_cci->setIssuerAndVerify(nullptr);
+        }
+        else {
+            m_LastError = ret;
+            if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
+                UapkiNS::SmartBA sba_sid;
+                DO(CerStore::keyIdToSid(ba_keyid_certnotfound, &sba_sid));
+                DO(addExpectedCertItem(CertEntity::INTERMEDIATE, sba_sid.get()));
+                for (const auto& it : chain_certs) {
+                    added_cci->setIssuerAndVerify(it);
+                    DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
+                }
+            }
+        }
+    }
+
+cleanup:
+    return ret;
+}
+
 int VerifiedSignerInfo::certValuesToStore (void)
 {
     for (const auto& it : m_CadesXlInfo.certValues) {
@@ -512,8 +605,7 @@ int VerifiedSignerInfo::certValuesToStore (void)
         const int ret = m_CerStore->addCert(it, true, false, false, is_unique, &cer_item);
         if (ret != RET_OK) return ret;
 
-        m_AddedCerts.push_back(cer_item);
-        m_CadesXlInfo.addedCerts.push_back(cer_item);
+        m_ListAddedCerts.certValues.push_back(cer_item);
     }
     return RET_OK;
 }
@@ -597,7 +689,15 @@ int VerifiedSignerInfo::validateStatuses (void)
     m_IsValidSignatures = collect_signatures.isValid();
     m_IsValidDigests = collect_digests.isValid();
     if (m_IsValidSignatures && m_IsValidDigests) {
-        m_ValidationStatus = ValidationStatus::TOTAL_VALID;
+        bool is_signvalid_allcerts = true;
+        for (const auto& it : m_CertChainItems) {
+            if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
+                is_signvalid_allcerts = false;
+                break;
+            }
+        }
+        m_ValidationStatus = (is_signvalid_allcerts)
+            ? ValidationStatus::TOTAL_VALID : ValidationStatus::INDETERMINATE;
     }
     else if (collect_signatures.isDeterminate() || collect_digests.isDeterminate()) {
         m_ValidationStatus = ValidationStatus::INDETERMINATE;
@@ -609,7 +709,7 @@ int VerifiedSignerInfo::validateStatuses (void)
     return RET_OK;
 }
 
-int VerifiedSignerInfo::verifyArchiveTS (
+int VerifiedSignerInfo::verifyArchiveTimeStamp (
         const vector<CerStore::Item*>& certs,
         const vector<CrlStore::Item*>& crls
 )
@@ -638,14 +738,18 @@ int VerifiedSignerInfo::verifyArchiveTS (
         }
 
         DO(m_ArchiveTsHelper.calcHash());
-        DEBUG_OUTCON(printf("VerifiedSignerInfo::verifyArchiveTS(), calculated hash-value, hex: ");  ba_print(stdout, m_ArchiveTsHelper.getHashValue()));
+        DEBUG_OUTCON(printf("VerifiedSignerInfo::verifyArchiveTimeStamp(), calculated hash-value, hex: ");  ba_print(stdout, m_ArchiveTsHelper.getHashValue()));
 
         m_ArchiveTS.statusDigest = (ba_cmp(m_ArchiveTS.hashedMessage.get(), m_ArchiveTsHelper.getHashValue()) == 0)
             ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID;
+        if (m_ArchiveTS.statusDigest == SignatureVerifyStatus::INVALID) {
+            m_LastError = RET_UAPKI_INVALID_DIGEST;
+        }
 
         ret = verifyAttrTimestamp(m_ArchiveTS);
         if (ret != RET_OK) {
             m_LastError = ret;
+            ret = (ret == RET_UAPKI_CERT_NOT_FOUND) ? RET_OK : ret;
         }
     }
 
@@ -675,7 +779,7 @@ int VerifiedSignerInfo::verifyCertificateRefs (void)
     return ret;
 }
 
-int VerifiedSignerInfo::verifyContentTS (
+int VerifiedSignerInfo::verifyContentTimeStamp (
         const ByteArray* baContent
 )
 {
@@ -689,6 +793,10 @@ int VerifiedSignerInfo::verifyContentTS (
         if (ret != RET_OK) {
             m_LastError = ret;
         }
+    }
+
+    if ((ret == RET_UAPKI_CERT_NOT_FOUND) || (ret == RET_UAPKI_INVALID_DIGEST)) {
+        ret = RET_OK;
     }
     return ret;
 }
@@ -729,7 +837,7 @@ int VerifiedSignerInfo::verifyMessageDigest (
     return RET_OK;
 }
 
-int VerifiedSignerInfo::verifySignatureTS (void)
+int VerifiedSignerInfo::verifySignatureTimeStamp (void)
 {
     int ret = RET_OK;
     if (m_SignatureTS.isPresent()) {
@@ -742,6 +850,10 @@ int VerifiedSignerInfo::verifySignatureTS (void)
             m_LastError = ret;
         }
     }
+
+    if ((ret == RET_UAPKI_CERT_NOT_FOUND) || (ret == RET_UAPKI_INVALID_DIGEST)) {
+        ret = RET_OK;
+    }
     return ret;
 }
 
@@ -752,21 +864,19 @@ int VerifiedSignerInfo::verifySignedAttribute (void)
     //  Get signer certificate
     switch (m_SignerInfo.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        ret = m_CerStore->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
         m_SignatureFormat = (m_StatusEssCert == DataVerifyStatus::INDETERMINATE)
             ? SignatureFormat::CADES_BES : SignatureFormat::CMS_SID_KEYID;
         break;
     case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        ret = m_CerStore->getCertByKeyId(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
         m_SignatureFormat = SignatureFormat::CMS_SID_KEYID;
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
+    ret = m_CerStore->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
 
     //  Verify signed attributes
     if (ret == RET_OK) {
-        DO(addCertValidationItem(CertEntity::SIGNER, m_CsiSigner));
         ret = verify_signature(
             m_SignerInfo.getSignatureAlgorithm().algorithm.c_str(),
             m_SignerInfo.getSignedAttrsEncoded(),
@@ -900,7 +1010,7 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
         CerStore::Item* cer_item = nullptr;
         DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
         it = nullptr;
-        m_AddedCerts.push_back(cer_item);
+        m_ListAddedCerts.others.push_back(cer_item);
     }
 
     DO(sdata_parser.parseSignerInfo(0, signer_info));
@@ -920,7 +1030,7 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
     }
 
     if (ret == RET_OK) {
-        DO(addCertValidationItem(CertEntity::SIGNER, attrTS.csiSigner));
+        m_ListAddedCerts.tsp.push_back(attrTS.csiSigner);
         ret = verify_signature(
             signer_info.getSignatureAlgorithm().algorithm.c_str(),
             signer_info.getSignedAttrsEncoded(),
@@ -996,29 +1106,30 @@ cleanup:
     return ret;
 }
 
+static bool find_cert_in_list (
+        const vector<CerStore::Item*>& cerStoreItems,
+        const ByteArray* baCertId
+)
+{
+    for (const auto& it : cerStoreItems) {
+        if (ba_cmp(baCertId, it->baCertId) == 0) {
+            return true;
+        }
+    }
+    return false;
+}   //  find_cert_in_list
+
 void VerifySignedDoc::detectCertSources (void)
 {
     for (auto& it_vsi : verifiedSignerInfos) {
         for (auto& it_cci : it_vsi.getCertChainItems()) {
-            //  Search in common certs
-            bool is_found = false;
-            for (const auto& it_acert : addedCerts) {
-                if (ba_cmp(it_cci->getSubjectCertId(), it_acert->baCertId) == 0) {
-                    is_found = true;
-                    break;
-                }
-            }
-
-            //  Search in certs from SignerInfo
-            if (!is_found) {
-                for (const auto& it_acert : it_vsi.getAddedCerts()) {
-                    if (ba_cmp(it_cci->getSubjectCertId(), it_acert->baCertId) == 0) {
-                        is_found = true;
-                        break;
-                    }
-                }
-            }
-
+            const ByteArray* cert_id = it_cci->getSubjectCertId();
+            const bool is_found = (
+                find_cert_in_list(addedCerts, cert_id) ||                           //  Common certs in signedData
+                find_cert_in_list(it_vsi.getListAddedCerts().tsp, cert_id) ||       //  TSP-certs from SignerInfo(signer TSP-response)
+                find_cert_in_list(it_vsi.getListAddedCerts().others, cert_id) ||    //  Other certs from SignerInfo(any sources)
+                find_cert_in_list(it_vsi.getListAddedCerts().certValues, cert_id)   //  Certs from SignerInfo(attribute certValues)
+            );
             it_cci->setCertSource((is_found) ? CertSource::SIGNATURE : CertSource::STORE);
         }
     }

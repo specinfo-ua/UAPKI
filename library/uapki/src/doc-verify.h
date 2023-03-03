@@ -110,8 +110,6 @@ struct CadesXlInfo {
                 revocationRefsParser;
     AttributeHelper::RevocationValuesParser
                 revocationValuesParser;
-    std::vector<CerStore::Item*>
-                addedCerts;
     VectorBA    expectedCertsByIssuerAndSN;
     DigestVerifyStatus
                 statusCertRefs;
@@ -146,8 +144,7 @@ struct CadesXlInfo {
 
 
 class CertChainItem {
-    const CertEntity
-                m_CertEntity;
+    CertEntity  m_CertEntity;
     CerStore::Item*
                 m_CsiSubject;
     CertSource  m_CertSource;
@@ -178,10 +175,11 @@ public:
     void setCertSource (
         const CertSource certSource
     );
-    void setCertStatus (const UapkiNS::CertStatus certStatus);
+    void setCertStatus (
+        const UapkiNS::CertStatus certStatus
+    );
     void setIssuerAndVerify (
-        CerStore::Item* csiIssuer,
-        const bool isSelfSigned
+        CerStore::Item* csiIssuer
     );
 
 public:
@@ -278,6 +276,12 @@ public:
 
 
 class VerifiedSignerInfo {
+    struct ListAddedCerts {
+        std::vector<CerStore::Item*> certValues;
+        std::vector<CerStore::Item*> others;
+        std::vector<CerStore::Item*> tsp;
+    };  //  end struct ListAddedCerts
+
     CerStore*   m_CerStore;
     bool        m_IsDigest;
     int         m_LastError;
@@ -315,8 +319,8 @@ class VerifiedSignerInfo {
                 m_CertChainItems;
     std::vector<ExpectedCertItem*>
                 m_ExpectedCertItems;
-    std::vector<CerStore::Item*>
-                m_AddedCerts;
+    ListAddedCerts
+                m_ListAddedCerts;
 
 public:
     VerifiedSignerInfo (void);
@@ -326,38 +330,37 @@ public:
         CerStore* iCerStore,
         const bool isDigest
     );
-    int addCertValidationItem (
+    int addCertChainItem (
         const CertEntity certEntity,
-        CerStore::Item* cerStoreItem
+        CerStore::Item* cerStoreItem,
+        CertChainItem** certChainItem
     );
     int addExpectedCertItem (
         const CertEntity certEntity,
         const ByteArray* baSidEncoded
     );
+    int buildCertChain (void);
     int certValuesToStore (void);
     void determineSignatureFormat (void);
     const char* getValidationStatus (void) const;
     int parseAttributes (void);
     int validateStatuses (void);
-    int verifyArchiveTS (
+    int verifyArchiveTimeStamp (
         const std::vector<CerStore::Item*>& certs,
         const std::vector<CrlStore::Item*>& crls
     );
     int verifyCertificateRefs (void);
-    int verifyContentTS (
+    int verifyContentTimeStamp (
         const ByteArray* baContent
     );
     int verifyMessageDigest (
         const ByteArray* baContent
     );
-    int verifySignatureTS (void);
+    int verifySignatureTimeStamp (void);
     int verifySignedAttribute (void);
     int verifySigningCertificateV2 (void);
 
 public:
-    const std::vector<CerStore::Item*>& getAddedCerts (void) const {
-        return m_AddedCerts;
-    }
     const AttrTimeStamp& getArchiveTS (void) const {
         return m_ArchiveTS;
     }
@@ -370,17 +373,17 @@ public:
     CerStore* getCerStore (void) const {
         return m_CerStore;
     }
-    const std::vector<CertChainItem*> getCertChainItems (void) const {
+    const std::vector<CertChainItem*>& getCertChainItems (void) const {
         return m_CertChainItems;
-    }
-    const std::vector<CerStore::Item*>& getCertValues (void) const {
-        return m_CadesXlInfo.addedCerts;
     }
     const AttrTimeStamp& getContentTS (void) const {
         return m_ContentTS;
     }
     const std::vector<ExpectedCertItem*> getExpectedCertItems (void) const {
         return m_ExpectedCertItems;
+    }
+    const ListAddedCerts& getListAddedCerts (void) const {
+        return m_ListAddedCerts;
     }
     AttributeHelper::RevocationRefsParser& getRevocationRefs (void) {
         return m_CadesXlInfo.revocationRefsParser;
