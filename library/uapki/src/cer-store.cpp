@@ -489,7 +489,7 @@ int CerStore::getCertBySID (
     int ret = RET_OK;
     UapkiNS::SmartBA sba_issuer, sba_keyid, sba_serialnum;
 
-    ret = parseSID(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
+    ret = parseSid(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
     if (ret != RET_OK) return ret;
 
     if (sba_keyid.size() > 0) {
@@ -991,7 +991,7 @@ cleanup:
     return ret;
 }
 
-int CerStore::parseSID (
+int CerStore::parseSid (
         const ByteArray* baSidEncoded,
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,

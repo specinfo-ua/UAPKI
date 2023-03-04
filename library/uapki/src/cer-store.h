@@ -252,7 +252,7 @@ public:
         const ByteArray* baEncoded,
         Item** cerStoreItem
     );
-    static int parseSID (//TODO: rename to parseSid
+    static int parseSid (
         const ByteArray* baSidEncoded,
         ByteArray** baIssuer,
         ByteArray** baSerialNumber,

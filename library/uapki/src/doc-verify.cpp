@@ -495,7 +495,7 @@ int VerifiedSignerInfo::addExpectedCertItem (
 )
 {
     SmartBA sba_keyid, sba_name, sba_serialnumber;
-    const int ret = CerStore::parseSID(baSidEncoded, &sba_name, &sba_serialnumber, &sba_keyid);
+    const int ret = CerStore::parseSid(baSidEncoded, &sba_name, &sba_serialnumber, &sba_keyid);
     if (ret != RET_OK) return ret;
 
     const bool is_keyid = (sba_keyid.size() > 0);
