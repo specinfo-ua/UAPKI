@@ -32,6 +32,7 @@
 #include "archive-timestamp-helper.h"
 #include "cer-store.h"
 #include "crl-store.h"
+#include "ocsp-helper.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
 #include "tsp-helper.h"
@@ -55,11 +56,11 @@ enum class CertEntity : uint32_t {
     ROOT            = 7
 };  //  end enum CertEntity
 
-enum class CertSource : uint32_t {
+enum class DataSource : uint32_t {
     UNDEFINED       = 0,
     SIGNATURE       = 1,
     STORE           = 2
-};  //  end enum CertSource
+};  //  end enum DataSource
 
 enum class ValidationStatus : uint32_t {
     UNDEFINED       = 0,
@@ -143,11 +144,21 @@ struct CadesXlInfo {
 };  //  end struct CadesXlInfo
 
 
+struct OcspResponseInfo : public UapkiNS::Ocsp::ResponseInfo {
+    DataSource  dataSource;
+
+    OcspResponseInfo (void)
+    : dataSource(DataSource::UNDEFINED)
+    {}
+
+};  //  end struct OcspResponseInfo
+
+
 class CertChainItem {
     CertEntity  m_CertEntity;
     CerStore::Item*
                 m_CsiSubject;
-    CertSource  m_CertSource;
+    DataSource  m_DataSource;
     std::string m_CommonName;
     CerStore::Item*
                 m_CsiIssuer;
@@ -155,7 +166,8 @@ class CertChainItem {
     bool        m_IsSelfSigned;
     UapkiNS::CertStatus
                 m_CertStatus;
-    SmartBA     m_OcspResponse;
+    OcspResponseInfo
+                m_OcspResponseInfo;
 
 public:
     CertChainItem (
@@ -169,14 +181,11 @@ public:
         const uint64_t validateTime
     );
     int decodeName (void);
-    int decodeOcspResponse (
-        const ByteArray* baOcspResponse
-    );
-    void setCertSource (
-        const CertSource certSource
-    );
     void setCertStatus (
         const UapkiNS::CertStatus certStatus
+    );
+    void setDataSource (
+        const DataSource dataSource
     );
     void setIssuerAndVerify (
         CerStore::Item* csiIssuer
@@ -186,20 +195,26 @@ public:
     CertEntity getCertEntity (void) const {
         return m_CertEntity;
     }
-    CertSource getCertSource (void) const {
-        return m_CertSource;
-    }
     UapkiNS::CertStatus getCertStatus (void) const {
         return m_CertStatus;
     }
     const std::string& getCommonName (void) const {
         return m_CommonName;
     }
+    DataSource getDataSource (void) const {
+        return m_DataSource;
+    }
     CerStore::Item* getIssuer (void) const {
         return m_CsiIssuer;
     }
     const ByteArray* getIssuerCertId (void) const {
         return (m_CsiIssuer) ? m_CsiIssuer->baCertId : nullptr;
+    }
+    const OcspResponseInfo& getOcspResponseInfo (void) const {
+        return m_OcspResponseInfo;
+    }
+    OcspResponseInfo& getOcspResponseInfo (void) {
+        return m_OcspResponseInfo;
     }
     CerStore::Item* getSubject (void) const {
         return m_CsiSubject;
@@ -491,8 +506,8 @@ const char* certEntityToStr (
     const CertEntity certEntity
 );
 
-const char* certSourceToStr (
-    const CertSource certSource
+const char* dataSourceToStr (
+    const DataSource dataSource
 );
 
 const char* validationStatusToStr (

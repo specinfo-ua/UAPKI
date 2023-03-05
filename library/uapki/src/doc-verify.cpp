@@ -315,7 +315,7 @@ CertChainItem::CertChainItem (
 )
     : m_CertEntity(iCertEntity)
     , m_CsiSubject(iCsiSubject)
-    , m_CertSource(CertSource::UNDEFINED)
+    , m_DataSource(DataSource::UNDEFINED)
     , m_CsiIssuer(nullptr)
     , m_IsExpired(true)
     , m_IsSelfSigned(false)
@@ -345,19 +345,11 @@ int CertChainItem::decodeName (void)
     );
 }
 
-int CertChainItem::decodeOcspResponse (
-        const ByteArray* baOcspResponse
+void CertChainItem::setDataSource (
+        const DataSource dataSource
 )
 {
-    //m_OcspResponse()
-    return 0;
-}
-
-void CertChainItem::setCertSource (
-        const CertSource certSource
-)
-{
-    m_CertSource = certSource;
+    m_DataSource = dataSource;
 }
 
 void CertChainItem::setCertStatus (
@@ -1130,7 +1122,7 @@ void VerifySignedDoc::detectCertSources (void)
                 find_cert_in_list(it_vsi.getListAddedCerts().others, cert_id) ||    //  Other certs from SignerInfo(any sources)
                 find_cert_in_list(it_vsi.getListAddedCerts().certValues, cert_id)   //  Certs from SignerInfo(attribute certValues)
             );
-            it_cci->setCertSource((is_found) ? CertSource::SIGNATURE : CertSource::STORE);
+            it_cci->setDataSource((is_found) ? DataSource::SIGNATURE : DataSource::STORE);
         }
     }
 }
@@ -1162,8 +1154,8 @@ const char* certEntityToStr (
     return CERT_ENTITY_STRINGS[((uint32_t)certEntity < 8) ? (uint32_t)certEntity : 0];
 }   //  certEntityToStr
 
-const char* certSourceToStr (
-        const CertSource certSource
+const char* dataSourceToStr (
+        const DataSource dataSource
 )
 {
     static const char* CERT_SOURCE_STRINGS[3] = {
@@ -1171,8 +1163,8 @@ const char* certSourceToStr (
         "SIGNATURE",
         "STORE"
     };
-    return CERT_SOURCE_STRINGS[((uint32_t)certSource < 3) ? (uint32_t)certSource : 0];
-}   //  certSourceToStr
+    return CERT_SOURCE_STRINGS[((uint32_t)dataSource < 3) ? (uint32_t)dataSource : 0];
+}   //  dataSourceToStr
 
 const char* validationStatusToStr (
         const ValidationStatus status
