@@ -106,11 +106,11 @@ namespace Ocsp {
 
         int init (void);
         int addCert (
-            const CerStore::Item* cerIssuer,
-            const CerStore::Item* cerSubject
+            const CerStore::Item* csiIssuer,
+            const CerStore::Item* csiSubject
         );
         int addSN (
-            const CerStore::Item* cerIssuer,
+            const CerStore::Item* csiIssuer,
             const ByteArray* baSerialNumber
         );
         int genNonce (
@@ -154,22 +154,59 @@ namespace Ocsp {
         );
         int scanSingleResponses (void);
         int verifyTbsResponseData (
-            const CerStore::Item* cerResponder,
+            const CerStore::Item* csiResponder,
             SignatureVerifyStatus& statusSign
         );
 
-        const size_t countOcspRecords (void) const { return m_OcspRecords.size(); };
-        const ByteArray* getNonce (void) const { return m_BaNonce; }
-        uint64_t getProducedAt (void) const { return m_ProducedAt; }
-        ResponseStatus getResponseStatus (void) const { return m_ResponseStatus; }
-        const ByteArray* getTbsRequestEncoded (void) const { return m_BaTbsRequestEncoded; }
-        const ByteArray* getTbsResponseData (void) const { return m_BaTbsResponseData; }
+    public:
+        const size_t countOcspRecords (void) const {
+            return m_OcspRecords.size();
+        };
+        const ByteArray* getNonce (void) const {
+            return m_BaNonce;
+        }
+        uint64_t getProducedAt (void) const {
+            return m_ProducedAt;
+        }
+        ResponseStatus getResponseStatus (void) const {
+            return m_ResponseStatus;
+        }
+        const ByteArray* getTbsRequestEncoded (void) const {
+            return m_BaTbsRequestEncoded;
+        }
+        const ByteArray* getTbsResponseData (void) const {
+            return m_BaTbsResponseData;
+        }
 
     public:
         int addNonceToExtension (void);
         int parseOcspResponse (const ByteArray* baEncoded);
 
     };  //  end class OcspHelper
+
+    struct ResponseInfo {
+        ResponseStatus
+                    responseStatus;
+        ResponderIdType
+                    responderIdType;
+        SmartBA     baResponderId;
+        uint64_t    msProducedAt;
+        OcspHelper::OcspRecord
+                    ocspRecord;
+        SignatureVerifyStatus
+                    statusSignature;
+        CerStore::Item*
+                    csiResponder;
+
+        ResponseInfo (void)
+        : responseStatus(ResponseStatus::UNDEFINED)
+        , responderIdType(ResponderIdType::UNDEFINED)
+        , msProducedAt(0)
+        , statusSignature(SignatureVerifyStatus::UNDEFINED)
+        , csiResponder(nullptr)
+        {}
+
+    };  //  end struct ResponseInfo
 
     int generateOtherHash (
         const ByteArray* baOcspResponseEncoded,

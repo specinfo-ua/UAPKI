@@ -156,29 +156,29 @@ int OcspHelper::init (void)
 }
 
 int OcspHelper::addCert (
-        const CerStore::Item* cerIssuer,
-        const CerStore::Item* cerSubject
+        const CerStore::Item* csiIssuer,
+        const CerStore::Item* csiSubject
 )
 {
-    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
+    if (!csiSubject) return RET_UAPKI_INVALID_PARAMETER;
 
-    return addSN(cerIssuer, cerSubject->baSerialNumber);
+    return addSN(csiIssuer, csiSubject->baSerialNumber);
 }
 
 int OcspHelper::addSN (
-        const CerStore::Item* cerIssuer,
+        const CerStore::Item* csiIssuer,
         const ByteArray* baSerialNumber
 )
 {
     int ret = RET_OK;
     OcspCertId cert_id;
 
-    if (!m_OcspRequest || !cerIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_OcspRequest || !csiIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
 
     memset(&cert_id, 0, sizeof(OcspCertId));
     cert_id.hashAlgoParamIsNull = false;
 
-    DO(certid_hashed_issuer(cert_id, cerIssuer));
+    DO(certid_hashed_issuer(cert_id, csiIssuer));
     cert_id.serialNumber = (ByteArray*)baSerialNumber;
 
     DO(ocsprequest_add_certid(*m_OcspRequest, cert_id));
@@ -541,7 +541,7 @@ cleanup:
 }
 
 int OcspHelper::verifyTbsResponseData (
-        const CerStore::Item* cerResponder,
+        const CerStore::Item* csiResponder,
         SignatureVerifyStatus& statusSign
 )
 {
@@ -554,14 +554,14 @@ int OcspHelper::verifyTbsResponseData (
 
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
 
-    if (cerResponder->algoKeyId == HASH_ALG_GOST34311) {
+    if (csiResponder->algoKeyId == HASH_ALG_GOST34311) {
         DO(asn_decodevalue_bitstring_encap_octet(&m_BasicOcspResp->signature, &ba_signature));
     }
     else {
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = verify_signature(s_signalgo, m_BaTbsResponseData, false, cerResponder->baSPKI, ba_signature);
+    ret = verify_signature(s_signalgo, m_BaTbsResponseData, false, csiResponder->baSPKI, ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SignatureVerifyStatus::VALID;
