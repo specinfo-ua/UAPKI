@@ -720,6 +720,20 @@ void CerStore::reset (void)
     mtx.unlock();
 }
 
+bool CerStore::addCertIfUnique (
+        vector<Item*>& cerStoreItems,
+        Item* cerStoreItem
+)
+{
+    if (!cerStoreItem) return false;
+
+    for (const auto& it : cerStoreItems) {
+        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == 0) return false;
+    }
+    cerStoreItems.push_back(cerStoreItem);
+    return true;
+}
+
 int CerStore::calcKeyId (
         const HashAlg algoKeyId,
         const ByteArray* baPubkey,
@@ -769,6 +783,19 @@ int CerStore::encodeIssuerAndSN (
 cleanup:
     asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
     return ret;
+}
+
+CerStore::Item* CerStore::findCertByCertId (
+        const std::vector<Item*>& cerStoreItems,
+        const ByteArray* baCertId
+)
+{
+    for (size_t i = 0; i < cerStoreItems.size(); i++) {
+        if (ba_cmp(baCertId, cerStoreItems[i]->baCertId) == 0) {
+            return cerStoreItems[i];
+        }
+    }
+    return nullptr;
 }
 
 int CerStore::generateEssCertId (

@@ -217,6 +217,10 @@ public:
     void reset (void);
 
 public:
+    static bool addCertIfUnique (
+        std::vector<Item*>& cerStoreItems,
+        Item* cerStoreItem
+    );
     static int calcKeyId (
         const HashAlg algoKeyId,
         const ByteArray* baPubkey,
@@ -226,6 +230,10 @@ public:
         const ByteArray* baIssuer,
         const ByteArray* baSerialNumber,
         ByteArray** baIssuerAndSN
+    );
+    static Item* findCertByCertId (
+        const std::vector<Item*>& cerStoreItems,
+        const ByteArray* baCertId
     );
     static int generateEssCertId (
         const Item* cerStoreItem,
