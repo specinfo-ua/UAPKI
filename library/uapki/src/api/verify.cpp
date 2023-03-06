@@ -155,7 +155,7 @@ static int result_certchainitem_to_json (
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", certChainItem.isExpired()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", certChainItem.isSelfSigned()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", certChainItem.isTrusted()));
-    DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(certChainItem.getCertStatus())));
+    //DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(certChainItem.getCertStatus())));
     if (certChainItem.getIssuerCertId()) {
         DO(json_object_set_base64(joResult, "issuerCertId", certChainItem.getIssuerCertId()));
         DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(certChainItem.getVerifyStatus())));
@@ -172,7 +172,7 @@ static int result_certchainitem_to_json (
 
         json_object_set_value(joResult, "validateByOCSP", json_value_init_object());
         JSON_Object* jo_valbyocsp = json_object_get_object(joResult, "validateByOCSP");
-        if (ocsp_respinfo.dataSource != UapkiNS::Doc::Verify::DataSource::UNDEFINED) {
+        if (ocsp_respinfo.isUsed) {
             DO_JSON(json_object_set_string(jo_valbyocsp, "source", UapkiNS::Doc::Verify::dataSourceToStr(ocsp_respinfo.dataSource)));
             DO_JSON(json_object_set_string(jo_valbyocsp, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(ocsp_respinfo.responseStatus)));
             DO_JSON(json_object_set_string(jo_valbyocsp, "producedAt", TimeUtils::mstimeToFormat(ocsp_respinfo.msProducedAt).c_str()));
@@ -189,6 +189,9 @@ static int result_certchainitem_to_json (
             if (ocsp_respinfo.csiResponder) {
                 DO(json_object_set_base64(jo_valbyocsp, "signerCertId", ocsp_respinfo.csiResponder->baCertId));
             }
+        }
+        else {
+            DO_JSON(json_object_set_string(jo_valbyocsp, "status", "NOT USED"));
         }
     }
 
@@ -486,56 +489,19 @@ cleanup:
     return ret;
 }   //  result_to_json
 
-/*static int validate_by_crl (
+static int validate_by_crl (
         UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
         UapkiNS::Doc::Verify::CertChainItem& certChainItem
 )
 {
     int ret = RET_OK;
     //TODO:
-cleanup:
+//cleanup:
     return ret;
-}   //  validate_by_crl*/
-
-static int verify_ocspresponse (
-        CerStore& cerStore,
-        UapkiNS::Ocsp::OcspHelper& ocspClient,
-        UapkiNS::Doc::Verify::OcspResponseInfo& ocspResponseInfo
-)
-{
-    int ret = RET_OK;
-    UapkiNS::VectorBA vba_certs;
-
-    DO(ocspClient.getCerts(vba_certs));
-    for (auto& it : vba_certs) {
-        bool is_unique;
-        DO(cerStore.addCert(it, false, false, false, is_unique, nullptr));
-        it = nullptr;
-    }
-
-    DO(ocspClient.getResponderId(ocspResponseInfo.responderIdType, &ocspResponseInfo.baResponderId));
-    if (ocspResponseInfo.responderIdType == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
-        DO(cerStore.getCertBySubject(ocspResponseInfo.baResponderId.get(), &ocspResponseInfo.csiResponder));
-    }
-    else {
-        //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        DO(cerStore.getCertByKeyId(ocspResponseInfo.baResponderId.get(), &ocspResponseInfo.csiResponder));
-    }
-
-    ret = ocspClient.verifyTbsResponseData(ocspResponseInfo.csiResponder, ocspResponseInfo.statusSignature);
-    if (ret == RET_VERIFY_FAILED) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED);
-    }
-    else if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_ERROR);
-    }
-
-cleanup:
-    return ret;
-}   //  verify_ocspresponse
+}   //  validate_by_crl
 
 static int validate_by_ocsp (
-        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
         UapkiNS::Doc::Verify::CertChainItem& certChainItem
 )
 {
@@ -600,7 +566,7 @@ static int validate_by_ocsp (
     ocsp_respinfo.responseStatus = ocsp_helper.getResponseStatus();
 
     if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
-        DO(verify_ocspresponse(*verifySignedDoc.cerStore, ocsp_helper, ocsp_respinfo));
+        (void)verifiedSignerInfo.verifyOcspResponse(ocsp_helper, ocsp_respinfo);
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
@@ -673,23 +639,21 @@ static int verify_p7s (
         DO(verified_sinfo.validateStatuses());
     }
 
-    /*for (auto& it_vsi : verify_sdoc.verifiedSignerInfos) {
+    for (auto& it_vsi : verify_sdoc.verifiedSignerInfos) {
         if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
-            for (auto& it : it_vsi.getCertChainItems()) {
-                (void)validate_by_crl(verify_sdoc, *it);
+            for (auto& it_cci : it_vsi.getCertChainItems()) {
+                (void)validate_by_crl(verify_sdoc, *it_cci);
             }
         }
         else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
-            for (auto& it : it_vsi.getCertChainItems()) {
-                if (
-                    !it->isSelfSigned() &&
-                    (it->getCertEntity() != UapkiNS::Doc::Verify::CertEntity::OCSP)
-                ) {
-                    (void)validate_by_ocsp(verify_sdoc, *it);
+            for (auto& it_cci : it_vsi.getCertChainItems()) {
+                if (it_cci->getOcspResponseInfo().isUsed) {
+                    (void)validate_by_ocsp(it_vsi, *it_cci);
                 }
             }
+            DO(it_vsi.addOcspCertsToChain());
         }
-    }*/
+    }
 
     verify_sdoc.detectCertSources();
 

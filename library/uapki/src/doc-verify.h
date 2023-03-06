@@ -146,9 +146,11 @@ struct CadesXlInfo {
 
 struct OcspResponseInfo : public UapkiNS::Ocsp::ResponseInfo {
     DataSource  dataSource;
+    bool        isUsed;
 
     OcspResponseInfo (void)
     : dataSource(DataSource::UNDEFINED)
+    , isUsed(true)
     {}
 
 };  //  end struct OcspResponseInfo
@@ -292,8 +294,9 @@ public:
 
 class VerifiedSignerInfo {
     struct ListAddedCerts {
-        std::vector<CerStore::Item*> certValues;
-        std::vector<CerStore::Item*> others;
+        std::vector<CerStore::Item*> addedCerts;    //  All certs from SignerInfo (including OCSP/TSP-response)
+        std::vector<CerStore::Item*> certValues;    //  Certs from attribute certValues
+        std::vector<CerStore::Item*> ocsp;
         std::vector<CerStore::Item*> tsp;
     };  //  end struct ListAddedCerts
 
@@ -354,6 +357,7 @@ public:
         const CertEntity certEntity,
         const ByteArray* baSidEncoded
     );
+    int addOcspCertsToChain (void);
     int buildCertChain (void);
     int certValuesToStore (void);
     void determineSignatureFormat (void);
@@ -370,6 +374,10 @@ public:
     );
     int verifyMessageDigest (
         const ByteArray* baContent
+    );
+    int verifyOcspResponse (
+        Ocsp::OcspHelper& ocspClient,
+        OcspResponseInfo& ocspResponseInfo
     );
     int verifySignatureTimeStamp (void);
     int verifySignedAttribute (void);
@@ -398,6 +406,9 @@ public:
         return m_ExpectedCertItems;
     }
     const ListAddedCerts& getListAddedCerts (void) const {
+        return m_ListAddedCerts;
+    }
+    ListAddedCerts& getListAddedCerts (void) {
         return m_ListAddedCerts;
     }
     AttributeHelper::RevocationRefsParser& getRevocationRefs (void) {
