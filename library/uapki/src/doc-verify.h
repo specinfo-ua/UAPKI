@@ -363,6 +363,7 @@ public:
     void determineSignatureFormat (void);
     const char* getValidationStatus (void) const;
     int parseAttributes (void);
+    int setRevocationValuesForChain (void);
     int validateStatuses (void);
     int verifyArchiveTimeStamp (
         const std::vector<CerStore::Item*>& certs,

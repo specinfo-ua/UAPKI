@@ -640,17 +640,23 @@ static int verify_p7s (
     }
 
     for (auto& it_vsi : verify_sdoc.verifiedSignerInfos) {
-        if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
-            for (auto& it_cci : it_vsi.getCertChainItems()) {
-                (void)validate_by_crl(verify_sdoc, *it_cci);
-            }
-        }
-        else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
-            for (auto& it_cci : it_vsi.getCertChainItems()) {
-                if (it_cci->getOcspResponseInfo().isUsed) {
-                    (void)validate_by_ocsp(it_vsi, *it_cci);
+        if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
+            if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
+                for (auto& it_cci : it_vsi.getCertChainItems()) {
+                    (void)validate_by_crl(verify_sdoc, *it_cci);
                 }
             }
+            else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
+                for (auto& it_cci : it_vsi.getCertChainItems()) {
+                    if (it_cci->getOcspResponseInfo().isUsed) {
+                        (void)validate_by_ocsp(it_vsi, *it_cci);
+                    }
+                }
+                DO(it_vsi.addOcspCertsToChain());
+            }
+        }
+        else {
+            DO(it_vsi.setRevocationValuesForChain());
             DO(it_vsi.addOcspCertsToChain());
         }
     }

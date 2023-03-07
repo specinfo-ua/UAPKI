@@ -637,6 +637,36 @@ int VerifiedSignerInfo::parseAttributes (void)
     return ret;
 }
 
+int VerifiedSignerInfo::setRevocationValuesForChain (void)
+{
+    int ret = RET_OK;
+
+    for (const auto& it_ocspval : m_CadesXlInfo.revocationValuesParser.getOcspVals()) {
+        Ocsp::OcspHelper ocsp_helper;
+        ret = ocsp_helper.parseBasicOcspResponse(it_ocspval);
+        if (ret == RET_OK) {
+            SmartBA sba_sn;
+            DO(ocsp_helper.scanSingleResponses());
+            DO(ocsp_helper.getSerialNumberFromCertId(0, &sba_sn));  //  Work with one OCSP request that has one certificate
+
+            for (const auto& it_cci : m_CertChainItems) {
+                if (ba_cmp(sba_sn.get(), it_cci->getSubject()->baSerialNumber) == 0) {
+                    OcspResponseInfo& ocsp_respinfo = it_cci->getOcspResponseInfo();
+                    ocsp_respinfo.dataSource = DataSource::SIGNATURE;
+                    ocsp_respinfo.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
+                    (void)verifyOcspResponse(ocsp_helper, ocsp_respinfo);
+                    ocsp_respinfo.msProducedAt = ocsp_helper.getProducedAt();
+                    ocsp_respinfo.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+                    break;
+                }
+            }
+        }
+    }
+
+cleanup:
+    return ret;
+}
+
 int VerifiedSignerInfo::validateStatuses (void)
 {
     CollectVerifyStatus collect_digests, collect_signatures;

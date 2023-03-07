@@ -39,6 +39,7 @@
 
 using namespace std;
 
+
 namespace UapkiNS {
 
 namespace Ocsp {
