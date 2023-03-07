@@ -132,6 +132,9 @@ namespace Ocsp {
             const bool move = false
         );
 
+        int parseBasicOcspResponse (
+            const ByteArray* baEncoded
+        );
         int parseResponse (
             const ByteArray* baEncoded
         );
@@ -152,6 +155,10 @@ namespace Ocsp {
             ResponderIdType &responderIdType,
             ByteArray** baResponderId
         );
+        int getSerialNumberFromCertId (
+            const size_t index,
+            ByteArray** baSerialNumber
+        );
         int scanSingleResponses (void);
         int verifyTbsResponseData (
             const CerStore::Item* csiResponder,
@@ -159,7 +166,7 @@ namespace Ocsp {
         );
 
     public:
-        const size_t countOcspRecords (void) const {
+        const size_t countResponses (void) const {
             return m_OcspRecords.size();
         };
         const ByteArray* getNonce (void) const {

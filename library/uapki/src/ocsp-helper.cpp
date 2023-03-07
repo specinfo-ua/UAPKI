@@ -342,6 +342,24 @@ ByteArray* OcspHelper::getRequestEncoded (
     return rv_ba;
 }
 
+int OcspHelper::parseBasicOcspResponse (
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(m_BasicOcspResp = (BasicOCSPResponse_t*)asn_decode_ba_with_alloc(get_BasicOCSPResponse_desc(), baEncoded));
+
+    DO(asn_encode_ba(get_ResponseData_desc(), &m_BasicOcspResp->tbsResponseData, &m_BaTbsResponseData));
+
+    DO(asn_decodevalue_gentime(&m_BasicOcspResp->tbsResponseData.producedAt, &m_ProducedAt));
+
+cleanup:
+    return ret;
+}
+
 int OcspHelper::parseResponse (
         const ByteArray* baEncoded
 )
@@ -474,6 +492,20 @@ cleanup:
     return ret;
 }
 
+int OcspHelper::getSerialNumberFromCertId (
+        const size_t index,
+        ByteArray** baSerialNumber
+)
+{
+    if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
+
+    const ResponseData_t* tbs_respdata = &m_BasicOcspResp->tbsResponseData;
+    if (index >= (size_t)tbs_respdata->responses.list.count) return RET_UAPKI_INVALID_PARAMETER;
+
+    const SingleResponse_t* resp = tbs_respdata->responses.list.array[index];
+    return asn_INTEGER2ba(&resp->certID.serialNumber, baSerialNumber);
+}
+
 int OcspHelper::scanSingleResponses (void)
 {
     int ret = RET_OK;
@@ -485,7 +517,7 @@ int OcspHelper::scanSingleResponses (void)
 
     tbs_respdata = &m_BasicOcspResp->tbsResponseData;
     const int cnt_responses = tbs_respdata->responses.list.count;
-    if (cnt_responses <= 0) return RET_UAPKI_INVALID_PARAMETER;
+    if (cnt_responses <= 0) return RET_UAPKI_INVALID_COUNT_ITEMS;
 
     m_OcspRecords.resize((size_t)cnt_responses);
     if (m_OcspRequest) {
