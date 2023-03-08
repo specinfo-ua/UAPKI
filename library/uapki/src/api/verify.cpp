@@ -513,7 +513,6 @@ static int validate_by_ocsp (
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
 
-    ocsp_respinfo.dataSource = UapkiNS::Doc::Verify::DataSource::STORE;
     bool need_update = csi_subject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
     if (need_update) {
         const CerStore::Item* csi_issuer = certChainItem.getIssuer();
@@ -566,6 +565,7 @@ static int validate_by_ocsp (
     ocsp_respinfo.responseStatus = ocsp_helper.getResponseStatus();
 
     if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
+        ocsp_respinfo.dataSource = UapkiNS::Doc::Verify::DataSource::STORE;
         (void)verifiedSignerInfo.verifyOcspResponse(ocsp_helper, ocsp_respinfo);
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());

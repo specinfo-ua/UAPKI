@@ -294,8 +294,9 @@ public:
 
 class VerifiedSignerInfo {
     struct ListAddedCerts {
-        std::vector<CerStore::Item*> addedCerts;    //  All certs from SignerInfo (including OCSP/TSP-response)
         std::vector<CerStore::Item*> certValues;    //  Certs from attribute certValues
+        std::vector<CerStore::Item*> fromOnline;    //  Certs from OCSP-response
+        std::vector<CerStore::Item*> fromSignature; //  All certs from SignerInfo (including OCSP/TSP-response)
         std::vector<CerStore::Item*> ocsp;
         std::vector<CerStore::Item*> tsp;
     };  //  end struct ListAddedCerts

@@ -600,8 +600,8 @@ int VerifiedSignerInfo::certValuesToStore (void)
         const int ret = m_CerStore->addCert(it, true, false, false, is_unique, &cer_item);
         if (ret != RET_OK) return ret;
 
-        m_ListAddedCerts.addedCerts.push_back(cer_item);
         m_ListAddedCerts.certValues.push_back(cer_item);
+        m_ListAddedCerts.fromSignature.push_back(cer_item);
     }
     return RET_OK;
 }
@@ -870,6 +870,8 @@ int VerifiedSignerInfo::verifyOcspResponse (
 {
     int ret = RET_OK;
     UapkiNS::VectorBA vba_certs;
+    vector<CerStore::Item*>& added_certs = (ocspResponseInfo.dataSource == DataSource::SIGNATURE)
+        ? m_ListAddedCerts.fromSignature : m_ListAddedCerts.fromOnline;
 
     DO(ocspClient.getCerts(vba_certs));
     for (auto& it : vba_certs) {
@@ -877,7 +879,7 @@ int VerifiedSignerInfo::verifyOcspResponse (
         CerStore::Item* cer_item = nullptr;
         DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
         it = nullptr;
-        m_ListAddedCerts.addedCerts.push_back(cer_item);
+        added_certs.push_back(cer_item);
     }
 
     DO(ocspClient.getResponderId(ocspResponseInfo.responderIdType, &ocspResponseInfo.baResponderId));
@@ -1080,7 +1082,7 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
         CerStore::Item* cer_item = nullptr;
         DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
         it = nullptr;
-        m_ListAddedCerts.addedCerts.push_back(cer_item);
+        m_ListAddedCerts.fromSignature.push_back(cer_item);
     }
 
     DO(sdata_parser.parseSignerInfo(0, signer_info));
@@ -1183,7 +1185,7 @@ void VerifySignedDoc::detectCertSources (void)
             const ByteArray* cert_id = it_cci->getSubjectCertId();
             const bool is_found = (
                 CerStore::findCertByCertId(addedCerts, cert_id) ||
-                CerStore::findCertByCertId(it_vsi.getListAddedCerts().addedCerts, cert_id)
+                CerStore::findCertByCertId(it_vsi.getListAddedCerts().fromSignature, cert_id)
             );
             it_cci->setDataSource((is_found) ? DataSource::SIGNATURE : DataSource::STORE);
         }
