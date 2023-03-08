@@ -233,7 +233,7 @@ int CrlStore::Item::revokedCerts (
                     extns_get_crl_invalidity_date(revoked_cert->crlEntryExtensions, &invalidity_date);
                 }
 
-                revcert_item = new RevokedCertItem((size_t)i, revocation_date, crl_reason, invalidity_date);
+                revcert_item = new RevokedCertItem(revocation_date, crl_reason, invalidity_date);
                 if (revcert_item) {
                     revokedItems.push_back(revcert_item);
                 }

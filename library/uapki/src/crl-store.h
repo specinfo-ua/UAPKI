@@ -50,20 +50,17 @@ public:
     };  //  end enum CrlType
 
     struct RevokedCertItem {
-        size_t      index;
         uint64_t    revocationDate;
         UapkiNS::CrlReason
                     crlReason;
         uint64_t    invalidityDate;
 
         RevokedCertItem (
-            const size_t iIndex,
             const uint64_t iRevocationDate = 0,
             const UapkiNS::CrlReason iCrlReason = UapkiNS::CrlReason::UNDEFINED,
             const uint64_t iInvalidityDate = 0
         )
-            : index(iIndex)
-            , revocationDate(iRevocationDate)
+            : revocationDate(iRevocationDate)
             , crlReason(iCrlReason)
             , invalidityDate(iInvalidityDate)
         {}
