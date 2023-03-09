@@ -161,16 +161,16 @@ struct ResultValidationByCrl {
 
 };  //  end struct ResultValidationByCrl
 
-struct OcspResponseInfo : public UapkiNS::Ocsp::ResponseInfo {
+struct ResultValidationByOcsp : public UapkiNS::Ocsp::ResponseInfo {
     DataSource  dataSource;
     bool        isUsed;
 
-    OcspResponseInfo (void)
+    ResultValidationByOcsp (void)
     : dataSource(DataSource::UNDEFINED)
     , isUsed(true)
     {}
 
-};  //  end struct OcspResponseInfo
+};  //  end struct ResultValidationByOcsp
 
 
 class CertChainItem {
@@ -187,8 +187,8 @@ class CertChainItem {
                 m_CertStatus;
     ResultValidationByCrl
                 m_ResultValidationByCrl;
-    OcspResponseInfo
-                m_OcspResponseInfo;
+    ResultValidationByOcsp
+                m_ResultValidationByOcsp;
 
 public:
     CertChainItem (
@@ -237,11 +237,11 @@ public:
     ResultValidationByCrl& getResultValidationByCrl (void) {
         return m_ResultValidationByCrl;
     }
-    const OcspResponseInfo& getOcspResponseInfo (void) const {
-        return m_OcspResponseInfo;
+    const ResultValidationByOcsp& getResultValidationByOcsp (void) const {
+        return m_ResultValidationByOcsp;
     }
-    OcspResponseInfo& getOcspResponseInfo (void) {
-        return m_OcspResponseInfo;
+    ResultValidationByOcsp& getResultValidationByOcsp (void) {
+        return m_ResultValidationByOcsp;
     }
     CerStore::Item* getSubject (void) const {
         return m_CsiSubject;
@@ -404,7 +404,7 @@ public:
     );
     int verifyOcspResponse (
         Ocsp::OcspHelper& ocspClient,
-        OcspResponseInfo& ocspResponseInfo
+        ResultValidationByOcsp& resultValByOcsp
     );
     int verifySignatureTimeStamp (void);
     int verifySignedAttribute (void);

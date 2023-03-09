@@ -357,7 +357,7 @@ void CertChainItem::setIssuerAndVerify (
         m_CertEntity = CertEntity::ROOT;
         m_CsiIssuer = m_CsiSubject;
         m_IsSelfSigned = true;
-        m_OcspResponseInfo.isUsed = false;
+        m_ResultValidationByOcsp.isUsed = false;
     }
     (void)m_CsiSubject->verify(m_CsiIssuer);
 }
@@ -517,7 +517,7 @@ int VerifiedSignerInfo::addOcspCertsToChain (void)
         CertChainItem* added_cci = nullptr;
         const int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci);
         if (ret != RET_OK) return ret;
-        added_cci->getOcspResponseInfo().isUsed = false;
+        added_cci->getResultValidationByOcsp().isUsed = false;
     }
     return RET_OK;
 }
@@ -651,12 +651,12 @@ int VerifiedSignerInfo::setRevocationValuesForChain (void)
 
             for (const auto& it_cci : m_CertChainItems) {
                 if (ba_cmp(sba_sn.get(), it_cci->getSubject()->baSerialNumber) == 0) {
-                    OcspResponseInfo& ocsp_respinfo = it_cci->getOcspResponseInfo();
-                    ocsp_respinfo.dataSource = DataSource::SIGNATURE;
-                    ocsp_respinfo.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
-                    (void)verifyOcspResponse(ocsp_helper, ocsp_respinfo);
-                    ocsp_respinfo.msProducedAt = ocsp_helper.getProducedAt();
-                    ocsp_respinfo.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+                    ResultValidationByOcsp& result_valbyocsp = it_cci->getResultValidationByOcsp();
+                    result_valbyocsp.dataSource = DataSource::SIGNATURE;
+                    result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
+                    (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
+                    result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
+                    result_valbyocsp.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
                     break;
                 }
             }
@@ -865,12 +865,12 @@ int VerifiedSignerInfo::verifyMessageDigest (
 
 int VerifiedSignerInfo::verifyOcspResponse (
         Ocsp::OcspHelper& ocspClient,
-        OcspResponseInfo& ocspResponseInfo
+        ResultValidationByOcsp& resultValByOcsp
 )
 {
     int ret = RET_OK;
     UapkiNS::VectorBA vba_certs;
-    vector<CerStore::Item*>& added_certs = (ocspResponseInfo.dataSource == DataSource::SIGNATURE)
+    vector<CerStore::Item*>& added_certs = (resultValByOcsp.dataSource == DataSource::SIGNATURE)
         ? m_ListAddedCerts.fromSignature : m_ListAddedCerts.fromOnline;
 
     DO(ocspClient.getCerts(vba_certs));
@@ -882,18 +882,18 @@ int VerifiedSignerInfo::verifyOcspResponse (
         added_certs.push_back(cer_item);
     }
 
-    DO(ocspClient.getResponderId(ocspResponseInfo.responderIdType, &ocspResponseInfo.baResponderId));
-    if (ocspResponseInfo.responderIdType == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
-        ret = m_CerStore->getCertBySubject(ocspResponseInfo.baResponderId.get(), &ocspResponseInfo.csiResponder);
+    DO(ocspClient.getResponderId(resultValByOcsp.responderIdType, &resultValByOcsp.baResponderId));
+    if (resultValByOcsp.responderIdType == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
+        ret = m_CerStore->getCertBySubject(resultValByOcsp.baResponderId.get(), &resultValByOcsp.csiResponder);
     }
     else {
         //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        ret = m_CerStore->getCertByKeyId(ocspResponseInfo.baResponderId.get(), &ocspResponseInfo.csiResponder);
+        ret = m_CerStore->getCertByKeyId(resultValByOcsp.baResponderId.get(), &resultValByOcsp.csiResponder);
     }
 
     if (ret == RET_OK) {
-        m_ListAddedCerts.ocsp.push_back(ocspResponseInfo.csiResponder);
-        ret = ocspClient.verifyTbsResponseData(ocspResponseInfo.csiResponder, ocspResponseInfo.statusSignature);
+        m_ListAddedCerts.ocsp.push_back(resultValByOcsp.csiResponder);
+        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.csiResponder, resultValByOcsp.statusSignature);
         if (ret == RET_VERIFY_FAILED) {
             ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED;
         }
@@ -902,7 +902,7 @@ int VerifiedSignerInfo::verifyOcspResponse (
         }
     }
     else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
-        ocspResponseInfo.statusSignature = UapkiNS::VerifyStatus::INDETERMINATE;
+        resultValByOcsp.statusSignature = UapkiNS::VerifyStatus::INDETERMINATE;
     }
 
 cleanup:

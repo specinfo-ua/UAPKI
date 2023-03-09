@@ -173,15 +173,15 @@ static int result_certchainitem_to_json (
         }
     }
     else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
-        const UapkiNS::Doc::Verify::OcspResponseInfo& ocsp_respinfo = certChainItem.getOcspResponseInfo();
-        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_respinfo.ocspRecord;
+        const UapkiNS::Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
+        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = result_valbyocsp.ocspRecord;
 
         json_object_set_value(joResult, "validateByOCSP", json_value_init_object());
         JSON_Object* jo_valbyocsp = json_object_get_object(joResult, "validateByOCSP");
-        if (ocsp_respinfo.isUsed) {
-            DO_JSON(json_object_set_string(jo_valbyocsp, "source", UapkiNS::Doc::Verify::dataSourceToStr(ocsp_respinfo.dataSource)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(ocsp_respinfo.responseStatus)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "producedAt", TimeUtils::mstimeToFormat(ocsp_respinfo.msProducedAt).c_str()));
+        if (result_valbyocsp.isUsed) {
+            DO_JSON(json_object_set_string(jo_valbyocsp, "source", UapkiNS::Doc::Verify::dataSourceToStr(result_valbyocsp.dataSource)));
+            DO_JSON(json_object_set_string(jo_valbyocsp, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(result_valbyocsp.responseStatus)));
+            DO_JSON(json_object_set_string(jo_valbyocsp, "producedAt", TimeUtils::mstimeToFormat(result_valbyocsp.msProducedAt).c_str()));
             DO_JSON(json_object_set_string(jo_valbyocsp, "status", CrlStore::certStatusToStr(ocsp_record.status)));
             DO_JSON(json_object_set_string(jo_valbyocsp, "thisUpdate", TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate).c_str()));
             if (ocsp_record.msNextUpdate > 0) {
@@ -191,9 +191,9 @@ static int result_certchainitem_to_json (
                 DO_JSON(json_object_set_string(jo_valbyocsp, "revocationReason", CrlStore::crlReasonToStr(ocsp_record.revocationReason)));
                 DO_JSON(json_object_set_string(jo_valbyocsp, "revocationTime", TimeUtils::mstimeToFormat(ocsp_record.msRevocationTime).c_str()));
             }
-            DO_JSON(json_object_set_string(jo_valbyocsp, "statusSignature", UapkiNS::verifyStatusToStr(ocsp_respinfo.statusSignature)));
-            if (ocsp_respinfo.csiResponder) {
-                DO(json_object_set_base64(jo_valbyocsp, "signerCertId", ocsp_respinfo.csiResponder->baCertId));
+            DO_JSON(json_object_set_string(jo_valbyocsp, "statusSignature", UapkiNS::verifyStatusToStr(result_valbyocsp.statusSignature)));
+            if (result_valbyocsp.csiResponder) {
+                DO(json_object_set_base64(jo_valbyocsp, "signerCertId", result_valbyocsp.csiResponder->baCertId));
             }
         }
         else {
@@ -650,7 +650,7 @@ static int validate_by_ocsp (
     int ret = RET_OK;
     const LibraryConfig::OcspParams& ocsp_params = get_config()->getOcsp();
     CerStore::Item* csi_subject = certChainItem.getSubject();
-    UapkiNS::Doc::Verify::OcspResponseInfo& ocsp_respinfo = certChainItem.getOcspResponseInfo();
+    UapkiNS::Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
@@ -704,20 +704,20 @@ static int validate_by_ocsp (
     }
 
     ret = ocsp_helper.parseResponse(need_update ? sba_resp.get() : csi_subject->certStatusByOcsp.baResult);
-    ocsp_respinfo.responseStatus = ocsp_helper.getResponseStatus();
+    result_valbyocsp.responseStatus = ocsp_helper.getResponseStatus();
 
     if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
-        ocsp_respinfo.dataSource = UapkiNS::Doc::Verify::DataSource::STORE;
-        (void)verifiedSignerInfo.verifyOcspResponse(ocsp_helper, ocsp_respinfo);
+        result_valbyocsp.dataSource = UapkiNS::Doc::Verify::DataSource::STORE;
+        (void)verifiedSignerInfo.verifyOcspResponse(ocsp_helper, result_valbyocsp);
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
-        ocsp_respinfo.msProducedAt = ocsp_helper.getProducedAt();
-        ocsp_respinfo.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+        result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
+        result_valbyocsp.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
         if (need_update) {
             DO(csi_subject->certStatusByOcsp.set(
-                ocsp_respinfo.ocspRecord.status,
-                ocsp_respinfo.ocspRecord.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                result_valbyocsp.ocspRecord.status,
+                result_valbyocsp.ocspRecord.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
                 sba_resp.get()
             ));
         }
@@ -790,7 +790,7 @@ static int verify_p7s (
             }
             else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
                 for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    if (it_cci->getOcspResponseInfo().isUsed) {
+                    if (it_cci->getResultValidationByOcsp().isUsed) {
                         (void)validate_by_ocsp(it_vsi, *it_cci);
                     }
                 }
