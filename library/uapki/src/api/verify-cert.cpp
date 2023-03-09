@@ -368,24 +368,24 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
 
         DO(ocsp_helper.scanSingleResponses());
 
-        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
-        DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(ocsp_record.status)));
-        s_time = TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate);
+        const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
+        DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
+        s_time = TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate);
         DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
-        if (ocsp_record.msNextUpdate > 0) {
-            s_time = TimeUtils::mstimeToFormat(ocsp_record.msNextUpdate);
+        if (singleresp_info.msNextUpdate > 0) {
+            s_time = TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate);
             DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
         }
-        if (ocsp_record.status == UapkiNS::CertStatus::REVOKED) {
-            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(ocsp_record.revocationReason)));
-            s_time = TimeUtils::mstimeToFormat(ocsp_record.msRevocationTime);
+        if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
+            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
+            s_time = TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime);
             DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
         }
 
         if (need_update) {
             DO(cerSubject->certStatusByOcsp.set(
-                ocsp_record.status,
-                ocsp_record.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                singleresp_info.certStatus,
+                singleresp_info.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
                 sba_resp.get()
             ));
         }

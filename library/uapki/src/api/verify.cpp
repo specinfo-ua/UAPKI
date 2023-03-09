@@ -174,7 +174,7 @@ static int result_certchainitem_to_json (
     }
     else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
         const UapkiNS::Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
-        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = result_valbyocsp.ocspRecord;
+        const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = result_valbyocsp.singleResponseInfo;
 
         json_object_set_value(joResult, "validateByOCSP", json_value_init_object());
         JSON_Object* jo_valbyocsp = json_object_get_object(joResult, "validateByOCSP");
@@ -182,14 +182,14 @@ static int result_certchainitem_to_json (
             DO_JSON(json_object_set_string(jo_valbyocsp, "source", UapkiNS::Doc::Verify::dataSourceToStr(result_valbyocsp.dataSource)));
             DO_JSON(json_object_set_string(jo_valbyocsp, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(result_valbyocsp.responseStatus)));
             DO_JSON(json_object_set_string(jo_valbyocsp, "producedAt", TimeUtils::mstimeToFormat(result_valbyocsp.msProducedAt).c_str()));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "status", CrlStore::certStatusToStr(ocsp_record.status)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "thisUpdate", TimeUtils::mstimeToFormat(ocsp_record.msThisUpdate).c_str()));
-            if (ocsp_record.msNextUpdate > 0) {
-                DO_JSON(json_object_set_string(jo_valbyocsp, "nextUpdate", TimeUtils::mstimeToFormat(ocsp_record.msNextUpdate).c_str()));
+            DO_JSON(json_object_set_string(jo_valbyocsp, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
+            DO_JSON(json_object_set_string(jo_valbyocsp, "thisUpdate", TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate).c_str()));
+            if (singleresp_info.msNextUpdate > 0) {
+                DO_JSON(json_object_set_string(jo_valbyocsp, "nextUpdate", TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate).c_str()));
             }
-            if (ocsp_record.status == UapkiNS::CertStatus::REVOKED) {
-                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationReason", CrlStore::crlReasonToStr(ocsp_record.revocationReason)));
-                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationTime", TimeUtils::mstimeToFormat(ocsp_record.msRevocationTime).c_str()));
+            if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
+                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
+                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
             }
             DO_JSON(json_object_set_string(jo_valbyocsp, "statusSignature", UapkiNS::verifyStatusToStr(result_valbyocsp.statusSignature)));
             if (result_valbyocsp.csiResponder) {
@@ -713,11 +713,11 @@ static int validate_by_ocsp (
         DO(ocsp_helper.scanSingleResponses());
 
         result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
-        result_valbyocsp.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+        result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
         if (need_update) {
             DO(csi_subject->certStatusByOcsp.set(
-                result_valbyocsp.ocspRecord.status,
-                result_valbyocsp.ocspRecord.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                result_valbyocsp.singleResponseInfo.certStatus,
+                result_valbyocsp.singleResponseInfo.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
                 sba_resp.get()
             ));
         }

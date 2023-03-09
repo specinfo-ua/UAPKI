@@ -663,16 +663,16 @@ static int get_cert_status_by_ocsp (
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
 
-        const UapkiNS::Ocsp::OcspHelper::OcspRecord& ocsp_record = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+        const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
         if (need_update) {
             DO(cerDataItem.pcsiSubject->certStatusByOcsp.set(
-                ocsp_record.status,
-                ocsp_record.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
+                singleresp_info.certStatus,
+                singleresp_info.msThisUpdate + UapkiNS::Ocsp::OFFSET_EXPIRE_DEFAULT,
                 sba_resp.get()
             ));
         }
 
-        switch (ocsp_record.status) {
+        switch (singleresp_info.certStatus) {
         case UapkiNS::CertStatus::GOOD:
             (void)cerDataItem.basicOcspResponse.set(ocsp_helper.getBasicOcspResponseEncoded(true));
             DO(ocsp_helper.getOcspIdentifier(&cerDataItem.ocspIdentifier));

@@ -56,7 +56,7 @@ static const char* RESPONSE_STATUS_STRINGS[8] = {
     "UNAUTHORIZED"
 };
 
-static OcspHelper::OcspRecord ocsp_record_empty;
+static OcspHelper::SingleResponseInfo singleresponseinfo_empty;
 
 
 struct OcspCertId {
@@ -138,7 +138,7 @@ void OcspHelper::reset (void)
     ba_free(m_BaTbsRequestEncoded);
     ba_free(m_BaTbsResponseData);
 
-    m_OcspRecords.clear();
+    m_SingleResponseInfos.clear();
     m_OcspRequest = nullptr;
     m_BasicOcspResp = nullptr;
     m_BaBasicOcspResponse = nullptr;
@@ -456,13 +456,13 @@ cleanup:
     return ret;
 }
 
-const OcspHelper::OcspRecord& OcspHelper::getOcspRecord (
+const OcspHelper::SingleResponseInfo& OcspHelper::getSingleResponseInfo (
         const size_t index
 ) const
 {
-    if (index >= m_OcspRecords.size()) return ocsp_record_empty;
+    if (index >= m_SingleResponseInfos.size()) return singleresponseinfo_empty;
 
-    return m_OcspRecords[index];
+    return m_SingleResponseInfos[index];
 }
 
 int OcspHelper::getResponderId (
@@ -520,7 +520,7 @@ int OcspHelper::scanSingleResponses (void)
     const int cnt_responses = tbs_respdata->responses.list.count;
     if (cnt_responses <= 0) return RET_UAPKI_INVALID_COUNT_ITEMS;
 
-    m_OcspRecords.resize((size_t)cnt_responses);
+    m_SingleResponseInfos.resize((size_t)cnt_responses);
     if (m_OcspRequest) {
         tbs_req = &m_OcspRequest->tbsRequest;
         if (tbs_req->requestList.list.count != cnt_responses) {
@@ -528,9 +528,9 @@ int OcspHelper::scanSingleResponses (void)
         }
     }
 
-    for (size_t i = 0; i < m_OcspRecords.size(); i++) {
+    for (size_t i = 0; i < m_SingleResponseInfos.size(); i++) {
         const SingleResponse_t* resp = tbs_respdata->responses.list.array[i];
-        OcspRecord& ocsp_item = m_OcspRecords[i];
+        SingleResponseInfo& ocsp_item = m_SingleResponseInfos[i];
         uint32_t crl_reason = 0;
 
         if (m_OcspRequest) {
@@ -545,10 +545,10 @@ int OcspHelper::scanSingleResponses (void)
 
         switch (resp->certStatus.present) {
         case CertStatus_PR_good:
-            ocsp_item.status = UapkiNS::CertStatus::GOOD;
+            ocsp_item.certStatus = UapkiNS::CertStatus::GOOD;
             break;
         case CertStatus_PR_revoked:
-            ocsp_item.status = UapkiNS::CertStatus::REVOKED;
+            ocsp_item.certStatus = UapkiNS::CertStatus::REVOKED;
             revoked_info = &resp->certStatus.choice.revoked;
             DO(asn_decodevalue_gentime(&revoked_info->revocationTime, &ocsp_item.msRevocationTime));
             if (revoked_info->revocationReason != nullptr) {
@@ -557,7 +557,7 @@ int OcspHelper::scanSingleResponses (void)
             }
             break;
         case CertStatus_PR_unknown:
-            ocsp_item.status = UapkiNS::CertStatus::UNKNOWN;
+            ocsp_item.certStatus = UapkiNS::CertStatus::UNKNOWN;
             break;
         default:
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);

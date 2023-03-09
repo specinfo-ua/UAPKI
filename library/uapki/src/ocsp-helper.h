@@ -65,26 +65,26 @@ namespace Ocsp {
     class OcspHelper
     {
     public:
-        struct OcspRecord {
-            UapkiNS::CertStatus
-                        status;
+        struct SingleResponseInfo {
+            CertStatus  certStatus;
             uint64_t    msThisUpdate;
             uint64_t    msNextUpdate;
             uint64_t    msRevocationTime;
-            UapkiNS::CrlReason
-                        revocationReason;
-            OcspRecord (void)
-                : status(UapkiNS::CertStatus::UNDEFINED)
+            CrlReason   revocationReason;
+
+            SingleResponseInfo (void)
+                : certStatus(CertStatus::UNDEFINED)
                 , msThisUpdate(0)
                 , msNextUpdate(0)
                 , msRevocationTime(0)
-                , revocationReason(UapkiNS::CrlReason::UNDEFINED)
+                , revocationReason(CrlReason::UNDEFINED)
             {}
-        };  //  end struct OcspRecord
+
+        };  //  end struct SingleResponseInfo
 
     private:
-        std::vector<OcspRecord>
-                    m_OcspRecords;
+        std::vector<SingleResponseInfo>
+                    m_SingleResponseInfos;
         OCSPRequest_t*
                     m_OcspRequest;
         BasicOCSPResponse_t*
@@ -148,7 +148,7 @@ namespace Ocsp {
         int getOcspIdentifier (     //  Note: used for complete-revocation-references Attribute (rfc5126, $6.2.2)
             ByteArray** baOcspIdentifier
         );
-        const OcspRecord& getOcspRecord (
+        const SingleResponseInfo& getSingleResponseInfo (
             const size_t index
         ) const;
         int getResponderId (
@@ -166,8 +166,8 @@ namespace Ocsp {
         );
 
     public:
-        const size_t countResponses (void) const {
-            return m_OcspRecords.size();
+        const size_t countSingleResponses (void) const {
+            return m_SingleResponseInfos.size();
         };
         const ByteArray* getNonce (void) const {
             return m_BaNonce;
@@ -198,8 +198,8 @@ namespace Ocsp {
                     responderIdType;
         SmartBA     baResponderId;
         uint64_t    msProducedAt;
-        OcspHelper::OcspRecord
-                    ocspRecord;
+        OcspHelper::SingleResponseInfo
+                    singleResponseInfo;
         SignatureVerifyStatus
                     statusSignature;
         CerStore::Item*

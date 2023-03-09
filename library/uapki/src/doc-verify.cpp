@@ -656,7 +656,7 @@ int VerifiedSignerInfo::setRevocationValuesForChain (void)
                     result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
                     (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
                     result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
-                    result_valbyocsp.ocspRecord = ocsp_helper.getOcspRecord(0); //  Work with one OCSP request that has one certificate
+                    result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
                     break;
                 }
             }
