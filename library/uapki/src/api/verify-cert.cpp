@@ -194,7 +194,7 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
         cert_status = UapkiNS::CertStatus::GOOD;
     }
     else {
-        revcert_before = CrlStore::foundNearBefore(revoked_items, validateTime);
+        revcert_before = CrlStore::findNearBefore(revoked_items, validateTime);
         if (revcert_before) {
             DEBUG_OUTCON(printf("revcert_before: [%lld]  revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n",
                 revcert_before->index, revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));

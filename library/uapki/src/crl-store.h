@@ -154,13 +154,15 @@ public:
         uint64_t& issuedTime,
         ByteArray** baCrlNumber
     );
-    static const RevokedCertItem* foundNearAfter (
+    static const RevokedCertItem* findNearBefore (
         const std::vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validityTime
+        const uint64_t validateTime
     );
-    static const RevokedCertItem* foundNearBefore (
+    static bool findRevokedCert (
         const std::vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validityTime
+        const uint64_t validateTime,
+        UapkiNS::CertStatus& status,
+        RevokedCertItem& revokedCertItem
     );
     static int parseCrl (
         const ByteArray* baEncoded,

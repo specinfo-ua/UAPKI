@@ -557,7 +557,7 @@ static int get_cert_status_by_crl (
         cert_status = UapkiNS::CertStatus::GOOD;
     }
     else {
-        const CrlStore::RevokedCertItem* revcert_before = CrlStore::foundNearBefore(revoked_items, validate_time);
+        const CrlStore::RevokedCertItem* revcert_before = CrlStore::findNearBefore(revoked_items, validate_time);
         if (revcert_before) {
             DEBUG_OUTCON(printf("revcert_before: [%lld]  revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n",
                 revcert_before->index, revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));

@@ -144,6 +144,23 @@ struct CadesXlInfo {
 };  //  end struct CadesXlInfo
 
 
+struct ResultValidationByCrl {
+    CertStatus  certStatus;
+    CrlStore::Item*
+                crlStoreItem;
+    CerStore::Item*
+                csiIssuer;
+    CrlStore::RevokedCertItem
+                revokedCertItem;
+
+    ResultValidationByCrl (void)
+        : certStatus(CertStatus::UNDEFINED)
+        , crlStoreItem(nullptr)
+        , csiIssuer(nullptr)
+    {}
+
+};  //  end struct ResultValidationByCrl
+
 struct OcspResponseInfo : public UapkiNS::Ocsp::ResponseInfo {
     DataSource  dataSource;
     bool        isUsed;
@@ -168,6 +185,8 @@ class CertChainItem {
     bool        m_IsSelfSigned;
     UapkiNS::CertStatus
                 m_CertStatus;
+    ResultValidationByCrl
+                m_ResultValidationByCrl;
     OcspResponseInfo
                 m_OcspResponseInfo;
 
@@ -211,6 +230,12 @@ public:
     }
     const ByteArray* getIssuerCertId (void) const {
         return (m_CsiIssuer) ? m_CsiIssuer->baCertId : nullptr;
+    }
+    const ResultValidationByCrl& getResultValidationByCrl (void) const {
+        return m_ResultValidationByCrl;
+    }
+    ResultValidationByCrl& getResultValidationByCrl (void) {
+        return m_ResultValidationByCrl;
     }
     const OcspResponseInfo& getOcspResponseInfo (void) const {
         return m_OcspResponseInfo;

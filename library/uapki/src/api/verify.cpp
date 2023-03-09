@@ -155,16 +155,22 @@ static int result_certchainitem_to_json (
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", certChainItem.isExpired()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", certChainItem.isSelfSigned()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", certChainItem.isTrusted()));
-    //DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(certChainItem.getCertStatus())));
     if (certChainItem.getIssuerCertId()) {
         DO(json_object_set_base64(joResult, "issuerCertId", certChainItem.getIssuerCertId()));
         DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(certChainItem.getVerifyStatus())));
     }
 
     if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
+        const UapkiNS::Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
+
         json_object_set_value(joResult, "validateByCRL", json_value_init_object());
         JSON_Object* jo_valbycrl = json_object_get_object(joResult, "validateByCRL");
-        //TODO
+        if (!certChainItem.isSelfSigned()) {
+            DO_JSON(json_object_set_string(jo_valbycrl, "status", CrlStore::certStatusToStr(result_valbycrl.certStatus)));
+        }
+        else {
+            DO_JSON(json_object_set_string(jo_valbycrl, "status", "NOT USED"));
+        }
     }
     else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
         const UapkiNS::Doc::Verify::OcspResponseInfo& ocsp_respinfo = certChainItem.getOcspResponseInfo();
@@ -489,14 +495,150 @@ cleanup:
     return ret;
 }   //  result_to_json
 
+static int process_crl (
+        CrlStore& crlStore,
+        const CerStore::Item* cerSubject,
+        const CerStore::Item* cerIssuer,
+        const ByteArray** baCrlNumber,
+        const uint64_t validateTime,
+        CrlStore::Item** crlItem
+)
+{
+    int ret = RET_OK;
+    const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
+    CrlStore::Item* crl = nullptr;
+    UapkiNS::SmartBA sba_crl;
+
+    crl = crlStore.getCrl(cerSubject->baAuthorityKeyId, crl_type);
+    if (crl) {
+        if (crl->nextUpdate < validateTime) {
+            DEBUG_OUTCON(puts("process_crl(), Need get newest CRL"));
+            crl = nullptr;
+        }
+    }
+
+    if (!crl) {
+        if (HttpHelper::isOfflineMode()) {
+            SET_ERROR(RET_UAPKI_OFFLINE_MODE);
+        }
+
+        vector<string> uris;
+        ret = cerSubject->getCrlUris((crl_type == CrlStore::CrlType::FULL), uris);
+        if (ret != RET_OK) {
+            if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
+                ret = RET_UAPKI_CRL_URL_NOT_PRESENT;
+            }
+            SET_ERROR(ret);
+        }
+
+        const vector<string> shuffled_uris = HttpHelper::randomURIs(uris);
+        DEBUG_OUTCON(printf("process_crl(CrlType: %d), download CRL", crl_type));
+        for (auto& it : shuffled_uris) {
+            DEBUG_OUTCON(printf("process_crl(), HttpHelper::get('%s')\n", it.c_str()));
+            ret = HttpHelper::get(it.c_str(), &sba_crl);
+            if (ret == RET_OK) {
+                DEBUG_OUTCON(printf("process_crl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+                DEBUG_OUTCON(if (sba_crl.size() < 1024) { ba_print(stdout, sba_crl.get()); });
+                break;
+            }
+        }
+        if (ret != RET_OK) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
+        }
+
+        bool is_unique;
+        DO(crlStore.addCrl(sba_crl.get(), true, is_unique, nullptr));
+        sba_crl.set(nullptr);
+
+        crl = crlStore.getCrl(cerSubject->baAuthorityKeyId, crl_type);
+        if (!crl) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+
+        if (crl->nextUpdate < validateTime) {
+            DEBUG_OUTCON(puts("process_crl(), Need get newest CRL. Again... stop it!"));
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+    }
+
+    //  Check CrlNumber and DeltaCrl
+    if (!crl->baCrlNumber) {
+        SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+    }
+    if (crl_type == CrlStore::CrlType::FULL) {
+        *baCrlNumber = crl->baCrlNumber;
+    }
+    else {
+        if (ba_cmp(*baCrlNumber, crl->baDeltaCrl) != RET_OK) {
+            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+        }
+    }
+
+    if (cerIssuer) {
+        ret = crl->verify(cerIssuer);
+        if (crl->statusSign == CerStore::VerifyStatus::FAILED) {
+            SET_ERROR(ret);
+        }
+    }
+    else {
+        crl->statusSign = CerStore::VerifyStatus::INDETERMINATE;
+    }
+
+    *crlItem = crl;
+
+cleanup:
+    return ret;
+}   //  process_crl
+
 static int validate_by_crl (
         UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
         UapkiNS::Doc::Verify::CertChainItem& certChainItem
 )
 {
     int ret = RET_OK;
-    //TODO:
-//cleanup:
+    const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
+    UapkiNS::Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
+    CrlStore::Item* crl_item = nullptr;
+    vector<const CrlStore::RevokedCertItem*> revoked_items;
+    const ByteArray* ba_crlnumber = nullptr;
+    const bool cfg_crldelta_enabled = true;
+
+    DO(process_crl(
+        *verifySignedDoc.crlStore,
+        certChainItem.getSubject(),
+        certChainItem.getIssuer(),
+        &ba_crlnumber,
+        verify_options.validateTime,
+        &crl_item
+    ));
+    DEBUG_OUTCON(printf("validate_by_crl() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
+    DO(crl_item->revokedCerts(certChainItem.getSubject(), revoked_items));
+
+    if (cfg_crldelta_enabled) {
+        DO(process_crl(
+            *verifySignedDoc.crlStore,
+            certChainItem.getSubject(),
+            certChainItem.getIssuer(),
+            &ba_crlnumber,
+            verify_options.validateTime,
+            &crl_item
+        ));
+        DO(crl_item->revokedCerts(certChainItem.getSubject(), revoked_items));
+    }
+
+    result_valbycrl.crlStoreItem = crl_item;
+    result_valbycrl.csiIssuer = certChainItem.getIssuer();
+
+    DEBUG_OUTCON(for (auto& it : revoked_items) {
+        printf("[%lld] revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->index, it->revocationDate, it->crlReason, it->invalidityDate);
+    });
+    (void)CrlStore::findRevokedCert(revoked_items, verify_options.validateTime, result_valbycrl.certStatus, result_valbycrl.revokedCertItem);
+
+cleanup:
+    for (auto& it : revoked_items) {
+        delete it;
+    }
+    revoked_items.clear();
     return ret;
 }   //  validate_by_crl
 
