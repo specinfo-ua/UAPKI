@@ -285,7 +285,6 @@ public:
     ExpectedCertItem (
         const CertEntity iCertEntity
     );
-    ~ExpectedCertItem (void);
 
 public:
     int setResponderId (
@@ -315,6 +314,50 @@ public:
     }
 
 };  //  end class ExpectedCertItem
+
+
+class ExpectedCrlItem {
+    SmartBA     m_AuthorityKeyId;
+    SmartBA     m_Name;
+    std::string m_Url;
+    //  If present Full-CRL
+    uint64_t    m_ThisUpdate;
+    uint64_t    m_NextUpdate;
+    SmartBA     m_BaCrlNumber;
+
+public:
+    ExpectedCrlItem (void);
+
+public:
+    int set (
+        const CerStore::Item* cerSubject,
+        const CrlStore::Item* crlFull
+    );
+
+public:
+    const ByteArray* getAuthorityKeyId (void) const {
+        return m_AuthorityKeyId.get();
+    }
+    const ByteArray* getCrlNumber (void) const {
+        return m_BaCrlNumber.get();
+    }
+    const ByteArray* getName (void) const {
+        return m_Name.get();
+    }
+    uint64_t getNextUpdate (void) const {
+        return m_NextUpdate;
+    }
+    uint64_t getThisUpdate (void) const {
+        return m_ThisUpdate;
+    }
+    std::string getUrl (void) const {
+        return m_Url;
+    }
+    bool isPresentFullCrl (void) const {
+        return !m_BaCrlNumber.empty();
+    }
+
+};  //  end class ExpectedCrlItem
 
 
 class VerifiedSignerInfo {
@@ -363,6 +406,8 @@ class VerifiedSignerInfo {
                 m_CertChainItems;
     std::vector<ExpectedCertItem*>
                 m_ExpectedCertItems;
+    std::vector<ExpectedCrlItem*>
+                m_ExpectedCrlItems;
     ListAddedCerts
                 m_ListAddedCerts;
 
@@ -382,6 +427,10 @@ public:
     int addExpectedCertItem (
         const CertEntity certEntity,
         const ByteArray* baSidEncoded
+    );
+    int addExpectedCrlItem (
+        CerStore::Item* cerSubject,
+        CrlStore::Item* crlFull
     );
     int addOcspCertsToChain (void);
     int buildCertChain (void);
@@ -431,6 +480,9 @@ public:
     }
     const std::vector<ExpectedCertItem*> getExpectedCertItems (void) const {
         return m_ExpectedCertItems;
+    }
+    const std::vector<ExpectedCrlItem*> getExpectedCrlItems (void) const {
+        return m_ExpectedCrlItems;
     }
     const ListAddedCerts& getListAddedCerts (void) const {
         return m_ListAddedCerts;

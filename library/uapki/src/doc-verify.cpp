@@ -371,10 +371,6 @@ ExpectedCertItem::ExpectedCertItem (
 {
 }
 
-ExpectedCertItem::~ExpectedCertItem (void)
-{
-}
-
 int ExpectedCertItem::setResponderId (
         const bool isKeyId,
         const ByteArray* baResponderId
@@ -411,6 +407,43 @@ int ExpectedCertItem::setSignerIdentifier (
 }
 
 
+ExpectedCrlItem::ExpectedCrlItem (void)
+    : m_ThisUpdate(0)
+    , m_NextUpdate(0)
+{
+}
+
+int ExpectedCrlItem::set (
+        const CerStore::Item* cerSubject,
+        const CrlStore::Item* crlFull
+)
+{
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (!m_AuthorityKeyId.set(ba_copy_with_alloc(cerSubject->baAuthorityKeyId, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+    if (!m_Name.set(ba_copy_with_alloc(cerSubject->baIssuer, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+
+    vector<string> uris;
+    if (!crlFull) {
+        (void)cerSubject->getCrlUris(true, uris);
+    }
+    else {
+        (void)cerSubject->getCrlUris(false, uris);
+        m_ThisUpdate = crlFull->thisUpdate;
+        m_NextUpdate = crlFull->nextUpdate;
+        if (!m_BaCrlNumber.set(ba_copy_with_alloc(crlFull->baCrlNumber, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+    }
+    for (const auto& it : uris) {
+        m_Url += it + ";";
+    }
+    if (!m_Url.empty()) {
+        m_Url.pop_back();
+    }
+
+    return RET_OK;
+}
+
+
 VerifiedSignerInfo::VerifiedSignerInfo (void)
     : m_CerStore(nullptr)
     , m_IsDigest(false)
@@ -434,6 +467,9 @@ VerifiedSignerInfo::~VerifiedSignerInfo (void)
         delete it;
     }
     for (auto& it : m_ExpectedCertItems) {
+        delete it;
+    }
+    for (auto& it : m_ExpectedCrlItems) {
         delete it;
     }
 }
@@ -505,6 +541,24 @@ int VerifiedSignerInfo::addExpectedCertItem (
 
     m_ExpectedCertItems.push_back(expcert_item);
     return expcert_item->setSignerIdentifier((is_keyid) ? sba_keyid.get() : sba_serialnumber.get(), sba_name.get());
+}
+
+int VerifiedSignerInfo::addExpectedCrlItem (
+        CerStore::Item* cerSubject,
+        CrlStore::Item* crlFull
+)
+{
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
+
+    for (const auto& it : m_ExpectedCrlItems) {
+        if (ba_cmp(cerSubject->baAuthorityKeyId, it->getAuthorityKeyId()) == 0) return RET_OK;
+    }
+
+    ExpectedCrlItem* expcrl_item = new ExpectedCrlItem();
+    if (!expcrl_item) return RET_UAPKI_GENERAL_ERROR;
+
+    m_ExpectedCrlItems.push_back(expcrl_item);
+    return expcrl_item->set(cerSubject, crlFull);
 }
 
 int VerifiedSignerInfo::addOcspCertsToChain (void)

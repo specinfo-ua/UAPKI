@@ -62,6 +62,25 @@ DEBUG_OUTPUT_OUTSTREAM_FUNC
 using namespace std;
 
 
+static int name_to_json (
+        JSON_Object* joResult,
+        const char* keyName,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    Name_t* name = nullptr;
+
+    CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baEncoded));
+
+    DO_JSON(json_object_set_value(joResult, keyName, json_value_init_object()));
+    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, keyName), *name));
+
+cleanup:
+    asn_free(get_Name_desc(), name);
+    return ret;
+}   //  name_to_json
+
 static int parse_verify_options (
         JSON_Object* joParams,
         UapkiNS::Doc::Verify::VerifyOptions& verifyOptions
@@ -258,15 +277,12 @@ static int result_expectedcertitem_to_json (
 )
 {
     int ret = RET_OK;
-    Name_t* name = nullptr;
 
     DO_JSON(json_object_set_string(joResult, "entity", UapkiNS::Doc::Verify::certEntityToStr(expectedCertItem.getCertEntity())));
     switch (expectedCertItem.getIdType()) {
     case UapkiNS::Doc::Verify::ExpectedCertItem::IdType::CER_IDTYPE:
         if (!expectedCertItem.getKeyId()) {
-            CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), expectedCertItem.getName()));
-            DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
-            DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "issuer"), *name));
+            DO(name_to_json(joResult, "issuer", expectedCertItem.getName()));
             DO(json_object_set_hex(joResult, "serialNumber", expectedCertItem.getSerialNumber()));
         }
         else {
@@ -275,9 +291,7 @@ static int result_expectedcertitem_to_json (
         break;
     case UapkiNS::Doc::Verify::ExpectedCertItem::IdType::ORS_IDTYPE:
         if (!expectedCertItem.getKeyId()) {
-            CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), expectedCertItem.getName()));
-            DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
-            DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), *name));
+            DO(name_to_json(joResult, "responderId", expectedCertItem.getName()));
         }
         else {
             DO(json_object_set_hex(joResult, "responderId", expectedCertItem.getKeyId()));
@@ -287,9 +301,34 @@ static int result_expectedcertitem_to_json (
     }
 
 cleanup:
-    asn_free(get_Name_desc(), name);
     return ret;
 }   //  result_expectedcertitem_to_json
+
+static int result_expectedcrlitem_to_json (
+        JSON_Object* joResult,
+        const UapkiNS::Doc::Verify::ExpectedCrlItem& expectedCrlItem
+)
+{
+    int ret = RET_OK;
+
+    DO(json_object_set_hex(joResult, "authorityKeyId", expectedCrlItem.getAuthorityKeyId()));
+    if (expectedCrlItem.getName()) {
+        DO(name_to_json(joResult, "issuer", expectedCrlItem.getName()));
+    }
+    if (!expectedCrlItem.getUrl().empty()) {
+        DO_JSON(json_object_set_string(joResult, "url", expectedCrlItem.getUrl().c_str()));
+    }
+    if (expectedCrlItem.isPresentFullCrl()) {
+        DO_JSON(json_object_set_value(joResult, "full", json_value_init_object()));
+        JSON_Object* jo_crlinfo = json_object_get_object(joResult, "full");
+        DO_JSON(json_object_set_string(jo_crlinfo, "thisUpdate", TimeUtils::mstimeToFormat(expectedCrlItem.getThisUpdate()).c_str()));
+        DO_JSON(json_object_set_string(jo_crlinfo, "nextUpdate", TimeUtils::mstimeToFormat(expectedCrlItem.getNextUpdate()).c_str()));
+        DO(json_object_set_hex(jo_crlinfo, "crlNumber", expectedCrlItem.getCrlNumber()));
+    }
+
+cleanup:
+    return ret;
+}   //  result_expectedcrlitem_to_json
 
 static int result_crlocspref_to_json (
         JSON_Object* joCrlOcspRef,
@@ -409,7 +448,7 @@ static int result_verifyinfo_to_json (
     DO_JSON(json_object_set_string(joSignInfo, "statusCertificateRefs", UapkiNS::verifyStatusToStr(verifyInfo.getCadesXlInfo().statusCertRefs)));
     DO(result_certificaterefs_to_json(joSignInfo, verifyInfo.getCadesXlInfo()));
     if (!verifyInfo.getListAddedCerts().certValues.empty()) {
-        json_object_set_value(joSignInfo, "certValues", json_value_init_array());
+        DO_JSON(json_object_set_value(joSignInfo, "certValues", json_value_init_array()));
         JSON_Array* ja_certids = json_object_get_array(joSignInfo, "certValues");
         for (const auto& it : verifyInfo.getListAddedCerts().certValues) {
             DO_JSON(json_array_append_base64(ja_certids, it->baCertId));
@@ -425,9 +464,9 @@ static int result_verifyinfo_to_json (
         (verifyOptions.validationType != CerStore::ValidationType::UNDEFINED) &&
         !verifyInfo.getCertChainItems().empty()
     ) {
-        size_t idx = 0;
         DO_JSON(json_object_set_value(joSignInfo, "certificateChain", json_value_init_array()));
         JSON_Array* ja_certchainitems = json_object_get_array(joSignInfo, "certificateChain");
+        size_t idx = 0;
         for (const auto& it : verifyInfo.getCertChainItems()) {
             DO_JSON(json_array_append_value(ja_certchainitems, json_value_init_object()));
             DO(result_certchainitem_to_json(json_array_get_object(ja_certchainitems, idx++), *it, verifyOptions));
@@ -435,12 +474,22 @@ static int result_verifyinfo_to_json (
     }
 
     if (!verifyInfo.getExpectedCertItems().empty()) {
-        size_t idx = 0;
         DO_JSON(json_object_set_value(joSignInfo, "expectedCerts", json_value_init_array()));
         JSON_Array* ja_expcertitems = json_object_get_array(joSignInfo, "expectedCerts");
+        size_t idx = 0;
         for (const auto& it : verifyInfo.getExpectedCertItems()) {
             DO_JSON(json_array_append_value(ja_expcertitems, json_value_init_object()));
             DO(result_expectedcertitem_to_json(json_array_get_object(ja_expcertitems, idx++), *it));
+        }
+    }
+
+    if (!verifyInfo.getExpectedCrlItems().empty()) {
+        DO_JSON(json_object_set_value(joSignInfo, "expectedCrls", json_value_init_array()));
+        JSON_Array* ja_expcrlitems = json_object_get_array(joSignInfo, "expectedCrls");
+        size_t idx = 0;
+        for (const auto& it : verifyInfo.getExpectedCrlItems()) {
+            DO_JSON(json_array_append_value(ja_expcrlitems, json_value_init_object()));
+            DO(result_expectedcrlitem_to_json(json_array_get_object(ja_expcrlitems, idx++), *it));
         }
     }
 
@@ -592,6 +641,7 @@ cleanup:
 
 static int validate_by_crl (
         UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
         UapkiNS::Doc::Verify::CertChainItem& certChainItem
 )
 {
@@ -639,6 +689,15 @@ cleanup:
         delete it;
     }
     revoked_items.clear();
+
+    switch (ret) {
+    case RET_UAPKI_OFFLINE_MODE:
+    case RET_UAPKI_CRL_NOT_DOWNLOADED:
+    case RET_UAPKI_CRL_NOT_FOUND:
+        (void)verifiedSignerInfo.addExpectedCrlItem(certChainItem.getSubject(), crl_item);
+        break;
+    default: break;
+    }
     return ret;
 }   //  validate_by_crl
 
@@ -785,7 +844,7 @@ static int verify_p7s (
         if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
             if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
                 for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    (void)validate_by_crl(verify_sdoc, *it_cci);
+                    (void)validate_by_crl(verify_sdoc, it_vsi, *it_cci);
                 }
             }
             else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
