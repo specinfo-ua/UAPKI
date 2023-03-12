@@ -149,14 +149,14 @@ struct ResultValidationByCrl {
     CrlStore::Item*
                 crlStoreItem;
     CerStore::Item*
-                csiIssuer;
+                cerIssuer;
     CrlStore::RevokedCertItem
                 revokedCertItem;
 
     ResultValidationByCrl (void)
         : certStatus(CertStatus::UNDEFINED)
         , crlStoreItem(nullptr)
-        , csiIssuer(nullptr)
+        , cerIssuer(nullptr)
     {}
 
 };  //  end struct ResultValidationByCrl

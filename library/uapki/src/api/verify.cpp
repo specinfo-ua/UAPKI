@@ -158,6 +158,83 @@ cleanup:
     return ret;
 }   //  result_attributes_to_json
 
+static int result_certchainitem_valbycrl_to_json (
+        JSON_Object* joResult,
+        const bool isSelfSigned,
+        const UapkiNS::Doc::Verify::ResultValidationByCrl& resultValByCrl
+)
+{
+    int ret = RET_OK;
+
+    if (!isSelfSigned) {
+        const CrlStore::Item* crlstore_item = resultValByCrl.crlStoreItem;
+        const CrlStore::RevokedCertItem& revcert_item = resultValByCrl.revokedCertItem;
+        if (crlstore_item) {
+            string s_commonname;
+            DO(CerStoreUtils::rdnameFromName(crlstore_item->crl->tbsCertList.issuer, OID_X520_CommonName, s_commonname));
+            DO(json_object_set_base64(joResult, "crlId", crlstore_item->baCrlId));
+            DO_JSON(json_object_set_string(joResult, "CN", s_commonname.c_str()));
+            DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtils::mstimeToFormat(crlstore_item->thisUpdate).c_str()));
+            DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtils::mstimeToFormat(crlstore_item->nextUpdate).c_str()));
+            DO(json_object_set_hex(joResult, "crlNumber", crlstore_item->baCrlNumber));
+            if (crlstore_item->baDeltaCrl) {
+                DO(json_object_set_hex(joResult, "deltaCrlIndicator", crlstore_item->baDeltaCrl));
+            }
+            if (resultValByCrl.cerIssuer) {
+                DO(json_object_set_base64(joResult, "issuerCertId", resultValByCrl.cerIssuer->baCertId));
+            }
+            DO_JSON(json_object_set_string(joResult, "statusSignature", CerStore::verifyStatusToStr(crlstore_item->statusSign)));
+        }
+        DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(resultValByCrl.certStatus)));
+        if (revcert_item.crlReason != UapkiNS::CrlReason::UNDEFINED) {
+            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(revcert_item.crlReason)));
+            const string s_revoktime = TimeUtils::mstimeToFormat(revcert_item.getDate());
+            DO_JSON(json_object_set_string(joResult, "revocationTime", s_revoktime.c_str()));
+        }
+    }
+    else {
+        DO_JSON(json_object_set_string(joResult, "status", "NOT USED"));
+    }
+
+cleanup:
+    return ret;
+}   //  result_certchainitem_valbycrl_to_json
+
+static int result_certchainitem_valbyocsp_to_json (
+        JSON_Object* joResult,
+        const UapkiNS::Doc::Verify::ResultValidationByOcsp& resultValByOcsp
+)
+{
+    int ret = RET_OK;
+
+    if (resultValByOcsp.isUsed) {
+        DO_JSON(json_object_set_string(joResult, "source", UapkiNS::Doc::Verify::dataSourceToStr(resultValByOcsp.dataSource)));
+        DO_JSON(json_object_set_string(joResult, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(resultValByOcsp.responseStatus)));
+        DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtils::mstimeToFormat(resultValByOcsp.msProducedAt).c_str()));
+        DO_JSON(json_object_set_string(joResult, "statusSignature", UapkiNS::verifyStatusToStr(resultValByOcsp.statusSignature)));
+        if (resultValByOcsp.csiResponder) {
+            DO(json_object_set_base64(joResult, "signerCertId", resultValByOcsp.csiResponder->baCertId));
+        }
+
+        const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = resultValByOcsp.singleResponseInfo;
+        DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
+        DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate).c_str()));
+        if (singleresp_info.msNextUpdate > 0) {
+            DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate).c_str()));
+        }
+        if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
+            DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
+            DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
+        }
+    }
+    else {
+        DO_JSON(json_object_set_string(joResult, "status", "NOT USED"));
+    }
+
+cleanup:
+    return ret;
+}   //  result_certchainitem_valbyocsp_to_json
+
 static int result_certchainitem_to_json (
         JSON_Object* joResult,
         const UapkiNS::Doc::Verify::CertChainItem& certChainItem,
@@ -180,44 +257,19 @@ static int result_certchainitem_to_json (
     }
 
     if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
-        const UapkiNS::Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
-
-        json_object_set_value(joResult, "validateByCRL", json_value_init_object());
-        JSON_Object* jo_valbycrl = json_object_get_object(joResult, "validateByCRL");
-        if (!certChainItem.isSelfSigned()) {
-            DO_JSON(json_object_set_string(jo_valbycrl, "status", CrlStore::certStatusToStr(result_valbycrl.certStatus)));
-        }
-        else {
-            DO_JSON(json_object_set_string(jo_valbycrl, "status", "NOT USED"));
-        }
+        DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
+        DO(result_certchainitem_valbycrl_to_json(
+            json_object_get_object(joResult, "validateByCRL"),
+            certChainItem.isSelfSigned(),
+            certChainItem.getResultValidationByCrl()
+        ));
     }
     else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
-        const UapkiNS::Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
-        const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = result_valbyocsp.singleResponseInfo;
-
-        json_object_set_value(joResult, "validateByOCSP", json_value_init_object());
-        JSON_Object* jo_valbyocsp = json_object_get_object(joResult, "validateByOCSP");
-        if (result_valbyocsp.isUsed) {
-            DO_JSON(json_object_set_string(jo_valbyocsp, "source", UapkiNS::Doc::Verify::dataSourceToStr(result_valbyocsp.dataSource)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(result_valbyocsp.responseStatus)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "producedAt", TimeUtils::mstimeToFormat(result_valbyocsp.msProducedAt).c_str()));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
-            DO_JSON(json_object_set_string(jo_valbyocsp, "thisUpdate", TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate).c_str()));
-            if (singleresp_info.msNextUpdate > 0) {
-                DO_JSON(json_object_set_string(jo_valbyocsp, "nextUpdate", TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate).c_str()));
-            }
-            if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
-                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
-                DO_JSON(json_object_set_string(jo_valbyocsp, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
-            }
-            DO_JSON(json_object_set_string(jo_valbyocsp, "statusSignature", UapkiNS::verifyStatusToStr(result_valbyocsp.statusSignature)));
-            if (result_valbyocsp.csiResponder) {
-                DO(json_object_set_base64(jo_valbyocsp, "signerCertId", result_valbyocsp.csiResponder->baCertId));
-            }
-        }
-        else {
-            DO_JSON(json_object_set_string(jo_valbyocsp, "status", "NOT USED"));
-        }
+        DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
+        DO(result_certchainitem_valbyocsp_to_json(
+            json_object_get_object(joResult, "validateByOCSP"),
+            certChainItem.getResultValidationByOcsp()
+        ));
     }
 
 cleanup:
@@ -653,31 +705,32 @@ static int validate_by_crl (
     const ByteArray* ba_crlnumber = nullptr;
     const bool cfg_crldelta_enabled = true;
 
+    result_valbycrl.cerIssuer = certChainItem.getIssuer();
+
     DO(process_crl(
         *verifySignedDoc.crlStore,
         certChainItem.getSubject(),
-        certChainItem.getIssuer(),
+        result_valbycrl.cerIssuer,
         &ba_crlnumber,
         verify_options.validateTime,
         &crl_item
     ));
     DEBUG_OUTCON(printf("validate_by_crl() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
     DO(crl_item->revokedCerts(certChainItem.getSubject(), revoked_items));
+    result_valbycrl.crlStoreItem = crl_item;
 
     if (cfg_crldelta_enabled) {
         DO(process_crl(
             *verifySignedDoc.crlStore,
             certChainItem.getSubject(),
-            certChainItem.getIssuer(),
+            result_valbycrl.cerIssuer,
             &ba_crlnumber,
             verify_options.validateTime,
             &crl_item
         ));
         DO(crl_item->revokedCerts(certChainItem.getSubject(), revoked_items));
+        result_valbycrl.crlStoreItem = crl_item;
     }
-
-    result_valbycrl.crlStoreItem = crl_item;
-    result_valbycrl.csiIssuer = certChainItem.getIssuer();
 
     DEBUG_OUTCON(for (auto& it : revoked_items) {
         printf("[%lld] revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->index, it->revocationDate, it->crlReason, it->invalidityDate);
