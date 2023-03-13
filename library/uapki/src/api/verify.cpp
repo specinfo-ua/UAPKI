@@ -837,6 +837,46 @@ cleanup:
     return ret;
 }   //  validate_by_ocsp
 
+static int validate_certs (
+        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc
+)
+{
+    int ret = RET_OK;
+    const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
+
+    for (auto& it_vsi : verifySignedDoc.verifiedSignerInfos) {
+        if (verify_options.validationType == CerStore::ValidationType::CRL) {
+            if (it_vsi.getSignatureFormat() >= UapkiNS::SignatureFormat::CADES_XL) {
+                //DO(it_vsi.setRevocationValuesForChain());
+                //DO(it_vsi.addOcspCertsToChain());
+            }
+            for (auto& it_cci : it_vsi.getCertChainItems()) {
+                if (it_cci->getResultValidationByCrl().isUsed) {
+                    (void)validate_by_crl(verifySignedDoc, it_vsi, *it_cci);
+                }
+            }
+            DO(it_vsi.addCrlCertsToChain());
+        }
+        else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
+            if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
+                for (auto& it_cci : it_vsi.getCertChainItems()) {
+                    if (it_cci->getResultValidationByOcsp().isUsed) {
+                        (void)validate_by_ocsp(it_vsi, *it_cci);
+                    }
+                }
+                DO(it_vsi.addOcspCertsToChain());
+            }
+            else {
+                DO(it_vsi.setRevocationValuesForChain());
+                DO(it_vsi.addOcspCertsToChain());
+            }
+        }
+    }
+
+cleanup:
+    return ret;
+}   //  validate_certs
+
 static int verify_p7s (
         const ByteArray* baSignature,
         const ByteArray* baContent,
@@ -891,30 +931,7 @@ static int verify_p7s (
         DO(verified_sinfo.validateStatuses());
     }
 
-    for (auto& it_vsi : verify_sdoc.verifiedSignerInfos) {
-        if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
-            if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
-                for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    if (it_cci->getResultValidationByCrl().isUsed) {
-                        (void)validate_by_crl(verify_sdoc, it_vsi, *it_cci);
-                    }
-                }
-                DO(it_vsi.addCrlCertsToChain());
-            }
-            else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
-                for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    if (it_cci->getResultValidationByOcsp().isUsed) {
-                        (void)validate_by_ocsp(it_vsi, *it_cci);
-                    }
-                }
-                DO(it_vsi.addOcspCertsToChain());
-            }
-        }
-        else {
-            DO(it_vsi.setRevocationValuesForChain());
-            DO(it_vsi.addOcspCertsToChain());
-        }
-    }
+    DO(validate_certs(verify_sdoc));
 
     verify_sdoc.detectCertSources();
 
