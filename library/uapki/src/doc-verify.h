@@ -145,6 +145,7 @@ struct CadesXlInfo {
 
 
 struct ResultValidationByCrl {
+    bool        isUsed;
     CertStatus  certStatus;
     CrlStore::Item*
                 crlStoreItem;
@@ -154,7 +155,8 @@ struct ResultValidationByCrl {
                 revokedCertItem;
 
     ResultValidationByCrl (void)
-        : certStatus(CertStatus::UNDEFINED)
+        : isUsed(true)
+        , certStatus(CertStatus::UNDEFINED)
         , crlStoreItem(nullptr)
         , cerIssuer(nullptr)
     {}
@@ -162,12 +164,12 @@ struct ResultValidationByCrl {
 };  //  end struct ResultValidationByCrl
 
 struct ResultValidationByOcsp : public UapkiNS::Ocsp::ResponseInfo {
-    DataSource  dataSource;
     bool        isUsed;
+    DataSource  dataSource;
 
     ResultValidationByOcsp (void)
-    : dataSource(DataSource::UNDEFINED)
-    , isUsed(true)
+        : isUsed(true)
+        , dataSource(DataSource::UNDEFINED)
     {}
 
 };  //  end struct ResultValidationByOcsp
@@ -424,6 +426,13 @@ public:
         CerStore::Item* cerStoreItem,
         CertChainItem** certChainItem
     );
+    int addCertChainItem (
+        const CertEntity certEntity,
+        CerStore::Item* cerStoreItem,
+        CertChainItem** certChainItem,
+        bool& isNewItem
+    );
+    int addCrlCertsToChain (void);
     int addExpectedCertItem (
         const CertEntity certEntity,
         const ByteArray* baSidEncoded

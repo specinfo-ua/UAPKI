@@ -357,6 +357,7 @@ void CertChainItem::setIssuerAndVerify (
         m_CertEntity = CertEntity::ROOT;
         m_CsiIssuer = m_CsiSubject;
         m_IsSelfSigned = true;
+        m_ResultValidationByCrl.isUsed = false;
         m_ResultValidationByOcsp.isUsed = false;
     }
     (void)m_CsiSubject->verify(m_CsiIssuer);
@@ -490,9 +491,21 @@ int VerifiedSignerInfo::addCertChainItem (
         CertChainItem** certChainItem
 )
 {
+    bool is_newitem;
+    return addCertChainItem(certEntity, cerStoreItem, certChainItem, is_newitem);
+}
+
+int VerifiedSignerInfo::addCertChainItem (
+        const CertEntity certEntity,
+        CerStore::Item* cerStoreItem,
+        CertChainItem** certChainItem,
+        bool& isNewItem
+)
+{
     for (const auto& it : m_CertChainItems) {
         if (ba_cmp(cerStoreItem->baCertId, it->getSubjectCertId()) == 0) {
             *certChainItem = it;
+            isNewItem = false;
             return RET_OK;
         }
     }
@@ -501,8 +514,27 @@ int VerifiedSignerInfo::addCertChainItem (
     *certChainItem = certchain_item;
     if (!certchain_item) return RET_UAPKI_GENERAL_ERROR;
 
+    isNewItem = true;
     m_CertChainItems.push_back(certchain_item);
     return certchain_item->decodeName();
+}
+
+int VerifiedSignerInfo::addCrlCertsToChain (void)
+{
+    vector<CerStore::Item*> crl_certs;
+    for (const auto& it : m_CertChainItems) {
+        (void)CerStore::addCertIfUnique(crl_certs, it->getResultValidationByCrl().cerIssuer);
+    }
+    for (const auto& it_csi : crl_certs) {
+        CertChainItem* added_cci = nullptr;
+        bool is_newitem;
+        const int ret = addCertChainItem(CertEntity::CRL, it_csi, &added_cci, is_newitem);
+        if (ret != RET_OK) return ret;
+        if (is_newitem) {
+            added_cci->getResultValidationByCrl().isUsed = false;
+        }
+    }
+    return RET_OK;
 }
 
 int VerifiedSignerInfo::addExpectedCertItem (
@@ -569,9 +601,12 @@ int VerifiedSignerInfo::addOcspCertsToChain (void)
     }
     for (const auto& it_csi : ocsp_certs) {
         CertChainItem* added_cci = nullptr;
-        const int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci);
+        bool is_newitem;
+        const int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
-        added_cci->getResultValidationByOcsp().isUsed = false;
+        if (is_newitem) {
+            added_cci->getResultValidationByOcsp().isUsed = false;
+        }
     }
     return RET_OK;
 }

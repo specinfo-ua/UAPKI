@@ -160,13 +160,12 @@ cleanup:
 
 static int result_certchainitem_valbycrl_to_json (
         JSON_Object* joResult,
-        const bool isSelfSigned,
         const UapkiNS::Doc::Verify::ResultValidationByCrl& resultValByCrl
 )
 {
     int ret = RET_OK;
 
-    if (!isSelfSigned) {
+    if (resultValByCrl.isUsed) {
         const CrlStore::Item* crlstore_item = resultValByCrl.crlStoreItem;
         const CrlStore::RevokedCertItem& revcert_item = resultValByCrl.revokedCertItem;
         if (crlstore_item) {
@@ -260,7 +259,6 @@ static int result_certchainitem_to_json (
         DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
         DO(result_certchainitem_valbycrl_to_json(
             json_object_get_object(joResult, "validateByCRL"),
-            certChainItem.isSelfSigned(),
             certChainItem.getResultValidationByCrl()
         ));
     }
@@ -897,8 +895,11 @@ static int verify_p7s (
         if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
             if (verifyOptions.validationType == CerStore::ValidationType::CRL) {
                 for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    (void)validate_by_crl(verify_sdoc, it_vsi, *it_cci);
+                    if (it_cci->getResultValidationByCrl().isUsed) {
+                        (void)validate_by_crl(verify_sdoc, it_vsi, *it_cci);
+                    }
                 }
+                DO(it_vsi.addCrlCertsToChain());
             }
             else if (verifyOptions.validationType == CerStore::ValidationType::OCSP) {
                 for (auto& it_cci : it_vsi.getCertChainItems()) {
