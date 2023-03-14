@@ -362,6 +362,26 @@ public:
 };  //  end class ExpectedCrlItem
 
 
+struct VerifyOptions {
+    CerStore::ValidationType
+                validationType;
+    uint64_t    validateTime;
+    bool        forcedValidateTime;
+    //  options
+    bool        forceOcsp;
+    bool        offlineCrl;
+
+    VerifyOptions (void)
+        : validationType(CerStore::ValidationType::UNDEFINED)
+        , validateTime(0)
+        , forcedValidateTime(false)
+        , forceOcsp(false)
+        , offlineCrl(false) {
+    }
+
+};  //  end struct VerifyOptions
+
+
 class VerifiedSignerInfo {
     struct ListAddedCerts {
         std::vector<CerStore::Item*> certValues;    //  Certs from attribute certValues
@@ -453,7 +473,7 @@ public:
         const uint64_t validateTime
     );
     void validateSignFormat (
-        const uint64_t validateTime
+        const VerifyOptions& verifyOptions
     );
     void validateStatusCerts (void);
     void validateValidityTimeCerts (
@@ -563,22 +583,6 @@ private:
 
 };  //  end class VerifiedSignerInfo
 
-struct VerifyOptions {
-    CerStore::ValidationType
-                validationType;
-    uint64_t    validateTime;
-    //  options
-    bool        forceOcsp;
-    bool        offlineCrl;
-
-    VerifyOptions (void)
-        : validationType(CerStore::ValidationType::UNDEFINED)
-        , validateTime(0)
-        , forceOcsp(false)
-        , offlineCrl(false) {
-    }
-
-};  //  end struct VerifyOptions
 
 struct VerifySignedDoc {
     CerStore*   cerStore;

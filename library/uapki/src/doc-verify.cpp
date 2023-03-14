@@ -763,7 +763,7 @@ cleanup:
 }
 
 void VerifiedSignerInfo::validateSignFormat (
-        const uint64_t validateTime
+        const VerifyOptions& verifyOptions
 )
 {
     CollectVerifyStatus collect_digests, collect_signatures;
@@ -772,7 +772,14 @@ void VerifiedSignerInfo::validateSignFormat (
     collect_signatures.set(getStatusSignature());
     collect_digests.set(getStatusMessageDigest());
     if (collect_signatures.isValid() && collect_digests.isValid()) {
-        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
+        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : verifyOptions.validateTime;
+        if (    //  Forced set BestSignatureTime
+            (m_SignatureFormat <= SignatureFormat::CADES_BES) &&
+            (verifyOptions.validationType != CerStore::ValidationType::OCSP) &&
+            verifyOptions.forcedValidateTime
+        ) {
+            m_BestSignatureTime = verifyOptions.validateTime;
+        }
     }
 
     //  Check attribute EssCert
