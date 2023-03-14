@@ -444,11 +444,14 @@ public:
     int addOcspCertsToChain (void);
     int buildCertChain (void);
     int certValuesToStore (void);
-    void determineSignatureFormat (void);
+    void determineSignFormat (void);
     const char* getValidationStatus (void) const;
     int parseAttributes (void);
     int setRevocationValuesForChain (void);
-    int validateStatuses (void);
+    void validateSignFormat (
+        const uint64_t validateTime
+    );
+    void validateStatusCerts (void);
     int verifyArchiveTimeStamp (
         const std::vector<CerStore::Item*>& certs,
         const std::vector<CrlStore::Item*>& crls
@@ -546,6 +549,7 @@ private:
     int parseUnsignedAttrs (
         const std::vector<Attribute>& unsignedAttrs
     );
+    bool validateCerts (void);
     int verifyAttrTimestamp (
         AttrTimeStamp& attrTS
     );

@@ -695,7 +695,7 @@ int VerifiedSignerInfo::certValuesToStore (void)
     return RET_OK;
 }
 
-void VerifiedSignerInfo::determineSignatureFormat (void)
+void VerifiedSignerInfo::determineSignFormat (void)
 {
     if (m_SignatureFormat == SignatureFormat::CADES_BES) {
         if (m_ContentTS.isPresent() && m_SignatureTS.isPresent()) {
@@ -756,7 +756,9 @@ cleanup:
     return ret;
 }
 
-int VerifiedSignerInfo::validateStatuses (void)
+void VerifiedSignerInfo::validateSignFormat (
+        const uint64_t validateTime
+)
 {
     CollectVerifyStatus collect_digests, collect_signatures;
 
@@ -764,7 +766,7 @@ int VerifiedSignerInfo::validateStatuses (void)
     collect_signatures.set(getStatusSignature());
     collect_digests.set(getStatusMessageDigest());
     if (collect_signatures.isValid() && collect_digests.isValid()) {
-        m_BestSignatureTime = m_SigningTime;
+        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
     }
 
     //  Check attribute EssCert
@@ -804,15 +806,7 @@ int VerifiedSignerInfo::validateStatuses (void)
     m_IsValidSignatures = collect_signatures.isValid();
     m_IsValidDigests = collect_digests.isValid();
     if (m_IsValidSignatures && m_IsValidDigests) {
-        bool is_signvalid_allcerts = true;
-        for (const auto& it : m_CertChainItems) {
-            if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
-                is_signvalid_allcerts = false;
-                break;
-            }
-        }
-        m_ValidationStatus = (is_signvalid_allcerts)
-            ? ValidationStatus::TOTAL_VALID : ValidationStatus::INDETERMINATE;
+        m_ValidationStatus = ValidationStatus::TOTAL_VALID;
     }
     else if (collect_signatures.isDeterminate() || collect_digests.isDeterminate()) {
         m_ValidationStatus = ValidationStatus::INDETERMINATE;
@@ -820,8 +814,19 @@ int VerifiedSignerInfo::validateStatuses (void)
     else {
         m_ValidationStatus = ValidationStatus::TOTAL_FAILED;
     }
+}
 
-    return RET_OK;
+void VerifiedSignerInfo::validateStatusCerts (void)
+{
+    if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
+        bool is_signvalid_allcerts = true;
+        for (const auto& it : m_CertChainItems) {
+            if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
+                is_signvalid_allcerts = false;
+                break;
+            }
+        }
+    }
 }
 
 int VerifiedSignerInfo::verifyArchiveTimeStamp (
@@ -1152,6 +1157,21 @@ int VerifiedSignerInfo::parseUnsignedAttrs (
 
 cleanup:
     return ret;
+}
+
+bool VerifiedSignerInfo::validateCerts (void)
+{
+    //  Checking all certs (and crls) are present
+    if (!m_ExpectedCertItems.empty() || !m_ExpectedCrlItems.empty()) return false;
+
+    //  Checking all certs in chain
+    for (const auto& it : m_CertChainItems) {
+        //if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
+        //    return false;
+        //}
+    }
+
+    return true;
 }
 
 int VerifiedSignerInfo::verifyAttrTimestamp (

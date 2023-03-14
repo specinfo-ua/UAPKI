@@ -702,6 +702,7 @@ static int validate_by_crl (
     vector<const CrlStore::RevokedCertItem*> revoked_items;
     const ByteArray* ba_crlnumber = nullptr;
     const bool cfg_crldelta_enabled = true;
+    const uint64_t validate_time = verifiedSignerInfo.getBestSignatureTime();
 
     result_valbycrl.cerIssuer = certChainItem.getIssuer();
 
@@ -710,7 +711,7 @@ static int validate_by_crl (
         certChainItem.getSubject(),
         result_valbycrl.cerIssuer,
         &ba_crlnumber,
-        verify_options.validateTime,
+        validate_time,
         &crl_item
     ));
     DEBUG_OUTCON(printf("validate_by_crl() ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
@@ -723,7 +724,7 @@ static int validate_by_crl (
             certChainItem.getSubject(),
             result_valbycrl.cerIssuer,
             &ba_crlnumber,
-            verify_options.validateTime,
+            validate_time,
             &crl_item
         ));
         DO(crl_item->revokedCerts(certChainItem.getSubject(), revoked_items));
@@ -733,7 +734,12 @@ static int validate_by_crl (
     DEBUG_OUTCON(for (auto& it : revoked_items) {
         printf("[%lld] revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->index, it->revocationDate, it->crlReason, it->invalidityDate);
     });
-    (void)CrlStore::findRevokedCert(revoked_items, verify_options.validateTime, result_valbycrl.certStatus, result_valbycrl.revokedCertItem);
+    (void)CrlStore::findRevokedCert(
+        revoked_items,
+        validate_time,
+        result_valbycrl.certStatus,
+        result_valbycrl.revokedCertItem
+    );
 
 cleanup:
     for (auto& it : revoked_items) {
@@ -838,38 +844,36 @@ cleanup:
 }   //  validate_by_ocsp
 
 static int validate_certs (
-        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc
+        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo
 )
 {
     int ret = RET_OK;
     const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
 
-    for (auto& it_vsi : verifySignedDoc.verifiedSignerInfos) {
-        if (verify_options.validationType == CerStore::ValidationType::CRL) {
-            if (it_vsi.getSignatureFormat() >= UapkiNS::SignatureFormat::CADES_XL) {
-                //DO(it_vsi.setRevocationValuesForChain());
-                //DO(it_vsi.addOcspCertsToChain());
-            }
-            for (auto& it_cci : it_vsi.getCertChainItems()) {
-                if (it_cci->getResultValidationByCrl().isUsed) {
-                    (void)validate_by_crl(verifySignedDoc, it_vsi, *it_cci);
-                }
-            }
-            DO(it_vsi.addCrlCertsToChain());
+    if (verify_options.validationType == CerStore::ValidationType::CRL) {
+        if (verifiedSignerInfo.getSignatureFormat() >= UapkiNS::SignatureFormat::CADES_XL) {
+            //TODO
         }
-        else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
-            if (it_vsi.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
-                for (auto& it_cci : it_vsi.getCertChainItems()) {
-                    if (it_cci->getResultValidationByOcsp().isUsed) {
-                        (void)validate_by_ocsp(it_vsi, *it_cci);
-                    }
+        for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
+            if (it_cci->getResultValidationByCrl().isUsed) {
+                (void)validate_by_crl(verifySignedDoc, verifiedSignerInfo, *it_cci);
+            }
+        }
+        DO(verifiedSignerInfo.addCrlCertsToChain());
+    }
+    else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
+        if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
+            for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
+                if (it_cci->getResultValidationByOcsp().isUsed) {
+                    (void)validate_by_ocsp(verifiedSignerInfo, *it_cci);
                 }
-                DO(it_vsi.addOcspCertsToChain());
             }
-            else {
-                DO(it_vsi.setRevocationValuesForChain());
-                DO(it_vsi.addOcspCertsToChain());
-            }
+            DO(verifiedSignerInfo.addOcspCertsToChain());
+        }
+        else {
+            DO(verifiedSignerInfo.setRevocationValuesForChain());
+            DO(verifiedSignerInfo.addOcspCertsToChain());
         }
     }
 
@@ -918,20 +922,20 @@ static int verify_p7s (
         DO(verified_sinfo.verifyMessageDigest(verify_sdoc.refContent));
         DO(verified_sinfo.verifySigningCertificateV2());
 
-        verified_sinfo.determineSignatureFormat();
+        verified_sinfo.determineSignFormat();
         DO(verified_sinfo.certValuesToStore());
         DO(verified_sinfo.verifyContentTimeStamp(verify_sdoc.refContent));
         DO(verified_sinfo.verifySignatureTimeStamp());
         DO(verified_sinfo.verifyCertificateRefs());
         DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
 
+        verified_sinfo.validateSignFormat(verifyOptions.validateTime);
         if (verifyOptions.validationType >= CerStore::ValidationType::CHAIN) {
             DO(verified_sinfo.buildCertChain());
         }
-        DO(verified_sinfo.validateStatuses());
+        DO(validate_certs(verify_sdoc, verified_sinfo));
+        verified_sinfo.validateStatusCerts();
     }
-
-    DO(validate_certs(verify_sdoc));
 
     verify_sdoc.detectCertSources();
 
