@@ -314,13 +314,13 @@ CertChainItem::~CertChainItem (void)
 {
 }
 
-int CertChainItem::checkValidityTime (
+bool CertChainItem::checkValidityTime (
         const uint64_t validateTime
 )
 {
     const int ret = m_CsiSubject->checkValidity(validateTime);
     m_IsExpired = (ret != RET_OK);
-    return ret;
+    return (!m_IsExpired);
 }
 
 int CertChainItem::decodeName (void)
@@ -593,7 +593,9 @@ int VerifiedSignerInfo::addExpectedCrlItem (
     return expcrl_item->set(cerSubject, crlFull);
 }
 
-int VerifiedSignerInfo::addOcspCertsToChain (void)
+int VerifiedSignerInfo::addOcspCertsToChain (
+        const uint64_t validateTime
+)
 {
     vector<CerStore::Item*> ocsp_certs;
     for (const auto& it : m_ListAddedCerts.ocsp) {
@@ -605,6 +607,7 @@ int VerifiedSignerInfo::addOcspCertsToChain (void)
         const int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
         if (is_newitem) {
+            added_cci->checkValidityTime(validateTime);
             added_cci->getResultValidationByOcsp().isUsed = false;
         }
     }
@@ -726,7 +729,9 @@ int VerifiedSignerInfo::parseAttributes (void)
     return ret;
 }
 
-int VerifiedSignerInfo::setRevocationValuesForChain (void)
+int VerifiedSignerInfo::setRevocationValuesForChain (
+        const uint64_t validateTime
+)
 {
     int ret = RET_OK;
 
@@ -746,6 +751,7 @@ int VerifiedSignerInfo::setRevocationValuesForChain (void)
                     (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
                     result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
                     result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
+                    it_cci->checkValidityTime(validateTime);
                     break;
                 }
             }
@@ -826,6 +832,15 @@ void VerifiedSignerInfo::validateStatusCerts (void)
                 break;
             }
         }
+    }
+}
+
+void VerifiedSignerInfo::validateValidityTimeCerts (
+        const uint64_t validateTime
+)
+{
+    for (auto& it : m_CertChainItems) {
+        (void)it->checkValidityTime(validateTime);
     }
 }
 

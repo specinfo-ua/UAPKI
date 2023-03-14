@@ -850,13 +850,15 @@ static int validate_certs (
 {
     int ret = RET_OK;
     const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
+    const uint64_t bestsign_time = verifiedSignerInfo.getBestSignatureTime();
 
     if (verify_options.validationType == CerStore::ValidationType::CRL) {
         if (verifiedSignerInfo.getSignatureFormat() >= UapkiNS::SignatureFormat::CADES_XL) {
             //TODO
         }
+        verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
         for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
-            if (it_cci->getResultValidationByCrl().isUsed) {
+            if (!it_cci->isExpired() && it_cci->getResultValidationByCrl().isUsed) {
                 (void)validate_by_crl(verifySignedDoc, verifiedSignerInfo, *it_cci);
             }
         }
@@ -864,16 +866,17 @@ static int validate_certs (
     }
     else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
         if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
+            verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
             for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
-                if (it_cci->getResultValidationByOcsp().isUsed) {
+                if (!it_cci->isExpired() && it_cci->getResultValidationByOcsp().isUsed) {
                     (void)validate_by_ocsp(verifiedSignerInfo, *it_cci);
                 }
             }
-            DO(verifiedSignerInfo.addOcspCertsToChain());
+            DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
         }
         else {
-            DO(verifiedSignerInfo.setRevocationValuesForChain());
-            DO(verifiedSignerInfo.addOcspCertsToChain());
+            DO(verifiedSignerInfo.setRevocationValuesForChain(bestsign_time));
+            DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
         }
     }
 

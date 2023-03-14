@@ -200,7 +200,7 @@ public:
     ~CertChainItem (void);
 
 public:
-    int checkValidityTime (
+    bool checkValidityTime (
         const uint64_t validateTime
     );
     int decodeName (void);
@@ -441,17 +441,24 @@ public:
         CerStore::Item* cerSubject,
         CrlStore::Item* crlFull
     );
-    int addOcspCertsToChain (void);
+    int addOcspCertsToChain (
+        const uint64_t validateTime
+    );
     int buildCertChain (void);
     int certValuesToStore (void);
     void determineSignFormat (void);
     const char* getValidationStatus (void) const;
     int parseAttributes (void);
-    int setRevocationValuesForChain (void);
+    int setRevocationValuesForChain (
+        const uint64_t validateTime
+    );
     void validateSignFormat (
         const uint64_t validateTime
     );
     void validateStatusCerts (void);
+    void validateValidityTimeCerts (
+        const uint64_t validateTime
+    );
     int verifyArchiveTimeStamp (
         const std::vector<CerStore::Item*>& certs,
         const std::vector<CrlStore::Item*>& crls
