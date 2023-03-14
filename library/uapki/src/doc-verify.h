@@ -452,7 +452,9 @@ public:
         CertChainItem** certChainItem,
         bool& isNewItem
     );
-    int addCrlCertsToChain (void);
+    int addCrlCertsToChain (
+        const uint64_t validateTime
+    );
     int addExpectedCertItem (
         const CertEntity certEntity,
         const ByteArray* baSidEncoded

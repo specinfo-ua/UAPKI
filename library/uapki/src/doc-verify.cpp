@@ -519,19 +519,30 @@ int VerifiedSignerInfo::addCertChainItem (
     return certchain_item->decodeName();
 }
 
-int VerifiedSignerInfo::addCrlCertsToChain (void)
+int VerifiedSignerInfo::addCrlCertsToChain (
+        const uint64_t validateTime
+)
 {
     vector<CerStore::Item*> crl_certs;
     for (const auto& it : m_CertChainItems) {
         (void)CerStore::addCertIfUnique(crl_certs, it->getResultValidationByCrl().cerIssuer);
     }
+
     for (const auto& it_csi : crl_certs) {
         CertChainItem* added_cci = nullptr;
         bool is_newitem;
-        const int ret = addCertChainItem(CertEntity::CRL, it_csi, &added_cci, is_newitem);
+        int ret = addCertChainItem(CertEntity::CRL, it_csi, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
+
         if (is_newitem) {
+            vector<CerStore::Item*> chain_certs;
+            added_cci->checkValidityTime(validateTime);
             added_cci->getResultValidationByCrl().isUsed = false;
+            ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
+            if ((ret == RET_OK) && !chain_certs.empty()) {
+                //  Add one cert - issuer
+                added_cci->setIssuerAndVerify(chain_certs[0]);
+            }
         }
     }
     return RET_OK;
@@ -601,14 +612,22 @@ int VerifiedSignerInfo::addOcspCertsToChain (
     for (const auto& it : m_ListAddedCerts.ocsp) {
         (void)CerStore::addCertIfUnique(ocsp_certs, it);
     }
+
     for (const auto& it_csi : ocsp_certs) {
         CertChainItem* added_cci = nullptr;
         bool is_newitem;
-        const int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci, is_newitem);
+        int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
+
         if (is_newitem) {
+            vector<CerStore::Item*> chain_certs;
             added_cci->checkValidityTime(validateTime);
             added_cci->getResultValidationByOcsp().isUsed = false;
+            ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
+            if ((ret == RET_OK) && !chain_certs.empty()) {
+                //  Add one cert - issuer
+                added_cci->setIssuerAndVerify(chain_certs[0]);
+            }
         }
     }
     return RET_OK;
@@ -832,11 +851,14 @@ void VerifiedSignerInfo::validateSignFormat (
 void VerifiedSignerInfo::validateStatusCerts (void)
 {
     if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
-        bool is_signvalid_allcerts = true;
         for (const auto& it : m_CertChainItems) {
             if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
-                is_signvalid_allcerts = false;
-                break;
+                m_ValidationStatus = ValidationStatus::INDETERMINATE;
+                return;
+            }
+            if (it->isExpired()) {
+                m_ValidationStatus = ValidationStatus::INDETERMINATE;
+                return;
             }
         }
     }

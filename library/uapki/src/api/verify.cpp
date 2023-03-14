@@ -877,7 +877,7 @@ static int validate_certs (
                 (void)validate_by_crl(verifySignedDoc, verifiedSignerInfo, *it_cci);
             }
         }
-        DO(verifiedSignerInfo.addCrlCertsToChain());
+        DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
     }
     else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
         if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
