@@ -494,7 +494,7 @@ static int process_crl (
 
         if (crl->nextUpdate < validateTime) {
             DEBUG_OUTCON(puts("process_crl(), Need get newest CRL. Again... stop it!"));
-            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+            SET_ERROR(RET_UAPKI_CRL_EXPIRED);
         }
     }
 

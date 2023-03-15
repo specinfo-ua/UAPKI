@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-21
+//  Last update: 2023-03-15
 
 #ifndef _UAPKI_ERRORS_H_
 #define _UAPKI_ERRORS_H_
@@ -119,7 +119,7 @@
 #define RET_UAPKI_CRL_URL_NOT_PRESENT                                 (UAPKI_ERROR_NAME_CODE | 0x00000051)
 #define RET_UAPKI_CRL_NOT_DOWNLOADED                                  (UAPKI_ERROR_NAME_CODE | 0x00000052)
 #define RET_UAPKI_CRL_NOT_FOUND                                       (UAPKI_ERROR_NAME_CODE | 0x00000053)
-
+#define RET_UAPKI_CRL_EXPIRED                                         (UAPKI_ERROR_NAME_CODE | 0x00000054)
 
 #define RET_UAPKI_OCSP_URL_NOT_PRESENT                                (UAPKI_ERROR_NAME_CODE | 0x00000060)
 #define RET_UAPKI_OCSP_NOT_RESPONDING                                 (UAPKI_ERROR_NAME_CODE | 0x00000061)

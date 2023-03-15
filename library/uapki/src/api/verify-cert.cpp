@@ -125,7 +125,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
 
         if (crl->nextUpdate < validateTime) {
             DEBUG_OUTCON(puts("process_crl(), Need get newest CRL. Again... stop it!"));
-            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+            SET_ERROR(RET_UAPKI_CRL_EXPIRED);
         }
     }
 

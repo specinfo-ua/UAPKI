@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-21
+//  Last update: 2023-03-15
 
 #include <stddef.h>
 
@@ -232,7 +232,7 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "CRL_URL_NOT_PRESENT",              //  (UAPKI_ERROR_NAME_CODE | 0x00000051)
     "CRL_NOT_DOWNLOADED",               //  (UAPKI_ERROR_NAME_CODE | 0x00000052)
     "CRL_NOT_FOUND",                    //  (UAPKI_ERROR_NAME_CODE | 0x00000053)
-    "",
+    "CRL_EXPIRED",                      //  (UAPKI_ERROR_NAME_CODE | 0x00000054)
     "",
     "",
     "",
