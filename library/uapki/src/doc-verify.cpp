@@ -848,17 +848,36 @@ void VerifiedSignerInfo::validateSignFormat (
     }
 }
 
-void VerifiedSignerInfo::validateStatusCerts (void)
+void VerifiedSignerInfo::validateStatusCerts (
+        const CerStore::ValidationType validationType
+)
 {
     if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
+        if (!m_ExpectedCertItems.empty() || !m_ExpectedCrlItems.empty()) {
+            m_ValidationStatus = ValidationStatus::INDETERMINATE;
+            return;
+        }
+
         for (const auto& it : m_CertChainItems) {
-            if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
+            if (it->isExpired() || (it->getVerifyStatus() != CerStore::VerifyStatus::VALID)) {
                 m_ValidationStatus = ValidationStatus::INDETERMINATE;
                 return;
             }
-            if (it->isExpired()) {
-                m_ValidationStatus = ValidationStatus::INDETERMINATE;
-                return;
+
+            if (validationType == CerStore::ValidationType::CRL) {
+                const ResultValidationByCrl& result_valbycrl = it->getResultValidationByCrl();
+                if (result_valbycrl.isUsed && (result_valbycrl.certStatus != UapkiNS::CertStatus::GOOD)) {
+                    m_ValidationStatus = ValidationStatus::INDETERMINATE;
+                    return;
+                }
+            }
+
+            if (validationType == CerStore::ValidationType::OCSP) {
+                const ResultValidationByOcsp& result_valbyocsp = it->getResultValidationByOcsp();
+                if (result_valbyocsp.isUsed && (result_valbyocsp.singleResponseInfo.certStatus != UapkiNS::CertStatus::GOOD)) {
+                    m_ValidationStatus = ValidationStatus::INDETERMINATE;
+                    return;
+                }
             }
         }
     }
@@ -1201,21 +1220,6 @@ int VerifiedSignerInfo::parseUnsignedAttrs (
 
 cleanup:
     return ret;
-}
-
-bool VerifiedSignerInfo::validateCerts (void)
-{
-    //  Checking all certs (and crls) are present
-    if (!m_ExpectedCertItems.empty() || !m_ExpectedCrlItems.empty()) return false;
-
-    //  Checking all certs in chain
-    for (const auto& it : m_CertChainItems) {
-        //if (it->getVerifyStatus() != CerStore::VerifyStatus::VALID) {
-        //    return false;
-        //}
-    }
-
-    return true;
 }
 
 int VerifiedSignerInfo::verifyAttrTimestamp (

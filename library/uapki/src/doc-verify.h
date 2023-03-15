@@ -477,7 +477,9 @@ public:
     void validateSignFormat (
         const VerifyOptions& verifyOptions
     );
-    void validateStatusCerts (void);
+    void validateStatusCerts (
+        const CerStore::ValidationType validationType
+    );
     void validateValidityTimeCerts (
         const uint64_t validateTime
     );
@@ -578,7 +580,6 @@ private:
     int parseUnsignedAttrs (
         const std::vector<Attribute>& unsignedAttrs
     );
-    bool validateCerts (void);
     int verifyAttrTimestamp (
         AttrTimeStamp& attrTS
     );

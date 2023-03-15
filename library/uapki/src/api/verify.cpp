@@ -671,7 +671,7 @@ static int process_crl (
 
         if (crl->nextUpdate < validateTime) {
             DEBUG_OUTCON(puts("process_crl(), Need get newest CRL. Again... stop it!"));
-            SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
+            SET_ERROR(RET_UAPKI_CRL_EXPIRED);
         }
     }
 
@@ -919,9 +919,7 @@ static int verify_p7s (
     }
 
     DO(verify_sdoc.parse(baSignature));
-
     verify_sdoc.getContent(baContent);
-
     DO(verify_sdoc.addCertsToStore());
 
     //  For each signer_info
@@ -952,13 +950,12 @@ static int verify_p7s (
             DO(verified_sinfo.buildCertChain());
         }
         DO(validate_certs(verify_sdoc, verified_sinfo));
-        verified_sinfo.validateStatusCerts();
+        verified_sinfo.validateStatusCerts(verifyOptions.validationType);
     }
 
     verify_sdoc.detectCertSources();
 
     DO(result_to_json(joResult, verify_sdoc));
-
     ret = verify_sdoc.getLastError();
 
 cleanup:
