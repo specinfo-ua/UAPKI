@@ -867,7 +867,11 @@ static int validate_certs (
     const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
     const uint64_t bestsign_time = verifiedSignerInfo.getBestSignatureTime();
 
-    if (verify_options.validationType == CerStore::ValidationType::CRL) {
+    switch (verify_options.validationType) {
+    case CerStore::ValidationType::CHAIN:
+        verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
+        break;
+    case CerStore::ValidationType::CRL:
         if (verifiedSignerInfo.getSignatureFormat() >= UapkiNS::SignatureFormat::CADES_XL) {
             //TODO
         }
@@ -878,8 +882,8 @@ static int validate_certs (
             }
         }
         DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
-    }
-    else if (verify_options.validationType == CerStore::ValidationType::OCSP) {
+        break;
+    case CerStore::ValidationType::OCSP:
         if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
             verifiedSignerInfo.validateValidityTimeCerts(verify_options.validateTime);
             for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
@@ -893,6 +897,9 @@ static int validate_certs (
             DO(verifiedSignerInfo.setRevocationValuesForChain(bestsign_time));
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
         }
+        break;
+    default:
+        break;
     }
 
 cleanup:

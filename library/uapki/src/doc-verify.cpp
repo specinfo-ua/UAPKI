@@ -1366,7 +1366,7 @@ const char* certEntityToStr (
     static const char* CERT_ENTITY_STRINGS[8] = {
         "UNDEFINED",
         "SIGNER",
-        "INDETERMINATE",
+        "INTERMEDIATE",
         "CRL",
         "OCSP",
         "TSP",
