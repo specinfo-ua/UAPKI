@@ -474,6 +474,7 @@ public:
     int certValuesToStore (void);
     void determineSignFormat (void);
     const char* getValidationStatus (void) const;
+    std::vector<std::string> getWarningMessages (void) const;
     int parseAttributes (void);
     int setRevocationValuesForChain (
         const uint64_t validateTime

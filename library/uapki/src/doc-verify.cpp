@@ -746,6 +746,28 @@ const char* VerifiedSignerInfo::getValidationStatus (void) const {
     return validationStatusToStr(m_ValidationStatus);
 }
 
+vector<string> VerifiedSignerInfo::getWarningMessages (void) const
+{
+    vector<string> rv_warns;
+
+    if (m_SignatureFormat <= SignatureFormat::CADES_BES) {
+        if (m_SigningTime == 0) {
+            rv_warns.push_back("THE SIGNING TIME IS NOT PRESENT");
+        }
+    }
+
+    if (m_SignatureFormat <= SignatureFormat::CADES_C) {
+        for (const auto& it : m_CertChainItems) {
+            if (it->getValidationType() == CerStore::ValidationType::OCSP) {
+                rv_warns.push_back("THE STATUS OF CERTIFICATE IS FROM OCSP");
+                break;
+            }
+        }
+    }
+
+    return rv_warns;
+}
+
 int VerifiedSignerInfo::parseAttributes (void)
 {
     int ret = parseSignedAttrs(m_SignerInfo.getSignedAttrs());
@@ -777,12 +799,15 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
                     (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
                     result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
                     result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
-                    it_cci->checkValidityTime(validateTime);
                     it_cci->setValidationType(CerStore::ValidationType::OCSP);
                     break;
                 }
             }
         }
+    }
+
+    for (const auto& it_cci : m_CertChainItems) {
+        (void)it_cci->checkValidityTime(validateTime);
     }
 
 cleanup:

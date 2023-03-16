@@ -454,6 +454,7 @@ static int result_verifyinfo_to_json (
 )
 {
     int ret = RET_OK;
+    const vector<string> warns = verifyInfo.getWarningMessages();
 
     if (verifyInfo.getSignerCertId()) {
         DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.getSignerCertId()));
@@ -520,6 +521,14 @@ static int result_verifyinfo_to_json (
         for (const auto& it : verifyInfo.getExpectedCrlItems()) {
             DO_JSON(json_array_append_value(ja_expcrlitems, json_value_init_object()));
             DO(result_expectedcrlitem_to_json(json_array_get_object(ja_expcrlitems, idx++), *it));
+        }
+    }
+
+    if (!warns.empty()) {
+        DO_JSON(json_object_set_value(joSignInfo, "warnings", json_value_init_array()));
+        JSON_Array* ja_warns = json_object_get_array(joSignInfo, "warnings");
+        for (const auto& it : warns) {
+            DO_JSON(json_array_append_string(ja_warns, it.c_str()));
         }
     }
 
