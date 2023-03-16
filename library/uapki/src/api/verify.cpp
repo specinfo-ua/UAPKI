@@ -58,6 +58,9 @@ DEBUG_OUTPUT_OUTSTREAM_FUNC
 #define DEBUG_OUTPUT_OUTSTREAM(msg,baData) debug_output_stream(DEBUG_OUTSTREAM_FOPEN,"VERIFY",msg,baData)
 #endif
 
+//#define TEST_SIM_BREAKDOWN_CRL
+//#define TEST_SIM_BREAKDOWN_OCSP
+
 
 using namespace std;
 
@@ -148,7 +151,8 @@ cleanup:
 
 static int result_certchainitem_valbycrl_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ResultValidationByCrl& resultValByCrl
+        const UapkiNS::Doc::Verify::ResultValidationByCrl& resultValByCrl,
+        string& statusValidation
 )
 {
     int ret = RET_OK;
@@ -180,13 +184,20 @@ static int result_certchainitem_valbycrl_to_json (
         DO_JSON(json_object_set_string(joResult, "revocationTime", s_revoktime.c_str()));
     }
 
+    statusValidation = UapkiNS::verifyStatusToStr((
+        crlstore_item &&
+        (crlstore_item->statusSign == CerStore::VerifyStatus::VALID) &&
+        (resultValByCrl.certStatus == UapkiNS::CertStatus::GOOD)
+    ) ? UapkiNS::SignatureVerifyStatus::VALID : UapkiNS::SignatureVerifyStatus::INVALID);
+
 cleanup:
     return ret;
 }   //  result_certchainitem_valbycrl_to_json
 
 static int result_certchainitem_valbyocsp_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ResultValidationByOcsp& resultValByOcsp
+        const UapkiNS::Doc::Verify::ResultValidationByOcsp& resultValByOcsp,
+        string& statusValidation
 )
 {
     int ret = RET_OK;
@@ -211,6 +222,11 @@ static int result_certchainitem_valbyocsp_to_json (
         DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
     }
 
+    statusValidation = UapkiNS::verifyStatusToStr((
+        (resultValByOcsp.statusSignature == UapkiNS::SignatureVerifyStatus::VALID) &&
+        (singleresp_info.certStatus == UapkiNS::CertStatus::GOOD)
+    ) ? UapkiNS::SignatureVerifyStatus::VALID : UapkiNS::SignatureVerifyStatus::INVALID);
+
 cleanup:
     return ret;
 }   //  result_certchainitem_valbyocsp_to_json
@@ -222,6 +238,7 @@ static int result_certchainitem_to_json (
 )
 {
     int ret = RET_OK;
+    string s_statusvalidation;
 
     DO(json_object_set_base64(joResult, "subjectCertId", certChainItem.getSubjectCertId()));
     DO_JSON(json_object_set_string(joResult, "CN", certChainItem.getCommonName().c_str()));
@@ -237,21 +254,37 @@ static int result_certchainitem_to_json (
     }
 
     if (!certChainItem.isExpired()) {
-        if (certChainItem.getValidationType() == CerStore::ValidationType::CRL) {
+        switch (certChainItem.getValidationType()) {
+        case CerStore::ValidationType::UNDEFINED:
+            s_statusvalidation = string("UNDEFINED");
+            break;
+        case CerStore::ValidationType::NONE:
+            s_statusvalidation = string("NONE");
+            break;
+        case CerStore::ValidationType::CRL:
             DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
             DO(result_certchainitem_valbycrl_to_json(
                 json_object_get_object(joResult, "validateByCRL"),
-                certChainItem.getResultValidationByCrl()
+                certChainItem.getResultValidationByCrl(),
+                s_statusvalidation
             ));
-        }
-        else if (certChainItem.getValidationType() == CerStore::ValidationType::OCSP) {
+            break;
+        case CerStore::ValidationType::OCSP:
             DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
             DO(result_certchainitem_valbyocsp_to_json(
                 json_object_get_object(joResult, "validateByOCSP"),
-                certChainItem.getResultValidationByOcsp()
+                certChainItem.getResultValidationByOcsp(),
+                s_statusvalidation
             ));
+            break;
+        default:
+            break;
         }
     }
+    else {
+        s_statusvalidation = string("EXPIRED");
+    }
+    DO_JSON(json_object_set_string(joResult, "statusValidation", s_statusvalidation.c_str()));
 
 cleanup:
     return ret;
@@ -600,6 +633,9 @@ static int process_crl (
         }
     }
 
+#ifdef TEST_SIM_BREAKDOWN_CRL
+    crl = nullptr;
+#endif
     if (!crl) {
         if (HttpHelper::isOfflineMode()) {
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
@@ -607,6 +643,9 @@ static int process_crl (
 
         vector<string> uris;
         ret = cerSubject->getCrlUris((crl_type == CrlStore::CrlType::FULL), uris);
+#ifdef TEST_SIM_BREAKDOWN_CRL
+        ret = RET_UAPKI_CRL_NOT_DOWNLOADED;
+#endif
         if (ret != RET_OK) {
             if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
                 ret = RET_UAPKI_CRL_URL_NOT_PRESENT;
@@ -769,6 +808,9 @@ static int validate_by_ocsp (
         }
 
         ret = csi_subject->getOcspUris(uris);
+#ifdef TEST_SIM_BREAKDOWN_OCSP
+        ret = RET_UAPKI_OCSP_NOT_RESPONDING;
+#endif
         if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
             SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
         }
@@ -842,16 +884,20 @@ static int validate_certs (
     switch (verify_options.validationType) {
     case UapkiNS::Doc::Verify::VerifyOptions::ValidationType::CHAIN:
         verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
+        for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+            it->setValidationType(CerStore::ValidationType::NONE);
+        }
         break;
     case UapkiNS::Doc::Verify::VerifyOptions::ValidationType::FULL:
         if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
             verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
-            for (auto& it_cci : verifiedSignerInfo.getCertChainItems()) {
-                if (!it_cci->isExpired()) {
-                    if (it_cci->getValidationType() == CerStore::ValidationType::UNDEFINED) {
-                        ret = validate_by_crl(verifySignedDoc, verifiedSignerInfo, *it_cci);
-                        if (ret != RET_OK) {
-                            (void)validate_by_ocsp(verifiedSignerInfo, *it_cci);
+            for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+                if (!it->isExpired()) {
+                    if (it->getValidationType() == CerStore::ValidationType::UNDEFINED) {
+                        ret = validate_by_crl(verifySignedDoc, verifiedSignerInfo, *it);
+                        if ((ret != RET_OK) && !verify_options.onlyCrl) {
+                            it->setValidationType(CerStore::ValidationType::UNDEFINED);
+                            (void)validate_by_ocsp(verifiedSignerInfo, *it);
                         }
                     }
                 }

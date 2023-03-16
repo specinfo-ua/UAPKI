@@ -877,7 +877,7 @@ void VerifiedSignerInfo::validateSignFormat (
 void VerifiedSignerInfo::validateStatusCerts (void)
 {
     if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
-        if (!m_ExpectedCertItems.empty() || !m_ExpectedCrlItems.empty()) {
+        if (!m_ExpectedCertItems.empty()) {
             m_ValidationStatus = ValidationStatus::INDETERMINATE;
             return;
         }
@@ -889,6 +889,9 @@ void VerifiedSignerInfo::validateStatusCerts (void)
             }
 
             switch (it->getValidationType()) {
+            case CerStore::ValidationType::UNDEFINED:
+                m_ValidationStatus = ValidationStatus::INDETERMINATE;
+                break;
             case CerStore::ValidationType::CRL:
                 if (it->getResultValidationByCrl().certStatus != UapkiNS::CertStatus::GOOD) {
                     m_ValidationStatus = ValidationStatus::INDETERMINATE;
@@ -900,6 +903,8 @@ void VerifiedSignerInfo::validateStatusCerts (void)
                     m_ValidationStatus = ValidationStatus::INDETERMINATE;
                     return;
                 }
+                break;
+            default:
                 break;
             }
         }
