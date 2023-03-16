@@ -145,7 +145,6 @@ struct CadesXlInfo {
 
 
 struct ResultValidationByCrl {
-    bool        isUsed;
     CertStatus  certStatus;
     CrlStore::Item*
                 crlStoreItem;
@@ -155,8 +154,7 @@ struct ResultValidationByCrl {
                 revokedCertItem;
 
     ResultValidationByCrl (void)
-        : isUsed(true)
-        , certStatus(CertStatus::UNDEFINED)
+        : certStatus(CertStatus::UNDEFINED)
         , crlStoreItem(nullptr)
         , cerIssuer(nullptr)
     {}
@@ -164,12 +162,10 @@ struct ResultValidationByCrl {
 };  //  end struct ResultValidationByCrl
 
 struct ResultValidationByOcsp : public UapkiNS::Ocsp::ResponseInfo {
-    bool        isUsed;
     DataSource  dataSource;
 
     ResultValidationByOcsp (void)
-        : isUsed(true)
-        , dataSource(DataSource::UNDEFINED)
+        : dataSource(DataSource::UNDEFINED)
     {}
 
 };  //  end struct ResultValidationByOcsp
@@ -185,6 +181,8 @@ class CertChainItem {
                 m_CsiIssuer;
     bool        m_IsExpired;
     bool        m_IsSelfSigned;
+    CerStore::ValidationType
+                m_ValidationType;
     UapkiNS::CertStatus
                 m_CertStatus;
     ResultValidationByCrl
@@ -212,6 +210,9 @@ public:
     );
     void setIssuerAndVerify (
         CerStore::Item* csiIssuer
+    );
+    void setValidationType (
+        const CerStore::ValidationType validationType
     );
 
 public:
@@ -250,6 +251,9 @@ public:
     }
     const ByteArray* getSubjectCertId (void) const {
         return (m_CsiSubject) ? m_CsiSubject->baCertId : nullptr;
+    }
+    CerStore::ValidationType getValidationType (void) const {
+        return m_ValidationType;
     }
     CerStore::VerifyStatus getVerifyStatus (void) const {
         return (m_CsiSubject) ? m_CsiSubject->verifyStatus : CerStore::VerifyStatus::UNDEFINED;
@@ -363,21 +367,21 @@ public:
 
 
 struct VerifyOptions {
-    CerStore::ValidationType
+    enum class ValidationType : uint32_t {
+        UNDEFINED   = 0,
+        STRUCT      = 1,
+        CHAIN       = 2,
+        FULL        = 3
+    };  //  end enum ValidationType
+
+    ValidationType
                 validationType;
-    uint64_t    validateTime;
-    bool        forcedValidateTime;
-    //  options
-    bool        forceOcsp;
-    bool        offlineCrl;
+    bool        onlyCrl;
 
     VerifyOptions (void)
-        : validationType(CerStore::ValidationType::UNDEFINED)
-        , validateTime(0)
-        , forcedValidateTime(false)
-        , forceOcsp(false)
-        , offlineCrl(false) {
-    }
+        : validationType(ValidationType::UNDEFINED)
+        , onlyCrl(false)
+    {}
 
 };  //  end struct VerifyOptions
 
@@ -475,11 +479,9 @@ public:
         const uint64_t validateTime
     );
     void validateSignFormat (
-        const VerifyOptions& verifyOptions
+        const uint64_t validateTime
     );
-    void validateStatusCerts (
-        const CerStore::ValidationType validationType
-    );
+    void validateStatusCerts (void);
     void validateValidityTimeCerts (
         const uint64_t validateTime
     );
@@ -590,6 +592,8 @@ private:
 struct VerifySignedDoc {
     CerStore*   cerStore;
     CrlStore*   crlStore;
+    const uint64_t
+                validateTime;
     const UapkiNS::Doc::Verify::VerifyOptions&
                 verifyOptions;
     UapkiNS::Pkcs7::SignedDataParser
@@ -628,7 +632,11 @@ const char* dataSourceToStr (
 );
 
 const char* validationStatusToStr (
-    const ValidationStatus status
+    const ValidationStatus validationStatus
+);
+
+VerifyOptions::ValidationType validationTypeFromStr (
+    const std::string& validationType
 );
 
 

@@ -306,6 +306,7 @@ CertChainItem::CertChainItem (
     , m_CsiIssuer(nullptr)
     , m_IsExpired(true)
     , m_IsSelfSigned(false)
+    , m_ValidationType(CerStore::ValidationType::UNDEFINED)
     , m_CertStatus(UapkiNS::CertStatus::UNDEFINED)
 {
 }
@@ -357,10 +358,16 @@ void CertChainItem::setIssuerAndVerify (
         m_CertEntity = CertEntity::ROOT;
         m_CsiIssuer = m_CsiSubject;
         m_IsSelfSigned = true;
-        m_ResultValidationByCrl.isUsed = false;
-        m_ResultValidationByOcsp.isUsed = false;
+        m_ValidationType = CerStore::ValidationType::NONE;
     }
     (void)m_CsiSubject->verify(m_CsiIssuer);
+}
+
+void CertChainItem::setValidationType (
+    const CerStore::ValidationType validationType
+)
+{
+    m_ValidationType = validationType;
 }
 
 
@@ -537,7 +544,7 @@ int VerifiedSignerInfo::addCrlCertsToChain (
         if (is_newitem) {
             vector<CerStore::Item*> chain_certs;
             added_cci->checkValidityTime(validateTime);
-            added_cci->getResultValidationByCrl().isUsed = false;
+            added_cci->setValidationType(CerStore::ValidationType::NONE);
             ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
             if ((ret == RET_OK) && !chain_certs.empty()) {
                 //  Add one cert - issuer
@@ -622,7 +629,7 @@ int VerifiedSignerInfo::addOcspCertsToChain (
         if (is_newitem) {
             vector<CerStore::Item*> chain_certs;
             added_cci->checkValidityTime(validateTime);
-            added_cci->getResultValidationByOcsp().isUsed = false;
+            added_cci->setValidationType(CerStore::ValidationType::NONE);
             ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
             if ((ret == RET_OK) && !chain_certs.empty()) {
                 //  Add one cert - issuer
@@ -771,6 +778,7 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
                     result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
                     result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
                     it_cci->checkValidityTime(validateTime);
+                    it_cci->setValidationType(CerStore::ValidationType::OCSP);
                     break;
                 }
             }
@@ -782,7 +790,7 @@ cleanup:
 }
 
 void VerifiedSignerInfo::validateSignFormat (
-        const VerifyOptions& verifyOptions
+        const uint64_t validateTime
 )
 {
     CollectVerifyStatus collect_digests, collect_signatures;
@@ -791,14 +799,7 @@ void VerifiedSignerInfo::validateSignFormat (
     collect_signatures.set(getStatusSignature());
     collect_digests.set(getStatusMessageDigest());
     if (collect_signatures.isValid() && collect_digests.isValid()) {
-        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : verifyOptions.validateTime;
-        if (    //  Forced set BestSignatureTime
-            (m_SignatureFormat <= SignatureFormat::CADES_BES) &&
-            (verifyOptions.validationType != CerStore::ValidationType::OCSP) &&
-            verifyOptions.forcedValidateTime
-        ) {
-            m_BestSignatureTime = verifyOptions.validateTime;
-        }
+        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
     }
 
     //  Check attribute EssCert
@@ -848,9 +849,7 @@ void VerifiedSignerInfo::validateSignFormat (
     }
 }
 
-void VerifiedSignerInfo::validateStatusCerts (
-        const CerStore::ValidationType validationType
-)
+void VerifiedSignerInfo::validateStatusCerts (void)
 {
     if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
         if (!m_ExpectedCertItems.empty() || !m_ExpectedCrlItems.empty()) {
@@ -864,20 +863,19 @@ void VerifiedSignerInfo::validateStatusCerts (
                 return;
             }
 
-            if (validationType == CerStore::ValidationType::CRL) {
-                const ResultValidationByCrl& result_valbycrl = it->getResultValidationByCrl();
-                if (result_valbycrl.isUsed && (result_valbycrl.certStatus != UapkiNS::CertStatus::GOOD)) {
+            switch (it->getValidationType()) {
+            case CerStore::ValidationType::CRL:
+                if (it->getResultValidationByCrl().certStatus != UapkiNS::CertStatus::GOOD) {
                     m_ValidationStatus = ValidationStatus::INDETERMINATE;
                     return;
                 }
-            }
-
-            if (validationType == CerStore::ValidationType::OCSP) {
-                const ResultValidationByOcsp& result_valbyocsp = it->getResultValidationByOcsp();
-                if (result_valbyocsp.isUsed && (result_valbyocsp.singleResponseInfo.certStatus != UapkiNS::CertStatus::GOOD)) {
+                break;
+            case CerStore::ValidationType::OCSP:
+                if (it->getResultValidationByOcsp().singleResponseInfo.certStatus != UapkiNS::CertStatus::GOOD) {
                     m_ValidationStatus = ValidationStatus::INDETERMINATE;
                     return;
                 }
+                break;
             }
         }
     }
@@ -1296,6 +1294,7 @@ VerifySignedDoc::VerifySignedDoc (
 )
     : cerStore(iCerStore)
     , crlStore(iCrlStore)
+    , validateTime(TimeUtils::nowMsTime())
     , verifyOptions(iVerifyOptions)
     , refContent(nullptr)
 {
@@ -1389,7 +1388,7 @@ const char* dataSourceToStr (
 }   //  dataSourceToStr
 
 const char* validationStatusToStr (
-        const ValidationStatus status
+        const ValidationStatus validationStatus
 )
 {
     static const char* VALIDATION_STATUS_STRINGS[4] = {
@@ -1398,8 +1397,25 @@ const char* validationStatusToStr (
         "TOTAL-FAILED",
         "TOTAL-VALID"
     };
-    return VALIDATION_STATUS_STRINGS[((uint32_t)status < 4) ? (uint32_t)status : 0];
+    return VALIDATION_STATUS_STRINGS[((uint32_t)validationStatus < 4) ? (uint32_t)validationStatus : 0];
 }   //  validationStatusToStr
+
+VerifyOptions::ValidationType validationTypeFromStr (
+    const string& validationType
+)
+{
+    VerifyOptions::ValidationType rv_type = VerifyOptions::ValidationType::UNDEFINED;
+    if (validationType.empty() || (validationType == string("STRUCT"))) {
+        rv_type = VerifyOptions::ValidationType::STRUCT;
+    }
+    else if (validationType == string("CHAIN")) {
+        rv_type = VerifyOptions::ValidationType::CHAIN;
+    }
+    else if (validationType == string("FULL")) {
+        rv_type = VerifyOptions::ValidationType::FULL;
+    }
+    return rv_type;
+}   //  validationTypeFromStr
 
 
 }   //  end namespace Verify
