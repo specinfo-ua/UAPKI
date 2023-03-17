@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-03-01
+//  Last update: 2023-03-17
 
 
 #include "signeddata-helper.h"
@@ -319,7 +319,7 @@ int SignedDataBuilder::SignerInfo::setSid (
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
-    DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baSidEncoded));
+    DO(asn_decode_ba(get_ANY_desc(), &m_SignerInfo->sid, baSidEncoded));
 
 cleanup:
     return ret;
@@ -337,11 +337,11 @@ int SignedDataBuilder::SignerInfo::setSid (
 
     switch (sidType) {
     case SignerIdentifierType::ISSUER_AND_SN:
-        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, baData));
+        DO(asn_decode_ba(get_ANY_desc(), &m_SignerInfo->sid, baData));
         break;
     case SignerIdentifierType::SUBJECT_KEYID:
         DO(keyIdToSid(baData, &sba_encoded));
-        DO(asn_decode_ba(get_SignerIdentifier_desc(), &m_SignerInfo->sid, sba_encoded.get()));
+        DO(asn_decode_ba(get_ANY_desc(), &m_SignerInfo->sid, sba_encoded.get()));
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
