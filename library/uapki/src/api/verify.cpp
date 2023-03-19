@@ -217,7 +217,7 @@ static int result_certchainitem_valbyocsp_to_json (
     if (singleresp_info.msNextUpdate > 0) {
         DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate).c_str()));
     }
-    if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
+    if (singleresp_info.revocationReason != UapkiNS::CrlReason::UNDEFINED) {
         DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
         DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
     }
@@ -497,10 +497,7 @@ static int result_verifyinfo_to_json (
     DO_JSON(json_object_set_string(joSignInfo, "status", verifyInfo.getValidationStatus()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validSignatures", verifyInfo.isValidSignatures()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validDigests", verifyInfo.isValidDigests()));
-    if (verifyInfo.getBestSignatureTime() > 0) {
-        DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtils::mstimeToFormat(verifyInfo.getBestSignatureTime()).c_str()));
-    }
-
+    DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtils::mstimeToFormat(verifyInfo.getBestSignatureTime()).c_str()));
     DO_JSON(json_object_set_string(joSignInfo, "statusSignature", UapkiNS::verifyStatusToStr(verifyInfo.getStatusSignature())));
     DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", UapkiNS::verifyStatusToStr(verifyInfo.getStatusMessageDigest())));
     if (verifyInfo.getSigningTime() > 0) {

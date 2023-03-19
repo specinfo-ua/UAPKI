@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,7 +33,7 @@
 
 
 static const char* LIB_NAME     = "UAPKI";
-static const char* LIB_VERSION  = "2.0.8";
+static const char* LIB_VERSION  = "2.0.9";
 
 
 int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
