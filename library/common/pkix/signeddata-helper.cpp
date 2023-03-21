@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-03-17
+//  Last update: 2023-03-21
 
 
 #include "signeddata-helper.h"
@@ -577,7 +577,9 @@ SignedDataParser::~SignedDataParser (void)
     asn_free(get_SignedData_desc(), m_SignedData);
 }
 
-int SignedDataParser::parse (const ByteArray* baEncoded)
+int SignedDataParser::parse (
+        const ByteArray* baEncoded
+)
 {
     int ret = RET_OK;
     ContentInfo_t* cinfo = nullptr;
@@ -634,11 +636,24 @@ cleanup:
     return ret;
 }
 
-int SignedDataParser::parseSignerInfo (const size_t index, SignerInfo& signerInfo)
+int SignedDataParser::parseSignerInfo (
+        const size_t index,
+        SignerInfo& signerInfo
+)
 {
     if (index >= m_CountSignerInfos) return RET_INDEX_OUT_OF_RANGE;
 
     return signerInfo.parse(m_SignedData->signerInfos.list.array[index]);
+}
+
+bool SignedDataParser::isContainDigestAlgorithm (
+        const AlgorithmIdentifier& digestAlgorithm
+)
+{
+    for (const auto& it : m_DigestAlgorithms) {
+        if (digestAlgorithm.algorithm == it) return true;
+    }
+    return false;
 }
 
 int SignedDataParser::decodeDigestAlgorithms (
@@ -658,14 +673,6 @@ int SignedDataParser::decodeDigestAlgorithms (
 cleanup:
     ::free(s_dgstalgo);
     return ret;
-}
-
-bool SignedDataParser::isContainDigestAlgorithm (const AlgorithmIdentifier& digestAlgorithm)
-{
-    for (const auto& it : m_DigestAlgorithms) {
-        if (digestAlgorithm.algorithm == it) return true;
-    }
-    return false;
 }
 
 int SignedDataParser::decodeEncapContentInfo (

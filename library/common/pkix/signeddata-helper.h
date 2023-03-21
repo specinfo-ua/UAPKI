@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-03-01
+//  Last update: 2023-03-21
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -305,9 +305,16 @@ namespace Pkcs7 {
         SignedDataParser (void);
         ~SignedDataParser (void);
 
-        int parse (const ByteArray* baEncoded);
-        int parseSignerInfo (const size_t index, SignerInfo& signerInfo);
-        bool isContainDigestAlgorithm (const AlgorithmIdentifier& digestAlgorithm);
+        int parse (
+            const ByteArray* baEncoded
+        );
+        int parseSignerInfo (
+            const size_t index,
+            SignerInfo& signerInfo
+        );
+        bool isContainDigestAlgorithm (
+            const AlgorithmIdentifier& digestAlgorithm
+        );
 
     public:
         uint32_t getVersion (void) const {
