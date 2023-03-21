@@ -1,11 +1,11 @@
-//  Last update: 2021-09-20
+//  Last update: 2022-11-22
 
 #ifndef PARSON_BA_UTILS_H
 #define PARSON_BA_UTILS_H
 
 
 #include "parson.h"
-#include "uapkic.h"
+#include "byte-array.h"
 #include "uapki-errors.h"
 
 

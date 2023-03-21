@@ -1,12 +1,13 @@
-//  Last update: 2021-09-20
+//  Last update: 2022-11-22
 
 #include <stdlib.h>
 #include <string.h>
 #include "parson-ba-utils.h"
+#include "uapkic-errors.h"
 
 
 #undef FILE_MARKER
-#define FILE_MARKER "json/parson-ba-utils.c"
+#define FILE_MARKER "common/json/parson-ba-utils.c"
 
 
 int json_object_set_hex (JSON_Object* jsonObject, const char* name, const ByteArray* baData)
