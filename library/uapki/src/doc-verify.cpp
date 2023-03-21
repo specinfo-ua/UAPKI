@@ -249,7 +249,7 @@ int CadesXlInfo::verifyCertRefs (
                 return ret;
             }
 
-            ret = cerStore->getCertByIssuerAndSn(sba_issuer.get(), it.issuerSerial.baSerialNumber, &cer_item);
+            ret = cerStore->getCertByIssuerAndSN(sba_issuer.get(), it.issuerSerial.baSerialNumber, &cer_item);
             if (ret == RET_OK) {
                 refba_cert = cer_item->baEncoded;
             }

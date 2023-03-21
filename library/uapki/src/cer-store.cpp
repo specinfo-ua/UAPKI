@@ -387,7 +387,10 @@ cleanup:
     return ret;
 }
 
-int CerStore::getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem)
+int CerStore::getCertByCertId (
+        const ByteArray* baCertId,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -405,7 +408,10 @@ int CerStore::getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem)
+int CerStore::getCertByEncoded (
+        const ByteArray* baEncoded,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -423,7 +429,10 @@ int CerStore::getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertByIndex (const size_t index, Item** cerStoreItem)
+int CerStore::getCertByIndex (
+        const size_t index,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -438,7 +447,7 @@ int CerStore::getCertByIndex (const size_t index, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertByIssuerAndSn (
+int CerStore::getCertByIssuerAndSN (
         const ByteArray* baIssuer,
         const ByteArray* baSerialNumber,
         Item** cerStoreItem
@@ -448,7 +457,10 @@ int CerStore::getCertByIssuerAndSn (
     int ret = RET_UAPKI_CERT_NOT_FOUND;
     mtx.lock();
     for (auto& it : m_Items) {
-        if ((ba_cmp(baSerialNumber, it->baSerialNumber) == RET_OK) && (ba_cmp(baIssuer, it->baIssuer) == RET_OK)) {
+        if (
+            (ba_cmp(baSerialNumber, it->baSerialNumber) == RET_OK) &&
+            (ba_cmp(baIssuer, it->baIssuer) == RET_OK)
+        ) {
             *cerStoreItem = it;
             ret = RET_OK;
             break;
@@ -514,7 +526,10 @@ int CerStore::getCertBySID (
     return ret;
 }
 
-int CerStore::getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem)
+int CerStore::getCertBySPKI (
+        const ByteArray* baSPKI,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -532,7 +547,10 @@ int CerStore::getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem)
     return ret;
 }
 
-int CerStore::getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem)
+int CerStore::getCertBySubject (
+        const ByteArray* baSubject,
+        Item** cerStoreItem
+)
 {
     mutex mtx;
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -547,23 +565,6 @@ int CerStore::getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem)
     }
 
     mtx.unlock();
-    return ret;
-}
-
-int CerStore::load (
-        const char* path
-)
-{
-    mutex mtx;
-    if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
-
-    mtx.lock();
-    m_Path = string(path);
-    const int ret = loadDir();
-    mtx.unlock();
-    if (ret != RET_OK) {
-        reset();
-    }
     return ret;
 }
 
@@ -671,6 +672,23 @@ int CerStore::getIssuerCert (
         *cerIssuer = (Item*)cerSubject;
     }
 
+    return ret;
+}
+
+int CerStore::load (
+        const char* path
+)
+{
+    mutex mtx;
+    if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
+
+    mtx.lock();
+    m_Path = string(path);
+    const int ret = loadDir();
+    mtx.unlock();
+    if (ret != RET_OK) {
+        reset();
+    }
     return ret;
 }
 
@@ -1091,7 +1109,9 @@ const char* CerStore::verifyStatusToStr (
     return VERIFY_STATUS_STRINGS[((uint32_t)status < 6) ? (uint32_t)status : 0];
 }
 
-CerStore::Item* CerStore::addItem (Item* item)
+CerStore::Item* CerStore::addItem (
+        Item* item
+)
 {
     for (auto& it : m_Items) {
         const int ret = ba_cmp(item->baKeyId, it->baKeyId);
@@ -1149,7 +1169,9 @@ int CerStore::loadDir (void)
     return RET_OK;
 }
 
-int CerStore::saveToFile (const Item* cerStoreItem)
+int CerStore::saveToFile (
+        const Item* cerStoreItem
+)
 {
     if (m_Path.empty()) return RET_OK;
 

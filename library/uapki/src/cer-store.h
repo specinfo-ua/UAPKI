@@ -168,10 +168,19 @@ public:
         bool& isUnique,
         Item** cerStoreItem
     );
-    int getCertByCertId (const ByteArray* baCertId, Item** cerStoreItem);
-    int getCertByEncoded (const ByteArray* baEncoded, Item** cerStoreItem);
-    int getCertByIndex (const size_t index, Item** cerStoreItem);
-    int getCertByIssuerAndSn (
+    int getCertByCertId (
+        const ByteArray* baCertId,
+        Item** cerStoreItem
+    );
+    int getCertByEncoded (
+        const ByteArray* baEncoded,
+        Item** cerStoreItem
+    );
+    int getCertByIndex (
+        const size_t index,
+        Item** cerStoreItem
+    );
+    int getCertByIssuerAndSN (
         const ByteArray* baIssuer,
         const ByteArray* baSerialNumber,
         Item** cerStoreItem
@@ -184,8 +193,14 @@ public:
         const ByteArray* baSID,
         Item** cerStoreItem
     );
-    int getCertBySPKI (const ByteArray* baSPKI, Item** cerStoreItem);
-    int getCertBySubject (const ByteArray* baSubject, Item** cerStoreItem);
+    int getCertBySPKI (
+        const ByteArray* baSPKI,
+        Item** cerStoreItem
+    );
+    int getCertBySubject (
+        const ByteArray* baSubject,
+        Item** cerStoreItem
+    );
     int getChainCerts (
         const Item* cerSubject,
         std::vector<Item*>& chainCerts
@@ -275,9 +290,13 @@ public:
 
 private:
     //  addItem - added unique item, return new-item or exists-item
-    Item* addItem (Item* cerStoreItem);
+    Item* addItem (
+        Item* cerStoreItem
+    );
     int loadDir (void);
-    int saveToFile (const Item* cerStoreItem);
+    int saveToFile (
+        const Item* cerStoreItem
+    );
 
 public:
     void saveStatToLog (
