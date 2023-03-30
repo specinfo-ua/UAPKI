@@ -25,13 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-03-15
+//  Last update: 2023-03-29
 
 #include <stddef.h>
 
 #define COUNT_UAPKIC_ERRORS 34
 #define COUNT_ASN1_ERRORS   4
-#define COUNT_CM_ERRORS     55
+#define COUNT_CM_ERRORS     64
 #define COUNT_UAPKI_ERRORS  128
 #define OFFSET_ASN1_ERRORS  100
 
@@ -135,15 +135,24 @@ static const char* STR_CM_ERRORS[COUNT_CM_ERRORS] = {
     "TOKEN_NO_FREE_SESSIONS",       //  (CM_ERROR_NAME_CODE | 0x0000002B)
     "TOKEN_NO_FREE_SPACE",          //  (CM_ERROR_NAME_CODE | 0x0000002C)
     "TOKEN_ALREADY_LOGGED",         //  (CM_ERROR_NAME_CODE | 0x0000002D)
-    "TOKEN_NOT_LOGGED",             //  (CM_ERROR_NAME_CODE | 0x0000002E)
-    "TOKEN_ERROR2",                 //  (CM_ERROR_NAME_CODE | 0x0000002F)
+    "ERROR_0x2E",                   //  (CM_ERROR_NAME_CODE | 0x0000002E)
+    "STORAGE_NOT_FOUND",            //  (CM_ERROR_NAME_CODE | 0x0000002F)
     "FILE_OPEN_ERROR",              //  (CM_ERROR_NAME_CODE | 0x00000030)
     "FILE_READ_ERROR",              //  (CM_ERROR_NAME_CODE | 0x00000031)
     "FILE_WRITE_ERROR",             //  (CM_ERROR_NAME_CODE | 0x00000032)
     "FILE_DELETE_ERROR",            //  (CM_ERROR_NAME_CODE | 0x00000033)
     "DECODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0x00000034)
     "ENCODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0X00000035)
-    "PASSWORD_NOT_SET"              //  (CM_ERROR_NAME_CODE | 0x00000036)
+    "PASSWORD_NOT_SET",             //  (CM_ERROR_NAME_CODE | 0x00000036)
+    "ERROR_0x37",                   //  (CM_ERROR_NAME_CODE | 0x00000037)
+    "ERROR_0x38",                   //  (CM_ERROR_NAME_CODE | 0x00000038)
+    "ERROR_0x39",                   //  (CM_ERROR_NAME_CODE | 0x00000039)
+    "ERROR_0x3A",                   //  (CM_ERROR_NAME_CODE | 0x0000003A)
+    "ERROR_0x3B",                   //  (CM_ERROR_NAME_CODE | 0x0000003B)
+    "ERROR_0x3C",                   //  (CM_ERROR_NAME_CODE | 0x0000003C)
+    "ERROR_0x3D",                   //  (CM_ERROR_NAME_CODE | 0x0000003D)
+    "ERROR_0x3E",                   //  (CM_ERROR_NAME_CODE | 0x0000003E)
+    "ERROR_0x3F"                    //  (CM_ERROR_NAME_CODE | 0x0000003F)
 };
 
 static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
