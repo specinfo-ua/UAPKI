@@ -26,43 +26,37 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef    _PKI_STATUS_H_
-#define    _PKI_STATUS_H_
+#ifndef	_CERT_RESPONSE_H_
+#define	_CERT_RESPONSE_H_
 
 
 #include "asn_application.h"
 
 /* Including external dependencies */
-#include "INTEGER.h"
+#include "CertifiedKeyPair.h"
+#include "PKIStatusInfo.h"
+#include "NativeInteger.h"
+#include "OCTET_STRING.h"
+#include "constr_SEQUENCE.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Dependencies */
-typedef enum PKIStatus {
-    PKIStatus_granted                   = 0,    //  Note: renamed to accepted in RFC 4210 CMP $5.2.3
-    PKIStatus_grantedWithMods           = 1,
-    PKIStatus_rejection                 = 2,
-    PKIStatus_waiting                   = 3,
-    PKIStatus_revocationWarning         = 4,
-    PKIStatus_revocationNotification    = 5,
-    PKIStatus_keyUpdateWarning          = 6     //  Note: added in RFC 4210 CMP $5.2.3
-} e_PKIStatus;
+/* CertResponse */
+typedef struct CertResponse {
+    long                    certReqId;
+    PKIStatusInfo_t         status;
+    CertifiedKeyPair_t*     certifiedKeyPair    /* OPTIONAL */;
+    OCTET_STRING_t*         rspInfo             /* OPTIONAL */;
 
-/* PKIStatus */
-typedef INTEGER_t     PKIStatus_t;
+    /* Context for parsing across buffer boundaries */
+    asn_struct_ctx_t _asn_ctx;
+} CertResponse_t;
 
 /* Implementation */
-extern asn_TYPE_descriptor_t PKIStatus_desc;
-UAPKIF_EXPORT asn_TYPE_descriptor_t* get_PKIStatus_desc(void);
-asn_struct_free_f PKIStatus_free;
-asn_struct_print_f PKIStatus_print;
-asn_constr_check_f PKIStatus_constraint;
-ber_type_decoder_f PKIStatus_decode_ber;
-der_type_encoder_f PKIStatus_encode_der;
-xer_type_decoder_f PKIStatus_decode_xer;
-xer_type_encoder_f PKIStatus_encode_xer;
+extern asn_TYPE_descriptor_t CertResponse_desc;
+UAPKIF_EXPORT asn_TYPE_descriptor_t* get_CertResponse_desc(void);
 
 #ifdef __cplusplus
 }

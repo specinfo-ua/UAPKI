@@ -26,40 +26,92 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _SIGNER_INFO_H_
-#define	_SIGNER_INFO_H_
+#ifndef	_PKI_BODY_H_
+#define	_PKI_BODY_H_
 
 
 #include "asn_application.h"
 
 /* Including external dependencies */
-#include "AlgorithmIdentifier.h"
 #include "ANY.h"
-#include "INTEGER.h"
-#include "OCTET_STRING.h"
-#include "constr_SEQUENCE.h"
+#include "constr_CHOICE.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* SignerInfo */
-typedef struct SignerInfo {
-    INTEGER_t              version;
-    ANY_t                  sid;
-    AlgorithmIdentifier_t  digestAlgorithm;
-    ANY_t                  signedAttrs;
-    AlgorithmIdentifier_t  signatureAlgorithm;
-    OCTET_STRING_t         signature;
-    ANY_t*                 unsignedAttrs    /* OPTIONAL */;
-    
+/* Dependencies */
+typedef enum PKIBody_PR {
+    PKIBody_PR_NOTHING,	/* No components present */
+    PKIBody_PR_ir,
+    PKIBody_PR_ip,
+    PKIBody_PR_cr,
+    PKIBody_PR_cp,
+    PKIBody_PR_p10cr,
+    PKIBody_PR_popdecc,
+    PKIBody_PR_popdecr,
+    PKIBody_PR_kur,
+    PKIBody_PR_kup,
+    PKIBody_PR_krr,
+    PKIBody_PR_krp,
+    PKIBody_PR_rr,
+    PKIBody_PR_rp,
+    PKIBody_PR_ccr,
+    PKIBody_PR_ccp,
+    PKIBody_PR_ckuann,
+    PKIBody_PR_cann,
+    PKIBody_PR_rann,
+    PKIBody_PR_crlann,
+    PKIBody_PR_pkiconf,
+    PKIBody_PR_nested,
+    PKIBody_PR_genm,
+    PKIBody_PR_genp,
+    PKIBody_PR_error,
+    PKIBody_PR_certConf,
+    PKIBody_PR_pollReq,
+    PKIBody_PR_pollRep
+} PKIBody_PR;
+
+/* PKIBody */
+typedef struct PKIBody {
+    PKIBody_PR present;
+    union PKIBody_u {
+        ANY_t   ir;
+        ANY_t   ip;
+        ANY_t   cr;
+        ANY_t   cp;
+        ANY_t   p10cr;
+        ANY_t   popdecc;
+        ANY_t   popdecr;
+        ANY_t   kur;
+        ANY_t   kup;
+        ANY_t   krr;
+        ANY_t   krp;
+        ANY_t   rr;
+        ANY_t   rp;
+        ANY_t   ccr;
+        ANY_t   ccp;
+        ANY_t   ckuann;
+        ANY_t   cann;
+        ANY_t   rann;
+        ANY_t   crlann;
+        ANY_t   pkiconf;
+        ANY_t   nested;
+        ANY_t   genm;
+        ANY_t   genp;
+        ANY_t   error;
+        ANY_t   certConf;
+        ANY_t   pollReq;
+        ANY_t   pollRep;
+    } choice;
+
     /* Context for parsing across buffer boundaries */
     asn_struct_ctx_t _asn_ctx;
-} SignerInfo_t;
+} PKIBody_t;
 
 /* Implementation */
-extern asn_TYPE_descriptor_t SignerInfo_desc;
-UAPKIF_EXPORT asn_TYPE_descriptor_t* get_SignerInfo_desc(void);
+extern asn_TYPE_descriptor_t PKIBody_desc;
+UAPKIF_EXPORT asn_TYPE_descriptor_t* get_PKIBody_desc(void);
 
 #ifdef __cplusplus
 }

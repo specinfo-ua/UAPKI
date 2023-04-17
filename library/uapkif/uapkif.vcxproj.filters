@@ -927,6 +927,75 @@
     <ClInclude Include="include\ATSHashIndex.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\PKIMessage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIHeader.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ErrorMsgContent.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIBody.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SequenceOfANY.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertReqMsg.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertRequest.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertTemplate.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PBMParameter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\POPOPrivKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\POPOSigningKey.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\POPOSigningKeyInput.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ProofOfPossession.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\OptionalValidity.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertifiedKeyPair.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertOrEncCert.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertRepMessage.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CertResponse.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EncryptedValue.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PKIPublicationInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SinglePubInfo.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevDetails.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\RevRepContent.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\struct\AccessDescription.c">
@@ -1818,6 +1887,75 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\ATSHashIndexFull.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIMessage.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIHeader.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ErrorMsgContent.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIBody.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SequenceOfANY.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertReqMsg.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertRequest.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertTemplate.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PBMParameter.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\POPOPrivKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\POPOSigningKey.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\POPOSigningKeyInput.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\ProofOfPossession.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\OptionalValidity.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertifiedKeyPair.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertOrEncCert.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertRepMessage.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\CertResponse.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\EncryptedValue.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\PKIPublicationInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\SinglePubInfo.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevDetails.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\RevRepContent.c">
       <Filter>src\struct</Filter>
     </ClCompile>
   </ItemGroup>
