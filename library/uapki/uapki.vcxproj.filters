@@ -252,6 +252,9 @@
     <ClCompile Include="src\doc-verify.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\api\random-bytes.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">

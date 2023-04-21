@@ -61,6 +61,7 @@
     <ClCompile Include="src\api\encrypt.cpp" />
     <ClCompile Include="src\api\get-cert.cpp" />
     <ClCompile Include="src\api\list-certs.cpp" />
+    <ClCompile Include="src\api\random-bytes.cpp" />
     <ClCompile Include="src\api\remove-cert.cpp" />
     <ClCompile Include="src\api\verify-cert.cpp" />
     <ClCompile Include="src\api\key-get-csr.cpp" />

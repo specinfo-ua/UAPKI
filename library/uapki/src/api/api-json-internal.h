@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -84,6 +84,8 @@ int uapki_asn1_encode (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult);
+
+int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult);
 
 #ifdef __cplusplus
 }

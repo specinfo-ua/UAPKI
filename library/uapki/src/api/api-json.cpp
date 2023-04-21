@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -155,6 +155,9 @@ UAPKI_EXPORT char* process (const char* request)
     }
     else if (strcmp(s_method, "ENCRYPT") == 0) {
         err_code = uapki_encrypt(jo_params, jo_result);
+    }
+    else if (strcmp(s_method, "RANDOM_BYTES") == 0) {
+        err_code = uapki_random_bytes(jo_params, jo_result);
     }
     else {
         err_code = RET_UAPKI_INVALID_METHOD;
