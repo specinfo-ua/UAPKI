@@ -70,7 +70,7 @@
 #define RET_CM_UNSUPPORTED_KEY_CONTAINER             (CM_ERROR_NAME_CODE | 0x00000022)
 #define RET_CM_UNSUPPORTED_FORMAT                    (CM_ERROR_NAME_CODE | 0x00000023)
 #define RET_CM_CONNECTION_ERROR                      (CM_ERROR_NAME_CODE | 0x00000024)
-#define RET_CM_RESPONSE_INVALID                      (CM_ERROR_NAME_CODE | 0x00000025)
+#define RET_CM_INVALID_RESPONSE                      (CM_ERROR_NAME_CODE | 0x00000025)
 #define RET_CM_RESPONSE_ERROR                        (CM_ERROR_NAME_CODE | 0x00000026)
 #define RET_CM_ACCESS_DENIED                         (CM_ERROR_NAME_CODE | 0x00000027)
 #define RET_CM_JSON_FAILURE                          (CM_ERROR_NAME_CODE | 0x00000028)
@@ -88,6 +88,8 @@
 #define RET_CM_DECODE_ASN1_ERROR                     (CM_ERROR_NAME_CODE | 0x00000034)
 #define RET_CM_ENCODE_ASN1_ERROR                     (CM_ERROR_NAME_CODE | 0x00000035)
 #define RET_CM_PASSWORD_NOT_SET                      (CM_ERROR_NAME_CODE | 0x00000036)
+#define RET_CM_INVALID_CERTIFICATE                   (CM_ERROR_NAME_CODE | 0x00000037)
+#define RET_CM_INVALID_KEYID                         (CM_ERROR_NAME_CODE | 0x00000038)
 
 
 #endif

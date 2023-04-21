@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-03-29
+//  Last update: 2023-04-03
 
 #include <stddef.h>
 
@@ -126,7 +126,7 @@ static const char* STR_CM_ERRORS[COUNT_CM_ERRORS] = {
     "UNSUPPORTED_KEY_CONTAINER",    //  (CM_ERROR_NAME_CODE | 0x00000022)
     "UNSUPPORTED_FORMAT",           //  (CM_ERROR_NAME_CODE | 0x00000023)
     "CONNECTION_ERROR",             //  (CM_ERROR_NAME_CODE | 0x00000024)
-    "RESPONSE_INVALID",             //  (CM_ERROR_NAME_CODE | 0x00000025)
+    "INVALID_RESPONSE",             //  (CM_ERROR_NAME_CODE | 0x00000025)
     "RESPONSE_ERROR",               //  (CM_ERROR_NAME_CODE | 0x00000026)
     "ACCESS_DENIED",                //  (CM_ERROR_NAME_CODE | 0x00000027)
     "JSON_FAILURE",                 //  (CM_ERROR_NAME_CODE | 0x00000028)
@@ -144,8 +144,8 @@ static const char* STR_CM_ERRORS[COUNT_CM_ERRORS] = {
     "DECODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0x00000034)
     "ENCODE_ASN1_ERROR",            //  (CM_ERROR_NAME_CODE | 0X00000035)
     "PASSWORD_NOT_SET",             //  (CM_ERROR_NAME_CODE | 0x00000036)
-    "ERROR_0x37",                   //  (CM_ERROR_NAME_CODE | 0x00000037)
-    "ERROR_0x38",                   //  (CM_ERROR_NAME_CODE | 0x00000038)
+    "INVALID_CERTIFICATE",          //  (CM_ERROR_NAME_CODE | 0x00000037)
+    "INVALID_KEYID",                //  (CM_ERROR_NAME_CODE | 0x00000038)
     "ERROR_0x39",                   //  (CM_ERROR_NAME_CODE | 0x00000039)
     "ERROR_0x3A",                   //  (CM_ERROR_NAME_CODE | 0x0000003A)
     "ERROR_0x3B",                   //  (CM_ERROR_NAME_CODE | 0x0000003B)
