@@ -115,8 +115,19 @@ int AttrTimeStamp::parse (
         const ByteArray* baEncoded
 )
 {
-    const int ret = tsTokenParser.parse(baEncoded);
+    int ret = tsTokenParser.parse(baEncoded);
     if (ret != RET_OK) return ret;
+
+    Pkcs7::SignedDataParser& sdata_parser = tsTokenParser.getSignedDataParser();
+    if (
+        (!sdata_parser.getEncapContentInfo().baEncapContent) ||
+        (sdata_parser.getCountSignerInfos() == 0)
+    ) return RET_UAPKI_INVALID_STRUCT;
+
+    ret = sdata_parser.parseSignerInfo(0, signerInfo);
+    if (ret != RET_OK) return ret;
+
+    if (!sdata_parser.isContainDigestAlgorithm(signerInfo.getDigestAlgorithm())) return RET_UAPKI_INVALID_STRUCT;
 
     policy = tsTokenParser.getPolicyId();
     hashAlgo = tsTokenParser.getHashAlgo();
@@ -130,26 +141,45 @@ int AttrTimeStamp::verifyDigest (
         const bool isDigest
 )
 {
+    int ret = RET_OK;
+    SmartBA sba_hashdata, sba_hashtstinfo;
+    HashAlg hash_alg = hash_from_oid(signerInfo.getDigestAlgorithm().algorithm.c_str());
+
+    if (hash_alg == HASH_ALG_UNDEFINED) {
+        statusDigest = DigestVerifyStatus::FAILED;
+        return RET_UAPKI_UNSUPPORTED_ALG;
+    }
+
+    ret = ::hash(hash_alg, tsTokenParser.getSignedDataParser().getEncapContentInfo().baEncapContent, &sba_hashtstinfo);
+    if (ret != RET_OK) {
+        statusDigest = DigestVerifyStatus::FAILED;
+        return ret;
+    }
+
+    if (ba_cmp(signerInfo.getMessageDigest(), sba_hashtstinfo.get()) != 0) {
+        statusDigest = DigestVerifyStatus::INVALID;
+        return RET_UAPKI_INVALID_DIGEST;
+    }
+
     if (!baData) {
         statusDigest = DigestVerifyStatus::INDETERMINATE;
         return RET_OK;
     }
 
     if (!isDigest) {
-        const HashAlg hash_alg = hash_from_oid(hashAlgo.c_str());
+        hash_alg = hash_from_oid(hashAlgo.c_str());
         if (hash_alg == HASH_ALG_UNDEFINED) {
             statusDigest = DigestVerifyStatus::FAILED;
             return RET_UAPKI_UNSUPPORTED_ALG;
         }
 
-        SmartBA sba_hash;
-        const int ret = ::hash(hash_alg, baData, &sba_hash);
+        ret = ::hash(hash_alg, baData, &sba_hashdata);
         if (ret != RET_OK) {
             statusDigest = DigestVerifyStatus::FAILED;
             return ret;
         }
 
-        statusDigest = (ba_cmp(hashedMessage.get(), sba_hash.get()) == 0)
+        statusDigest = (ba_cmp(hashedMessage.get(), sba_hashdata.get()) == 0)
             ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
     else {
@@ -1256,11 +1286,7 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
 {
     int ret = RET_OK;
     Pkcs7::SignedDataParser& sdata_parser = attrTS.tsTokenParser.getSignedDataParser();
-    Pkcs7::SignedDataParser::SignerInfo signer_info;
-
-    if (sdata_parser.getCountSignerInfos() == 0) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
+    const Pkcs7::SignedDataParser::SignerInfo& signer_info = attrTS.signerInfo;
 
     for (auto& it : sdata_parser.getCerts()) {
         bool is_unique;
@@ -1268,11 +1294,6 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
         DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
         it = nullptr;
         m_ListAddedCerts.fromSignature.push_back(cer_item);
-    }
-
-    DO(sdata_parser.parseSignerInfo(0, signer_info));
-    if (!sdata_parser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
-        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
     }
 
     switch (signer_info.getSidType()) {

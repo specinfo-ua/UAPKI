@@ -73,6 +73,8 @@ enum class ValidationStatus : uint32_t {
 struct AttrTimeStamp {
     Tsp::TsTokenParser
                 tsTokenParser;
+    Pkcs7::SignedDataParser::SignerInfo
+                signerInfo;
     std::string policy;
     std::string hashAlgo;
     SmartBA     hashedMessage;

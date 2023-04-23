@@ -124,10 +124,18 @@ namespace Tsp {
             const bool move = false
         );
 
-        uint64_t getGenTime (void) const { return m_GenTime; }
-        const std::string& getHashAlgo (void) const { return m_HashAlgo; }
-        const std::string& getPolicyId(void) const { return m_PolicyId; }
-        UapkiNS::Pkcs7::SignedDataParser& getSignedDataParser (void) { return m_SignedDataParser; }
+        uint64_t getGenTime (void) const {
+            return m_GenTime;
+        }
+        const std::string& getHashAlgo (void) const {
+            return m_HashAlgo;
+        }
+        const std::string& getPolicyId (void) const {
+            return m_PolicyId;
+        }
+        UapkiNS::Pkcs7::SignedDataParser& getSignedDataParser (void) {
+            return m_SignedDataParser;
+        }
 
     };  //  end class TsTokenParser
 
