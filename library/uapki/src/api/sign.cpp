@@ -177,9 +177,14 @@ static int verify_signeddata (
     int ret = RET_OK;
     UapkiNS::Pkcs7::SignedDataParser sdata_parser;
     UapkiNS::Pkcs7::SignedDataParser::SignerInfo signer_info;
+    UapkiNS::SmartBA sba_hashtstinfo;
+    HashAlg hash_alg = HASH_ALG_UNDEFINED;
 
     DO(sdata_parser.parse(baEncoded));
-    if (sdata_parser.getCountSignerInfos() == 0) {
+    if (
+        (!sdata_parser.getEncapContentInfo().baEncapContent) ||
+        (sdata_parser.getCountSignerInfos() == 0)
+    ) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
@@ -191,7 +196,15 @@ static int verify_signeddata (
 
     DO(sdata_parser.parseSignerInfo(0, signer_info));
     if (!sdata_parser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
-        SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    hash_alg = hash_from_oid(signer_info.getDigestAlgorithm().algorithm.c_str());
+    if (hash_alg == HASH_ALG_UNDEFINED) {
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+    }
+    DO(::hash(hash_alg, sdata_parser.getEncapContentInfo().baEncapContent, &sba_hashtstinfo));
+    if (ba_cmp(signer_info.getMessageDigest(), sba_hashtstinfo.get()) != 0) {
+        SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
     }
 
     switch (signer_info.getSidType()) {
