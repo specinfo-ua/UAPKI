@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,6 +29,7 @@
 #include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 
 
 #undef FILE_MARKER
@@ -39,8 +40,7 @@ int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     CerStore* cer_store = nullptr;
-    ByteArray* ba_certid = nullptr;
-    ByteArray* ba_encoded = nullptr;
+    UapkiNS::SmartBA sba_certid, sba_encoded;
     bool permanent = false;
 
     cer_store = get_cerstore();
@@ -48,19 +48,20 @@ int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    ba_certid = json_object_get_base64(joParams, "certId");
-    if (!ba_certid) {
+    if (!sba_certid.set(json_object_get_base64(joParams, "certId"))) {
         CerStore::Item* cer_item = nullptr;
-        ba_encoded = json_object_get_base64(joParams, "bytes");
+        if (!sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
 
-        DO(cer_store->getCertByEncoded(ba_encoded, &cer_item));
-        CHECK_NOT_NULL(ba_certid = ba_copy_with_alloc(cer_item->baCertId, 0, 0));
+        DO(cer_store->getCertByEncoded(sba_encoded.get(), &cer_item));
+        if (!sba_certid.set(ba_copy_with_alloc(cer_item->baCertId, 0, 0))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
     }
 
-    DO(cer_store->removeCert(ba_certid, permanent));
+    DO(cer_store->removeCert(sba_certid.get(), permanent));
 
 cleanup:
-    ba_free(ba_certid);
-    ba_free(ba_encoded);
     return ret;
 }

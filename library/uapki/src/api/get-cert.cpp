@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,6 +29,7 @@
 #include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 
 
 #undef FILE_MARKER
@@ -39,18 +40,16 @@ int uapki_get_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     CerStore* cer_store = nullptr;
-    ByteArray* ba_certid = nullptr;
-    ByteArray* ba_encoded = nullptr;
+    UapkiNS::SmartBA sba_certid;
 
     cer_store = get_cerstore();
     if (!cer_store) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    ba_certid = json_object_get_base64(joParams, "certId");
-    if (ba_certid) {
+    if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
         CerStore::Item* cer_item = nullptr;
-        DO(cer_store->getCertByCertId(ba_certid, &cer_item));
+        DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
         DO(json_object_set_base64(joResult, "bytes", cer_item->baEncoded));
     }
     else {
@@ -58,7 +57,5 @@ int uapki_get_cert (JSON_Object* joParams, JSON_Object* joResult)
     }
 
 cleanup:
-    ba_free(ba_certid);
-    ba_free(ba_encoded);
     return ret;
 }
