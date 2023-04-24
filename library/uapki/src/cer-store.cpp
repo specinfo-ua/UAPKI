@@ -1192,7 +1192,7 @@ void CerStore::saveStatToLog (
     FILE* f = fopen("uapki-cer-store.log", "a");
     if (!f) return;
 
-    uint64_t ms = TimeUtils::nowMsTime();
+    uint64_t ms = TimeUtils::mstimeNow();
     string s_line = string("*** STAT[") + to_string(ctr_stat) + string("] BEGIN *** '") + message;
     s_line += string("' TIME ") + TimeUtils::mstimeToFormat(ms) + string(" ***\n");
     fputs(s_line.c_str(), f);

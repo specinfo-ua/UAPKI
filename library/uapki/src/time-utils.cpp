@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <time.h>
 #include "time-utils.h"
 #include "asn1-ba-utils.h"
 #include "macros-internal.h"
@@ -36,31 +35,59 @@
 using namespace std;
 
 
-static const char* HEX_ASN1_GENTIME_2K = "180F32303030303130313030303030305A";
 static const size_t STIME_FORMAT_INDECES[14] = { 0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18 };
 
-
-string TimeUtils::mstimeToFormat (const uint64_t msTime, const bool isLocal)
+static int two_digits_to_int (
+        const char* s
+)
 {
-    const time_t t = msTime / 1000;
+    return (s[0] - 0x30) * 10 + (s[1] - 0x30);
+}   //  two_digits_to_int
+
+
+string TimeUtils::mstimeToFormat (
+        const uint64_t msTime,
+        const bool isLocal
+)
+{
+    ::tm tm_data;
     string rv_stime;
+    if (!mstimeToTm(tm_data, msTime, isLocal)) return rv_stime;
+
     rv_stime.resize(24);
-    if (!isLocal) {
-        strftime((char*)rv_stime.data(), 23, "%Y-%m-%d %H:%M:%S", gmtime(&t));
-    }
-    else {
-        strftime((char*)rv_stime.data(), 23, "%Y-%m-%d %H:%M:%S", localtime(&t));
-    }
+    strftime((char*)rv_stime.data(), 23, "%Y-%m-%d %H:%M:%S", &tm_data);
     rv_stime.resize(19);
     return rv_stime;
 }
 
-uint64_t TimeUtils::nowMsTime (void)
+bool TimeUtils::mstimeToTm (
+        ::tm& tmData,
+        const uint64_t msTime,
+        const bool isLocal
+)
+{
+    const uint64_t t_sec = msTime / 1000;
+#if defined(_WIN32) || defined(__WINDOWS__)
+    const errno_t err = (isLocal)
+        ? ::localtime_s(&tmData, (time_t*)&t_sec)
+        : ::gmtime_s(&tmData, (time_t*)&t_sec);
+    return (err == 0);
+#elif defined(__linux__) || defined(__APPLE__) || defined(__GNUC__)
+    const ::tm* r_tm = (isLocal)
+        ? ::localtime_r(&t_sec, &tmData)
+        : ::gmtime_r(&t_sec, &tmData);
+    return (r_tm);
+#endif
+}
+
+uint64_t TimeUtils::mstimeNow (void)
 {
     return time(nullptr) * 1000;
 }
 
-string TimeUtils::stimeToFormat (const char* sTime)
+string TimeUtils::stimeToFormat (
+        const char* sTime
+)
 {
     string rv_stime;
     if (sTime && (strlen(sTime) > 0)) {
@@ -73,32 +100,64 @@ string TimeUtils::stimeToFormat (const char* sTime)
     return rv_stime;
 }
 
-int TimeUtils::stimeToMstime (const char* sTime, uint64_t& msTime)
+int TimeUtils::stimeToMstime (
+        const char* sTime,
+        uint64_t& msTime
+)
 {
-    int ret = RET_OK;
-    UapkiNS::SmartBA sba_time;
-    uint64_t ms = 0;
-
     if (
-        sTime && (strlen(sTime) == 19) &&
-        (sTime[4] == '-') && (sTime[7] == '-') && (sTime[10] == ' ') &&
-        (sTime[13] == ':') && (sTime[16] == ':')
-    ) {
-        if (sba_time.set(ba_alloc_from_hex(HEX_ASN1_GENTIME_2K))) {
-            for (size_t i = 0; i < 14; i++) {
-                ba_set_byte(sba_time.get(), i + 2, sTime[STIME_FORMAT_INDECES[i]]);
-            }
-            DO(ba_decode_pkixtime(sba_time.get(), &ms));
-            msTime = ms;
-        }
-        else {
-            ret = RET_UAPKI_GENERAL_ERROR;
-        }
-    }
-    else {
-        ret = RET_UAPKI_INVALID_PARAMETER;
-    }
+        !sTime || (strlen(sTime) != 19) ||
+        (sTime[4] != '-') || (sTime[7] != '-') ||
+        ((sTime[10] != ' ') && (sTime[10] != 'T')) ||
+        (sTime[13] != ':') || (sTime[16] != ':')
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
-cleanup:
-    return ret;
+    ::tm tm_data;
+    tm_data.tm_year = two_digits_to_int(&sTime[0]) * 100;
+    tm_data.tm_year += two_digits_to_int(&sTime[2]) - 1900;
+    tm_data.tm_mon = two_digits_to_int(&sTime[5]) - 1;
+    tm_data.tm_mday = two_digits_to_int(&sTime[8]);
+    tm_data.tm_hour = two_digits_to_int(&sTime[11]);
+    tm_data.tm_min = two_digits_to_int(&sTime[14]);
+    tm_data.tm_sec = two_digits_to_int(&sTime[17]);
+    msTime = tmToMstime(tm_data, 0);
+    return RET_OK;
+}
+
+uint64_t TimeUtils::tmToMstime (
+        ::tm& tmData,
+        const int msec
+)
+{
+    //  Based by source https://lynx.invisible-island.net/lynx2.8.4/breakout/src/mktime.c
+    const static int m_to_d[12] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+    uint64_t rv_t;
+    short month, year;
+
+    month = tmData.tm_mon;
+    year = tmData.tm_year + month / 12 + 1900;
+    month %= 12;
+    if (month < 0)
+    {
+        year -= 1;
+        month += 12;
+    }
+    rv_t = (year - 1970) * 365 + m_to_d[month];
+    if (month <= 1) {
+        year -= 1;
+    }
+    rv_t += (year - 1968) / 4;
+    rv_t -= (year - 1900) / 100;
+    rv_t += (year - 1600) / 400;
+    rv_t += tmData.tm_mday;
+    rv_t -= 1;
+    rv_t *= 24;
+    rv_t += tmData.tm_hour;
+    rv_t *= 60;
+    rv_t += tmData.tm_min;
+    rv_t *= 60;
+    rv_t += tmData.tm_sec;
+    rv_t *= 1000;
+    rv_t += msec;
+    return rv_t;
 }

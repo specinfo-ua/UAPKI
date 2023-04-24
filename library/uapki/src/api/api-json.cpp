@@ -169,7 +169,7 @@ cleanup:
         json_result.setString("error", error_code_to_str(err_code));
     }
     if (ParsonHelper::jsonObjectGetBoolean(jo_params, "reportTime", false)) {
-        const string s_time = TimeUtils::mstimeToFormat(TimeUtils::nowMsTime());
+        const string s_time = TimeUtils::mstimeToFormat(TimeUtils::mstimeNow());
         json_object_set_string(jo_result, "reportTime", s_time.c_str());
     }
     json_result.serialize(&rv_sjson);

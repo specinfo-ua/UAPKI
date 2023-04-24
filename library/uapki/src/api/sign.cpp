@@ -540,7 +540,7 @@ static int get_cert_status_by_crl (
     int ret = RET_OK;
     CerStore& cer_store = *get_cerstore();
     CrlStore& crl_store = *get_crlstore();
-    const uint64_t validate_time = TimeUtils::nowMsTime();
+    const uint64_t validate_time = TimeUtils::mstimeNow();
     CrlStore::Item* crl_item = nullptr;
     vector<const CrlStore::RevokedCertItem*> revoked_items;
     const ByteArray* ba_crlnumber = nullptr;
@@ -548,7 +548,7 @@ static int get_cert_status_by_crl (
     UapkiNS::CertStatus cert_status = UapkiNS::CertStatus::UNDEFINED;
     const bool cfg_crldelta_enabled = true;
 
-    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::nowMsTime()));
+    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::mstimeNow()));
 
     DO(cer_store.getIssuerCert(cerDataItem.pcsiSubject, &cerDataItem.pcsiIssuer, cerDataItem.isSelfSigned));
     if (cerDataItem.isSelfSigned) return RET_OK;
@@ -620,7 +620,7 @@ static int get_cert_status_by_ocsp (
     vector<string> shuffled_uris, uris;
     bool need_update;
 
-    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::nowMsTime()));
+    DO(cerDataItem.pcsiSubject->checkValidity(TimeUtils::mstimeNow()));
 
     DO(cer_store.getIssuerCert(cerDataItem.pcsiSubject, &cerDataItem.pcsiIssuer, cerDataItem.isSelfSigned));
     if (cerDataItem.isSelfSigned) return RET_OK;
@@ -636,7 +636,7 @@ static int get_cert_status_by_ocsp (
         SET_ERROR(ret);
     }
 
-    need_update = cerDataItem.pcsiSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    need_update = cerDataItem.pcsiSubject->certStatusByOcsp.isExpired(TimeUtils::mstimeNow());
     if (need_update) {
         DO(ocsp_helper.init());
         DO(ocsp_helper.addCert(cerDataItem.pcsiIssuer, cerDataItem.pcsiSubject));

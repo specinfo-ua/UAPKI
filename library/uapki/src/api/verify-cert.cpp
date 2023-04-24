@@ -323,7 +323,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
         SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
     }
 
-    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::mstimeNow());
     if (need_update) {
         DO(ocsp_helper.init());
         DO(ocsp_helper.addCert(cerIssuer, cerSubject));
@@ -438,7 +438,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     s_validatetime = ParsonHelper::jsonObjectGetString(joParams, "validateTime");
     need_updatecert = s_validatetime.empty();
     if (need_updatecert || (validation_type == CerStore::ValidationType::OCSP)) {
-        validate_time = TimeUtils::nowMsTime();
+        validate_time = TimeUtils::mstimeNow();
     }
     else {
         DO(TimeUtils::stimeToMstime(s_validatetime.c_str(), validate_time));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,15 +29,34 @@
 #define UAPKI_TIME_UTILS_H
 
 
+#include <stdint.h>
+#include <time.h>
 #include <string>
 
 
 namespace TimeUtils {
 
-    std::string mstimeToFormat (const uint64_t msTime, const bool isLocal = false);
-    uint64_t nowMsTime (void);
-    std::string stimeToFormat (const char* sTime);
-    int stimeToMstime (const char* sTime, uint64_t& msTime);
+    std::string mstimeToFormat (
+        const uint64_t msTime,
+        const bool isLocal = false
+    );
+    bool mstimeToTm (
+        ::tm& tmData,
+        const uint64_t msTime,
+        const bool isLocal
+    );
+    uint64_t mstimeNow (void);
+    std::string stimeToFormat (
+        const char* sTime
+    );
+    int stimeToMstime (
+        const char* sTime,
+        uint64_t& msTime
+    );
+    uint64_t tmToMstime (
+        ::tm& tmData,
+        const int msec = 0
+    );
 
 }   //  end namespace TimeUtils
 

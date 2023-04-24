@@ -276,7 +276,7 @@ int SigningDoc::buildSignedAttributes (void)
     DO(signerInfo->addSignedAttrContentType(contentType));
     DO(signerInfo->addSignedAttrMessageDigest(messageDigest.get()));
     if (signParams->includeTime) {
-        DO(signerInfo->addSignedAttrSigningTime(TimeUtils::nowMsTime()));
+        DO(signerInfo->addSignedAttrSigningTime(TimeUtils::mstimeNow()));
     }
 
     //  Add CAdES-signed attrs

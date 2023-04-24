@@ -792,7 +792,7 @@ static int validate_by_ocsp (
     UapkiNS::SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
 
-    bool need_update = csi_subject->certStatusByOcsp.isExpired(TimeUtils::nowMsTime());
+    bool need_update = csi_subject->certStatusByOcsp.isExpired(TimeUtils::mstimeNow());
     if (need_update) {
         const CerStore::Item* csi_issuer = certChainItem.getIssuer();
 

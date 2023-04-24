@@ -1345,7 +1345,7 @@ VerifySignedDoc::VerifySignedDoc (
 )
     : cerStore(iCerStore)
     , crlStore(iCrlStore)
-    , validateTime(TimeUtils::nowMsTime())
+    , validateTime(TimeUtils::mstimeNow())
     , verifyOptions(iVerifyOptions)
     , refContent(nullptr)
 {
