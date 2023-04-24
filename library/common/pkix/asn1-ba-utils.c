@@ -32,9 +32,6 @@
 #include "uapki-errors.h"
 
 
-#define UTC_TIME_MS_END 2524608000000ul
-
-
 int asn_decode_anystring (const uint8_t* buf, const size_t len, char** str)
 {
     int ret = RET_OK;
@@ -529,39 +526,6 @@ int ba_encode_oid (const char* oid, ByteArray** baEncoded)
 
 cleanup:
     asn_free(get_OBJECT_IDENTIFIER_desc(), asn_oid);
-    return ret;
-}
-
-int ba_encode_pkixtime (const PKIXTime_PR frmTime, const uint64_t msTime, ByteArray** baEncoded)
-{
-    int ret = RET_OK;
-    PKIXTime_PR frm_time = frmTime;
-    GeneralizedTime_t* gen_time = NULL;
-    UTCTime_t* utc_time = NULL;
-
-    CHECK_PARAM(baEncoded != NULL);
-
-    if (frm_time == PKIXTime_PR_NOTHING) {
-        frm_time = (msTime < UTC_TIME_MS_END) ? PKIXTime_PR_utcTime : PKIXTime_PR_generalTime;
-    }
-    
-    switch (frm_time) {
-    case PKIXTime_PR_utcTime:
-        DO(asn_msec2UT(msTime, &utc_time));
-        DO(asn_encode_ba(get_UTCTime_desc(), utc_time, baEncoded));
-        break;
-    case PKIXTime_PR_generalTime:
-        DO(asn_msec2GT(msTime, &gen_time));
-        DO(asn_encode_ba(get_GeneralizedTime_desc(), gen_time, baEncoded));
-        break;
-    default:
-        SET_ERROR(RET_INVALID_PARAM);
-        break;
-    }
-
-cleanup:
-    asn_free(get_GeneralizedTime_desc(), gen_time);
-    asn_free(get_UTCTime_desc(), utc_time);
     return ret;
 }
 

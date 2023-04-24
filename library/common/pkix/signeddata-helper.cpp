@@ -555,7 +555,7 @@ int SignedDataBuilder::SignerInfo::addSignedAttrSigningTime (
     int ret = RET_OK;
     UapkiNS::Attribute attr = UapkiNS::Attribute(string(OID_PKCS9_SIGNING_TIME));
 
-    DO(ba_encode_pkixtime(PKIXTime_PR_NOTHING, signingTime, &attr.baValues));
+    DO(UapkiNS::Util::encodePkixTime(PKIXTime_PR_NOTHING, signingTime, &attr.baValues));
     DO(addSignedAttr(attr));
 
 cleanup:

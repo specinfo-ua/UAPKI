@@ -67,7 +67,6 @@ int ba_encode_integer (const ByteArray* baData, ByteArray** baEncoded);
 int ba_encode_integer_int32 (const int32_t value, ByteArray** baEncoded);
 int ba_encode_octetstring (const ByteArray* baData, ByteArray** baEncoded);
 int ba_encode_oid (const char* oid, ByteArray** baEncoded);
-int ba_encode_pkixtime (const PKIXTime_PR frmTime, const uint64_t msTime, ByteArray** baEncoded);
 int ba_encode_printablestring (const char* strLatin, ByteArray** baEncoded);
 int ba_encode_utf8string (const char* strUtf8, ByteArray** baEncoded);
 
