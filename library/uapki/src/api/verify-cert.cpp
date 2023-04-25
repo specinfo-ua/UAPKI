@@ -441,7 +441,7 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
         validate_time = TimeUtils::mstimeNow();
     }
     else {
-        DO(TimeUtils::stimeToMstime(s_validatetime.c_str(), validate_time));
+        DO(TimeUtils::ftimeToMtime(s_validatetime, validate_time));
     }
     s_validatetime = TimeUtils::mstimeToFormat(validate_time);
     DO_JSON(json_object_set_string(joResult, "validateTime", s_validatetime.c_str()));

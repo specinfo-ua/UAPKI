@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- //  Last update: 2023-04-24
+ //  Last update: 2023-04-25
 
 #ifndef UAPKI_UTILS_H
 #define UAPKI_UTILS_H
@@ -48,6 +48,10 @@ namespace Util {
     int addToAttributes (Attributes_t* attrs, const char* type, const ByteArray* baValues);
     int addToAttributes (Attributes_t* attrs, const UapkiNS::Attribute& attr);
 
+    int decodePkixTime (
+        const ByteArray* baEncoded,
+        uint64_t& msTime
+    );
     int encodeGenTime (
         const uint64_t msTime,
         ByteArray** baEncoded
@@ -60,6 +64,11 @@ namespace Util {
     int encodeUtcTime (
         const uint64_t msTime,
         ByteArray** baEncoded
+    );
+
+    int pkixTimeFromAsn1 (
+        const PKIXTime_t* pkixTime,
+        uint64_t& msTime
     );
 
 }   //  end namespace Util

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-24
+//  Last update: 2023-04-25
 
 
 #include "attribute-helper.h"
@@ -256,7 +256,7 @@ int decodeSigningTime (
         uint64_t& signingTime
 )
 {
-    return ba_decode_pkixtime(baEncoded, &signingTime);
+    return Util::decodePkixTime(baEncoded, signingTime);
 }
 
 int encodeAttribute (

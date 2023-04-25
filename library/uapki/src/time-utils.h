@@ -36,6 +36,10 @@
 
 namespace TimeUtils {
 
+    int ftimeToMtime (
+        const std::string& fTime,
+        uint64_t& msTime
+    );
     std::string mstimeToFormat (
         const uint64_t msTime,
         const bool isLocal = false
@@ -49,8 +53,8 @@ namespace TimeUtils {
     std::string stimeToFormat (
         const char* sTime
     );
-    int stimeToMstime (
-        const char* sTime,
+    int stimeToMtime (
+        const std::string& sTime,
         uint64_t& msTime
     );
     uint64_t tmToMstime (

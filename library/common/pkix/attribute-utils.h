@@ -43,9 +43,6 @@ int attrs_add_attribute (Attributes_t* attrs, const char* attrType, const ByteAr
 const Attribute_t* attrs_get_attr_by_oid (const Attributes_t* attrs, const char* oidType);
 int attrs_get_attrvalue_by_oid (const Attributes_t* attrs, const char* oidType, ByteArray** baEncoded);
 
-int attrs_get_content_type (const Attributes_t* attrs, char** oidContentType);
-int attrs_get_message_digest (const Attributes_t* attrs, ByteArray** baMessageDigest);
-int attrs_get_signing_time (const Attributes_t* attrs, uint64_t* signingTime);
 
 #ifdef __cplusplus
 }

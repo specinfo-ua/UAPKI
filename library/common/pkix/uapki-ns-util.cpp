@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-04-24
+//  Last update: 2023-04-25
 
 #include "uapki-ns-util.h"
 #include "macros-internal.h"
@@ -167,6 +167,24 @@ int Util::addToAttributes (Attributes_t* attrs, const Attribute& attr)
     return addToAttributes(attrs, attr.type.c_str(), attr.baValues);
 }
 
+int Util::decodePkixTime (
+        const ByteArray* baEncoded,
+        uint64_t& msTime
+)
+{
+    int ret = RET_OK;
+    PKIXTime_t* pkix_time = nullptr;
+
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(pkix_time = (PKIXTime_t*)asn_decode_ba_with_alloc(get_PKIXTime_desc(), baEncoded));
+    DO(pkixTimeFromAsn1(pkix_time, msTime));
+
+cleanup:
+    asn_free(get_PKIXTime_desc(), pkix_time);
+    return ret;
+}
+
 int Util::encodeGenTime (
         const uint64_t msTime,
         ByteArray** baEncoded
@@ -268,6 +286,30 @@ int Util::encodeUtcTime (
 
 cleanup:
     asn_free(get_UTCTime_desc(), utc_time);
+    return ret;
+}
+
+int Util::pkixTimeFromAsn1 (
+        const PKIXTime_t* pkixTime,
+        uint64_t& msTime
+)
+{
+    int ret = RET_OK;
+
+    if (!pkixTime) return RET_UAPKI_INVALID_PARAMETER;
+
+    switch (pkixTime->present) {
+    case PKIXTime_PR_utcTime:
+        msTime = asn_UT2msec(&pkixTime->choice.utcTime, NULL, false);
+        break;
+    case PKIXTime_PR_generalTime:
+        msTime = asn_GT2msec(&pkixTime->choice.generalTime, NULL, false);
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
+
+cleanup:
     return ret;
 }
 

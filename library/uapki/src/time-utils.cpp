@@ -45,6 +45,30 @@ static int two_digits_to_int (
 }   //  two_digits_to_int
 
 
+int TimeUtils::ftimeToMtime (
+        const string& fTime,
+        uint64_t& msTime
+)
+{
+    if (
+        (fTime.length() != 19) ||
+        (fTime[4] != '-') || (fTime[7] != '-') ||
+        ((fTime[10] != ' ') && (fTime[10] != 'T')) ||
+        (fTime[13] != ':') || (fTime[16] != ':')
+    ) return RET_UAPKI_INVALID_PARAMETER;
+
+    ::tm tm_data;
+    tm_data.tm_year = two_digits_to_int(&fTime[0]) * 100;
+    tm_data.tm_year += two_digits_to_int(&fTime[2]) - 1900;
+    tm_data.tm_mon = two_digits_to_int(&fTime[5]) - 1;
+    tm_data.tm_mday = two_digits_to_int(&fTime[8]);
+    tm_data.tm_hour = two_digits_to_int(&fTime[11]);
+    tm_data.tm_min = two_digits_to_int(&fTime[14]);
+    tm_data.tm_sec = two_digits_to_int(&fTime[17]);
+    msTime = tmToMstime(tm_data, 0);
+    return RET_OK;
+}
+
 string TimeUtils::mstimeToFormat (
         const uint64_t msTime,
         const bool isLocal
@@ -100,26 +124,21 @@ string TimeUtils::stimeToFormat (
     return rv_stime;
 }
 
-int TimeUtils::stimeToMstime (
-        const char* sTime,
+int TimeUtils::stimeToMtime (
+        const string& sTime,
         uint64_t& msTime
 )
 {
-    if (
-        !sTime || (strlen(sTime) != 19) ||
-        (sTime[4] != '-') || (sTime[7] != '-') ||
-        ((sTime[10] != ' ') && (sTime[10] != 'T')) ||
-        (sTime[13] != ':') || (sTime[16] != ':')
-    ) return RET_UAPKI_INVALID_PARAMETER;
+    if (sTime.length() != 14) return RET_UAPKI_INVALID_PARAMETER;
 
     ::tm tm_data;
     tm_data.tm_year = two_digits_to_int(&sTime[0]) * 100;
     tm_data.tm_year += two_digits_to_int(&sTime[2]) - 1900;
-    tm_data.tm_mon = two_digits_to_int(&sTime[5]) - 1;
-    tm_data.tm_mday = two_digits_to_int(&sTime[8]);
-    tm_data.tm_hour = two_digits_to_int(&sTime[11]);
-    tm_data.tm_min = two_digits_to_int(&sTime[14]);
-    tm_data.tm_sec = two_digits_to_int(&sTime[17]);
+    tm_data.tm_mon = two_digits_to_int(&sTime[4]) - 1;
+    tm_data.tm_mday = two_digits_to_int(&sTime[6]);
+    tm_data.tm_hour = two_digits_to_int(&sTime[8]);
+    tm_data.tm_min = two_digits_to_int(&sTime[10]);
+    tm_data.tm_sec = two_digits_to_int(&sTime[12]);
     msTime = tmToMstime(tm_data, 0);
     return RET_OK;
 }
@@ -129,16 +148,13 @@ uint64_t TimeUtils::tmToMstime (
         const int msec
 )
 {
-    //  Based by source https://lynx.invisible-island.net/lynx2.8.4/breakout/src/mktime.c
-    const static int m_to_d[12] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
-    uint64_t rv_t;
-    short month, year;
+    static const uint64_t m_to_d[12] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+    uint64_t rv_t, month, year;
 
     month = tmData.tm_mon;
     year = tmData.tm_year + month / 12 + 1900;
     month %= 12;
-    if (month < 0)
-    {
+    if (month < 0) {
         year -= 1;
         month += 12;
     }
@@ -146,11 +162,8 @@ uint64_t TimeUtils::tmToMstime (
     if (month <= 1) {
         year -= 1;
     }
-    rv_t += (year - 1968) / 4;
-    rv_t -= (year - 1900) / 100;
-    rv_t += (year - 1600) / 400;
-    rv_t += tmData.tm_mday;
-    rv_t -= 1;
+    rv_t += (year - 1968) / 4 - (year - 1900) / 100 + (year - 1600) / 400;
+    rv_t += tmData.tm_mday - 1;
     rv_t *= 24;
     rv_t += tmData.tm_hour;
     rv_t *= 60;
