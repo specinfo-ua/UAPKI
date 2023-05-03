@@ -25,28 +25,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef UAPKI_ATTRIBUTE_UTILS_H
-#define UAPKI_ATTRIBUTE_UTILS_H
+#ifndef UAPKI_TIME_UTIL_H
+#define UAPKI_TIME_UTIL_H
 
 
-#include "byte-array.h"
-#include "uapkif.h"
+#include <stdint.h>
+#include <time.h>
+#include <string>
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace TimeUtil {
 
+    int ftimeToMtime (
+        const std::string& fTime,
+        uint64_t& msTime
+    );
+    std::string mtimeToFtime (
+        const uint64_t msTime,
+        const bool isLocal = false
+    );
+    uint64_t mtimeNow (void);
+    std::string stimeToFtime (
+        const char* sTime
+    );
+    int stimeToMtime (
+        const std::string& sTime,
+        uint64_t& msTime
+    );
+    std::string tmToFtime (
+        const ::tm& tmData
+    );
 
-int attrs_add_attribute (Attributes_t* attrs, const char* attrType, const ByteArray* baEncoded);
-
-const Attribute_t* attrs_get_attr_by_oid (const Attributes_t* attrs, const char* oidType);
-int attrs_get_attrvalue_by_oid (const Attributes_t* attrs, const char* oidType, ByteArray** baEncoded);
-
-
-#ifdef __cplusplus
-}
-#endif
+}   //  end namespace TimeUtil
 
 
 #endif

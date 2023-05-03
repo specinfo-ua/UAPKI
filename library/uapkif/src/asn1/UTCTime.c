@@ -1,34 +1,36 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  * Copyright 2004 Lev Walkin <vlm@lionet.info>. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "asn_internal.h"
+#include "asn1-utils.h"
 #include "UTCTime.h"
-#include "GeneralizedTime.h"
+#include <stdbool.h>
+#include <stdlib.h>
 #include <errno.h>
 
 #undef FILE_MARKER
@@ -40,7 +42,7 @@
 #include <time.h>
 #endif    /* __CYGWIN__ */
 
-#ifndef    ASN___INTERNAL_TEST_MODE
+#ifndef ASN___INTERNAL_TEST_MODE
 
 /*
  * UTCTime basic type description.
@@ -79,7 +81,7 @@ asn_TYPE_descriptor_t UTCTime_desc = {
     0    /* No specifics */
 };
 
-asn_TYPE_descriptor_t *get_UTCTime_desc(void)
+asn_TYPE_descriptor_t* get_UTCTime_desc(void)
 {
     return &UTCTime_desc;
 }
@@ -94,11 +96,8 @@ UTCTime_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
         asn_app_constraint_failed_f *ctfailcb, void *app_key)
 {
     const UTCTime_t *st = (const UTCTime_t *)sptr;
-    time_t tloc;
 
-    errno = EPERM;            /* Just an unlikely error code */
-    tloc = asn_UT2time(st, 0, 0);
-    if (tloc == -1 && errno != EPERM) {
+    if ((st->size != 13) || st->buf[12] != 'Z') {
         ASN__CTFAIL(app_key, td, sptr,
                 "%s: Invalid time format: %s (%s:%d)",
                 td->name, strerror(errno), FILE_MARKER, __LINE__);
@@ -115,32 +114,7 @@ UTCTime_encode_xer(asn_TYPE_descriptor_t *td, void *sptr,
         int ilevel, enum xer_encoder_flags_e flags,
         asn_app_consume_bytes_f *cb, void *app_key)
 {
-
-    if (flags & XER_F_CANONICAL) {
-        asn_enc_rval_t rv;
-        UTCTime_t *ut;
-        struct tm tm;
-
-        errno = EPERM;
-        if (asn_UT2time((UTCTime_t *)sptr, &tm, 1) == -1
-                && errno != EPERM) {
-            ASN__ENCODE_FAILED;
-        }
-
-        /* Fractions are not allowed in UTCTime */
-        ut = asn_time2GT(0, 0, 1);
-        if (!ut) {
-            ASN__ENCODE_FAILED;
-        }
-
-        rv = OCTET_STRING_encode_xer_utf8(td, sptr, ilevel, flags,
-                cb, app_key);
-        OCTET_STRING_free(&UTCTime_desc, ut, 0);
-        return rv;
-    } else {
-        return OCTET_STRING_encode_xer_utf8(td, sptr, ilevel, flags,
-                cb, app_key);
-    }
+    return OCTET_STRING_encode_xer_utf8(td, sptr, ilevel, flags, cb, app_key);
 }
 
 #endif    /* ASN___INTERNAL_TEST_MODE */
@@ -156,67 +130,16 @@ UTCTime_print(asn_TYPE_descriptor_t *td, const void *sptr, int ilevel,
 
     if (st && st->buf) {
         char buf[32];
-        struct tm tm;
         int ret;
 
-        errno = EPERM;
-        if (asn_UT2time(st, &tm, 1) == -1 && errno != EPERM) {
+        if (st->size != 13) {
             return (cb("<bad-value>", 11, app_key) < 0) ? -1 : 0;
         }
 
-        ret = snprintf(buf, sizeof(buf),
-                "%04d-%02d-%02d %02d:%02d:%02d (GMT)",
-                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                tm.tm_hour, tm.tm_min, tm.tm_sec);
+        ret = snprintf(buf, sizeof(buf), "%.*s", st->size, st->buf);
         ASSERT(ret > 0 && ret < (int)sizeof(buf));
         return (cb(buf, ret, app_key) < 0) ? -1 : 0;
     } else {
         return (cb("<absent>", 8, app_key) < 0) ? -1 : 0;
     }
 }
-
-time_t
-asn_UT2time(const UTCTime_t *st, struct tm *_tm, int as_gmt)
-{
-    char buf[24];    /* "AAMMJJhhmmss+hhmm" + cushion */
-    GeneralizedTime_t gt;
-
-    if (!st || !st->buf
-            || st->size < 11 || st->size >= ((int)sizeof(buf) - 2)) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    gt.buf = (unsigned char *)buf;
-    gt.size = st->size + 2;
-    memcpy(gt.buf + 2, st->buf, st->size);
-    if (st->buf[0] > 0x35) {
-        /* 19xx */
-        gt.buf[0] = 0x31;
-        gt.buf[1] = 0x39;
-    } else {
-        /* 20xx */
-        gt.buf[0] = 0x32;
-        gt.buf[1] = 0x30;
-    }
-
-    return asn_GT2time(&gt, _tm, as_gmt);
-}
-
-UTCTime_t *
-asn_time2UT(UTCTime_t *opt_ut, const struct tm *tm, int force_gmt)
-{
-    GeneralizedTime_t *gt = (GeneralizedTime_t *)opt_ut;
-
-    gt = asn_time2GT(gt, tm, force_gmt);
-    if (gt == 0) {
-        return 0;
-    }
-
-    ASSERT(gt->size >= 2);
-    gt->size -= 2;
-    memmove(gt->buf, gt->buf + 2, gt->size + 1);
-
-    return (UTCTime_t *)gt;
-}
-

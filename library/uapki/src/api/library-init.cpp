@@ -26,13 +26,12 @@
  */
 
 #include "api-json-internal.h"
-#include "asn1-ba-utils.h"
 #include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"
 #include "parson-helper.h"
 #include "tsp-helper.h"
-#include "uapki-ns.h"
+#include "uapki-ns-util.h"
 
 
 #undef FILE_MARKER
@@ -169,7 +168,7 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
     tsp_params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");
     if (!tsp_params.policyId.empty()) {
         UapkiNS::SmartBA sba_encoded;
-        if (ba_encode_oid(tsp_params.policyId.c_str(), &sba_encoded) != RET_OK) {
+        if (UapkiNS::Util::encodeOid(tsp_params.policyId.c_str(), &sba_encoded) != RET_OK) {
             tsp_params.policyId.clear();
         }
     }

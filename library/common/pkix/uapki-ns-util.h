@@ -25,10 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- //  Last update: 2023-04-25
+//  Last update: 2023-05-03
 
-#ifndef UAPKI_UTILS_H
-#define UAPKI_UTILS_H
+#ifndef UAPKI_NS_UTIL_H
+#define UAPKI_NS_UTIL_H
 
 
 #include "uapki-ns.h"
@@ -45,15 +45,57 @@ namespace Util {
     int attributeFromAsn1 (const Attribute_t& asn1, UapkiNS::Attribute& attr);
     int attributeToAsn1 (Attribute_t& asn1, const char* type, const ByteArray* baValues);
     int attributeToAsn1 (Attribute_t& asn1, const UapkiNS::Attribute& attr);
-    int addToAttributes (Attributes_t* attrs, const char* type, const ByteArray* baValues);
-    int addToAttributes (Attributes_t* attrs, const UapkiNS::Attribute& attr);
 
+    int addToAttributes (
+        Attributes_t* attrs,
+        const char* type,
+        const ByteArray* baValues
+    );
+    int addToAttributes (
+        Attributes_t* attrs,
+        const UapkiNS::Attribute& attr
+    );
+    const Attribute_t* attributeFromAttributes (
+        const Attributes_t* attrs,
+        const char* oidType
+    );
+    int attrValueFromAttributes (
+        const Attributes_t* attrs,
+        const char* oidType,
+        ByteArray** baAttrValue
+    );
+
+    int addToExtensions (
+        Extensions_t* extns,
+        const char* extnId,
+        const bool critical,
+        const ByteArray* baExtnValue
+    );
+    const Extension_t* extensionFromExtensions (
+        const Extensions_t* extns,
+        const char* extnId
+    );
+    int extnValueFromExtensions (
+        const Extensions_t* extns,
+        const char* extnId,
+        bool* critical,
+        ByteArray** baExtnValue
+    );
+
+    int decodeOid (
+        const ByteArray* baEncoded,
+        char** oid
+    );
     int decodePkixTime (
         const ByteArray* baEncoded,
         uint64_t& msTime
     );
     int encodeGenTime (
         const uint64_t msTime,
+        ByteArray** baEncoded
+    );
+    int encodeOctetString (
+        const ByteArray* baData,
         ByteArray** baEncoded
     );
     int encodePkixTime (
@@ -66,9 +108,51 @@ namespace Util {
         ByteArray** baEncoded
     );
 
+    bool equalValueOctetString (
+        const OCTET_STRING_t& octetString1,
+        const OCTET_STRING_t& octetString2
+    );
+    bool equalValuePrimitiveType (
+        const ASN__PRIMITIVE_TYPE_t& primType1,
+        const ASN__PRIMITIVE_TYPE_t& primType2
+    );
+
+    int genTimeFromAsn1 (
+        const GeneralizedTime_t* genTime,
+        uint64_t& msTime
+    );
     int pkixTimeFromAsn1 (
         const PKIXTime_t* pkixTime,
         uint64_t& msTime
+    );
+    int utcTimeFromAsn1 (
+        const UTCTime_t* utcTime,
+        uint64_t& msTime
+    );
+
+    int bitStringEncapOctetFromAsn1 (const BIT_STRING_t* bsEncapOctet, ByteArray** baData);
+    int bitStringFromAsn1 (const BIT_STRING_t* bs, uint32_t* bits);
+    int bmpStringFromAsn1 (const BMPString_t* bmpStr, char** str);
+    int enumeratedFromAsn1 (const ENUMERATED_t* enumerated, uint32_t* enumValue);
+
+    int decodeAnyString (const uint8_t* buf, const size_t len, char** str);
+    int decodeAnyString (const ByteArray* baEncoded, char** str);
+    int decodeBmpString (const ByteArray* baEncoded, char** str);
+    int decodeEnumerated (const ByteArray* baEncoded, uint32_t* enumValue);
+    int decodeOctetString (const ByteArray* baEncoded, ByteArray** baData);
+
+    int encodeBmpString (const char* strUtf8, ByteArray** baEncoded);
+    int encodeIa5String (const char* strLatin, ByteArray** baEncoded);
+    int encodeInteger (const ByteArray* baData, ByteArray** baEncoded);
+    int encodeInteger (const int32_t value, ByteArray** baEncoded);
+    int encodeOid (const char* oid, ByteArray** baEncoded);
+    int encodePrintableString (const char* strLatin, ByteArray** baEncoded);
+    int encodeUtf8string (const char* strUtf8, ByteArray** baEncoded);
+
+    int pbufToStr (const uint8_t* buf, const size_t len, char** str);
+
+    std::string baToHex (
+        const ByteArray* baData
     );
 
 }   //  end namespace Util

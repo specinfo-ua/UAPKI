@@ -26,15 +26,14 @@
  */
 
 #include "ocsp-helper.h"
-#include "asn1-ba-utils.h"
-#include "extension-utils.h"
+#include "extension-helper.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapkic.h"
 #include "uapkif.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "verify-utils.h"
+#include "uapki-ns-verify.h"
 
 
 using namespace std;
@@ -237,7 +236,7 @@ int OcspHelper::addNonceToExtension (void)
         ASN_ALLOC_TYPE(tbs_request->requestExtensions, Extensions_t);
     }
 
-    DO(extns_add_ocsp_nonce(tbs_request->requestExtensions, m_BaNonce));
+    DO(ExtensionHelper::addOcspNonce(tbs_request->requestExtensions, m_BaNonce));
 
 cleanup:
     return ret;
@@ -255,7 +254,7 @@ int OcspHelper::parseOcspResponse (const ByteArray* baEncoded)
 
     CHECK_NOT_NULL(ocsp_resp = (OCSPResponse_t*)asn_decode_ba_with_alloc(get_OCSPResponse_desc(), baEncoded));
 
-    DO(asn_decodevalue_enumerated(&ocsp_resp->responseStatus, &status));
+    DO(Util::enumeratedFromAsn1(&ocsp_resp->responseStatus, &status));
     m_ResponseStatus = static_cast<ResponseStatus>(status);
     if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
         ResponseBytes_t* resp_bytes = ocsp_resp->responseBytes;
@@ -301,7 +300,7 @@ int OcspHelper::setSignature (
     ASN_ALLOC_TYPE(sign, Signature_t);
 
     //  =signatureAlgorithm=
-    DO(UapkiNS::Util::algorithmIdentifierToAsn1(sign->signatureAlgorithm, aidSignature));
+    DO(Util::algorithmIdentifierToAsn1(sign->signatureAlgorithm, aidSignature));
 
     //  =signature=
     DO(asn_ba2BITSTRING(baSignValue, &sign->signature));
@@ -355,7 +354,7 @@ int OcspHelper::parseBasicOcspResponse (
 
     DO(asn_encode_ba(get_ResponseData_desc(), &m_BasicOcspResp->tbsResponseData, &m_BaTbsResponseData));
 
-    DO(asn_decodevalue_gentime(&m_BasicOcspResp->tbsResponseData.producedAt, &m_ProducedAt));
+    DO(Util::genTimeFromAsn1(&m_BasicOcspResp->tbsResponseData.producedAt, m_ProducedAt));
 
 cleanup:
     return ret;
@@ -370,7 +369,7 @@ int OcspHelper::parseResponse (
     DO(parseOcspResponse(baEncoded));
 
     if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
-        DO(asn_decodevalue_gentime(&m_BasicOcspResp->tbsResponseData.producedAt, &m_ProducedAt));
+        DO(Util::genTimeFromAsn1(&m_BasicOcspResp->tbsResponseData.producedAt, m_ProducedAt));
     }
 
 cleanup:
@@ -383,7 +382,7 @@ int OcspHelper::checkNonce (void)
     if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
 
     UapkiNS::SmartBA sba_nonce;
-    int ret = extns_get_ocsp_nonce(m_BasicOcspResp->tbsResponseData.responseExtensions, &sba_nonce);
+    int ret = ExtensionHelper::getOcspNonce(m_BasicOcspResp->tbsResponseData.responseExtensions, &sba_nonce);
     if (ret == RET_OK) {
         DO(ba_cmp(m_BaNonce, sba_nonce.get()));
     }
@@ -535,10 +534,12 @@ int OcspHelper::scanSingleResponses (void)
 
         if (m_OcspRequest) {
             const CertID_t* req_certid = &tbs_req->requestList.list.array[i]->reqCert;
-            if (!asn_primitive_data_is_equals(&req_certid->hashAlgorithm.algorithm, &resp->certID.hashAlgorithm.algorithm)
-                || !asn_octetstring_data_is_equals(&req_certid->issuerNameHash, &resp->certID.issuerNameHash)
-                || !asn_octetstring_data_is_equals(&req_certid->issuerKeyHash, &resp->certID.issuerKeyHash)
-                || !asn_primitive_data_is_equals(&req_certid->serialNumber, &resp->certID.serialNumber)) {
+            if (
+                !Util::equalValuePrimitiveType(req_certid->hashAlgorithm.algorithm, resp->certID.hashAlgorithm.algorithm) ||
+                !Util::equalValueOctetString(req_certid->issuerNameHash, resp->certID.issuerNameHash) ||
+                !Util::equalValueOctetString(req_certid->issuerKeyHash, resp->certID.issuerKeyHash) ||
+                !Util::equalValuePrimitiveType(req_certid->serialNumber, resp->certID.serialNumber)
+            ) {
                 SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
             }
         }
@@ -550,9 +551,9 @@ int OcspHelper::scanSingleResponses (void)
         case CertStatus_PR_revoked:
             ocsp_item.certStatus = UapkiNS::CertStatus::REVOKED;
             revoked_info = &resp->certStatus.choice.revoked;
-            DO(asn_decodevalue_gentime(&revoked_info->revocationTime, &ocsp_item.msRevocationTime));
+            DO(Util::genTimeFromAsn1(&revoked_info->revocationTime, ocsp_item.msRevocationTime));
             if (revoked_info->revocationReason != nullptr) {
-                DO(asn_decodevalue_enumerated(revoked_info->revocationReason, &crl_reason));
+                DO(Util::enumeratedFromAsn1(revoked_info->revocationReason, &crl_reason));
                 ocsp_item.revocationReason = (UapkiNS::CrlReason)crl_reason;
             }
             break;
@@ -563,9 +564,9 @@ int OcspHelper::scanSingleResponses (void)
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
 
-        DO(asn_decodevalue_gentime(&resp->thisUpdate, &ocsp_item.msThisUpdate));
+        DO(Util::genTimeFromAsn1(&resp->thisUpdate, ocsp_item.msThisUpdate));
         if (resp->nextUpdate != nullptr) {
-            DO(asn_decodevalue_gentime(resp->nextUpdate, &ocsp_item.msNextUpdate));
+            DO(Util::genTimeFromAsn1(resp->nextUpdate, ocsp_item.msNextUpdate));
         }
     }
 
@@ -588,13 +589,13 @@ int OcspHelper::verifyTbsResponseData (
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
 
     if (csiResponder->algoKeyId == HASH_ALG_GOST34311) {
-        DO(asn_decodevalue_bitstring_encap_octet(&m_BasicOcspResp->signature, &ba_signature));
+        DO(Util::bitStringEncapOctetFromAsn1(&m_BasicOcspResp->signature, &ba_signature));
     }
     else {
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = verify_signature(s_signalgo, m_BaTbsResponseData, false, csiResponder->baSPKI, ba_signature);
+    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, csiResponder->baSPKI, ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SignatureVerifyStatus::VALID;
@@ -633,7 +634,7 @@ int generateOtherHash (
 
     if (hash_alg != HashAlg::HASH_ALG_SHA1) {
         other_hash->present = OtherHash_PR_otherHash;
-        DO(UapkiNS::Util::algorithmIdentifierToAsn1(other_hash->choice.otherHash.hashAlgorithm, aidHash));
+        DO(Util::algorithmIdentifierToAsn1(other_hash->choice.otherHash.hashAlgorithm, aidHash));
         DO(asn_ba2OCTSTRING(sba_hashvalue.get(), &other_hash->choice.otherHash.hashValue));
     }
     else {

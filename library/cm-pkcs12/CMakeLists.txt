@@ -53,15 +53,15 @@ aux_source_directory(${PATH_PRJ}/src/storage CMP12_STORAGE_SOURCES)
 aux_source_directory(${PATH_COMMON_JSON} JSON_SOURCES)
 set(COMMON_SOURCES
     ${PATH_COMMON_PKIX}/aid.c
-    ${PATH_COMMON_PKIX}/asn1-ba-utils.c
     ${PATH_COMMON_PKIX}/ba-utils.c
     ${PATH_COMMON_PKIX}/dstu4145-params.c
     ${PATH_COMMON_PKIX}/iconv-utils.c
     ${PATH_COMMON_PKIX}/iso15946.c
     ${PATH_COMMON_PKIX}/key-wrap.c
-    ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/oids.c
+    ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/private-key.c
+    ${PATH_COMMON_PKIX}/uapki-ns-util.cpp
 )
 
 add_library(cm-pkcs12 SHARED

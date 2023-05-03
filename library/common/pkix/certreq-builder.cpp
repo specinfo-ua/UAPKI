@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,14 +26,12 @@
  */
 
 #include "certreq-builder.h"
-#include "asn1-ba-utils.h"
 #include "ba-utils.h"
-#include "attribute-utils.h"
 #include "dstu-ns.h"
-#include "extension-utils.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapki-errors.h"
+#include "uapki-ns-util.h"
 #include <stdio.h>
 
 
@@ -174,7 +172,7 @@ int CertReqBuilder::addExtensions (const vector<UapkiNS::Extension>& extensions)
 
     if (!extensions.empty()) {
         DO(encodeExtensions(extensions, &ba_extnvalue));
-        DO(attrs_add_attribute(&m_TbsCsrInfo->attributes, OID_PKCS9_EXTENSION_REQUEST, ba_extnvalue));
+        DO(UapkiNS::Util::addToAttributes(&m_TbsCsrInfo->attributes, OID_PKCS9_EXTENSION_REQUEST, ba_extnvalue));
     }
 
 cleanup:
@@ -248,7 +246,7 @@ int CertReqBuilder::encodeExtensions (const vector<UapkiNS::Extension>& extensio
     ASN_ALLOC_TYPE(extns, Extensions_t);
 
     for (auto& it : extensions) {
-        DO(extns_add_extension(extns, it.extnId.c_str(), it.critical, it.baExtnValue));
+        DO(UapkiNS::Util::addToExtensions(extns, it.extnId.c_str(), it.critical, it.baExtnValue));
     }
 
     DO(asn_encode_ba(get_Extensions_desc(), extns, baEncoded));
@@ -271,10 +269,10 @@ int CertReqBuilder::nameAddRdName (Name_t* name, const UapkiNS::RdName& rdName)
     DO(asn_set_oid_from_text(rdName.type.c_str(), &atav->type));
     switch (rdName.stringType) {
     case UapkiNS::RdName::StringType::PRINTABLE:
-        DO(ba_encode_printablestring(rdName.value.c_str(), &ba_encoded));
+        DO(UapkiNS::Util::encodePrintableString(rdName.value.c_str(), &ba_encoded));
         break;
     case UapkiNS::RdName::StringType::UTF8:
-        DO(ba_encode_utf8string(rdName.value.c_str(), &ba_encoded));
+        DO(UapkiNS::Util::encodeUtf8string(rdName.value.c_str(), &ba_encoded));
         break;
     default:
         SET_ERROR(RET_UAPKI_NOT_SUPPORTED);

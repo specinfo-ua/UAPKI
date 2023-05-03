@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include "file-storage.h"
 #include "cm-errors.h"
-#include "asn1-ba-utils.h"
 #include "ba-utils.h"
 #include "content-info.h"
 #include "jks-buffer.h"

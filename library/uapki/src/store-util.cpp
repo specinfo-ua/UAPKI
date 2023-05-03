@@ -25,20 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "store-utils.h"
-#include "asn1-ba-utils.h"
-#include "attribute-utils.h"
+#include "store-util.h"
 #include "extension-helper.h"
-#include "extension-utils.h"
+#include "extension-helper-json.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
+#include "time-util.h"
 #include "uapki-errors.h"
-#include "uapki-ns.h"
-#include "time-utils.h"
-#include "verify-utils.h"
-#include <string>
+#include "uapki-ns-util.h"
+#include "uapki-ns-verify.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -48,10 +45,10 @@
 
 
 using namespace std;
-using namespace ExtensionHelper;
+using namespace UapkiNS;
 
 
-int CerStoreUtils::detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
+int CerStoreUtil::detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
 {
     int ret = RET_OK;
     const TBSCertificate_t& tbs_cert = cerStoreItem->cert->tbsCertificate;
@@ -71,12 +68,12 @@ int CerStoreUtils::detailInfoToJson (JSON_Object* joResult, const CerStore::Item
     DO_JSON(json_object_set_value(joResult, "extensions", json_value_init_array()));
     DO_JSON(json_object_set_value(joResult, "signatureInfo", json_value_init_object()));
 
-    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "issuer"), tbs_cert.issuer));
+    DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "issuer"), tbs_cert.issuer));
     DO(validityToJson(joResult, cerStoreItem));
-    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "subject"), tbs_cert.subject));
-    DO(CerStoreUtils::spkiToJson(json_object_get_object(joResult, "subjectPublicKeyInfo"), cerStoreItem, true));
-    DO(CerStoreUtils::extensionsToJson(json_object_get_array(joResult, "extensions"), cerStoreItem, self_signed));
-    DO(CerStoreUtils::signatureInfoToJson(json_object_get_object(joResult, "signatureInfo"), cerStoreItem));
+    DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "subject"), tbs_cert.subject));
+    DO(CerStoreUtil::spkiToJson(json_object_get_object(joResult, "subjectPublicKeyInfo"), cerStoreItem, true));
+    DO(CerStoreUtil::extensionsToJson(json_object_get_array(joResult, "extensions"), cerStoreItem, self_signed));
+    DO(CerStoreUtil::signatureInfoToJson(json_object_get_object(joResult, "signatureInfo"), cerStoreItem));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", self_signed));
 
 cleanup:
@@ -133,7 +130,7 @@ cleanup:
     return json_object_get_object(jo_decoded, "value");
 }
 
-int CerStoreUtils::extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned)
+int CerStoreUtil::extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned)
 {
     int ret = RET_OK;
     const Extensions_t* extns = cerStoreItem->cert->tbsCertificate.extensions;
@@ -160,46 +157,46 @@ int CerStoreUtils::extensionsToJson (JSON_Array* jaResult, const CerStore::Item*
 
         //  Decode specific extensions
         if (oid_is_equal(s_extnid, OID_X509v3_KeyUsage)) {
-            DO(DecodeToJsonObject::keyUsage(ba_value, extn_json_add_decoded(jo_extn, "keyUsage")));
+            DO(ExtensionHelper::DecodeToJsonObject::keyUsage(ba_value, extn_json_add_decoded(jo_extn, "keyUsage")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_SubjectKeyIdentifier)) {
-            DO(DecodeToJsonObject::subjectKeyIdentifier(ba_value, extn_json_add_decoded(jo_extn, "subjectKeyIdentifier"), &ba_subjectkeyid));
+            DO(ExtensionHelper::DecodeToJsonObject::subjectKeyId(ba_value, extn_json_add_decoded(jo_extn, "subjectKeyIdentifier"), &ba_subjectkeyid));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_AuthorityKeyIdentifier)) {
-            DO(DecodeToJsonObject::authorityKeyIdentifier(ba_value, extn_json_add_decoded(jo_extn, "authorityKeyIdentifier"), &ba_authoritykeyid));
+            DO(ExtensionHelper::DecodeToJsonObject::authorityKeyId(ba_value, extn_json_add_decoded(jo_extn, "authorityKeyIdentifier"), &ba_authoritykeyid));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_BasicConstraints)) {
-            DO(DecodeToJsonObject::basicConstraints(ba_value, extn_json_add_decoded(jo_extn, "basicConstraints")));
+            DO(ExtensionHelper::DecodeToJsonObject::basicConstraints(ba_value, extn_json_add_decoded(jo_extn, "basicConstraints")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_CRLDistributionPoints)) {
-            DO(DecodeToJsonObject::distributionPoints(ba_value, extn_json_add_decoded(jo_extn, "cRLDistributionPoints")));
+            DO(ExtensionHelper::DecodeToJsonObject::distributionPoints(ba_value, extn_json_add_decoded(jo_extn, "cRLDistributionPoints")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_CertificatePolicies)) {
-            DO(DecodeToJsonObject::certificatePolicies(ba_value, extn_json_add_decoded(jo_extn, "certificatePolicies")));
+            DO(ExtensionHelper::DecodeToJsonObject::certificatePolicies(ba_value, extn_json_add_decoded(jo_extn, "certificatePolicies")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_ExtendedKeyUsage)) {
-            DO(DecodeToJsonObject::extendedKeyUsage(ba_value, extn_json_add_decoded(jo_extn, "extKeyUsage")));
+            DO(ExtensionHelper::DecodeToJsonObject::extendedKeyUsage(ba_value, extn_json_add_decoded(jo_extn, "extKeyUsage")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_FreshestCRL)) {
-            DO(DecodeToJsonObject::distributionPoints(ba_value, extn_json_add_decoded(jo_extn, "freshestCRL")));
+            DO(ExtensionHelper::DecodeToJsonObject::distributionPoints(ba_value, extn_json_add_decoded(jo_extn, "freshestCRL")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_SubjectDirectoryAttributes)) {
-            DO(DecodeToJsonObject::subjectDirectoryAttributes(ba_value, extn_json_add_decoded(jo_extn, "subjectDirectoryAttributes")));
+            DO(ExtensionHelper::DecodeToJsonObject::subjectDirectoryAttributes(ba_value, extn_json_add_decoded(jo_extn, "subjectDirectoryAttributes")));
         }
         else if (oid_is_equal(s_extnid, OID_PKIX_AuthorityInfoAccess)) {
-            DO(DecodeToJsonObject::accessDescriptions(ba_value, extn_json_add_decoded(jo_extn, "authorityInfoAccess")));
+            DO(ExtensionHelper::DecodeToJsonObject::accessDescriptions(ba_value, extn_json_add_decoded(jo_extn, "authorityInfoAccess")));
         }
         else if (oid_is_equal(s_extnid, OID_PKIX_QcStatements)) {
-            DO(DecodeToJsonObject::qcStatements(ba_value, extn_json_add_decoded(jo_extn, "qcStatements")));
+            DO(ExtensionHelper::DecodeToJsonObject::qcStatements(ba_value, extn_json_add_decoded(jo_extn, "qcStatements")));
         }
         else if (oid_is_equal(s_extnid, OID_PKIX_SubjectInfoAccess)) {
-            DO(DecodeToJsonObject::accessDescriptions(ba_value, extn_json_add_decoded(jo_extn, "subjectInfoAccess")));
+            DO(ExtensionHelper::DecodeToJsonObject::accessDescriptions(ba_value, extn_json_add_decoded(jo_extn, "subjectInfoAccess")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_SubjectAlternativeName)) {
-            DO(DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "subjectAltName")));
+            DO(ExtensionHelper::DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "subjectAltName")));
         }
         else if (oid_is_equal(s_extnid, OID_X509v3_IssuerAlternativeName)) {
-            DO(DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "issuerAltName")));
+            DO(ExtensionHelper::DecodeToJsonObject::alternativeName(ba_value, extn_json_add_decoded(jo_extn, "issuerAltName")));
         }
 
         ::free(s_extnid);
@@ -219,7 +216,7 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::nameToJson (
+int CerStoreUtil::nameToJson (
         JSON_Object* joResult,
         const ByteArray* baEncoded
 )
@@ -236,7 +233,7 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::nameToJson (JSON_Object* joResult, const Name_t& name)
+int CerStoreUtil::nameToJson (JSON_Object* joResult, const Name_t& name)
 {
     if (name.present != Name_PR_rdnSequence) return RET_UAPKI_INVALID_STRUCT;
 
@@ -249,7 +246,7 @@ int CerStoreUtils::nameToJson (JSON_Object* joResult, const Name_t& name)
         for (size_t j = 0; j < rdname_src->list.count; j++) {
             const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
             DO(asn_oid_to_text(&attr->type, &s_oid));
-            DO(asn_decode_anystring(attr->value.buf, (const size_t)attr->value.size, &s_value));
+            DO(Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, &s_value));
             DO_JSON(json_object_set_string(joResult, oid_to_rdname(s_oid), s_value));
             ::free(s_oid);
             ::free(s_value);
@@ -263,14 +260,14 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::ocspIdentifierToJson (
+int CerStoreUtil::ocspIdentifierToJson (
         JSON_Object* joResult,
         const ByteArray* baEncoded
 )
 {
     int ret = RET_OK;
     OcspIdentifier_t* ocsp_identifier = nullptr;
-    UapkiNS::SmartBA sba_keyid;
+    SmartBA sba_keyid;
     uint64_t ms_producedat = 0;
 
     CHECK_NOT_NULL(ocsp_identifier = (OcspIdentifier_t*)asn_decode_ba_with_alloc(get_OcspIdentifier_desc(), baEncoded));
@@ -279,7 +276,7 @@ int CerStoreUtils::ocspIdentifierToJson (
     switch (ocsp_identifier->ocspResponderID.present) {
     case ResponderID_PR_byName:
         DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
-        DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), ocsp_identifier->ocspResponderID.choice.byName));
+        DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "responderId"), ocsp_identifier->ocspResponderID.choice.byName));
         break;
     case ResponderID_PR_byKey:
         DO(asn_OCTSTRING2ba(&ocsp_identifier->ocspResponderID.choice.byKey, &sba_keyid));
@@ -289,15 +286,15 @@ int CerStoreUtils::ocspIdentifierToJson (
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
     //  =producedAt=
-    DO(asn_decodevalue_gentime(&ocsp_identifier->producedAt, &ms_producedat));
-    DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtils::mstimeToFormat(ms_producedat).c_str()));
+    DO(Util::genTimeFromAsn1(&ocsp_identifier->producedAt, ms_producedat));
+    DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtil::mtimeToFtime(ms_producedat).c_str()));
 
 cleanup:
     asn_free(get_OcspIdentifier_desc(), ocsp_identifier);
     return ret;
 }
 
-int CerStoreUtils::rdnameFromName (
+int CerStoreUtil::rdnameFromName (
         const Name_t& name,
         const char* type,
         string& value
@@ -306,13 +303,13 @@ int CerStoreUtils::rdnameFromName (
     if (name.present != Name_PR_rdnSequence) return RET_UAPKI_INVALID_STRUCT;
     if (!type) return RET_UAPKI_INVALID_PARAMETER;
 
-    for (size_t i = 0; i < name.choice.rdnSequence.list.count; i++) {
+    for (int i = 0; i < name.choice.rdnSequence.list.count; i++) {
         const RelativeDistinguishedName_t* rdname_src = name.choice.rdnSequence.list.array[i];
-        for (size_t j = 0; j < rdname_src->list.count; j++) {
+        for (int j = 0; j < rdname_src->list.count; j++) {
             const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
             if (OID_is_equal_oid(&attr->type, type)) {
                 char* s_value = nullptr;
-                const int ret = asn_decode_anystring(attr->value.buf, (const size_t)attr->value.size, &s_value);
+                const int ret = Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, &s_value);
                 if (ret != RET_OK) return ret;
 
                 value = string(s_value);
@@ -325,7 +322,7 @@ int CerStoreUtils::rdnameFromName (
     return RET_OK;
 }
 
-int CerStoreUtils::signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
+int CerStoreUtil::signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
 {
     if ((joResult == nullptr) || (cerStoreItem == nullptr)) return RET_UAPKI_GENERAL_ERROR;
 
@@ -353,9 +350,11 @@ int CerStoreUtils::signatureInfoToJson (JSON_Object* joResult, const CerStore::I
 
     //  Set signature
     DO(asn_BITSTRING2ba(&cerStoreItem->cert->signature, &ba_encoded));
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo)
-        || oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)) {
-        DO(ba_decode_octetstring(ba_encoded, &ba_encapsignvalue));
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo) ||
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)
+    ) {
+        DO(Util::decodeOctetString(ba_encoded, &ba_encapsignvalue));
         ref_ba = ba_encapsignvalue;
     }
     else {
@@ -370,7 +369,7 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded)
+int CerStoreUtil::spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded)
 {
     if ((joResult == nullptr) || (cerStoreItem == nullptr)) return RET_UAPKI_GENERAL_ERROR;
 
@@ -401,9 +400,11 @@ int CerStoreUtils::spkiToJson (JSON_Object* joResult, const CerStore::Item* cerS
 
     //  Set publicKey
     DO(asn_BITSTRING2ba(&spki.subjectPublicKey, &ba_encoded));
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, cerStoreItem->keyAlgo)
-        || oid_is_parent(OID_DSTU4145_WITH_GOST3411, cerStoreItem->keyAlgo)) {
-        DO(ba_encode_octetstring(ba_encoded, &ba_encappubkey));
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, cerStoreItem->keyAlgo) ||
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, cerStoreItem->keyAlgo)
+    ) {
+        DO(Util::encodeOctetString(ba_encoded, &ba_encappubkey));
         ref_ba = ba_encappubkey;
     }
     else {
@@ -417,17 +418,17 @@ cleanup:
     return ret;
 }
 
-int CerStoreUtils::validityToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
+int CerStoreUtil::validityToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem)
 {
     if ((joResult == nullptr) || (cerStoreItem == nullptr)) return RET_UAPKI_GENERAL_ERROR;
 
     int ret = RET_OK;
     string s_time;
 
-    s_time = TimeUtils::mstimeToFormat(cerStoreItem->notBefore);
+    s_time = TimeUtil::mtimeToFtime(cerStoreItem->notBefore);
     DO_JSON(json_object_dotset_string(joResult, "validity.notBefore", s_time.c_str()));
 
-    s_time = TimeUtils::mstimeToFormat(cerStoreItem->notAfter);
+    s_time = TimeUtil::mtimeToFtime(cerStoreItem->notAfter);
     DO_JSON(json_object_dotset_string(joResult, "validity.notAfter", s_time.c_str()));
 
 cleanup:
@@ -435,7 +436,7 @@ cleanup:
 }
 
 
-int CrlStoreUtils::crlIdentifierToJson (
+int CrlStoreUtil::crlIdentifierToJson (
         JSON_Object* joResult,
         const ByteArray* baEncoded
 )
@@ -448,13 +449,13 @@ int CrlStoreUtils::crlIdentifierToJson (
 
     //  =crlIssuer=
     DO_JSON(json_object_set_value(joResult, "crlIssuer", json_value_init_object()));
-    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "crlIssuer"), crl_identifier->crlissuer));
+    DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "crlIssuer"), crl_identifier->crlissuer));
     //  =crlIssuedTime=
-    DO(asn_decodevalue_utctime(&crl_identifier->crlIssuedTime, &ms_issuedtime));
-    DO_JSON(json_object_set_string(joResult, "crlIssuedTime", TimeUtils::mstimeToFormat(ms_issuedtime).c_str()));
+    DO(Util::utcTimeFromAsn1(&crl_identifier->crlIssuedTime, ms_issuedtime));
+    DO_JSON(json_object_set_string(joResult, "crlIssuedTime", TimeUtil::mtimeToFtime(ms_issuedtime).c_str()));
     //  =crlNumber= (optional)
     if (crl_identifier->crlNumber) {
-        UapkiNS::SmartBA sba_number;
+        SmartBA sba_number;
         DO(asn_INTEGER2ba(crl_identifier->crlNumber, &sba_number));
         DO(json_object_set_hex(joResult, "crlNumber", sba_number.get()));
     }
@@ -464,7 +465,7 @@ cleanup:
     return ret;
 }
 
-int CrlStoreUtils::infoToJson (
+int CrlStoreUtil::infoToJson (
         JSON_Object* joResult,
         const CrlStore::Item* crlStoreItem
 )
@@ -476,12 +477,12 @@ int CrlStoreUtils::infoToJson (
     if ((joResult == nullptr) || (crlStoreItem == nullptr)) return RET_UAPKI_GENERAL_ERROR;
 
     DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
-    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "issuer"), crlStoreItem->crl->tbsCertList.issuer));
+    DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "issuer"), crlStoreItem->crl->tbsCertList.issuer));
 
-    s_time = TimeUtils::mstimeToFormat(crlStoreItem->thisUpdate);
+    s_time = TimeUtil::mtimeToFtime(crlStoreItem->thisUpdate);
     DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
 
-    s_time = TimeUtils::mstimeToFormat(crlStoreItem->nextUpdate);
+    s_time = TimeUtil::mtimeToFtime(crlStoreItem->nextUpdate);
     DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countRevokedCerts", (uint32_t)crlStoreItem->countRevokedCerts()));
@@ -500,7 +501,7 @@ cleanup:
     return ret;
 }
 
-int CrlStoreUtils::revokedCertsToJson (
+int CrlStoreUtil::revokedCertsToJson (
         JSON_Array* jaResult,
         const CrlStore::Item* crlStoreItem
 )
@@ -517,7 +518,7 @@ int CrlStoreUtils::revokedCertsToJson (
     revoked_certs = crlStoreItem->crl->tbsCertList.revokedCertificates;
     if (!revoked_certs) return ret;
 
-    DEBUG_OUTCON(printf("CrlStoreUtils::revokedCertsToJson() count: %d\n", revoked_certs->list.count));
+    DEBUG_OUTCON(printf("CrlStoreUtil::revokedCertsToJson() count: %d\n", revoked_certs->list.count));
     cnt_crls = (size_t)revoked_certs->list.count;
     for (size_t i = 0; i < cnt_crls; i++) {
         JSON_Object* jo_result = nullptr;
@@ -531,19 +532,19 @@ int CrlStoreUtils::revokedCertsToJson (
         ba_free(ba_sn);
         ba_sn = nullptr;
 
-        DO(asn_decodevalue_pkixtime(&revoked_cert->revocationDate, &ms_time));
-        s_time = TimeUtils::mstimeToFormat(ms_time);
+        DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, ms_time));
+        s_time = TimeUtil::mtimeToFtime(ms_time);
         DO_JSON(json_object_set_string(jo_result, "revocationDate", s_time.c_str()));
 
         if (revoked_cert->crlEntryExtensions) {
             uint32_t u32_crlreason = 0;
-            ret = extns_get_crl_reason(revoked_cert->crlEntryExtensions, &u32_crlreason);
+            ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, &u32_crlreason);
             if (ret == RET_OK) {
-                DO_JSON(json_object_set_string(jo_result, "crlReason", CrlStore::crlReasonToStr((UapkiNS::CrlReason)u32_crlreason)));
+                DO_JSON(json_object_set_string(jo_result, "crlReason", CrlStore::crlReasonToStr((CrlReason)u32_crlreason)));
             }
-            ret = extns_get_crl_invalidity_date(revoked_cert->crlEntryExtensions, &ms_time);
+            ret = ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, &ms_time);
             if (ret == RET_OK) {
-                s_time = TimeUtils::mstimeToFormat(ms_time);
+                s_time = TimeUtil::mtimeToFtime(ms_time);
                 DO_JSON(json_object_set_string(jo_result, "invalidityDate", s_time.c_str()));
             }
         }

@@ -35,12 +35,12 @@
 #include "ocsp-helper.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
-#include "store-utils.h"
-#include "time-utils.h"
+#include "store-util.h"
+#include "time-util.h"
 #include "tsp-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "verify-utils.h"
+#include "uapki-ns-verify.h"
 
 
 #undef FILE_MARKER
@@ -63,6 +63,7 @@ DEBUG_OUTPUT_OUTSTREAM_FUNC
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
 static int name_to_json (
@@ -77,7 +78,7 @@ static int name_to_json (
     CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baEncoded));
 
     DO_JSON(json_object_set_value(joResult, keyName, json_value_init_object()));
-    DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, keyName), *name));
+    DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, keyName), *name));
 
 cleanup:
     asn_free(get_Name_desc(), name);
@@ -86,14 +87,14 @@ cleanup:
 
 static int parse_verify_options (
         JSON_Object* joParams,
-        UapkiNS::Doc::Verify::VerifyOptions& verifyOptions
+        Doc::Verify::VerifyOptions& verifyOptions
 )
 {
     if (joParams) {
-        verifyOptions.validationType = UapkiNS::Doc::Verify::validationTypeFromStr(
+        verifyOptions.validationType = Doc::Verify::validationTypeFromStr(
             ParsonHelper::jsonObjectGetString(joParams, "validationType")
         );
-        if (verifyOptions.validationType == UapkiNS::Doc::Verify::VerifyOptions::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
+        if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
         verifyOptions.onlyCrl = ParsonHelper::jsonObjectGetBoolean(joParams, "onlyCrl", false);
     }
 
@@ -103,7 +104,7 @@ static int parse_verify_options (
 static int result_attr_timestamp_to_json (
         JSON_Object* joResult,
         const char* attrName,
-        const UapkiNS::Doc::Verify::AttrTimeStamp& attrTS
+        const Doc::Verify::AttrTimeStamp& attrTS
 )
 {
     int ret = RET_OK;
@@ -111,7 +112,7 @@ static int result_attr_timestamp_to_json (
     if (attrTS.isPresent()) {
         json_object_set_value(joResult, attrName, json_value_init_object());
         JSON_Object* jo_attrts = json_object_get_object(joResult, attrName);
-        DO_JSON(json_object_set_string(jo_attrts, "genTime", TimeUtils::mstimeToFormat(attrTS.msGenTime).c_str()));
+        DO_JSON(json_object_set_string(jo_attrts, "genTime", TimeUtil::mtimeToFtime(attrTS.msGenTime).c_str()));
         DO_JSON(json_object_set_string(jo_attrts, "policyId", attrTS.policy.c_str()));
         DO_JSON(json_object_set_string(jo_attrts, "hashAlgo", attrTS.hashAlgo.c_str()));
         DO(json_object_set_base64(jo_attrts, "hashedMessage", attrTS.hashedMessage.get()));
@@ -151,7 +152,7 @@ cleanup:
 
 static int result_certchainitem_valbycrl_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ResultValidationByCrl& resultValByCrl,
+        const Doc::Verify::ResultValidationByCrl& resultValByCrl,
         string& statusValidation
 )
 {
@@ -161,11 +162,11 @@ static int result_certchainitem_valbycrl_to_json (
 
     if (crlstore_item) {
         string s_commonname;
-        DO(CerStoreUtils::rdnameFromName(crlstore_item->crl->tbsCertList.issuer, OID_X520_CommonName, s_commonname));
+        DO(CerStoreUtil::rdnameFromName(crlstore_item->crl->tbsCertList.issuer, OID_X520_CommonName, s_commonname));
         DO(json_object_set_base64(joResult, "crlId", crlstore_item->baCrlId));
         DO_JSON(json_object_set_string(joResult, "CN", s_commonname.c_str()));
-        DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtils::mstimeToFormat(crlstore_item->thisUpdate).c_str()));
-        DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtils::mstimeToFormat(crlstore_item->nextUpdate).c_str()));
+        DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtil::mtimeToFtime(crlstore_item->thisUpdate).c_str()));
+        DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtil::mtimeToFtime(crlstore_item->nextUpdate).c_str()));
         DO(json_object_set_hex(joResult, "crlNumber", crlstore_item->baCrlNumber));
         if (crlstore_item->baDeltaCrl) {
             DO(json_object_set_hex(joResult, "deltaCrlIndicator", crlstore_item->baDeltaCrl));
@@ -180,7 +181,7 @@ static int result_certchainitem_valbycrl_to_json (
 
     if (revcert_item.crlReason != UapkiNS::CrlReason::UNDEFINED) {
         DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(revcert_item.crlReason)));
-        const string s_revoktime = TimeUtils::mstimeToFormat(revcert_item.getDate());
+        const string s_revoktime = TimeUtil::mtimeToFtime(revcert_item.getDate());
         DO_JSON(json_object_set_string(joResult, "revocationTime", s_revoktime.c_str()));
     }
 
@@ -196,16 +197,16 @@ cleanup:
 
 static int result_certchainitem_valbyocsp_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ResultValidationByOcsp& resultValByOcsp,
+        const Doc::Verify::ResultValidationByOcsp& resultValByOcsp,
         string& statusValidation
 )
 {
     int ret = RET_OK;
     const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = resultValByOcsp.singleResponseInfo;
 
-    DO_JSON(json_object_set_string(joResult, "source", UapkiNS::Doc::Verify::dataSourceToStr(resultValByOcsp.dataSource)));
+    DO_JSON(json_object_set_string(joResult, "source", Doc::Verify::dataSourceToStr(resultValByOcsp.dataSource)));
     DO_JSON(json_object_set_string(joResult, "responseStatus", UapkiNS::Ocsp::responseStatusToStr(resultValByOcsp.responseStatus)));
-    DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtils::mstimeToFormat(resultValByOcsp.msProducedAt).c_str()));
+    DO_JSON(json_object_set_string(joResult, "producedAt", TimeUtil::mtimeToFtime(resultValByOcsp.msProducedAt).c_str()));
     DO_JSON(json_object_set_string(joResult, "statusSignature", UapkiNS::verifyStatusToStr(resultValByOcsp.statusSignature)));
     if (resultValByOcsp.csiResponder) {
         DO(json_object_set_base64(joResult, "signerCertId", resultValByOcsp.csiResponder->baCertId));
@@ -213,13 +214,13 @@ static int result_certchainitem_valbyocsp_to_json (
 
     DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
 
-    DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate).c_str()));
+    DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtil::mtimeToFtime(singleresp_info.msThisUpdate).c_str()));
     if (singleresp_info.msNextUpdate > 0) {
-        DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate).c_str()));
+        DO_JSON(json_object_set_string(joResult, "nextUpdate", TimeUtil::mtimeToFtime(singleresp_info.msNextUpdate).c_str()));
     }
     if (singleresp_info.revocationReason != UapkiNS::CrlReason::UNDEFINED) {
         DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
-        DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime).c_str()));
+        DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtil::mtimeToFtime(singleresp_info.msRevocationTime).c_str()));
     }
 
     statusValidation = UapkiNS::verifyStatusToStr((
@@ -233,8 +234,8 @@ cleanup:
 
 static int result_certchainitem_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::CertChainItem& certChainItem,
-        const UapkiNS::Doc::Verify::VerifyOptions& verifyOptions
+        const Doc::Verify::CertChainItem& certChainItem,
+        const Doc::Verify::VerifyOptions& verifyOptions
 )
 {
     int ret = RET_OK;
@@ -242,9 +243,9 @@ static int result_certchainitem_to_json (
 
     DO(json_object_set_base64(joResult, "subjectCertId", certChainItem.getSubjectCertId()));
     DO_JSON(json_object_set_string(joResult, "CN", certChainItem.getCommonName().c_str()));
-    DO_JSON(json_object_set_string(joResult, "entity", UapkiNS::Doc::Verify::certEntityToStr(certChainItem.getCertEntity())));
-    DO_JSON(json_object_set_string(joResult, "source", UapkiNS::Doc::Verify::dataSourceToStr(certChainItem.getDataSource())));
-    DO(CerStoreUtils::validityToJson(joResult, certChainItem.getSubject()));
+    DO_JSON(json_object_set_string(joResult, "entity", Doc::Verify::certEntityToStr(certChainItem.getCertEntity())));
+    DO_JSON(json_object_set_string(joResult, "source", Doc::Verify::dataSourceToStr(certChainItem.getDataSource())));
+    DO(CerStoreUtil::validityToJson(joResult, certChainItem.getSubject()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", certChainItem.isExpired()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", certChainItem.isSelfSigned()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", certChainItem.isTrusted()));
@@ -309,7 +310,7 @@ cleanup:
 
 static int result_certificaterefs_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::CadesXlInfo& cadesXlInfo
+        const Doc::Verify::CadesXlInfo& cadesXlInfo
 )
 {
     int ret = RET_OK;
@@ -319,7 +320,7 @@ static int result_certificaterefs_to_json (
         JSON_Array* ja_certrefs = json_object_get_array(joResult, "certificateRefs");
         for (size_t i = 0; i < cadesXlInfo.certRefs.size(); i++) {
             const UapkiNS::OtherCertId& cert_ref = cadesXlInfo.certRefs[i];
-            UapkiNS::SmartBA sba_issuer;
+            SmartBA sba_issuer;
 
             DO_JSON(json_array_append_value(ja_certrefs, json_value_init_object()));
             JSON_Object* jo_certref = json_array_get_object(ja_certrefs, i);
@@ -327,7 +328,7 @@ static int result_certificaterefs_to_json (
             DO(result_otherhash_to_json(json_object_get_object(jo_certref, "certHash"), cert_ref));
             DO_JSON(json_object_set_value(jo_certref, "issuer", json_value_init_object()));
             DO(CerStore::issuerFromGeneralNames(cert_ref.issuerSerial.baIssuer, &sba_issuer));
-            DO(CerStoreUtils::nameToJson(json_object_get_object(jo_certref, "issuer"), sba_issuer.get()));
+            DO(CerStoreUtil::nameToJson(json_object_get_object(jo_certref, "issuer"), sba_issuer.get()));
             DO(json_object_set_hex(jo_certref, "serialNumber", cert_ref.issuerSerial.baSerialNumber));
             DO_JSON(json_object_set_string(jo_certref, "status", UapkiNS::verifyStatusToStr(cadesXlInfo.statusesCertRefs[i])));
         }
@@ -339,14 +340,14 @@ cleanup:
 
 static int result_expectedcertitem_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ExpectedCertItem& expectedCertItem
+        const Doc::Verify::ExpectedCertItem& expectedCertItem
 )
 {
     int ret = RET_OK;
 
-    DO_JSON(json_object_set_string(joResult, "entity", UapkiNS::Doc::Verify::certEntityToStr(expectedCertItem.getCertEntity())));
+    DO_JSON(json_object_set_string(joResult, "entity", Doc::Verify::certEntityToStr(expectedCertItem.getCertEntity())));
     switch (expectedCertItem.getIdType()) {
-    case UapkiNS::Doc::Verify::ExpectedCertItem::IdType::CER_IDTYPE:
+    case Doc::Verify::ExpectedCertItem::IdType::CER_IDTYPE:
         if (!expectedCertItem.getKeyId()) {
             DO(name_to_json(joResult, "issuer", expectedCertItem.getName()));
             DO(json_object_set_hex(joResult, "serialNumber", expectedCertItem.getSerialNumber()));
@@ -355,7 +356,7 @@ static int result_expectedcertitem_to_json (
             DO(json_object_set_hex(joResult, "keyId", expectedCertItem.getKeyId()));
         }
         break;
-    case UapkiNS::Doc::Verify::ExpectedCertItem::IdType::ORS_IDTYPE:
+    case Doc::Verify::ExpectedCertItem::IdType::ORS_IDTYPE:
         if (!expectedCertItem.getKeyId()) {
             DO(name_to_json(joResult, "responderId", expectedCertItem.getName()));
         }
@@ -372,7 +373,7 @@ cleanup:
 
 static int result_expectedcrlitem_to_json (
         JSON_Object* joResult,
-        const UapkiNS::Doc::Verify::ExpectedCrlItem& expectedCrlItem
+        const Doc::Verify::ExpectedCrlItem& expectedCrlItem
 )
 {
     int ret = RET_OK;
@@ -387,8 +388,8 @@ static int result_expectedcrlitem_to_json (
     if (expectedCrlItem.isPresentFullCrl()) {
         DO_JSON(json_object_set_value(joResult, "full", json_value_init_object()));
         JSON_Object* jo_crlinfo = json_object_get_object(joResult, "full");
-        DO_JSON(json_object_set_string(jo_crlinfo, "thisUpdate", TimeUtils::mstimeToFormat(expectedCrlItem.getThisUpdate()).c_str()));
-        DO_JSON(json_object_set_string(jo_crlinfo, "nextUpdate", TimeUtils::mstimeToFormat(expectedCrlItem.getNextUpdate()).c_str()));
+        DO_JSON(json_object_set_string(jo_crlinfo, "thisUpdate", TimeUtil::mtimeToFtime(expectedCrlItem.getThisUpdate()).c_str()));
+        DO_JSON(json_object_set_string(jo_crlinfo, "nextUpdate", TimeUtil::mtimeToFtime(expectedCrlItem.getNextUpdate()).c_str()));
         DO(json_object_set_hex(jo_crlinfo, "crlNumber", expectedCrlItem.getCrlNumber()));
     }
 
@@ -419,7 +420,7 @@ static int result_crlocspref_to_json (
             //  =crlIdentifier= (optional)
             if (it.baId) {
                 DO_JSON(json_object_set_value(jo_crlid, "crlIdentifier", json_value_init_object()));
-                DO(CrlStoreUtils::crlIdentifierToJson(json_object_get_object(jo_crlid, "crlIdentifier"), it.baId));
+                DO(CrlStoreUtil::crlIdentifierToJson(json_object_get_object(jo_crlid, "crlIdentifier"), it.baId));
             }
         }
     }
@@ -434,7 +435,7 @@ static int result_crlocspref_to_json (
             JSON_Object* jo_ocspid = json_array_get_object(ja_ocspids, idx++);
             //  =ocspIdentifier=
             DO_JSON(json_object_set_value(jo_ocspid, "ocspIdentifier", json_value_init_object()));
-            DO(CerStoreUtils::ocspIdentifierToJson(json_object_get_object(jo_ocspid, "ocspIdentifier"), it.baId));
+            DO(CerStoreUtil::ocspIdentifierToJson(json_object_get_object(jo_ocspid, "ocspIdentifier"), it.baId));
             //  =ocspHash= (optional)
             if (it.baHash) {
                 UapkiNS::OtherHash ocsp_hash;
@@ -482,8 +483,8 @@ cleanup:
 
 static int result_verifyinfo_to_json (
         JSON_Object* joSignInfo,
-        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifyInfo,
-        const UapkiNS::Doc::Verify::VerifyOptions& verifyOptions
+        Doc::Verify::VerifiedSignerInfo& verifyInfo,
+        const Doc::Verify::VerifyOptions& verifyOptions
 )
 {
     int ret = RET_OK;
@@ -497,11 +498,11 @@ static int result_verifyinfo_to_json (
     DO_JSON(json_object_set_string(joSignInfo, "status", verifyInfo.getValidationStatus()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validSignatures", verifyInfo.isValidSignatures()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validDigests", verifyInfo.isValidDigests()));
-    DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtils::mstimeToFormat(verifyInfo.getBestSignatureTime()).c_str()));
+    DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtil::mtimeToFtime(verifyInfo.getBestSignatureTime()).c_str()));
     DO_JSON(json_object_set_string(joSignInfo, "statusSignature", UapkiNS::verifyStatusToStr(verifyInfo.getStatusSignature())));
     DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", UapkiNS::verifyStatusToStr(verifyInfo.getStatusMessageDigest())));
     if (verifyInfo.getSigningTime() > 0) {
-        DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtils::mstimeToFormat(verifyInfo.getSigningTime()).c_str()));
+        DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtil::mtimeToFtime(verifyInfo.getSigningTime()).c_str()));
     }
     if (!verifyInfo.getSigPolicyId().empty()) {
         DO_JSON(json_object_dotset_string(joSignInfo, "signaturePolicy.sigPolicyId", verifyInfo.getSigPolicyId().c_str()));
@@ -524,7 +525,7 @@ static int result_verifyinfo_to_json (
     DO(result_attributes_to_json(joSignInfo, "signedAttributes", verifyInfo.getSignerInfo().getSignedAttrs()));
     DO(result_attributes_to_json(joSignInfo, "unsignedAttributes", verifyInfo.getSignerInfo().getUnsignedAttrs()));
 
-    if ((verifyOptions.validationType >= UapkiNS::Doc::Verify::VerifyOptions::ValidationType::CHAIN)) {
+    if ((verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN)) {
         DO_JSON(json_object_set_value(joSignInfo, "certificateChain", json_value_init_array()));
         JSON_Array* ja_certchainitems = json_object_get_array(joSignInfo, "certificateChain");
         size_t idx = 0;
@@ -568,7 +569,7 @@ cleanup:
 
 static int result_to_json (
         JSON_Object* joResult,
-        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc
+        Doc::Verify::VerifySignedDoc& verifySignedDoc
 )
 {
     int ret = RET_OK;
@@ -620,7 +621,7 @@ static int process_crl (
     int ret = RET_OK;
     const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
     CrlStore::Item* crl = nullptr;
-    UapkiNS::SmartBA sba_crl;
+    SmartBA sba_crl;
 
     crl = crlStore.getCrl(cerSubject->baAuthorityKeyId, crl_type);
     if (crl) {
@@ -710,14 +711,14 @@ cleanup:
 }   //  process_crl
 
 static int validate_by_crl (
-        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
-        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
-        UapkiNS::Doc::Verify::CertChainItem& certChainItem
+        Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
+        Doc::Verify::CertChainItem& certChainItem
 )
 {
     int ret = RET_OK;
-    const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
-    UapkiNS::Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
+    const Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
+    Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
     CrlStore::Item* crl_item = nullptr;
     vector<const CrlStore::RevokedCertItem*> revoked_items;
     const ByteArray* ba_crlnumber = nullptr;
@@ -780,19 +781,19 @@ cleanup:
 }   //  validate_by_crl
 
 static int validate_by_ocsp (
-        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
-        UapkiNS::Doc::Verify::CertChainItem& certChainItem
+        Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
+        Doc::Verify::CertChainItem& certChainItem
 )
 {
     int ret = RET_OK;
     const LibraryConfig::OcspParams& ocsp_params = get_config()->getOcsp();
     CerStore::Item* csi_subject = certChainItem.getSubject();
-    UapkiNS::Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
+    Doc::Verify::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
-    UapkiNS::SmartBA sba_resp;
+    SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
 
-    bool need_update = csi_subject->certStatusByOcsp.isExpired(TimeUtils::mstimeNow());
+    bool need_update = csi_subject->certStatusByOcsp.isExpired(TimeUtil::mtimeNow());
     if (need_update) {
         const CerStore::Item* csi_issuer = certChainItem.getIssuer();
 
@@ -847,7 +848,7 @@ static int validate_by_ocsp (
     result_valbyocsp.responseStatus = ocsp_helper.getResponseStatus();
 
     if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == UapkiNS::Ocsp::ResponseStatus::SUCCESSFUL)) {
-        result_valbyocsp.dataSource = UapkiNS::Doc::Verify::DataSource::STORE;
+        result_valbyocsp.dataSource = Doc::Verify::DataSource::STORE;
         (void)verifiedSignerInfo.verifyOcspResponse(ocsp_helper, result_valbyocsp);
         DO(ocsp_helper.checkNonce());
         DO(ocsp_helper.scanSingleResponses());
@@ -870,22 +871,22 @@ cleanup:
 }   //  validate_by_ocsp
 
 static int validate_certs (
-        UapkiNS::Doc::Verify::VerifySignedDoc& verifySignedDoc,
-        UapkiNS::Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo
+        Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo
 )
 {
     int ret = RET_OK;
-    const UapkiNS::Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
+    const Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
     const uint64_t bestsign_time = verifiedSignerInfo.getBestSignatureTime();
 
     switch (verify_options.validationType) {
-    case UapkiNS::Doc::Verify::VerifyOptions::ValidationType::CHAIN:
+    case Doc::Verify::VerifyOptions::ValidationType::CHAIN:
         verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
         for (auto& it : verifiedSignerInfo.getCertChainItems()) {
             it->setValidationType(CerStore::ValidationType::NONE);
         }
         break;
-    case UapkiNS::Doc::Verify::VerifyOptions::ValidationType::FULL:
+    case Doc::Verify::VerifyOptions::ValidationType::FULL:
         if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
             verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
             for (auto& it : verifiedSignerInfo.getCertChainItems()) {
@@ -919,12 +920,12 @@ static int verify_p7s (
         const ByteArray* baSignature,
         const ByteArray* baContent,
         const bool isDigest,
-        const UapkiNS::Doc::Verify::VerifyOptions& verifyOptions,
+        const Doc::Verify::VerifyOptions& verifyOptions,
         JSON_Object* joResult
 )
 {
     int ret = RET_OK;
-    UapkiNS::Doc::Verify::VerifySignedDoc verify_sdoc(
+    Doc::Verify::VerifySignedDoc verify_sdoc(
         get_cerstore(),
         get_crlstore(),
         verifyOptions
@@ -941,7 +942,7 @@ static int verify_p7s (
     //  For each signer_info
     verify_sdoc.verifiedSignerInfos.resize(verify_sdoc.sdataParser.getCountSignerInfos());
     for (size_t idx = 0; idx < verify_sdoc.sdataParser.getCountSignerInfos(); idx++) {
-        UapkiNS::Doc::Verify::VerifiedSignerInfo& verified_sinfo = verify_sdoc.verifiedSignerInfos[idx];
+        Doc::Verify::VerifiedSignerInfo& verified_sinfo = verify_sdoc.verifiedSignerInfos[idx];
 
         DO(verified_sinfo.init(verify_sdoc.cerStore, isDigest));
         DO(verify_sdoc.sdataParser.parseSignerInfo(idx, verified_sinfo.getSignerInfo()));
@@ -962,7 +963,7 @@ static int verify_p7s (
         DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
 
         verified_sinfo.validateSignFormat(verify_sdoc.validateTime);
-        if (verifyOptions.validationType >= UapkiNS::Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+        if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
             DO(verified_sinfo.buildCertChain());
         }
         DO(validate_certs(verify_sdoc, verified_sinfo));
@@ -990,7 +991,7 @@ static int verify_raw (
     int ret = RET_OK;
     CerStore::Item* cer_item = nullptr;
     CerStore::Item* cer_parsed = nullptr;
-    UapkiNS::SmartBA sba_pubdata;
+    SmartBA sba_pubdata;
     UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
     bool is_digitalsign = true;
 
@@ -1017,7 +1018,7 @@ static int verify_raw (
         }
     }
 
-    ret = verify_signature(s_signalgo.c_str(), baContent, isDigest,
+    ret = Verify::verifySignature(s_signalgo.c_str(), baContent, isDigest,
         (cer_item) ? cer_item->baSPKI : sba_pubdata.get(), baSignature);
     switch (ret) {
     case RET_OK:
@@ -1045,8 +1046,8 @@ int uapki_verify_signature (
 )
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_content;
-    UapkiNS::SmartBA sba_signature;
+    SmartBA sba_content;
+    SmartBA sba_signature;
     JSON_Object* jo_signature = nullptr;
     JSON_Object* jo_signparams = nullptr;
     JSON_Object* jo_signerpubkey = nullptr;
@@ -1064,7 +1065,7 @@ int uapki_verify_signature (
     is_raw = (jo_signparams != nullptr) || (jo_signerpubkey != nullptr);
 
     if (!is_raw) {
-        UapkiNS::Doc::Verify::VerifyOptions verify_options;
+        Doc::Verify::VerifyOptions verify_options;
         DO(parse_verify_options(json_object_get_object(joParams, "options"), verify_options));
         DO(verify_p7s(sba_signature.get(), sba_content.get(), is_digest, verify_options, joResult));
     }

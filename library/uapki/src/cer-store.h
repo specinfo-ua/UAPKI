@@ -147,7 +147,9 @@ public:
             const uint32_t bitNum,
             bool& bitValue
         ) const;
-        int verify (const CerStore::Item* cerIssuer);
+        int verify (
+        	const CerStore::Item* cerIssuer
+        );
 
     };  //  end struct Item
 

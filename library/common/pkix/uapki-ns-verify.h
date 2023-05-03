@@ -25,44 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef UAPKI_TIME_UTILS_H
-#define UAPKI_TIME_UTILS_H
+#ifndef UAPKI_NS_VERIFY_H
+#define UAPKI_NS_VERIFY_H
 
 
-#include <stdint.h>
-#include <time.h>
-#include <string>
+#include "uapkic.h"
+#include "oid-utils.h"
 
 
-namespace TimeUtils {
+namespace UapkiNS {
 
-    int ftimeToMtime (
-        const std::string& fTime,
-        uint64_t& msTime
-    );
-    std::string mstimeToFormat (
-        const uint64_t msTime,
-        const bool isLocal = false
-    );
-    bool mstimeToTm (
-        ::tm& tmData,
-        const uint64_t msTime,
-        const bool isLocal
-    );
-    uint64_t mstimeNow (void);
-    std::string stimeToFormat (
-        const char* sTime
-    );
-    int stimeToMtime (
-        const std::string& sTime,
-        uint64_t& msTime
-    );
-    uint64_t tmToMstime (
-        ::tm& tmData,
-        const int msec = 0
-    );
+namespace Verify {
 
-}   //  end namespace TimeUtils
+
+int parseSpki (
+    const ByteArray* baSignerSPKI,
+    SignAlg* keyAlgo,
+    EcParamsId* ecParamsId,
+    ByteArray** baPubkey,
+    ByteArray** baPubkeyRsaE
+);
+int verifyEcSign (
+    const SignAlg signAlgo,
+    const EcParamsId ecParamId,
+    const ByteArray* baPubkey,
+    const ByteArray* baHash,
+    const ByteArray* baSignValue
+);
+int verifyRsaV15Sign (
+    const HashAlg hashAlgo,
+    const ByteArray* baPubkeyN,
+    const ByteArray* baPubkeyE,
+    const ByteArray* baHash,
+    const ByteArray* baSignValue
+);
+int verifySignature (
+    const char* signAlgo,
+    const ByteArray* baData,
+    const bool isHash,
+    const ByteArray* baSignerSPKI,
+    const ByteArray* baSignValue
+);
+
+
+}   //  end namespace Verify
+
+}   //  end namespace UapkiNS
 
 
 #endif

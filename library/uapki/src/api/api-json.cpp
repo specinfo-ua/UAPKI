@@ -28,7 +28,7 @@
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-helper.h"
-#include "time-utils.h"
+#include "time-util.h"
 
 #undef FILE_MARKER
 #define FILE_MARKER "api/api-json.cpp"
@@ -169,7 +169,7 @@ cleanup:
         json_result.setString("error", error_code_to_str(err_code));
     }
     if (ParsonHelper::jsonObjectGetBoolean(jo_params, "reportTime", false)) {
-        const string s_time = TimeUtils::mstimeToFormat(TimeUtils::mstimeNow());
+        const string s_time = TimeUtil::mtimeToFtime(TimeUtil::mtimeNow());
         json_object_set_string(jo_result, "reportTime", s_time.c_str());
     }
     json_result.serialize(&rv_sjson);

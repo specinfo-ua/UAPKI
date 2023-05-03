@@ -26,7 +26,6 @@
  */
 
 #include "tsp-helper.h"
-#include "asn1-ba-utils.h"
 #include "drbg.h"
 #include "macros-internal.h"
 #include "oids.h"
@@ -325,7 +324,7 @@ int TsTokenParser::parse (
     DO(asn_oid_to_text(&tst_info->policy, &s_policy));
     DO(asn_oid_to_text(&tst_info->messageImprint.hashAlgorithm.algorithm, &s_hashalgo));
     DO(asn_OCTSTRING2ba(&tst_info->messageImprint.hashedMessage, &m_BaHashedMessage));
-    DO(asn_decodevalue_gentime(&tst_info->genTime, &m_GenTime));
+    DO(UapkiNS::Util::genTimeFromAsn1(&tst_info->genTime, m_GenTime));
 
     m_PolicyId = string(s_policy);
     m_HashAlgo = string(s_hashalgo);
@@ -350,42 +349,6 @@ ByteArray* TsTokenParser::getHashedMessage (
     return rv_ba;
 }
 
-
-/*
-int tsp_response_parse_statusinfo (const ByteArray* baEncoded, uint32_t* status, char** statusString, uint32_t* failInfo)
-{
-//  Test TSP-response: "3030302E02010230250C237265717565737420636F6E7461696E7320756E6B6E6F776E20616C676F726974686D2E03020780"
-//  Test TSP-response: "3032303002010230270C255375706572666C756F7573206D6573736167652064696765737420706172616D657465722E03020780"
-    int ret = RET_OK;
-    TimeStampResp_t* tsp_response = NULL;
-    unsigned long pkistatus_status = 0;
-    UTF8String_t* utf8_str = NULL;
-
-    CHECK_PARAM(baEncoded != NULL);
-    CHECK_PARAM(status != NULL);
-    CHECK_PARAM(statusString != NULL);
-    CHECK_PARAM(failInfo != NULL);
-
-    CHECK_NOT_NULL(tsp_response = asn_decode_ba_with_alloc(get_TimeStampResp_desc(), baEncoded));
-
-    DO(asn_INTEGER2ulong(&tsp_response->status.status, &pkistatus_status));
-    *status = (uint32_t)pkistatus_status;
-
-    if ((tsp_response->status.statusString != NULL) && (tsp_response->status.statusString->list.count > 0)) {
-        //  Get first utf8-string only
-        utf8_str = tsp_response->status.statusString->list.array[0];
-        DO(uint8_to_str_with_alloc(utf8_str->buf, (size_t)utf8_str->size, statusString));
-    }
-
-    if (tsp_response->status.failInfo != NULL) {
-        DO(asn_decodevalue_bitstring_to_uint32(tsp_response->status.failInfo, failInfo));
-    }
-
-cleanup:
-    asn_free(get_TimeStampResp_desc(), tsp_response);
-    return ret;
-}
-*/
 
 }   //  end namespace Tsp
 

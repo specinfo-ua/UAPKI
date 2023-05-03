@@ -28,7 +28,7 @@
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-helper.h"
-#include "store-utils.h"
+#include "store-util.h"
 #include "uapki-errors.h"
 
 
@@ -48,7 +48,7 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
         DO(CerStore::parseCert(ba_encoded, &cer_item));
         ba_encoded = nullptr;
 
-        DO(CerStoreUtils::detailInfoToJson(joResult, cer_item));
+        DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
         delete cer_item;
     }
     else {
@@ -58,7 +58,7 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
             if (cer_store) {
                 CerStore::Item* cer_item = nullptr;
                 DO(cer_store->getCertByCertId(ba_certid, &cer_item));
-                DO(CerStoreUtils::detailInfoToJson(joResult, cer_item));
+                DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
             }
             else {
                 SET_ERROR(RET_UAPKI_GENERAL_ERROR);

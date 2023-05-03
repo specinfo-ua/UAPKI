@@ -25,12 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-04-25
+//  Last update: 2023-05-03
 
 #include "uapki-ns-util.h"
+#include "iconv-utils.h"
 #include "macros-internal.h"
 #include "oids.h"
-#include "time-utils.h"
+#include "oid-utils.h"
+#include "time-util.h"
 #include "uapki-errors.h"
 
 
@@ -40,7 +42,8 @@ using namespace std;
 namespace UapkiNS {
 
 
-constexpr uint64_t UTC_TIME_MS_END = 2524608000000ul;
+constexpr uint64_t UTC_TIME_MS_END  = 2524608000000ul;
+static const char* HEX_SYMBOLS      = "0123456789ABCDEF";
 
 
 int Util::algorithmIdentifierFromAsn1 (const AlgorithmIdentifier_t& asn1, AlgorithmIdentifier& algoId)
@@ -144,7 +147,11 @@ int Util::attributeToAsn1 (Attribute_t& asn1, const Attribute& attr)
     return attributeToAsn1(asn1, attr.type.c_str(), attr.baValues);
 }
 
-int Util::addToAttributes (Attributes_t* attrs, const char* type, const ByteArray* baValues)
+int Util::addToAttributes (
+        Attributes_t* attrs,
+        const char* type,
+        const ByteArray* baValues
+)
 {
     int ret = RET_OK;
     Attribute_t* attr = nullptr;
@@ -162,9 +169,148 @@ cleanup:
     return ret;
 }
 
-int Util::addToAttributes (Attributes_t* attrs, const Attribute& attr)
+int Util::addToAttributes (
+        Attributes_t* attrs,
+        const Attribute& attr
+)
 {
     return addToAttributes(attrs, attr.type.c_str(), attr.baValues);
+}
+
+const Attribute_t* Util::attributeFromAttributes (
+        const Attributes_t* attrs,
+        const char* oidType
+)
+{
+    if (attrs && oidType) {
+        for (int i = 0; i < attrs->list.count; i++) {
+            const Attribute_t* attr = attrs->list.array[i];
+            if (OID_is_equal_oid(&attr->type, oidType)) {
+                return attr;
+            }
+        }
+    }
+    return nullptr;
+}
+
+int Util::attrValueFromAttributes (
+        const Attributes_t* attrs,
+        const char* oidType,
+        ByteArray** baAttrValue
+)
+{
+    int ret = RET_OK;
+    if (!attrs || !oidType || !baAttrValue) return RET_UAPKI_INVALID_PARAMETER;
+
+    const Attribute_t* attr = attributeFromAttributes(attrs, oidType);
+    if (!attr) {
+        ret = RET_UAPKI_ATTRIBUTE_NOT_PRESENT;
+        goto cleanup;
+    }
+
+    if (attr->value.list.count > 0) {
+        const AttributeValue_t* attr_value = attr->value.list.array[0];
+        *baAttrValue = ba_alloc_from_uint8(attr_value->buf, attr_value->size);
+    }
+    else {
+        *baAttrValue = ba_alloc();
+    }
+    CHECK_NOT_NULL(*baAttrValue);
+
+cleanup:
+    return ret;
+}
+
+int Util::addToExtensions (
+        Extensions_t* extns,
+        const char* extnId,
+        const bool critical,
+        const ByteArray* baExtnValue
+)
+{
+    int ret = RET_OK;
+    Extension_t* extn = nullptr;
+    BOOLEAN_t cr = true;
+
+    if (!extns || !extnId || !baExtnValue) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(extn, Extension_t);
+
+    DO(asn_set_oid_from_text(extnId, &extn->extnID));
+    if (critical) {
+        CHECK_NOT_NULL(extn->critical = (BOOLEAN_t*)asn_copy_with_alloc(get_BOOLEAN_desc(), &cr));
+    }
+    DO(asn_ba2OCTSTRING(baExtnValue, &extn->extnValue));
+
+    DO(ASN_SEQUENCE_ADD(&extns->list, extn));
+    extn = nullptr;
+
+cleanup:
+    asn_free(get_Extension_desc(), extn);
+    return ret;
+}
+
+const Extension_t* Util::extensionFromExtensions (
+        const Extensions_t* extns,
+        const char* extnId
+)
+{
+    if (extns && extnId) {
+        for (int i = 0; i < extns->list.count; i++) {
+            const Extension_t* extn = extns->list.array[i];
+            if (OID_is_equal_oid(&extn->extnID, extnId)) {
+                return extn;
+            }
+        }
+    }
+    return nullptr;
+}
+
+int Util::extnValueFromExtensions (
+        const Extensions_t* extns,
+        const char* extnId,
+        bool* critical,
+        ByteArray** baExtnValue
+)
+{
+    int ret = RET_OK;
+    if (!extns || !extnId || !baExtnValue) return RET_UAPKI_INVALID_PARAMETER;
+
+    const Extension_t* extn = extensionFromExtensions(extns, extnId);
+    if (!extn) {
+        ret = RET_UAPKI_EXTENSION_NOT_PRESENT;
+        goto cleanup;
+    }
+
+    if (critical) {
+        *critical = false;
+        if (extn->critical) {
+            *critical = (extn->critical != 0);
+        }
+    }
+
+    DO(asn_OCTSTRING2ba(&extn->extnValue, baExtnValue));
+
+cleanup:
+    return ret;
+}
+
+int Util::decodeOid (
+        const ByteArray* baEncoded,
+        char** oid
+)
+{
+    int ret = RET_OK;
+    OBJECT_IDENTIFIER_t* prim_oid = nullptr;
+
+    if (!baEncoded || !oid) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(prim_oid = (OBJECT_IDENTIFIER_t*)asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), baEncoded));
+    DO(asn_oid_to_text(prim_oid, oid));
+
+cleanup:
+    asn_free(get_OBJECT_IDENTIFIER_desc(), prim_oid);
+    return ret;
 }
 
 int Util::decodePkixTime (
@@ -191,34 +337,39 @@ int Util::encodeGenTime (
 )
 {
     int ret = RET_OK;
-    GeneralizedTime_t* gen_time = NULL;
-    ::tm tm_data;
-    string s_time;
-    UapkiNS::SmartBA sba_stime;
+    GeneralizedTime_t* gen_time = nullptr;
 
     if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    s_time.resize(15);
-    if (
-        !TimeUtils::mstimeToTm(tm_data, msTime, false) ||
-        (strftime((char*)s_time.data(), s_time.length(), "%Y%m%d%H%M%S", &tm_data) != 14)
-    ) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    s_time[14] = 'Z';
-    if (!sba_stime.set(ba_alloc_from_str(s_time.c_str()))) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
-
     ASN_ALLOC_TYPE(gen_time, GeneralizedTime_t);
 
-    DO(asn_ba2OCTSTRING(sba_stime.get(), gen_time));
+    DO(asn_time2GT(gen_time, msTime, nullptr));
 
     DO(asn_encode_ba(get_GeneralizedTime_desc(), gen_time, baEncoded));
 
 cleanup:
     asn_free(get_GeneralizedTime_desc(), gen_time);
+    return ret;
+}
+
+int Util::encodeOctetString (
+        const ByteArray* baData,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    OCTET_STRING_t* octet_string = nullptr;
+
+    if (!baData || !baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(octet_string, OCTET_STRING_t);
+
+    DO(asn_ba2OCTSTRING(baData, octet_string));
+
+    DO(asn_encode_ba(get_OCTET_STRING_desc(), octet_string, baEncoded));
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_string);
     return ret;
 }
 
@@ -259,34 +410,51 @@ int Util::encodeUtcTime (
 {
     int ret = RET_OK;
     UTCTime_t* utc_time = nullptr;
-    ::tm tm_data;
-    string s_time;
-    UapkiNS::SmartBA sba_stime;
 
     if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    s_time.resize(13);
-    if (
-        !TimeUtils::mstimeToTm(tm_data, msTime, false) ||
-        (strftime((char*)s_time.data(), s_time.length(), "%y%m%d%H%M%S", &tm_data) != 12)
-    ) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    s_time[12] = 'Z';
-    if (!sba_stime.set(ba_alloc_from_str(s_time.c_str()))) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
-
     ASN_ALLOC_TYPE(utc_time, UTCTime_t);
 
-    DO(asn_ba2OCTSTRING(sba_stime.get(), utc_time));
+    DO(asn_time2UT(utc_time, msTime, nullptr));
 
     DO(asn_encode_ba(get_UTCTime_desc(), utc_time, baEncoded));
 
 cleanup:
     asn_free(get_UTCTime_desc(), utc_time);
     return ret;
+}
+
+bool Util::equalValueOctetString (
+        const OCTET_STRING_t& octetString1,
+        const OCTET_STRING_t& octetString2
+)
+{
+    return (
+        (octetString1.size == octetString2.size) &&
+        (memcmp(octetString1.buf, octetString2.buf, (size_t)octetString2.size) == 0)
+    );
+}
+
+bool Util::equalValuePrimitiveType (
+        const ASN__PRIMITIVE_TYPE_t& primType1,
+        const ASN__PRIMITIVE_TYPE_t& primType2
+)
+{
+    return (
+        (primType1.size == primType2.size) &&
+        (memcmp(primType1.buf, primType2.buf, (size_t)primType2.size) == 0)
+    );
+}
+
+int Util::genTimeFromAsn1 (
+        const GeneralizedTime_t* genTime,
+        uint64_t& msTime
+)
+{
+    if (!genTime) return RET_UAPKI_INVALID_PARAMETER;
+
+    msTime = asn_GT2time(genTime, NULL);
+    return RET_OK;
 }
 
 int Util::pkixTimeFromAsn1 (
@@ -300,10 +468,10 @@ int Util::pkixTimeFromAsn1 (
 
     switch (pkixTime->present) {
     case PKIXTime_PR_utcTime:
-        msTime = asn_UT2msec(&pkixTime->choice.utcTime, NULL, false);
+        msTime = asn_UT2time(&pkixTime->choice.utcTime, nullptr);
         break;
     case PKIXTime_PR_generalTime:
-        msTime = asn_GT2msec(&pkixTime->choice.generalTime, NULL, false);
+        msTime = asn_GT2time(&pkixTime->choice.generalTime, nullptr);
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
@@ -313,5 +481,358 @@ cleanup:
     return ret;
 }
 
+int Util::utcTimeFromAsn1 (
+        const UTCTime_t* utcTime,
+        uint64_t& msTime
+)
+{
+    if (!utcTime) return RET_UAPKI_INVALID_PARAMETER;
+
+    msTime = asn_UT2time(utcTime, NULL);
+    return RET_OK;
+}
+
+int Util::bitStringEncapOctetFromAsn1 (const BIT_STRING_t* bsEncapOctet, ByteArray** baData)
+{
+    int ret = RET_OK;
+    OCTET_STRING_t* octet_str = NULL;
+    ByteArray* ba_encoded = NULL;
+
+    CHECK_PARAM(bsEncapOctet != NULL);
+    CHECK_PARAM(baData != NULL);
+
+    if (bsEncapOctet->bits_unused != 0) {
+        SET_ERROR(RET_UAPKI_UNEXPECTED_BIT_STRING);
+    }
+
+    DO(asn_BITSTRING2ba(bsEncapOctet, &ba_encoded));
+    CHECK_NOT_NULL(octet_str = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), ba_encoded));
+    DO(asn_OCTSTRING2ba(octet_str, baData));
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_str);
+    ba_free(ba_encoded);
+    return ret;
+}
+
+int Util::bitStringFromAsn1 (const BIT_STRING_t* bs, uint32_t* bits)
+{
+    int ret = RET_OK;
+    ByteArray* ba_bitvalues = NULL;
+    uint32_t i, value = 0;
+    const uint8_t* buf = NULL;
+
+    CHECK_PARAM(bs != NULL);
+    CHECK_PARAM(bits != NULL);
+
+    if (bs->bits_unused > 7) {
+        SET_ERROR(RET_UAPKI_INVALID_BIT_STRING);
+    }
+    if (bs->size > 4) {
+        SET_ERROR(RET_UAPKI_TOO_LONG_BIT_STRING);
+    }
+
+    *bits = 0;
+    DO(asn_BITSTRING2ba(bs, &ba_bitvalues));
+
+    buf = ba_get_buf_const(ba_bitvalues);
+    for (i = 0; i < (uint32_t)ba_get_len(ba_bitvalues); i++) {
+        value <<= 8;
+        value |= buf[i];
+    }
+    value >>= bs->bits_unused;
+    *bits = value;
+
+cleanup:
+    ba_free(ba_bitvalues);
+    return ret;
+}
+
+int Util::bmpStringFromAsn1 (const BMPString_t* bmpStr, char** str)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(bmpStr != NULL);
+    CHECK_PARAM(str != NULL);
+
+    DO(utf16be_to_utf8(bmpStr->buf, bmpStr->size, str));
+
+cleanup:
+    return ret;
+}
+
+int Util::enumeratedFromAsn1 (const ENUMERATED_t* enumerated, uint32_t* enumValue)
+{
+    int ret = RET_OK;
+    unsigned long value = 0;
+
+    CHECK_PARAM(enumerated != NULL);
+    CHECK_PARAM(enumValue != NULL);
+
+    if ((enumerated->size > 0) && (enumerated->size < 4)) {
+        DO(asn_INTEGER2ulong(enumerated, &value));
+        *enumValue = (uint32_t)value;
+    }
+    else {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
+
+cleanup:
+    return ret;
+}
+
+int Util::decodeAnyString (const uint8_t* buf, const size_t len, char** str)
+{
+    int ret = RET_OK;
+    OCTET_STRING_t* octet_str = NULL;
+    asn_TYPE_descriptor_t* desc = NULL;
+
+    CHECK_PARAM(buf != NULL);
+    CHECK_PARAM(str != NULL);
+
+    if (len < 2) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    switch (buf[0])
+    {
+    case 0x0C: desc = get_UTF8String_desc(); break;
+    case 0x13: desc = get_PrintableString_desc(); break;
+    case 0x16: desc = get_IA5String_desc(); break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+    octet_str = (OCTET_STRING_t*)asn_decode_with_alloc(desc, buf, len);
+    if (octet_str == NULL) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+    DO(UapkiNS::Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, str));
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), octet_str);
+    return ret;
+}
+
+int Util::decodeAnyString (const ByteArray* baEncoded, char** str)
+{
+    return decodeAnyString(ba_get_buf_const(baEncoded), ba_get_len(baEncoded), str);
+}
+
+int Util::decodeBmpString (const ByteArray* baEncoded, char** str)
+{
+    int ret = RET_OK;
+    BMPString_t* prim_bmpstr = NULL;
+
+    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(str != NULL);
+
+    CHECK_NOT_NULL(prim_bmpstr = (BMPString_t*)asn_decode_ba_with_alloc(get_BMPString_desc(), baEncoded));
+    DO(bmpStringFromAsn1(prim_bmpstr, str));
+
+cleanup:
+    asn_free(get_BMPString_desc(), prim_bmpstr);
+    return ret;
+}
+
+int Util::decodeEnumerated (const ByteArray* baEncoded, uint32_t* enumValue)
+{
+    int ret = RET_OK;
+    ENUMERATED_t* prim_enum = NULL;
+
+    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(enumValue != NULL);
+
+    CHECK_NOT_NULL(prim_enum = (ENUMERATED_t*)asn_decode_ba_with_alloc(get_ENUMERATED_desc(), baEncoded));
+    DO(enumeratedFromAsn1(prim_enum, enumValue));
+
+cleanup:
+    asn_free(get_ENUMERATED_desc(), prim_enum);
+    return ret;
+}
+
+int Util::decodeOctetString (const ByteArray* baEncoded, ByteArray** baData)
+{
+    int ret = RET_OK;
+    OCTET_STRING_t* prim_octetstr = NULL;
+
+    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(baData != NULL);
+
+    CHECK_NOT_NULL(prim_octetstr = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), baEncoded));
+    DO(asn_OCTSTRING2ba(prim_octetstr, baData));
+
+cleanup:
+    asn_free(get_OCTET_STRING_desc(), prim_octetstr);
+    return ret;
+}
+
+int Util::encodeBmpString (const char* strUtf8, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    ByteArray* ba_utf16be = NULL;
+    uint8_t* utf16 = NULL;
+    size_t utf16_len = 0;
+
+    CHECK_PARAM(strUtf8 != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    DO(utf8_to_utf16be(strUtf8, &utf16, &utf16_len));
+    CHECK_NOT_NULL(ba_utf16be = ba_alloc_from_uint8(utf16, utf16_len));
+    DO(encodeOctetString(ba_utf16be, baEncoded));
+    DO(ba_set_byte(*baEncoded, 0, 0x1E));
+
+cleanup:
+    ba_free(ba_utf16be);
+    free(utf16);
+    return ret;
+}
+
+int Util::encodeIa5String (const char* strLatin, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    IA5String_t* ia5_str = NULL;
+
+    CHECK_PARAM(strLatin != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(ia5_str, IA5String_t);
+    if (strLatin) {
+        DO(asn_bytes2OCTSTRING(ia5_str, (const uint8_t*)strLatin, strlen(strLatin)));
+    }
+    DO(asn_encode_ba(get_IA5String_desc(), ia5_str, baEncoded));
+
+cleanup:
+    asn_free(get_IA5String_desc(), ia5_str);
+    return ret;
+}
+
+int Util::encodeInteger (const ByteArray* baData, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    INTEGER_t* prim_integer = NULL;
+
+    CHECK_PARAM(baData != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(prim_integer, INTEGER_t);
+    DO(asn_ba2INTEGER(baData, prim_integer));
+    DO(asn_encode_ba(get_INTEGER_desc(), prim_integer, baEncoded));
+
+cleanup:
+    asn_free(get_INTEGER_desc(), prim_integer);
+    return ret;
+}
+
+int Util::encodeInteger (const int32_t value, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    INTEGER_t* prim_integer = NULL;
+
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(prim_integer, INTEGER_t);
+    DO(asn_long2INTEGER(prim_integer, value));
+    DO(asn_encode_ba(get_INTEGER_desc(), prim_integer, baEncoded));
+
+cleanup:
+    asn_free(get_INTEGER_desc(), prim_integer);
+    return ret;
+}
+
+int Util::encodeOid (const char* oid, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    OBJECT_IDENTIFIER_t* asn_oid = NULL;
+
+    CHECK_PARAM(oid != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(asn_oid, OBJECT_IDENTIFIER_t);
+    DO(asn_set_oid_from_text(oid, asn_oid));
+    DO(asn_encode_ba(get_OBJECT_IDENTIFIER_desc(), asn_oid, baEncoded));
+
+cleanup:
+    asn_free(get_OBJECT_IDENTIFIER_desc(), asn_oid);
+    return ret;
+}
+
+int Util::encodePrintableString (const char* strLatin, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    PrintableString_t* printable_str = NULL;
+
+    CHECK_PARAM(strLatin != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(printable_str, PrintableString_t);
+    if (strLatin) {
+        DO(asn_bytes2OCTSTRING(printable_str, (const uint8_t*)strLatin, strlen(strLatin)));
+    }
+    DO(asn_encode_ba(get_PrintableString_desc(), printable_str, baEncoded));
+
+cleanup:
+    asn_free(get_PrintableString_desc(), printable_str);
+    return ret;
+}
+
+int Util::encodeUtf8string (const char* strUtf8, ByteArray** baEncoded)
+{
+    int ret = RET_OK;
+    UTF8String_t* utf8_str = NULL;
+
+    CHECK_PARAM(strUtf8 != NULL);
+    CHECK_PARAM(baEncoded != NULL);
+
+    ASN_ALLOC_TYPE(utf8_str, UTF8String_t);
+    if (strUtf8) {
+        DO(asn_bytes2OCTSTRING(utf8_str, (const uint8_t*)strUtf8, strlen(strUtf8)));
+    }
+    DO(asn_encode_ba(get_UTF8String_desc(), utf8_str, baEncoded));
+
+cleanup:
+    asn_free(get_UTF8String_desc(), utf8_str);
+    return ret;
+}
+
+int Util::pbufToStr (const uint8_t* buf, const size_t len, char** str)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(buf != NULL);
+    CHECK_PARAM(str != NULL);
+
+    if (len > 0) {
+        *str = (char*)calloc(1, len + 1);
+        if (*str == NULL) {
+            ret = RET_MEMORY_ALLOC_ERROR;
+        }
+        memcpy(*str, buf, len);
+    }
+    else {
+        *str = NULL;
+    }
+
+cleanup:
+    return ret;
+}
+
+string Util::baToHex (
+        const ByteArray* baData
+)
+{
+    string rv_shex;
+    const size_t len = ba_get_len(baData);
+    if (len > 0) {
+        rv_shex.resize(2 * len);
+        const uint8_t* src = ba_get_buf_const(baData);
+        uint8_t* dst = (uint8_t*)rv_shex.data();
+        for (size_t i = 0, j = 0; i < len; i++) {
+            dst[j++] = HEX_SYMBOLS[src[i] >> 4];
+            dst[j++] = HEX_SYMBOLS[src[i] & 0x0F];
+        }
+    }
+    return rv_shex;
+}
 
 }   //  end namespace UapkiNS

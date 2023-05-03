@@ -25,58 +25,37 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef UAPKI_STORE_UTILS_H
-#define UAPKI_STORE_UTILS_H
+#ifndef UAPKI_EXTENSION_HELPER_JSON_H
+#define UAPKI_EXTENSION_HELPER_JSON_H
 
 
-#include "cer-store.h"
-#include "crl-store.h"
+#include "byte-array.h"
 #include "parson.h"
 
 
-namespace CerStoreUtils {
+namespace UapkiNS {
 
-    int detailInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
-    int extensionsToJson (JSON_Array* jaResult, const CerStore::Item* cerStoreItem, bool& selfSigned);
-    int nameToJson (
-        JSON_Object* joResult,
-        const ByteArray* baEncoded
-    );
-    int nameToJson (
-        JSON_Object* joResult,
-        const Name_t& name
-    );
-    int ocspIdentifierToJson (
-        JSON_Object* joResult,
-        const ByteArray* baEncoded
-    );
-    int rdnameFromName (
-        const Name_t& name,
-        const char* type,
-        std::string& value
-    );
-    int signatureInfoToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
-    int spkiToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem, const bool encoded);
-    int validityToJson (JSON_Object* joResult, const CerStore::Item* cerStoreItem);
+namespace ExtensionHelper {
 
-}
+namespace DecodeToJsonObject {
 
-namespace CrlStoreUtils {
+    int accessDescriptions          (const ByteArray* baEncoded, JSON_Object* joResult);
+    int alternativeName             (const ByteArray* baEncoded, JSON_Object* joResult);
+    int authorityKeyId              (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId);
+    int basicConstraints            (const ByteArray* baEncoded, JSON_Object* joResult);
+    int certificatePolicies         (const ByteArray* baEncoded, JSON_Object* joResult);
+    int distributionPoints          (const ByteArray* baEncoded, JSON_Object* joResult);
+    int extendedKeyUsage            (const ByteArray* baEncoded, JSON_Object* joResult);
+    int keyUsage                    (const ByteArray* baEncoded, JSON_Object* joResult);
+    int qcStatements                (const ByteArray* baEncoded, JSON_Object* joResult);
+    int subjectDirectoryAttributes  (const ByteArray* baEncoded, JSON_Object* joResult);
+    int subjectKeyId                (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId);
 
-    int crlIdentifierToJson (
-        JSON_Object* joResult,
-        const ByteArray* baEncoded
-    );
-    int infoToJson (
-        JSON_Object* joResult,
-        const CrlStore::Item* crlStoreItem
-    );
-    int revokedCertsToJson (
-        JSON_Array* jaResult,
-        const CrlStore::Item* crlStoreItem
-    );
+}   //  end namespace DecodeToJsonObject
 
-}
+}   //  end namespace ExtensionHelper
+
+}   //  end namespace UapkiNS
 
 
 #endif

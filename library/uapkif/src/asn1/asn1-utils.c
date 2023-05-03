@@ -1,33 +1,39 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2023, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "asn1-utils.h"
 #include "macros-internal.h"
 #include <time.h>
+
+
+#if defined(_USE_32BIT_TIME_T) || (defined(__TIMESIZE) && (__TIMESIZE != 64))
+#error Supported only 64bit time
+#endif
+
 
 #undef FILE_MARKER
 #define FILE_MARKER "asn1/asn1-utils.c"
@@ -1190,14 +1196,6 @@ cleanup:
     return ret;
 }
 
-UTCTime_t *asn_create_curent_time(void)
-{
-    time_t cur_time = time(NULL);
-    struct tm tm_cur_time = *localtime(&cur_time);
-
-    return asn_time2UT(NULL, &tm_cur_time, true);
-}
-
 int asn_print(FILE *stream, asn_TYPE_descriptor_t *td, void *sptr)
 {
     int ret = RET_OK;
@@ -1220,137 +1218,241 @@ void asn_free(asn_TYPE_descriptor_t *td, void *ptr)
 }
 
 
-//  source from "asn_utils_x.h"
-static int generalized_time_diff_init = 0;
-static time_t generalized_time_diff = 0;
+//  From "asn_utils_x.h" and "[asn1]", redesigned
 
-static void fix_generalized_time(void)
+bool asn_check_tm (
+        struct tm* tmData
+)
 {
-    uint8_t encoded[] = { 0x18, 0x0F, 0x32, 0x30, 0x31, 0x37, 0x30, 0x32, 0x30, 0x37, 0x30, 0x39, 0x32, 0x31, 0x35, 0x31, 0x5A };
-    int frac_value;
-    int frac_digits;
-    GeneralizedTime_t* actual = NULL;
-    time_t time_sec = 0;
-    time_t time_sec_exp = 1486459311;
-    int ret;
-
-    CHECK_NOT_NULL(actual = asn_decode_with_alloc(get_GeneralizedTime_desc(), encoded, sizeof(encoded)));
-    time_sec = asn_GT2time_frac(actual, &frac_value, &frac_digits, NULL, false);
-    if (time_sec == -1) {
-        //error
-        goto cleanup;
-    }
-
-    generalized_time_diff = time_sec_exp - time_sec;
-
-cleanup:
-
-    ASN_FREE(get_GeneralizedTime_desc(), actual);
-
-    return;
+    return (
+        tmData &&
+        (tmData->tm_year >= 70) &&                              //  years since 1900
+        (tmData->tm_mon >= 0) && (tmData->tm_mon <= 11) &&      //  months since January: 0..11
+        (tmData->tm_mday >= 1) && (tmData->tm_mday <= 31) &&
+        (tmData->tm_hour >= 0) && (tmData->tm_hour <= 23) &&
+        (tmData->tm_min >= 0) && (tmData->tm_min <= 59) &&
+        (tmData->tm_sec >= 0) && (tmData->tm_sec <= 60)
+    );
 }
 
-static time_t time_t_fix(time_t in)
+uint64_t asn_tm2msec (
+        struct tm* tmData,
+        const int ms
+)
 {
-    if (generalized_time_diff_init == 0) {
-        fix_generalized_time();
-        generalized_time_diff_init = 1;
-    }
+    static const uint64_t m_to_d[12] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+    uint64_t rv_t, month, year;
 
-    return generalized_time_diff + in;
+    month = tmData->tm_mon;
+    year = tmData->tm_year + month / 12 + 1900;
+    month %= 12;
+    if (month < 0) {
+        year -= 1;
+        month += 12;
+    }
+    rv_t = (year - 1970) * 365 + m_to_d[month];
+    if (month <= 1) {
+        year -= 1;
+    }
+    rv_t += (year - 1968) / 4 - (year - 1900) / 100 + (year - 1600) / 400;
+    rv_t += (uint64_t)tmData->tm_mday - 1;
+    rv_t *= 24;
+    rv_t += tmData->tm_hour;
+    rv_t *= 60;
+    rv_t += tmData->tm_min;
+    rv_t *= 60;
+    rv_t += tmData->tm_sec;
+    rv_t *= 1000;
+    rv_t += ms;
+    return rv_t;
 }
 
-static uint64_t pow10_uint64(int frac_digits)
+static bool b2t (
+        int* value,
+        const uint8_t* buf
+)
 {
-    uint64_t fbase;
-    for (fbase = 1; frac_digits--;) {
-            fbase *= 10;
-    }
-    return fbase;
+    const uint8_t d_x0 = buf[0];
+    const uint8_t d_0x = buf[1];
+    if ((d_x0 < 0x30) || (d_x0 > 0x39) || (d_0x < 0x30) || (d_0x > 0x39)) return false;
+
+    *value = (d_x0 - 0x30) * 10 + (d_0x - 0x30);
+    return true;
 }
 
-uint64_t asn_GT2msec(const GeneralizedTime_t *st, struct tm *ret_tm, int as_gmt)
+uint64_t asn_UT2time (
+        const UTCTime_t* st,
+        struct tm* tmData
+)
 {
-    int frac_value;
-    int frac_digits;
-    time_t time_sec;
-    uint64_t time_msec;
+    struct tm tm_data = { 0 };
+    struct tm* ref_tm = (tmData) ? tmData : &tm_data;
 
-    time_sec = time_t_fix(asn_GT2time_frac(st, &frac_value, &frac_digits, ret_tm, as_gmt));
-    if (time_sec != -1) {
-        time_msec = ((uint64_t)time_sec) * 1000 + (uint64_t)frac_value * pow10_uint64(3 - frac_digits);
-    } else {
-        time_msec = (uint64_t)-1;
+    if (
+        !st || !st->buf ||
+        (st->size != 13) || (st->buf[12] != 'Z')
+    ) {
+        return 0;
     }
 
-    return time_msec;
+    if (
+        !b2t(&ref_tm->tm_year, &st->buf[0]) ||
+        !b2t(&ref_tm->tm_mon, &st->buf[2]) ||
+        !b2t(&ref_tm->tm_mday, &st->buf[4]) ||
+        !b2t(&ref_tm->tm_hour, &st->buf[6]) ||
+        !b2t(&ref_tm->tm_min, &st->buf[8]) ||
+        !b2t(&ref_tm->tm_sec, &st->buf[10])
+    ) {
+        return 0;
+    }
+
+    ref_tm->tm_year += (ref_tm->tm_year < 50) ? 100 : 0;
+    ref_tm->tm_mon -= 1;
+    ref_tm->tm_isdst = ref_tm->tm_wday = ref_tm->tm_yday = 0;
+    if (!asn_check_tm(ref_tm)) {
+        return 0;
+    }
+
+    return asn_tm2msec(ref_tm, 0);
 }
 
-uint64_t asn_UT2msec(const UTCTime_t* st, struct tm* ret_tm, int as_gmt)
+uint64_t asn_GT2time (
+        const GeneralizedTime_t* st,
+        struct tm* tmData
+)
 {
-    time_t time_sec;
-    uint64_t time_msec;
+    struct tm tm_data = { 0 };
+    struct tm* ref_tm = (tmData) ? tmData : &tm_data;
+    int century = 0, ms = 0;
 
-    (void)as_gmt;
+    if (
+        !st || !st->buf ||
+        (st->size < 15) || (st->size == 16) || (st->size > 19) ||
+        (st->buf[st->size - 1] != 'Z')
+    ) {
+        return 0;
+    }
 
-    time_sec = time_t_fix(asn_UT2time(st, ret_tm, false));
-    if (time_sec != -1) {
-        time_msec = ((uint64_t)time_sec) * 1000;
+    if (
+        !b2t(&century, &st->buf[0]) ||
+        !b2t(&ref_tm->tm_year, &st->buf[2]) ||
+        !b2t(&ref_tm->tm_mon, &st->buf[4]) ||
+        !b2t(&ref_tm->tm_mday, &st->buf[6]) ||
+        !b2t(&ref_tm->tm_hour, &st->buf[8]) ||
+        !b2t(&ref_tm->tm_min, &st->buf[10]) ||
+        !b2t(&ref_tm->tm_sec, &st->buf[12])
+    ) {
+        return 0;
     }
-    else {
-        time_msec = (uint64_t)-1;
+
+    if (st->size > 16) {
+        if ((st->buf[14] != ',') && (st->buf[14] != '.')) {
+            return 0;
+        }
+        for (int i = 15, w = 100; i < st->size - 1; i++) {
+            const uint8_t d = st->buf[i];
+            if ((d < 0x30) || (d > 0x39)) return 0;
+            ms += (d - 0x30) * w;
+            w /= 10;
+        }
     }
-    return time_msec;
+
+    ref_tm->tm_year += century * 100 - 1900;
+    ref_tm->tm_mon -= 1;
+    ref_tm->tm_isdst = ref_tm->tm_wday = ref_tm->tm_yday = 0;
+    if (!asn_check_tm(ref_tm)) {
+        return 0;
+    }
+
+    return asn_tm2msec(ref_tm, ms);
 }
 
+bool asn_msecToTm (
+        struct tm* tmData,
+        const uint64_t msTime,
+        const bool isLocal
+)
+{
+    const time_t t_sec = msTime / 1000;
+#if defined(_WIN32) || defined(__WINDOWS__)
+    const errno_t err = (isLocal)
+        ? localtime_s(tmData, &t_sec)
+        : gmtime_s(tmData, &t_sec);
+    return (err == 0);
+#elif defined(__linux__) || defined(__APPLE__) || defined(__GNUC__)
+    const struct tm* r_tm = (isLocal)
+        ? localtime_r(&t_sec, tmData)
+        : gmtime_r(&t_sec, tmData);
+    return (r_tm);
+#endif
+}
 
-int asn_msec2GT(const uint64_t msec, GeneralizedTime_t **out)
+int asn_time2UT (
+        UTCTime_t* st,
+        const uint64_t msTime,
+        const struct tm* tmData
+)
 {
     int ret = RET_OK;
-    GeneralizedTime_t *generalTime = NULL;
-    time_t utc_time = msec / 1000;
+    struct tm tm_data = { 0 };
+    struct tm* ref_tm = (tmData) ? (struct tm*)tmData : &tm_data;
+    char s_buf[20] = { 0 };
 
-    CHECK_PARAM(out != NULL);
+    CHECK_PARAM(st);
 
-    const struct tm *st_tm = localtime(&utc_time);
-    if (st_tm == NULL) {
-        SET_ERROR(RET_ASN1_TIME_ERROR);
+    if (!tmData) {
+        if (!asn_msecToTm(ref_tm, msTime, false)) {
+            SET_ERROR(RET_INVALID_PARAM);
+        }
     }
 
-    generalTime = asn_time2GT(NULL, st_tm, true);
+    if (
+        !asn_check_tm(ref_tm) ||
+        (strftime(s_buf, sizeof(s_buf), "%y%m%d%H%M%SZ", ref_tm) != 13)
+    ) {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
 
-    *out = generalTime;
-    generalTime = NULL;
+    CALLOC_CHECKED(st->buf, 14);
+
+    memcpy(st->buf, s_buf, 14);
+    st->size = 13;
 
 cleanup:
-
-    asn_free(get_GeneralizedTime_desc(), generalTime);
-
     return ret;
 }
 
-int asn_msec2UT(const uint64_t msec, UTCTime_t **out)
+int asn_time2GT (
+        GeneralizedTime_t* st,
+        const uint64_t msTime,
+        const struct tm* tmData
+)
 {
     int ret = RET_OK;
-    UTCTime_t *utc_time_asn = NULL;
-    time_t utc_time = msec / 1000;
+    struct tm tm_data = { 0 };
+    struct tm* ref_tm = (tmData) ? (struct tm*)tmData : &tm_data;
+    char s_buf[20] = { 0 };
 
-    CHECK_PARAM(out != NULL);
+    CHECK_PARAM(st);
 
-    const struct tm *st_tm = localtime(&utc_time);
-    if (st_tm == NULL) {
-        SET_ERROR(RET_ASN1_TIME_ERROR);
+    if (!tmData) {
+        if (!asn_msecToTm(ref_tm, msTime, false)) {
+            SET_ERROR(RET_INVALID_PARAM);
+        }
     }
 
-    utc_time_asn = asn_time2UT(NULL, st_tm, true);
+    if (
+        !asn_check_tm(ref_tm) ||
+        (strftime(s_buf, sizeof(s_buf), "%Y%m%d%H%M%SZ", ref_tm) != 15)
+    ) {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
 
-    *out = utc_time_asn;
-    utc_time_asn = NULL;
+    CALLOC_CHECKED(st->buf, 16);
+
+    memcpy(st->buf, s_buf, 16);
+    st->size = 15;
 
 cleanup:
-
-    asn_free(get_UTCTime_desc(), utc_time_asn);
-
     return ret;
 }
-

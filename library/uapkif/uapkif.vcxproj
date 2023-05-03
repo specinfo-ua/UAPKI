@@ -297,7 +297,6 @@
     <ClInclude Include="include\SignedAttributes.h" />
     <ClInclude Include="include\SignedData.h" />
     <ClInclude Include="include\SignerIdentifier.h" />
-    <ClInclude Include="include\SignerIdentifierIm.h" />
     <ClInclude Include="include\SignerInfo.h" />
     <ClInclude Include="include\SignerInfos.h" />
     <ClInclude Include="include\SigningCertificateV2.h" />
@@ -631,7 +630,6 @@
     <ClCompile Include="src\struct\SignedAttributes.c" />
     <ClCompile Include="src\struct\SignedData.c" />
     <ClCompile Include="src\struct\SignerIdentifier.c" />
-    <ClCompile Include="src\struct\SignerIdentifierIm.c" />
     <ClCompile Include="src\struct\SignerInfo.c" />
     <ClCompile Include="src\struct\SignerInfos.c" />
     <ClCompile Include="src\struct\SigningCertificateV2.c" />

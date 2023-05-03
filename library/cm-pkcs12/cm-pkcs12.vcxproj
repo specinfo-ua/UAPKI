@@ -23,7 +23,6 @@
     <ClInclude Include="..\common\cm-api\cm-errors.h" />
     <ClInclude Include="..\common\cm-api\cm-export.h" />
     <ClInclude Include="..\common\pkix\aid.h" />
-    <ClInclude Include="..\common\pkix\asn1-ba-utils.h" />
     <ClInclude Include="..\common\pkix\ba-utils.h" />
     <ClInclude Include="..\common\pkix\dstu4145-params.h" />
     <ClInclude Include="..\common\pkix\iconv-utils.h" />
@@ -36,6 +35,7 @@
     <ClInclude Include="..\common\json\parson-ba-utils.h" />
     <ClInclude Include="..\common\json\parson-helper.h" />
     <ClInclude Include="..\common\json\parson.h" />
+    <ClInclude Include="..\common\pkix\uapki-ns-util.h" />
     <ClInclude Include="..\common\pkix\uapki-ns.h" />
     <ClInclude Include="src\cm-pkcs12-debug.h" />
     <ClInclude Include="src\crypto\pkcs5.h" />
@@ -51,7 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\common\pkix\aid.c" />
-    <ClCompile Include="..\common\pkix\asn1-ba-utils.c" />
     <ClCompile Include="..\common\pkix\ba-utils.c" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
     <ClCompile Include="..\common\pkix\iconv-utils.c" />
@@ -64,6 +63,7 @@
     <ClCompile Include="..\common\json\parson.c" />
     <ClCompile Include="..\common\json\strtod-no-locale.c" />
     <ClCompile Include="..\common\pkix\private-key.c" />
+    <ClCompile Include="..\common\pkix\uapki-ns-util.cpp" />
     <ClCompile Include="src\crypto\pkcs5.c" />
     <ClCompile Include="src\main-cm-pkcs12.cpp" />
     <ClCompile Include="src\cm-pkcs12-ctx.cpp" />

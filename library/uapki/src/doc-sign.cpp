@@ -28,9 +28,8 @@
 #include "doc-sign.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
-#include "attribute-utils.h"
 #include "oid-utils.h"
-#include "time-utils.h"
+#include "time-util.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -276,7 +275,7 @@ int SigningDoc::buildSignedAttributes (void)
     DO(signerInfo->addSignedAttrContentType(contentType));
     DO(signerInfo->addSignedAttrMessageDigest(messageDigest.get()));
     if (signParams->includeTime) {
-        DO(signerInfo->addSignedAttrSigningTime(TimeUtils::mstimeNow()));
+        DO(signerInfo->addSignedAttrSigningTime(TimeUtil::mtimeNow()));
     }
 
     //  Add CAdES-signed attrs

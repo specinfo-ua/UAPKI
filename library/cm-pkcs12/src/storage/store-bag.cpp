@@ -1,33 +1,32 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2023, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "store-bag.h"
 #include "cm-errors.h"
-#include "asn1-ba-utils.h"
 #include "iconv-utils.h"
 #include "macros-internal.h"
 #include "oids.h"
@@ -35,6 +34,7 @@
 #include "pkcs5.h"
 #include "pkcs12-utils.h"
 #include "private-key.h"
+#include "uapki-ns-util.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -189,17 +189,17 @@ bool StoreBag::getKeyInfo (StoreKeyInfo& keyInfo)
 
     const ByteArray* ba_attrvalue = friendlyName();
     if (ba_attrvalue) {
-        if ((ba_decode_bmpstring(ba_attrvalue, &s_param1) == RET_OK) && s_param1) {
+        if ((UapkiNS::Util::decodeBmpString(ba_attrvalue, &s_param1) == RET_OK) && s_param1) {
             keyInfo.label = string(s_param1);
             free(s_param1);
             s_param1 = nullptr;
         }
     }
 
-    ba_attrvalue = localKeyId();//getApplication()?
+    ba_attrvalue = localKeyId();
     if (ba_attrvalue) {
         ByteArray* ba_data = nullptr;
-        if (ba_decode_octetstring(ba_attrvalue, &ba_data) == RET_OK) {//now used OCTET_STRING - oid 'localKeyId'
+        if (UapkiNS::Util::decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {
             if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
                 keyInfo.application = string(s_param1);
                 free(s_param1);
@@ -208,19 +208,6 @@ bool StoreBag::getKeyInfo (StoreKeyInfo& keyInfo)
             ba_free(ba_data);
         }
     }
-
-    //ba_attrvalue = localKeyId();
-    //if (ba_attrvalue) {
-    //    ByteArray* ba_data = nullptr;
-    //    if (ba_decode_octetstring(ba_attrvalue, &ba_data) == RET_OK) {
-    //        if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
-    //            keyInfo.localKeyId = string(s_param1);
-    //            free(s_param1);
-    //            s_param1 = nullptr;
-    //        }
-    //        ba_free(ba_data);
-    //    }
-    //}
 
     free(s_param1);
     free(s_param2);
@@ -264,7 +251,7 @@ void StoreBag::setEncodedBag (const ByteArray* baEncoded)
 bool StoreBag::setFriendlyName (const char* utf8label)
 {
     ByteArray* ba_encoded = nullptr;
-    if (ba_encode_bmpstring(utf8label, &ba_encoded) != RET_OK) return false;
+    if (UapkiNS::Util::encodeBmpString(utf8label, &ba_encoded) != RET_OK) return false;
 
     StoreAttr* store_attr = findAttrByOid(OID_PKCS9_FRIENDLY_NAME);
     if (!store_attr) {
@@ -288,7 +275,7 @@ bool StoreBag::setLocalKeyID (const char* hex)
     if (!ba_data) return false;
 
     ByteArray* ba_encoded = nullptr;
-    if (ba_encode_octetstring(ba_data, &ba_encoded) != RET_OK) {
+    if (UapkiNS::Util::encodeOctetString(ba_data, &ba_encoded) != RET_OK) {
         ba_free(ba_data);
         return false;
     }

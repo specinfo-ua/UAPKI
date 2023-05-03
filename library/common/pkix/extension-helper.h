@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,35 +25,60 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef UAPKI_EXTENSION_HELPER_H
+#define UAPKI_EXTENSION_HELPER_H
+
+
+#include "byte-array.h"
+#include "Extension.h"
+#include "Extensions.h"
+#include "parson.h"
 #include <string>
 #include <vector>
-#include "byte-array.h"
-#include "parson.h"
 
+
+namespace UapkiNS {
 
 namespace ExtensionHelper {
 
-    namespace Decode {
 
-        int accessDescriptions          (const ByteArray* baEncoded, const char* oidAccessMethod, std::vector<std::string>& uris);
-        int distributionPoints          (const ByteArray* baEncoded, std::vector<std::string>& uris);
+int addOcspNonce (
+    Extensions_t* extns,
+    const ByteArray* baNonce
+);
+int addSubjectKeyId (
+    Extensions_t* extns,
+    const ByteArray* baSubjectKeyId
+);
 
-    }   //  end namespace Decode
+int decodeAccessDescriptions (
+    const ByteArray* baEncoded,
+    const char* oidAccessMethod,
+    std::vector<std::string>& uris
+);
+int decodeDistributionPoints (
+    const ByteArray* baEncoded,
+    std::vector<std::string>& uris
+);
 
-    namespace DecodeToJsonObject {
+int getAuthorityInfoAccess(const Extensions_t* extns, char** urlOcsp);
+int getAuthorityKeyId(const Extensions_t* extns, ByteArray** baKeyId);
+int getBasicConstrains(const Extensions_t* extns, bool* cA, int* pathLenConstraint);
+int getCrlDistributionPoints(const Extensions_t* extns, char** urlFull);
+int getCrlInvalidityDate(const Extensions_t* extns, uint64_t* invalidityDate);
+int getCrlNumber(const Extensions_t* extns, ByteArray** baCrlNumber);
+int getCrlReason(const Extensions_t* extns, uint32_t* crlReason);
+int getDeltaCrlIndicator(const Extensions_t* extns, ByteArray** baDeltaCrlIndicator);
+int getFreshestCrl(const Extensions_t* extns, char** urlDelta);
+int getKeyUsage(const Extensions_t* extns, uint32_t* keyUsage);
+int getOcspNonce(const Extensions_t* extns, ByteArray** baNonce);
+int getSubjectDirectoryAttributes(const Extensions_t* extns, const char* oidType, ByteArray** baEncoded);
+int getSubjectKeyId(const Extensions_t* extns, ByteArray** baKeyId);
+int getTspUrl(const Extensions_t* extns, char** urlTsp);
 
-        int accessDescriptions          (const ByteArray* baEncoded, JSON_Object* joResult);
-        int alternativeName             (const ByteArray* baEncoded, JSON_Object* joResult);
-        int authorityKeyIdentifier      (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId);
-        int basicConstraints            (const ByteArray* baEncoded, JSON_Object* joResult);
-        int certificatePolicies         (const ByteArray* baEncoded, JSON_Object* joResult);
-        int distributionPoints          (const ByteArray* baEncoded, JSON_Object* joResult);
-        int extendedKeyUsage            (const ByteArray* baEncoded, JSON_Object* joResult);
-        int keyUsage                    (const ByteArray* baEncoded, JSON_Object* joResult);
-        int qcStatements                (const ByteArray* baEncoded, JSON_Object* joResult);
-        int subjectDirectoryAttributes  (const ByteArray* baEncoded, JSON_Object* joResult);
-        int subjectKeyIdentifier        (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId);
-
-    }   //  end namespace DecodeToJsonObject
 
 }   //  end namespace ExtensionHelper
+
+}   //  end namespace UapkiNS
+
+#endif

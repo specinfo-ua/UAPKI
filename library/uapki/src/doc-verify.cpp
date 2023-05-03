@@ -28,18 +28,17 @@
 #include "doc-verify.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
-#include "attribute-utils.h"
 #include "global-objects.h"
 #include "hash.h"
 #include "oid-utils.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
-#include "store-utils.h"
-#include "time-utils.h"
+#include "store-util.h"
+#include "time-util.h"
 #include "tsp-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "verify-utils.h"
+#include "uapki-ns-verify.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -356,7 +355,7 @@ bool CertChainItem::checkValidityTime (
 
 int CertChainItem::decodeName (void)
 {
-    return CerStoreUtils::rdnameFromName(
+    return CerStoreUtil::rdnameFromName(
         m_CsiSubject->cert->tbsCertificate.subject,
         OID_X520_CommonName,
         m_CommonName
@@ -1164,7 +1163,7 @@ int VerifiedSignerInfo::verifySignedAttribute (void)
 
     //  Verify signed attributes
     if (ret == RET_OK) {
-        ret = verify_signature(
+        ret = UapkiNS::Verify::verifySignature(
             m_SignerInfo.getSignatureAlgorithm().algorithm.c_str(),
             m_SignerInfo.getSignedAttrsEncoded(),
             false,
@@ -1309,7 +1308,7 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
 
     if (ret == RET_OK) {
         m_ListAddedCerts.tsp.push_back(attrTS.csiSigner);
-        ret = verify_signature(
+        ret = UapkiNS::Verify::verifySignature(
             signer_info.getSignatureAlgorithm().algorithm.c_str(),
             signer_info.getSignedAttrsEncoded(),
             false,
@@ -1345,7 +1344,7 @@ VerifySignedDoc::VerifySignedDoc (
 )
     : cerStore(iCerStore)
     , crlStore(iCrlStore)
-    , validateTime(TimeUtils::mstimeNow())
+    , validateTime(TimeUtil::mtimeNow())
     , verifyOptions(iVerifyOptions)
     , refContent(nullptr)
 {

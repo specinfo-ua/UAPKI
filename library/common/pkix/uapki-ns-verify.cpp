@@ -1,36 +1,40 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2023, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "verify-utils.h"
-#include "asn1-ba-utils.h"
+#include "uapki-ns-verify.h"
 #include "dstu4145-params.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
+#include "uapkif.h"
 #include "uapki-errors.h"
+#include "uapki-ns-util.h"
+
+
+namespace UapkiNS {
 
 
 static int parse_dstu_signvalue (const ByteArray* baSignature, ByteArray** baR, ByteArray** baS)
@@ -108,8 +112,13 @@ cleanup:
     return ret;
 }
 
-int verify_ec_sign (const SignAlg signAlgo, const EcParamsId ecParamId,
-                    const ByteArray* baPubkey, const ByteArray* baHash, const ByteArray* baSignValue)
+int Verify::verifyEcSign (
+        const SignAlg signAlgo,
+        const EcParamsId ecParamId,
+        const ByteArray* baPubkey,
+        const ByteArray* baHash,
+        const ByteArray* baSignValue
+)
 {
     int ret = RET_OK;
     EcCtx* ec_ctx = NULL;
@@ -154,8 +163,13 @@ cleanup:
     return ret;
 }
 
-int verify_rsa_v15_sign (const HashAlg hashAlgo, const ByteArray* baPubkeyN, const ByteArray* baPubkeyE,
-                        const ByteArray* baHash, const ByteArray* baSignValue)
+int Verify::verifyRsaV15Sign (
+        const HashAlg hashAlgo,
+        const ByteArray* baPubkeyN,
+        const ByteArray* baPubkeyE,
+        const ByteArray* baHash,
+        const ByteArray* baSignValue
+)
 {
     int ret = RET_OK;
     RsaCtx* rsa_ctx = NULL;
@@ -186,7 +200,7 @@ static int dstu4145_params_get_ecparamsid(const ByteArray* baAlgoParam, EcParams
     CHECK_PARAM(ecParamsId != NULL);
 
     *ecParamsId = EC_PARAMS_ID_UNDEFINED;
-    dstu_params = asn_decode_ba_with_alloc(get_DSTU4145Params_desc(), baAlgoParam);
+    dstu_params = (DSTU4145Params_t*)asn_decode_ba_with_alloc(get_DSTU4145Params_desc(), baAlgoParam);
     ellipticCurve = &dstu_params->ellipticCurve;
 
     if (ellipticCurve->present == DSTUEllipticCurve_PR_NOTHING) {
@@ -215,7 +229,7 @@ static int parse_dstu_spki (const SubjectPublicKeyInfo_t* spki, EcParamsId* ecPa
 
     CHECK_NOT_NULL(ba_params = ba_alloc_from_uint8(spki->algorithm.parameters->buf, spki->algorithm.parameters->size));
     DO(dstu4145_params_get_ecparamsid(ba_params, ecParamsId));
-    DO(asn_decodevalue_bitstring_encap_octet(&spki->subjectPublicKey, baPubkey));
+    DO(Util::bitStringEncapOctetFromAsn1(&spki->subjectPublicKey, baPubkey));
 
 cleanup:
     ba_free(ba_params);
@@ -227,7 +241,7 @@ static int parse_ecdsa_spki (const SubjectPublicKeyInfo_t* spki, EcParamsId* ecP
     int ret = RET_OK;
     OBJECT_IDENTIFIER_t* oid_namedcurve = NULL;
 
-    CHECK_NOT_NULL(oid_namedcurve = asn_any2type(spki->algorithm.parameters, get_OBJECT_IDENTIFIER_desc()));
+    CHECK_NOT_NULL(oid_namedcurve = (OBJECT_IDENTIFIER_t*)asn_any2type(spki->algorithm.parameters, get_OBJECT_IDENTIFIER_desc()));
     *ecParamsId = ecid_from_OID(oid_namedcurve);
     if (*ecParamsId == EC_PARAMS_ID_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -247,7 +261,7 @@ static int parse_rsa_spki (const SubjectPublicKeyInfo_t* spki, ByteArray** baPub
 
     DO(asn_BITSTRING2ba(&spki->subjectPublicKey, &ba_pubkey));
 
-    CHECK_NOT_NULL(rsa_pubkey = asn_decode_ba_with_alloc(get_RSAPublicKey_desc(), ba_pubkey));
+    CHECK_NOT_NULL(rsa_pubkey = (RSAPublicKey_t*)asn_decode_ba_with_alloc(get_RSAPublicKey_desc(), ba_pubkey));
     DO(asn_INTEGER2ba(&rsa_pubkey->modulus, baPubkeyN));
     DO(asn_INTEGER2ba(&rsa_pubkey->publicExponent, baPubkeyE));
 
@@ -257,13 +271,19 @@ cleanup:
     return ret;
 }
 
-int parse_spki (const ByteArray* baSignerSPKI, SignAlg* keyAlgo, EcParamsId* ecParamsId, ByteArray** baPubkey, ByteArray** baPubkeyRsaE)
+int Verify::parseSpki (
+        const ByteArray* baSignerSPKI,
+        SignAlg* keyAlgo,
+        EcParamsId* ecParamsId,
+        ByteArray** baPubkey,
+        ByteArray** baPubkeyRsaE
+)
 {
     int ret = RET_OK;
-    SubjectPublicKeyInfo_t* spki = NULL;
-    char* s_oid = NULL;
+    SubjectPublicKeyInfo_t* spki = nullptr;
+    char* s_oid = nullptr;
 
-    CHECK_NOT_NULL(spki = asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), baSignerSPKI));
+    CHECK_NOT_NULL(spki = (SubjectPublicKeyInfo_t*)asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), baSignerSPKI));
 
     DO(asn_oid_to_text(&spki->algorithm.algorithm, &s_oid));
     if (spki->algorithm.parameters == NULL) {
@@ -292,8 +312,13 @@ cleanup:
     return ret;
 }
 
-int verify_signature (const char* signAlgo, const ByteArray* baData, const bool isHash,
-        const ByteArray* baSignerSPKI, const ByteArray* baSignValue)
+int Verify::verifySignature (
+        const char* signAlgo,
+        const ByteArray* baData,
+        const bool isHash,
+        const ByteArray* baSignerSPKI,
+        const ByteArray* baSignValue
+)
 {
     int ret = RET_OK;
     const ByteArray* ref_ba;
@@ -327,19 +352,19 @@ int verify_signature (const char* signAlgo, const ByteArray* baData, const bool 
         ref_ba = baData;
     }
 
-    DO(parse_spki(baSignerSPKI, &key_algo, &ec_paramsid, &ba_pubkey, &ba_pubkey_rsae));
+    DO(parseSpki(baSignerSPKI, &key_algo, &ec_paramsid, &ba_pubkey, &ba_pubkey_rsae));
     if (key_algo != sign_algo) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
     switch (sign_algo) {
     case SIGN_DSTU4145:
-        DO(verify_ec_sign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
+        DO(verifyEcSign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
         break;
     case SIGN_ECDSA:
-        DO(verify_ec_sign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
+        DO(verifyEcSign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
         break;
     case SIGN_RSA_PKCS_1_5:
-        DO(verify_rsa_v15_sign(hash_algo, ba_pubkey, ba_pubkey_rsae, ref_ba, baSignValue));
+        DO(verifyRsaV15Sign(hash_algo, ba_pubkey, ba_pubkey_rsae, ref_ba, baSignValue));
         break;
     default:
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -353,3 +378,5 @@ cleanup:
     return ret;
 }
 
+
+}   //  end namespace UapkiNS

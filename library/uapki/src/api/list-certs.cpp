@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,9 +28,9 @@
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-helper.h"
+#include "store-util.h"
+#include "time-util.h"
 #include "uapki-errors.h"
-#include "store-utils.h"
-#include "time-utils.h"
 
 
 #undef FILE_MARKER

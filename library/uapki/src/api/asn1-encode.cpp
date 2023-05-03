@@ -1,34 +1,35 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2023, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "api-json-internal.h"
-#include "asn1-ba-utils.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
+#include "time-util.h"
+#include "uapki-ns-util.h"
 
 
 #undef FILE_MARKER
@@ -60,11 +61,11 @@ static int asn1_encode_integer (JSON_Object* joItem, ByteArray** baEncoded)
 
     if (detect_integer && !detect_b64value) {
         const int32_t value = (int32_t)json_object_get_number(joItem, "integer");
-        DO(ba_encode_integer_int32(value, baEncoded));
+        DO(UapkiNS::Util::encodeInteger(value, baEncoded));
     }
     else if (!detect_integer && detect_b64value) {
         CHECK_NOT_NULL(ba_value = json_object_get_base64(joItem, "value"));
-        DO(ba_encode_integer(ba_value, baEncoded));
+        DO(UapkiNS::Util::encodeInteger(ba_value, baEncoded));
     }
     else {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
@@ -91,7 +92,7 @@ static int asn1_encode_octetstring (JSON_Object* joItem, ByteArray** baEncoded)
     ByteArray* ba_value = NULL;
 
     CHECK_NOT_NULL(ba_value = json_object_get_base64(joItem, "value"));
-    DO(ba_encode_octetstring(ba_value, baEncoded));
+    DO(UapkiNS::Util::encodeOctetString(ba_value, baEncoded));
 
 cleanup:
     ba_free(ba_value);
@@ -105,7 +106,7 @@ static int asn1_encode_oid (JSON_Object* joItem, ByteArray** baEncoded)
 
     CHECK_NOT_NULL(s_oid = json_object_get_string(joItem, "value"));
     if (strlen(s_oid) >= 3) {
-        DO(ba_encode_oid(s_oid, baEncoded));
+        DO(UapkiNS::Util::encodeOid(s_oid, baEncoded));
     }
     else {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);

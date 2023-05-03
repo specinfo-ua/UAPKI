@@ -26,14 +26,13 @@
  */
 
 #include "archive-timestamp-helper.h"
-#include "asn1-ba-utils.h"
 #include "ba-utils.h"
 #include "byte-array.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
+#include "uapkif.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "uapkif.h"
 
 
 #undef FILE_MARKER
@@ -89,7 +88,7 @@ int ArchiveTs3Helper::setHashContent (
 {
     if (contentType.empty() || !baHashContent) return RET_UAPKI_INVALID_PARAMETER;
 
-    const int ret = ba_encode_oid(contentType.c_str(), &m_Parts.contentType);
+    const int ret = UapkiNS::Util::encodeOid(contentType.c_str(), &m_Parts.contentType);
     if (ret != RET_OK) return ret;
 
     if (!m_Parts.hashContent.set(ba_copy_with_alloc(baHashContent, 0, 0))) return RET_UAPKI_GENERAL_ERROR;

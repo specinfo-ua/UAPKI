@@ -306,7 +306,6 @@
 #include "SignedAttributes.h"
 #include "SignedData.h"
 #include "SignerIdentifier.h"
-#include "SignerIdentifierIm.h"
 #include "SignerInfo.h"
 #include "SignerInfos.h"
 #include "SigningCertificateV2.h"

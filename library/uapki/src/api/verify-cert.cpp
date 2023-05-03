@@ -26,17 +26,16 @@
  */
 
 #include "api-json-internal.h"
-#include "asn1-ba-utils.h"
 #include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"
 #include "parson-helper.h"
-#include "store-utils.h"
-#include "time-utils.h"
+#include "store-util.h"
+#include "time-util.h"
 #include "uapki-errors.h"
-#include "uapki-ns.h"
+#include "uapki-ns-util.h"
+#include "uapki-ns-verify.h"
 #include "verify-status.h"
-#include "verify-utils.h"
 #include "uapki-debug.h"
 
 
@@ -56,6 +55,7 @@ DEBUG_OUTPUT_OUTSTREAM_FUNC
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
 static bool check_validity_time (const CerStore::Item* cerIssuer, const CerStore::Item* cerSubject, const uint64_t validateTime)
@@ -71,7 +71,7 @@ static int process_crl (JSON_Object* joResult, const CerStore::Item* cerIssuer, 
     int ret = RET_OK;
     const CrlStore::CrlType crl_type = (*baCrlNumber == nullptr) ? CrlStore::CrlType::FULL : CrlStore::CrlType::DELTA;
     CrlStore::Item* crl = nullptr;
-    UapkiNS::SmartBA sba_crl;
+    SmartBA sba_crl;
     vector<string> uris;
 
     ret = cerSubject->getCrlUris((crl_type == CrlStore::CrlType::FULL), uris);
@@ -214,7 +214,7 @@ static int validate_by_crl (JSON_Object* joResult, const CerStore::Item* cerIssu
                 break;
             }
             DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr((UapkiNS::CrlReason)revcert_before->crlReason)));
-            const string s_time = TimeUtils::mstimeToFormat(revcert_before->getDate());
+            const string s_time = TimeUtil::mtimeToFtime(revcert_before->getDate());
             DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
         }
         else {
@@ -249,7 +249,7 @@ static int responderid_to_json (JSON_Object* joResult, const UapkiNS::Ocsp::Resp
     case UapkiNS::Ocsp::ResponderIdType::BY_NAME:
         CHECK_NOT_NULL(name = (Name_t*)asn_decode_ba_with_alloc(get_Name_desc(), baResponderId));
         DO_JSON(json_object_set_value(joResult, "responderId", json_value_init_object()));
-        DO(CerStoreUtils::nameToJson(json_object_get_object(joResult, "responderId"), *name));
+        DO(CerStoreUtil::nameToJson(json_object_get_object(joResult, "responderId"), *name));
         break;
     case UapkiNS::Ocsp::ResponderIdType::BY_KEY:
         DO(json_object_set_hex(joResult, "responderId", baResponderId));
@@ -266,7 +266,7 @@ cleanup:
 static int verify_response_data (JSON_Object* joResult, UapkiNS::Ocsp::OcspHelper& ocspClient, CerStore& cerStore)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_responderid;
+    SmartBA sba_responderid;
     UapkiNS::VectorBA vba_certs;
     UapkiNS::Ocsp::ResponderIdType responder_idtype = UapkiNS::Ocsp::ResponderIdType::UNDEFINED;
     UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
@@ -307,7 +307,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
     int ret = RET_OK;
     const LibraryConfig::OcspParams& ocsp_params = get_config()->getOcsp();
     UapkiNS::Ocsp::OcspHelper ocsp_helper;
-    UapkiNS::SmartBA sba_resp;
+    SmartBA sba_resp;
     vector<string> shuffled_uris, uris;
     bool need_update;
     string s_time;
@@ -323,7 +323,7 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
         SET_ERROR(RET_UAPKI_OCSP_URL_NOT_PRESENT);
     }
 
-    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtils::mstimeNow());
+    need_update = cerSubject->certStatusByOcsp.isExpired(TimeUtil::mtimeNow());
     if (need_update) {
         DO(ocsp_helper.init());
         DO(ocsp_helper.addCert(cerIssuer, cerSubject));
@@ -363,22 +363,22 @@ static int validate_by_ocsp (JSON_Object* joResult, const CerStore::Item* cerIss
         DO(verify_response_data(joResult, ocsp_helper, cerStore));
         DO(ocsp_helper.checkNonce());
 
-        s_time = TimeUtils::mstimeToFormat(ocsp_helper.getProducedAt());
+        s_time = TimeUtil::mtimeToFtime(ocsp_helper.getProducedAt());
         DO_JSON(json_object_set_string(joResult, "producedAt", s_time.c_str()));
 
         DO(ocsp_helper.scanSingleResponses());
 
         const UapkiNS::Ocsp::OcspHelper::SingleResponseInfo& singleresp_info = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
         DO_JSON(json_object_set_string(joResult, "status", CrlStore::certStatusToStr(singleresp_info.certStatus)));
-        s_time = TimeUtils::mstimeToFormat(singleresp_info.msThisUpdate);
+        s_time = TimeUtil::mtimeToFtime(singleresp_info.msThisUpdate);
         DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
         if (singleresp_info.msNextUpdate > 0) {
-            s_time = TimeUtils::mstimeToFormat(singleresp_info.msNextUpdate);
+            s_time = TimeUtil::mtimeToFtime(singleresp_info.msNextUpdate);
             DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
         }
         if (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) {
             DO_JSON(json_object_set_string(joResult, "revocationReason", CrlStore::crlReasonToStr(singleresp_info.revocationReason)));
-            s_time = TimeUtils::mstimeToFormat(singleresp_info.msRevocationTime);
+            s_time = TimeUtil::mtimeToFtime(singleresp_info.msRevocationTime);
             DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
         }
 
@@ -438,16 +438,16 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     s_validatetime = ParsonHelper::jsonObjectGetString(joParams, "validateTime");
     need_updatecert = s_validatetime.empty();
     if (need_updatecert || (validation_type == CerStore::ValidationType::OCSP)) {
-        validate_time = TimeUtils::mstimeNow();
+        validate_time = TimeUtil::mtimeNow();
     }
     else {
-        DO(TimeUtils::ftimeToMtime(s_validatetime, validate_time));
+        DO(TimeUtil::ftimeToMtime(s_validatetime, validate_time));
     }
-    s_validatetime = TimeUtils::mstimeToFormat(validate_time);
+    s_validatetime = TimeUtil::mtimeToFtime(validate_time);
     DO_JSON(json_object_set_string(joResult, "validateTime", s_validatetime.c_str()));
 
     DO(json_object_set_base64(joResult, "subjectCertId", cer_subject->baCertId));
-    DO(CerStoreUtils::validityToJson(joResult, cer_subject));
+    DO(CerStoreUtil::validityToJson(joResult, cer_subject));
 
     DO(cer_store->getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
     is_expired = check_validity_time(cer_issuer, cer_subject, validate_time);

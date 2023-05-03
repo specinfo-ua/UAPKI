@@ -75,9 +75,6 @@
     <ClInclude Include="..\common\pkix\ba-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\pkix\asn1-ba-utils.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\pkix\aid.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
@@ -110,6 +107,9 @@
     </ClInclude>
     <ClInclude Include="src\cm-pkcs12-debug.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\uapki-ns-util.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -176,9 +176,6 @@
     <ClCompile Include="..\common\pkix\ba-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\pkix\asn1-ba-utils.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\pkix\aid.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
@@ -195,6 +192,9 @@
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\private-key.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\uapki-ns-util.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
   </ItemGroup>

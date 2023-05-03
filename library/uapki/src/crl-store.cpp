@@ -28,15 +28,14 @@
 #include <mutex>
 #include <string.h>
 #include "crl-store.h"
-#include "asn1-ba-utils.h"
 #include "ba-utils.h"
 #include "dirent-internal.h"
-#include "extension-utils.h"
+#include "extension-helper.h"
 #include "macros-internal.h"
 #include "oids.h"
-#include "str-utils.h"
 #include "uapki-errors.h"
-#include "verify-utils.h"
+#include "uapki-ns-util.h"
+#include "uapki-ns-verify.h"
 
 
 #undef FILE_MARKER
@@ -50,9 +49,10 @@
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
-static const string CRL_EXT = ".crl";
+static const char* CRL_EXT = ".crl";
 
 
 static const char* CERT_STATUS_STRINGS[4] = {
@@ -217,20 +217,20 @@ int CrlStore::Item::revokedCerts (
         user_sn.size = (int)ba_get_len(cerSubject->baSerialNumber);
         for (int i = 0; i < revoked_certs->list.count; i++) {
             const RevokedCertificate_t* revoked_cert = revoked_certs->list.array[i];
-            if (asn_primitive_data_is_equals((ASN__PRIMITIVE_TYPE_t*)&revoked_cert->userCertificate, &user_sn)) {
+            if (Util::equalValuePrimitiveType(revoked_cert->userCertificate, user_sn)) {
                 DEBUG_OUTCON(printf("equal SerialNumber, index: %d\n", i));
                 const RevokedCertItem* revcert_item = nullptr;
                 uint64_t invalidity_date = 0, revocation_date = 0;
                 UapkiNS::CrlReason crl_reason = UapkiNS::CrlReason::UNDEFINED;
 
-                DO(asn_decodevalue_pkixtime(&revoked_cert->revocationDate, &revocation_date));
+                DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, revocation_date));
                 if (revoked_cert->crlEntryExtensions) {
                     uint32_t u32_crlreason = 0;
-                    ret = extns_get_crl_reason(revoked_cert->crlEntryExtensions, &u32_crlreason);
+                    ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, &u32_crlreason);
                     if (ret == RET_OK) {
                         crl_reason = (UapkiNS::CrlReason)u32_crlreason;
                     }
-                    extns_get_crl_invalidity_date(revoked_cert->crlEntryExtensions, &invalidity_date);
+                    ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, &invalidity_date);
                 }
 
                 revcert_item = new RevokedCertItem(revocation_date, crl_reason, invalidity_date);
@@ -262,15 +262,17 @@ int CrlStore::Item::verify (
         CHECK_NOT_NULL(ba_tbs = ba_alloc_from_uint8(x509_tbs->tbsData.buf, x509_tbs->tbsData.size));
 
         DO(asn_oid_to_text(&crl->signatureAlgorithm.algorithm, &s_signalgo));
-        if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo)
-            || oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)) {
-            DO(asn_decodevalue_bitstring_encap_octet(&crl->signatureValue, &ba_signature));
+        if (
+            oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo) ||
+            oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)
+        ) {
+            DO(Util::bitStringEncapOctetFromAsn1(&crl->signatureValue, &ba_signature));
         }
         else {
             DO(asn_BITSTRING2ba(&crl->signatureValue, &ba_signature));
         }
 
-        ret = verify_signature(s_signalgo, ba_tbs, false, cerIssuer->baSPKI, ba_signature);
+        ret = Verify::verifySignature(s_signalgo, ba_tbs, false, cerIssuer->baSPKI, ba_signature);
         switch (ret) {
         case RET_OK:
             statusSign = CerStore::VerifyStatus::VALID;
@@ -492,7 +494,7 @@ int CrlStore::decodeCrlIdentifier (
     //  =crlIssuer=
     DO(asn_encode_ba(get_Name_desc(), &crl_identifier->crlissuer, baIssuer));
     //  =crlIssuedTime=
-    DO(asn_decodevalue_utctime(&crl_identifier->crlIssuedTime, &msIssuedTime));
+    DO(Util::utcTimeFromAsn1(&crl_identifier->crlIssuedTime, msIssuedTime));
     //  =crlNumber= (optional)
     if (crl_identifier->crlNumber) {
         DO(asn_INTEGER2ba(crl_identifier->crlNumber, baCrlNumber));
@@ -602,17 +604,17 @@ int CrlStore::parseCrl (
     if (tbs->version) {
         DO(asn_INTEGER2ulong(tbs->version, &version));
     }
-    if (!asn_primitive_data_is_equals(&tbs->signature.algorithm, &crl->signatureAlgorithm.algorithm)) {
+    if (!Util::equalValuePrimitiveType(tbs->signature.algorithm, crl->signatureAlgorithm.algorithm)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
     DO(asn_encode_ba(get_Name_desc(), &tbs->issuer, &ba_issuer));
-    DO(asn_decodevalue_pkixtime(&tbs->thisUpdate, &this_update));
-    DO(asn_decodevalue_pkixtime(&tbs->nextUpdate, &next_update));
+    DO(Util::pkixTimeFromAsn1(&tbs->thisUpdate, this_update));
+    DO(Util::pkixTimeFromAsn1(&tbs->nextUpdate, next_update));
 
     if (tbs->crlExtensions) {
-        DO(extns_get_authority_keyid(tbs->crlExtensions, &ba_authoritykeyid));
-        DO(extns_get_crl_number(tbs->crlExtensions, &ba_crlnumber));
-        ret = extns_get_delta_crl_indicator(tbs->crlExtensions, &ba_deltacrl);
+        DO(ExtensionHelper::getAuthorityKeyId(tbs->crlExtensions, &ba_authoritykeyid));
+        DO(ExtensionHelper::getCrlNumber(tbs->crlExtensions, &ba_crlnumber));
+        ret = ExtensionHelper::getDeltaCrlIndicator(tbs->crlExtensions, &ba_deltacrl);
         switch (ret) {
         case RET_OK:
             crl_type = CrlType::DELTA;
@@ -701,7 +703,7 @@ int CrlStore::loadDir (void)
 
         //  Check ext of file
         const string s_name = string(in_file->d_name);
-        size_t pos = s_name.rfind(CRL_EXT.c_str());
+        size_t pos = s_name.rfind(CRL_EXT);
         if (pos != s_name.length() - 4) {
             continue;
         }
@@ -733,12 +735,12 @@ int CrlStore::saveToFile (
 {
     if (m_Path.empty() || ((crlStoreItem->type != CrlType::FULL) && (crlStoreItem->type != CrlType::DELTA))) return RET_OK;
 
-    string s_hex = StrUtils::hexFromBa(crlStoreItem->baAuthorityKeyId);
+    string s_hex = Util::baToHex(crlStoreItem->baAuthorityKeyId);
     if (s_hex.empty()) return RET_OK;
 
     string s_path = m_Path + s_hex + ((crlStoreItem->type == CrlType::FULL) ? "-full-" : "-delta-");
-    s_hex = StrUtils::hexFromBa(crlStoreItem->baCrlNumber);
-    s_path += s_hex + CRL_EXT;
+    s_hex = Util::baToHex(crlStoreItem->baCrlNumber);
+    s_path += s_hex + string(CRL_EXT);
 
     const int ret = ba_to_file(crlStoreItem->baEncoded, s_path.c_str());
     return ret;

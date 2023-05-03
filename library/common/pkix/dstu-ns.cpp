@@ -25,14 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-02-28
+//  Last update: 2023-05-01
 
 #include "dstu-ns.h"
-#include "asn1-ba-utils.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapki-errors.h"
-#include "uapki-ns.h"
+#include "uapki-ns-util.h"
 
 
 #undef FILE_MARKER
@@ -65,7 +64,7 @@ int DstuNS::ba2BitStringEncapOctet (const ByteArray* baData, BIT_STRING_t* bsEnc
     CHECK_PARAM(baData != nullptr);
     CHECK_PARAM(bsEncapOctet != nullptr);
 
-    DO(ba_encode_octetstring(baData, &ba_encap));
+    DO(UapkiNS::Util::encodeOctetString(baData, &ba_encap));
 
     bsEncapOctet->bits_unused = 0;
     DO(asn_ba2BITSTRING(ba_encap, bsEncapOctet));
@@ -83,7 +82,7 @@ int DstuNS::calcKeyId (const ByteArray* baPubkey, ByteArray** baKeyId)
     CHECK_PARAM(baPubkey != nullptr);
     CHECK_PARAM(baKeyId != nullptr);
 
-    DO(ba_encode_octetstring(baPubkey, &ba_encappubkey));
+    DO(UapkiNS::Util::encodeOctetString(baPubkey, &ba_encappubkey));
 
     DO(::hash(HASH_ALG_GOST34311, ba_encappubkey, baKeyId));
 

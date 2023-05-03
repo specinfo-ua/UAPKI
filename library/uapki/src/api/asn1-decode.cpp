@@ -1,35 +1,35 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Copyright (c) 2023, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "api-json-internal.h"
-#include "asn1-ba-utils.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
-#include "time-utils.h"
+#include "time-util.h"
+#include "uapki-ns-util.h"
 
 
 #undef FILE_MARKER
@@ -95,7 +95,7 @@ static int asn1_decode_bit_string (const ByteArray* baEncoded, JSON_Object* joRe
     DO(asn_BITSTRING2ba(prim_bitstr, &ba_data));
     DO_JSON(json_object_set_base64(joResult, "value", ba_data));
     if ((ba_get_len(ba_data) > 0) && (ba_get_len(ba_data) < 4)) {
-        DO(asn_decodevalue_bitstring_to_uint32(prim_bitstr, &bits));
+        DO(UapkiNS::Util::bitStringFromAsn1(prim_bitstr, &bits));
         DO_JSON(json_object_set_number(joResult, "integer", (double)bits));
     }
 
@@ -113,7 +113,7 @@ static int asn1_decode_bmp_string (const ByteArray* baEncoded, JSON_Object* joRe
     char* s_value = NULL;
 
     CHECK_NOT_NULL(bmp_str = (BMPString_t*)asn_decode_ba_with_alloc(get_BMPString_desc(), baEncoded));
-    DO(asn_decodevalue_bmpstring(bmp_str, &s_value));
+    DO(UapkiNS::Util::bmpStringFromAsn1(bmp_str, &s_value));
     DO_JSON(json_object_set_string(joResult, "value", s_value));
     if ((bmp_str->buf != NULL) && (bmp_str->size > 0)) {
         CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(bmp_str->buf, bmp_str->size));
@@ -123,7 +123,7 @@ static int asn1_decode_bmp_string (const ByteArray* baEncoded, JSON_Object* joRe
 cleanup:
     asn_free(get_BMPString_desc(), bmp_str);
     ba_free(ba_value);
-    free(s_value);
+    ::free(s_value);
     return ret;
 }
 
@@ -147,11 +147,33 @@ static int asn1_decode_enumerated (const ByteArray* baEncoded, JSON_Object* joRe
     uint32_t value = 0;
 
     CHECK_NOT_NULL(prim_enum = (ENUMERATED_t*)asn_decode_ba_with_alloc(get_ENUMERATED_desc(), baEncoded));
-    DO(asn_decodevalue_enumerated(prim_enum, &value));
+    DO(UapkiNS::Util::enumeratedFromAsn1(prim_enum, &value));
     DO_JSON(json_object_set_number(joResult, "value", (double)value));
 
 cleanup:
     asn_free(get_ENUMERATED_desc(), prim_enum);
+    return ret;
+}
+
+static int asn1_decode_gentime (const ByteArray* baEncoded, JSON_Object* joResult)
+{
+    int ret = RET_OK;
+    GeneralizedTime_t* gen_time = nullptr;
+    uint64_t ms_time;
+    string stime;
+    ::tm tm_data;
+
+    CHECK_NOT_NULL(gen_time = (GeneralizedTime_t*)asn_decode_ba_with_alloc(get_GeneralizedTime_desc(), baEncoded));
+
+    ms_time = asn_GT2time(gen_time, &tm_data);
+    if (ms_time > 0) {
+        stime = TimeUtil::tmToFtime(tm_data);
+    }
+    DO_JSON(json_object_set_string(joResult, "value", stime.c_str()));
+    DO_JSON(ParsonHelper::jsonObjectSetUint64(joResult, "integer", ms_time));
+
+cleanup:
+    asn_free(get_GeneralizedTime_desc(), gen_time);
     return ret;
 }
 
@@ -216,19 +238,19 @@ static int asn1_decode_oid (const ByteArray* baEncoded, JSON_Object* joResult)
 
 cleanup:
     asn_free(get_OBJECT_IDENTIFIER_desc(), prim_oid);
-    free(s_oid);
+    ::free(s_oid);
     return ret;
 }
 
 static int asn1_decode_string (asn_TYPE_descriptor_t* desc, const ByteArray* baEncoded, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    OCTET_STRING_t* octet_str = NULL;
-    ByteArray* ba_value = NULL;
-    char* s_value = NULL;
+    OCTET_STRING_t* octet_str = nullptr;
+    ByteArray* ba_value = nullptr;
+    char* s_value = nullptr;
 
     CHECK_NOT_NULL(octet_str = (OCTET_STRING_t*)asn_decode_ba_with_alloc(desc, baEncoded));
-    DO(asn_decodevalue_octetstring_to_str(octet_str, &s_value));
+    DO(UapkiNS::Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, &s_value));
     DO_JSON(json_object_set_string(joResult, "value", s_value));
 
     if ((octet_str->buf != NULL) && (octet_str->size > 0)) {
@@ -239,26 +261,34 @@ static int asn1_decode_string (asn_TYPE_descriptor_t* desc, const ByteArray* baE
 cleanup:
     asn_free(desc, octet_str);
     ba_free(ba_value);
-    free(s_value);
+    ::free(s_value);
     return ret;
 }
 
-static int asn1_decode_time (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_utctime (const ByteArray* baEncoded, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    char* s_value = NULL;
-    uint64_t ms_time = 0;
+    UTCTime_t* utc_time = nullptr;
+    char* s_value = nullptr;
+    uint64_t ms_time;
     string stime;
+    ::tm tm_data;
 
-    DO(ba_decode_time(baEncoded, &ms_time, &s_value));
-    stime = TimeUtils::stimeToFormat(s_value);
+    CHECK_NOT_NULL(utc_time = (UTCTime_t*)asn_decode_ba_with_alloc(get_UTCTime_desc(), baEncoded));
+
+    ms_time = asn_UT2time(utc_time, &tm_data);
+    if (ms_time > 0) {
+        stime = TimeUtil::tmToFtime(tm_data);
+    }
     DO_JSON(json_object_set_string(joResult, "value", stime.c_str()));
     DO_JSON(ParsonHelper::jsonObjectSetUint64(joResult, "integer", ms_time));
 
 cleanup:
-    free(s_value);
+    asn_free(get_UTCTime_desc(), utc_time);
+    ::free(s_value);
     return ret;
 }
+
 
 int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult)
 {
@@ -340,9 +370,11 @@ int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult)
             case 0x16:
                 ret = asn1_decode_string(get_IA5String_desc(), ba_encoded, jo_result);
                 break;
-            case 0x17:  //  UTC_TIME
-            case 0x18:  //  GENERALIZED_TIME
-                ret = asn1_decode_time(ba_encoded, jo_result);
+            case 0x17:
+                ret = asn1_decode_utctime(ba_encoded, jo_result);
+                break;
+            case 0x18:
+                ret = asn1_decode_gentime(ba_encoded, jo_result);
                 break;
             case 0x1E:
                 ret = asn1_decode_bmp_string(ba_encoded, jo_result);

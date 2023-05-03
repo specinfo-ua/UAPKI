@@ -28,19 +28,17 @@
 #include <mutex>
 #include <string.h>
 #include "cer-store.h"
-#include "asn1-ba-utils.h"
 #include "ba-utils.h"
 #include "crl-store.h"
 #include "dirent-internal.h"
 #include "dstu-ns.h"
 #include "extension-helper.h"
-#include "extension-utils.h"
 #include "macros-internal.h"
 #include "oids.h"
-#include "str-utils.h"
-#include "time-utils.h"
+#include "time-util.h"
 #include "uapki-errors.h"
-#include "verify-utils.h"
+#include "uapki-ns-util.h"
+#include "uapki-ns-verify.h"
 
 
 #undef FILE_MARKER
@@ -54,9 +52,10 @@
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
-static const string CER_EXT = ".cer";
+static const char* CER_EXT = ".cer";
 
 
 #ifdef DEBUG_CERSTOREITEM_INFO
@@ -71,7 +70,7 @@ string debug_cerstoreitem_info_get_commonname (const Name_t& name)
             const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
             if (OID_is_equal_oid(&attr->type, OID_X520_CommonName)) {
                 char* s_value = nullptr;
-                int ret = asn_decode_anystring(attr->value.buf, (const size_t)attr->value.size, &s_value);
+                int ret = Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, &s_value);
                 if (ret == RET_OK) {
                     rv_s = string(s_value);
                     ::free(s_value);
@@ -86,10 +85,10 @@ string debug_cerstoreitem_info_get_commonname (const Name_t& name)
 void debug_cerstoreitem_info (CerStore::Item& cerStoreItem)
 {
     cerStoreItem.devsSubject = debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.subject);
-    cerStoreItem.devsIssuerAndSn = StrUtils::hexFromBa(cerStoreItem.baSerialNumber)
+    cerStoreItem.devsIssuerAndSn = Util::baToHex(cerStoreItem.baSerialNumber)
         + string("; ") + debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.issuer);
-    cerStoreItem.devsValidity = TimeUtils::mstimeToFormat(cerStoreItem.notBefore)
-        + string(" - ") + TimeUtils::mstimeToFormat(cerStoreItem.notAfter);
+    cerStoreItem.devsValidity = TimeUtil::mtimeToFtime(cerStoreItem.notBefore)
+        + string(" - ") + TimeUtil::mtimeToFtime(cerStoreItem.notAfter);
 }   //  debug_cerstoreitem_info
 #endif
 
@@ -228,11 +227,11 @@ int CerStore::Item::getCrlUris (
 {
     int ret = RET_OK;
     const char* oid_extnid = isFull ? OID_X509v3_CRLDistributionPoints : OID_X509v3_FreshestCRL;
-    UapkiNS::SmartBA sba_extnvalue;
+    SmartBA sba_extnvalue;
 
-    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, oid_extnid, nullptr, &sba_extnvalue));
+    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, oid_extnid, nullptr, &sba_extnvalue));
 
-    DO(ExtensionHelper::Decode::distributionPoints(sba_extnvalue.get(), uris));
+    DO(ExtensionHelper::decodeDistributionPoints(sba_extnvalue.get(), uris));
 
 cleanup:
     return ret;
@@ -251,11 +250,11 @@ int CerStore::Item::getOcspUris (
 ) const
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_extnvalue;
+    SmartBA sba_extnvalue;
 
-    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, OID_PKIX_AuthorityInfoAccess, nullptr, &sba_extnvalue));
+    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, OID_PKIX_AuthorityInfoAccess, nullptr, &sba_extnvalue));
 
-    DO(ExtensionHelper::Decode::accessDescriptions(sba_extnvalue.get(), OID_PKIX_OCSP, uris));
+    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_OCSP, uris));
 
 cleanup:
     return ret;
@@ -266,11 +265,11 @@ int CerStore::Item::getTspUris (
 ) const
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_extnvalue;
+    SmartBA sba_extnvalue;
 
-    DO(extns_get_extnvalue_by_oid(cert->tbsCertificate.extensions, OID_PKIX_SubjectInfoAccess, nullptr, &sba_extnvalue));
+    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, OID_PKIX_SubjectInfoAccess, nullptr, &sba_extnvalue));
 
-    DO(ExtensionHelper::Decode::accessDescriptions(sba_extnvalue.get(), OID_PKIX_TimeStamping, uris));
+    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_TimeStamping, uris));
 
 cleanup:
     return ret;
@@ -286,14 +285,16 @@ int CerStore::Item::keyUsageByBit (
     return RET_OK;
 }
 
-int CerStore::Item::verify (const CerStore::Item* cerIssuer)
+int CerStore::Item::verify (
+        const CerStore::Item* cerIssuer
+)
 {
     verifyStatus = VerifyStatus::INDETERMINATE;
     if (!cerIssuer) return RET_OK;
 
     int ret = RET_OK;
     X509Tbs_t* x509_cert = nullptr;
-    UapkiNS::SmartBA sba_signvalue, sba_tbs;
+    SmartBA sba_signvalue, sba_tbs;
     char* s_signalgo = nullptr;
 
     CHECK_NOT_NULL(x509_cert = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded));
@@ -303,14 +304,13 @@ int CerStore::Item::verify (const CerStore::Item* cerIssuer)
 
     DO(asn_oid_to_text(&cert->signatureAlgorithm.algorithm, &s_signalgo));
     if (algoKeyId == HASH_ALG_GOST34311) {
-        DO(asn_decodevalue_bitstring_encap_octet(&cert->signature, &sba_signvalue));
+        DO(Util::bitStringEncapOctetFromAsn1(&cert->signature, &sba_signvalue));
     }
     else {
         DO(asn_BITSTRING2ba(&cert->signature, &sba_signvalue));
     }
 
-    
-    ret = verify_signature(s_signalgo, sba_tbs.get(), false, cerIssuer->baSPKI, sba_signvalue.get());
+    ret = Verify::verifySignature(s_signalgo, sba_tbs.get(), false, cerIssuer->baSPKI, sba_signvalue.get());
     switch (ret) {
     case RET_OK:
         verifyStatus = VerifyStatus::VALID;
@@ -499,7 +499,7 @@ int CerStore::getCertBySID (
 {
     mutex mtx;
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_issuer, sba_keyid, sba_serialnum;
+    SmartBA sba_issuer, sba_keyid, sba_serialnum;
 
     ret = parseSid(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
     if (ret != RET_OK) return ret;
@@ -766,7 +766,7 @@ int CerStore::calcKeyId (
     CHECK_PARAM(baKeyId != nullptr);
 
     if (algoKeyId == HASH_ALG_GOST34311) {
-        DO(ba_encode_octetstring(baPubkey, &ba_encappubkey));
+        DO(Util::encodeOctetString(baPubkey, &ba_encappubkey));
         ref_ba = ba_encappubkey;
     }
     else {
@@ -904,12 +904,12 @@ int CerStore::keyIdFromSid (
 )
 {
     int ret = RET_OK;
-    SignerIdentifierIm_t* sid = nullptr;
+    SignerIdentifier_t* sid = nullptr;
 
     if ((ba_get_len(baSidEncoded) < 3) || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
 
-    CHECK_NOT_NULL(sid = (SignerIdentifierIm_t*)asn_decode_ba_with_alloc(get_SignerIdentifierIm_desc(), baSidEncoded));
-    if (sid->present == SignerIdentifierIm_PR_subjectKeyIdentifier) {
+    CHECK_NOT_NULL(sid = (SignerIdentifier_t*)asn_decode_ba_with_alloc(get_SignerIdentifier_desc(), baSidEncoded));
+    if (sid->present == SignerIdentifier_PR_subjectKeyIdentifier) {
         DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
     }
     else {
@@ -917,7 +917,7 @@ int CerStore::keyIdFromSid (
     }
 
 cleanup:
-    asn_free(get_SignerIdentifierIm_desc(), sid);
+    asn_free(get_SignerIdentifier_desc(), sid);
     return ret;
 }
 
@@ -927,18 +927,18 @@ int CerStore::keyIdToSid (
 )
 {
     int ret = RET_OK;
-    SignerIdentifierIm_t* sid = nullptr;
+    SignerIdentifier_t* sid = nullptr;
 
     if ((ba_get_len(baKeyId) == 0) || !baSidEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    ASN_ALLOC_TYPE(sid, SignerIdentifierIm_t);
-    sid->present = SignerIdentifierIm_PR_subjectKeyIdentifier;
+    ASN_ALLOC_TYPE(sid, SignerIdentifier_t);
+    sid->present = SignerIdentifier_PR_subjectKeyIdentifier;
     DO(asn_ba2OCTSTRING(baKeyId, &sid->choice.subjectKeyIdentifier));
 
-    DO(asn_encode_ba(get_SignerIdentifierIm_desc(), sid, baSidEncoded));
+    DO(asn_encode_ba(get_SignerIdentifier_desc(), sid, baSidEncoded));
 
 cleanup:
-    asn_free(get_SignerIdentifierIm_desc(), sid);
+    asn_free(get_SignerIdentifier_desc(), sid);
     return ret;
 }
 
@@ -949,14 +949,14 @@ int CerStore::parseCert (
 {
     int ret = RET_OK;
     Certificate_t* cert = nullptr;
-    UapkiNS::SmartBA sba_authkeyid;
-    UapkiNS::SmartBA sba_certid;
-    UapkiNS::SmartBA sba_issuer;
-    UapkiNS::SmartBA sba_keyid;
-    UapkiNS::SmartBA sba_pubkey;
-    UapkiNS::SmartBA sba_serialnum;
-    UapkiNS::SmartBA sba_spki;
-    UapkiNS::SmartBA sba_subject;
+    SmartBA sba_authkeyid;
+    SmartBA sba_certid;
+    SmartBA sba_issuer;
+    SmartBA sba_keyid;
+    SmartBA sba_pubkey;
+    SmartBA sba_serialnum;
+    SmartBA sba_spki;
+    SmartBA sba_subject;
     Item* cer_item = nullptr;
     HashAlg algo_keyid = HASH_ALG_SHA1;
     uint64_t not_after = 0, not_before = 0;
@@ -970,15 +970,15 @@ int CerStore::parseCert (
 
     DO(asn_INTEGER2ba(&cert->tbsCertificate.serialNumber, &sba_serialnum));
     DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.issuer, &sba_issuer));
-    DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notBefore, &not_before));
-    DO(asn_decodevalue_pkixtime(&cert->tbsCertificate.validity.notAfter, &not_after));
+    DO(Util::pkixTimeFromAsn1(&cert->tbsCertificate.validity.notBefore, not_before));
+    DO(Util::pkixTimeFromAsn1(&cert->tbsCertificate.validity.notAfter, not_after));
     DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &sba_subject));
     DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &sba_spki));
     DO(asn_oid_to_text(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, &s_keyalgo));
     if (DstuNS::isDstu4145family(s_keyalgo)) {
         algo_keyid = HASH_ALG_GOST34311;
         //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
-        DO(asn_decodevalue_bitstring_encap_octet(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
+        DO(Util::bitStringEncapOctetFromAsn1(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
     }
     else {
         DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
@@ -988,7 +988,7 @@ int CerStore::parseCert (
     DO(encode_issuer_and_sn(&cert->tbsCertificate, &sba_certid));
 
     if (cert->tbsCertificate.extensions) {
-        ret = extns_get_key_usage(cert->tbsCertificate.extensions, &key_usage);
+        ret = ExtensionHelper::getKeyUsage(cert->tbsCertificate.extensions, &key_usage);
         if (ret != RET_OK) {
             if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
                 key_usage = 0;
@@ -996,7 +996,7 @@ int CerStore::parseCert (
             }
         }
         //  Required attribute authorityKeyIdentifier
-        DO(extns_get_authority_keyid(cert->tbsCertificate.extensions, &sba_authkeyid));
+        DO(ExtensionHelper::getAuthorityKeyId(cert->tbsCertificate.extensions, &sba_authkeyid));
     }
 
     cer_item = new Item();
@@ -1044,15 +1044,15 @@ int CerStore::parseSid (
 )
 {
     int ret = RET_OK;
-    SignerIdentifierIm_t* sid = nullptr;
+    SignerIdentifier_t* sid = nullptr;
     ByteArray* ba_issuer = nullptr;
     ByteArray* ba_serialnum = nullptr;
 
     if ((ba_get_len(baSidEncoded) < 3) || !baIssuer || !baSerialNumber || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
 
-    CHECK_NOT_NULL(sid = (SignerIdentifierIm_t*)asn_decode_ba_with_alloc(get_SignerIdentifierIm_desc(), baSidEncoded));
+    CHECK_NOT_NULL(sid = (SignerIdentifier_t*)asn_decode_ba_with_alloc(get_SignerIdentifier_desc(), baSidEncoded));
     switch (sid->present) {
-    case SignerIdentifierIm_PR_issuerAndSerialNumber:
+    case SignerIdentifier_PR_issuerAndSerialNumber:
         DO(asn_encode_ba(get_Name_desc(), &sid->choice.issuerAndSerialNumber.issuer, &ba_issuer));
         DO(asn_INTEGER2ba(&sid->choice.issuerAndSerialNumber.serialNumber, &ba_serialnum));
         *baIssuer = ba_issuer;
@@ -1060,7 +1060,7 @@ int CerStore::parseSid (
         ba_issuer = nullptr;
         ba_serialnum = nullptr;
         break;
-    case SignerIdentifierIm_PR_subjectKeyIdentifier:
+    case SignerIdentifier_PR_subjectKeyIdentifier:
         DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
         break;
     default:
@@ -1068,7 +1068,7 @@ int CerStore::parseSid (
     }
 
 cleanup:
-    asn_free(get_SignerIdentifierIm_desc(), sid);
+    asn_free(get_SignerIdentifier_desc(), sid);
     ba_free(ba_issuer);
     ba_free(ba_serialnum);
     return ret;
@@ -1143,7 +1143,7 @@ int CerStore::loadDir (void)
 
         //  Check ext of file
         const string s_name = string(in_file->d_name);
-        size_t pos = s_name.rfind(CER_EXT.c_str());
+        size_t pos = s_name.rfind(CER_EXT);
         if (pos != s_name.length() - 4) {
             continue;
         }
@@ -1175,10 +1175,10 @@ int CerStore::saveToFile (
 {
     if (m_Path.empty()) return RET_OK;
 
-    string s_hex = StrUtils::hexFromBa(cerStoreItem->baKeyId);
+    string s_hex = Util::baToHex(cerStoreItem->baKeyId);
     if (s_hex.empty()) return RET_OK;
 
-    const string s_path = m_Path + s_hex + CER_EXT;
+    const string s_path = m_Path + s_hex + string(CER_EXT);
     const int ret = ba_to_file(cerStoreItem->baEncoded, s_path.c_str());
     return ret;
 }
@@ -1192,19 +1192,19 @@ void CerStore::saveStatToLog (
     FILE* f = fopen("uapki-cer-store.log", "a");
     if (!f) return;
 
-    uint64_t ms = TimeUtils::mstimeNow();
+    uint64_t ms = TimeUtil::mtimeNow();
     string s_line = string("*** STAT[") + to_string(ctr_stat) + string("] BEGIN *** '") + message;
-    s_line += string("' TIME ") + TimeUtils::mstimeToFormat(ms) + string(" ***\n");
+    s_line += string("' TIME ") + TimeUtil::mtimeToFtime(ms) + string(" ***\n");
     fputs(s_line.c_str(), f);
 
     size_t idx = 0;
     for (const auto& it : m_Items) {
         s_line = string("CER[") + to_string(idx++) + string("]\n");
-        s_line += string("KeyId: ") + StrUtils::hexFromBa(it->baKeyId) + string("\n");
-        s_line += string("SerialNumber: ") + StrUtils::hexFromBa(it->baSerialNumber) + string("\n");
+        s_line += string("KeyId: ") + Util::baToHex(it->baKeyId) + string("\n");
+        s_line += string("SerialNumber: ") + Util::baToHex(it->baSerialNumber) + string("\n");
         s_line += string("OCSP, status: ") + CrlStore::certStatusToStr(it->certStatusByOcsp.status) + string("\n");
         s_line += string("OCSP, validTime: ") + string(it->certStatusByOcsp.isExpired(ms) ? "IS EXPIRED " : "IS VALID   ");
-        s_line += TimeUtils::mstimeToFormat(it->certStatusByOcsp.validTime) + string("\n");
+        s_line += TimeUtil::mtimeToFtime(it->certStatusByOcsp.validTime) + string("\n");
         s_line += string("\n");
         fputs(s_line.c_str(), f);
     }

@@ -1,28 +1,28 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  * Copyright 2016 PrivatBank IT <acsk@privatbank.ua>
  * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -30,6 +30,7 @@
 #define SRC_ASN1_UTILS_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "byte-array.h"
 #include "asn1-errors.h"
@@ -437,16 +438,19 @@ UAPKIF_EXPORT int asn_BITSTRING2ba(const BIT_STRING_t *string, ByteArray **ba);
 /** Преобразует OCTERT_STRING в объект указанного типа. */
 UAPKIF_EXPORT int asn_OCTSTRING_to_type(const OCTET_STRING_t *src, asn_TYPE_descriptor_t *type, void **dst);
 
-UAPKIF_EXPORT UTCTime_t *asn_create_curent_time(void);
-
 UAPKIF_EXPORT int asn_print(FILE *stream, asn_TYPE_descriptor_t *td, void *sptr);
 UAPKIF_EXPORT void asn_free(asn_TYPE_descriptor_t *td, void *ptr);
 
-//  from "asn_utils_x.h"
-UAPKIF_EXPORT uint64_t asn_GT2msec(const GeneralizedTime_t *st, struct tm *ret_tm, int as_gmt);
-UAPKIF_EXPORT uint64_t asn_UT2msec(const UTCTime_t* st, struct tm* ret_tm, int as_gmt);
-UAPKIF_EXPORT int asn_msec2GT(const uint64_t msec, GeneralizedTime_t **out);
-UAPKIF_EXPORT int asn_msec2UT(const uint64_t msec, UTCTime_t **out);
+//  From "asn_utils_x.h" and "[asn1]", redesigned
+struct tm;    /* <time.h> */
+
+UAPKIF_EXPORT bool asn_check_tm (struct tm* tmData);
+UAPKIF_EXPORT uint64_t asn_tm2msec (struct tm* tmData, const int ms);
+UAPKIF_EXPORT uint64_t asn_UT2time (const UTCTime_t* st, struct tm* tmData);
+UAPKIF_EXPORT uint64_t asn_GT2time (const GeneralizedTime_t* st, struct tm* tmData);
+UAPKIF_EXPORT bool asn_msecToTm (struct tm* tmData, const uint64_t msTime, const bool isLocal);
+UAPKIF_EXPORT int asn_time2UT (UTCTime_t* st, const uint64_t msTime, const struct tm* tmData);
+UAPKIF_EXPORT int asn_time2GT (GeneralizedTime_t* st, const uint64_t msTime, const struct tm* tmData);
 
 #ifdef __cplusplus
 }

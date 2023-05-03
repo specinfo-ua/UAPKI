@@ -45,37 +45,22 @@
     <ClCompile Include="src\cm-providers.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\time-utils.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\cer-store.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\store-utils.cpp">
+    <ClCompile Include="src\store-util.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\global-objects.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\str-utils.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\pkix\aid.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\pkix\asn1-ba-utils.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\pkix\attribute-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\ba-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\dstu4145-params.c">
-      <Filter>common\pkix</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\pkix\extension-utils.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\http-helper.cpp">
@@ -93,7 +78,7 @@
     <ClCompile Include="..\common\pkix\uapki-errors.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\pkix\verify-utils.c">
+    <ClCompile Include="..\common\pkix\uapki-ns-verify.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\json\parson.c">
@@ -255,6 +240,12 @@
     <ClCompile Include="src\api\random-bytes.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\pkix\time-util.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\extension-helper-json.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -281,37 +272,22 @@
     <ClInclude Include="src\cm-providers.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\time-utils.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="src\cer-store.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\store-utils.h">
+    <ClInclude Include="src\store-util.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\library-config.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\str-utils.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="..\common\pkix\aid.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\asn1-ba-utils.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\attribute-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\ba-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\dstu4145-params.h">
-      <Filter>common\pkix</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\pkix\extension-utils.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\pkix\http-helper.h">
@@ -329,7 +305,7 @@
     <ClInclude Include="..\common\pkix\uapki-errors.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\pkix\verify-utils.h">
+    <ClInclude Include="..\common\pkix\uapki-ns-verify.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
     <ClInclude Include="..\common\json\parson.h">
@@ -412,6 +388,12 @@
     </ClInclude>
     <ClInclude Include="src\doc-verify.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\time-util.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\extension-helper-json.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
