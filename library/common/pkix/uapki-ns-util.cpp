@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-05
 
 #include "uapki-ns-util.h"
 #include "iconv-utils.h"
@@ -46,7 +45,10 @@ constexpr uint64_t UTC_TIME_MS_END  = 2524608000000ul;
 static const char* HEX_SYMBOLS      = "0123456789ABCDEF";
 
 
-int Util::algorithmIdentifierFromAsn1 (const AlgorithmIdentifier_t& asn1, AlgorithmIdentifier& algoId)
+int Util::algorithmIdentifierFromAsn1 (
+        const AlgorithmIdentifier_t& asn1,
+        AlgorithmIdentifier& algoId
+)
 {
     int ret = RET_OK;
     char* s_algo = nullptr;
@@ -68,7 +70,11 @@ cleanup:
     return ret;
 }
 
-int Util::algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const char* algo, const ByteArray* baParams)
+int Util::algorithmIdentifierToAsn1 (
+        AlgorithmIdentifier_t& asn1,
+        const char* algo,
+        const ByteArray* baParams
+)
 {
     int ret = RET_OK;
 
@@ -89,7 +95,10 @@ cleanup:
     return ret;
 }
 
-int Util::algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const AlgorithmIdentifier& algoId)
+int Util::algorithmIdentifierToAsn1 (
+        AlgorithmIdentifier_t& asn1,
+        const AlgorithmIdentifier& algoId
+)
 {
     return algorithmIdentifierToAsn1(asn1, algoId.algorithm.c_str(), algoId.baParameters);
 }
@@ -114,7 +123,10 @@ cleanup:
     return ret;
 }
 
-int Util::attributeFromAsn1 (const Attribute_t& asn1, Attribute& attr)
+int Util::attributeFromAsn1 (
+        const Attribute_t& asn1,
+        Attribute& attr
+)
 {
     int ret = RET_OK;
 
@@ -137,7 +149,11 @@ cleanup:
     return ret;
 }
 
-int Util::attributeToAsn1 (Attribute_t& asn1, const char* type, const ByteArray* baValues)
+int Util::attributeToAsn1 (
+        Attribute_t& asn1,
+        const char* type,
+        const ByteArray* baValues
+)
 {
     int ret = RET_OK;
     ANY_t* any = nullptr;
@@ -159,7 +175,10 @@ cleanup:
     return ret;
 }
 
-int Util::attributeToAsn1 (Attribute_t& asn1, const Attribute& attr)
+int Util::attributeToAsn1 (
+        Attribute_t& asn1,
+        const Attribute& attr
+)
 {
     return attributeToAsn1(asn1, attr.type.c_str(), attr.baValues);
 }
@@ -578,7 +597,10 @@ int Util::utcTimeFromAsn1 (
     return RET_OK;
 }
 
-int Util::bitStringEncapOctetFromAsn1 (const BIT_STRING_t* bsEncapOctet, ByteArray** baData)
+int Util::bitStringEncapOctetFromAsn1 (
+        const BIT_STRING_t* bsEncapOctet,
+        ByteArray** baData
+)
 {
     int ret = RET_OK;
     OCTET_STRING_t* octet_str = NULL;
@@ -601,7 +623,10 @@ cleanup:
     return ret;
 }
 
-int Util::bitStringFromAsn1 (const BIT_STRING_t* bs, uint32_t* bits)
+int Util::bitStringFromAsn1 (
+        const BIT_STRING_t* bs,
+        uint32_t* bits
+)
 {
     int ret = RET_OK;
     ByteArray* ba_bitvalues = NULL;
@@ -634,7 +659,10 @@ cleanup:
     return ret;
 }
 
-int Util::bmpStringFromAsn1 (const BMPString_t* bmpStr, char** str)
+int Util::bmpStringFromAsn1 (
+        const BMPString_t* bmpStr,
+        char** str
+)
 {
     int ret = RET_OK;
 
@@ -647,7 +675,10 @@ cleanup:
     return ret;
 }
 
-int Util::enumeratedFromAsn1 (const ENUMERATED_t* enumerated, uint32_t* enumValue)
+int Util::enumeratedFromAsn1 (
+        const ENUMERATED_t* enumerated,
+        uint32_t* enumValue
+)
 {
     int ret = RET_OK;
     unsigned long value = 0;
@@ -667,7 +698,11 @@ cleanup:
     return ret;
 }
 
-int Util::decodeAnyString (const uint8_t* buf, const size_t len, char** str)
+int Util::decodeAnyString (
+        const uint8_t* buf,
+        const size_t len,
+        char** str
+)
 {
     int ret = RET_OK;
     OCTET_STRING_t* octet_str = NULL;
@@ -700,12 +735,18 @@ cleanup:
     return ret;
 }
 
-int Util::decodeAnyString (const ByteArray* baEncoded, char** str)
+int Util::decodeAnyString (
+        const ByteArray* baEncoded,
+        char** str
+)
 {
     return decodeAnyString(ba_get_buf_const(baEncoded), ba_get_len(baEncoded), str);
 }
 
-int Util::decodeBmpString (const ByteArray* baEncoded, char** str)
+int Util::decodeBmpString (
+        const ByteArray* baEncoded,
+        char** str
+)
 {
     int ret = RET_OK;
     BMPString_t* prim_bmpstr = NULL;
@@ -721,7 +762,10 @@ cleanup:
     return ret;
 }
 
-int Util::decodeEnumerated (const ByteArray* baEncoded, uint32_t* enumValue)
+int Util::decodeEnumerated (
+        const ByteArray* baEncoded,
+        uint32_t* enumValue
+)
 {
     int ret = RET_OK;
     ENUMERATED_t* prim_enum = NULL;
@@ -755,7 +799,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeBmpString (const char* strUtf8, ByteArray** baEncoded)
+int Util::encodeBmpString (
+        const char* strUtf8,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     ByteArray* ba_utf16be = NULL;
@@ -776,7 +823,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeIa5String (const char* strLatin, ByteArray** baEncoded)
+int Util::encodeIa5String (
+        const char* strLatin,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     IA5String_t* ia5_str = NULL;
@@ -795,7 +845,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeInteger (const ByteArray* baData, ByteArray** baEncoded)
+int Util::encodeInteger (
+        const ByteArray* baData,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     INTEGER_t* prim_integer = NULL;
@@ -812,7 +865,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeInteger (const int32_t value, ByteArray** baEncoded)
+int Util::encodeInteger (
+        const int32_t value,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     INTEGER_t* prim_integer = NULL;
@@ -828,7 +884,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeOid (const char* oid, ByteArray** baEncoded)
+int Util::encodeOid (
+        const char* oid,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     OBJECT_IDENTIFIER_t* asn_oid = NULL;
@@ -845,7 +904,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodePrintableString (const char* strLatin, ByteArray** baEncoded)
+int Util::encodePrintableString (
+        const char* strLatin,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     PrintableString_t* printable_str = NULL;
@@ -864,7 +926,10 @@ cleanup:
     return ret;
 }
 
-int Util::encodeUtf8string (const char* strUtf8, ByteArray** baEncoded)
+int Util::encodeUtf8string (
+        const char* strUtf8,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     UTF8String_t* utf8_str = NULL;
