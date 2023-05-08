@@ -40,25 +40,24 @@ namespace UapkiNS {
 static int parse_dstu_signvalue (const ByteArray* baSignature, ByteArray** baR, ByteArray** baS)
 {
     int ret = RET_OK;
-    ByteArray* ba_r = NULL;
-    ByteArray* ba_s = NULL;
+    SmartBA sba_r, sba_s;
     size_t len = ba_get_len(baSignature) / 2;
 
     CHECK_PARAM(len > 0);
     CHECK_PARAM(baR != NULL);
     CHECK_PARAM(baS != NULL);
 
-    CHECK_NOT_NULL(ba_r = ba_copy_with_alloc(baSignature, 0, len));
-    CHECK_NOT_NULL(ba_s = ba_copy_with_alloc(baSignature, len, len));
+    if (
+        !sba_r.set(ba_copy_with_alloc(baSignature, 0, len)) ||
+        !sba_s.set(ba_copy_with_alloc(baSignature, len, len))
+    ) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
 
-    *baR = ba_r;
-    ba_r = NULL;
-    *baS = ba_s;
-    ba_s = NULL;
+    *baR = sba_r.pop();
+    *baS = sba_s.pop();
 
 cleanup:
-    ba_free(ba_r);
-    ba_free(ba_s);
     return ret;
 }
 
@@ -172,7 +171,7 @@ int Verify::verifyRsaV15Sign (
 )
 {
     int ret = RET_OK;
-    RsaCtx* rsa_ctx = NULL;
+    RsaCtx* rsa_ctx = nullptr;
 
     CHECK_NOT_NULL(baPubkeyN);
     CHECK_NOT_NULL(baPubkeyE);
@@ -189,27 +188,27 @@ cleanup:
     return ret;
 }
 
-static int dstu4145_params_get_ecparamsid(const ByteArray* baAlgoParam, EcParamsId* ecParamsId)
+static int dstu4145_params_get_ecparamsid (const ByteArray* baAlgoParam, EcParamsId* ecParamsId)
 {
     int ret = RET_OK;
-    char* oid_curve = NULL;
-    DSTU4145Params_t* dstu_params = NULL;
+    DSTU4145Params_t* dstu_params = nullptr;
+    char* s_oidcurve = nullptr;
     const DSTUEllipticCurve_t* ellipticCurve;
 
     CHECK_PARAM(baAlgoParam != NULL);
     CHECK_PARAM(ecParamsId != NULL);
 
     *ecParamsId = EC_PARAMS_ID_UNDEFINED;
-    dstu_params = (DSTU4145Params_t*)asn_decode_ba_with_alloc(get_DSTU4145Params_desc(), baAlgoParam);
-    ellipticCurve = &dstu_params->ellipticCurve;
+    CHECK_NOT_NULL(dstu_params = (DSTU4145Params_t*)asn_decode_ba_with_alloc(get_DSTU4145Params_desc(), baAlgoParam));
 
+    ellipticCurve = &dstu_params->ellipticCurve;
     if (ellipticCurve->present == DSTUEllipticCurve_PR_NOTHING) {
         SET_ERROR(RET_INVALID_EC_PARAMS);
     }
 
-    DO(dstu4145_params_get_std_oid(ellipticCurve, &oid_curve));
-    if (oid_curve != NULL) {
-        *ecParamsId = ecid_from_oid(oid_curve);
+    DO(dstu4145_params_get_std_oid(ellipticCurve, &s_oidcurve));
+    if (s_oidcurve) {
+        *ecParamsId = ecid_from_oid(s_oidcurve);
     }
 
     if (*ecParamsId == EC_PARAMS_ID_UNDEFINED) {
@@ -218,21 +217,22 @@ static int dstu4145_params_get_ecparamsid(const ByteArray* baAlgoParam, EcParams
 
 cleanup:
     asn_free(get_DSTU4145Params_desc(), dstu_params);
-    free(oid_curve);
+    free(s_oidcurve);
     return ret;
 }
 
 static int parse_dstu_spki (const SubjectPublicKeyInfo_t* spki, EcParamsId* ecParamsId, ByteArray** baPubkey)
 {
     int ret = RET_OK;
-    ByteArray* ba_params = NULL;
+    SmartBA sba_params;
 
-    CHECK_NOT_NULL(ba_params = ba_alloc_from_uint8(spki->algorithm.parameters->buf, spki->algorithm.parameters->size));
-    DO(dstu4145_params_get_ecparamsid(ba_params, ecParamsId));
+    if (!sba_params.set(ba_alloc_from_uint8(spki->algorithm.parameters->buf, spki->algorithm.parameters->size))) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+    DO(dstu4145_params_get_ecparamsid(sba_params.get(), ecParamsId));
     DO(Util::bitStringEncapOctetFromAsn1(&spki->subjectPublicKey, baPubkey));
 
 cleanup:
-    ba_free(ba_params);
     return ret;
 }
 
