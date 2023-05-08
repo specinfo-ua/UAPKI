@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-03
+//  Last update: 2023-05-05
 
 #include "uapki-ns-util.h"
 #include "iconv-utils.h"
@@ -94,14 +94,32 @@ int Util::algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const Algorith
     return algorithmIdentifierToAsn1(asn1, algoId.algorithm.c_str(), algoId.baParameters);
 }
 
+int Util::encodeAlgorithmIdentifier (
+        const string& algoId,
+        const ByteArray* baParams,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    AlgorithmIdentifier_t* aid = nullptr;
+
+    ASN_ALLOC_TYPE(aid, AlgorithmIdentifier_t);
+
+    DO(algorithmIdentifierToAsn1(*aid, algoId.c_str(), baParams));
+
+    DO(asn_encode_ba(get_AlgorithmIdentifier_desc(), aid, baEncoded));
+
+cleanup:
+    asn_free(get_AlgorithmIdentifier_desc(), aid);
+    return ret;
+}
+
 int Util::attributeFromAsn1 (const Attribute_t& asn1, Attribute& attr)
 {
     int ret = RET_OK;
-    char* s_type = nullptr;
 
     //  =attrType=
-    DO(asn_oid_to_text(&asn1.type, &s_type));
-    attr.type = string(s_type);
+    DO(oidFromAsn1((OBJECT_IDENTIFIER_t*)&asn1.type, attr.type));
 
     //  =attrValues=
     if (asn1.value.list.count > 0) {
@@ -116,7 +134,6 @@ int Util::attributeFromAsn1 (const Attribute_t& asn1, Attribute& attr)
     }
 
 cleanup:
-    ::free(s_type);
     return ret;
 }
 
@@ -247,6 +264,75 @@ int Util::addToExtensions (
 
 cleanup:
     asn_free(get_Extension_desc(), extn);
+    return ret;
+}
+
+int Util::decodeExtension (
+    const ByteArray* baEncoded,
+    UapkiNS::Extension& decodedExtn
+)
+{
+    int ret = RET_OK;
+    Extension_t* extn = nullptr;
+
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(extn = (Extension_t*)asn_decode_ba_with_alloc(get_Extension_desc(), baEncoded));
+
+    DO(extensionFromAsn1(*extn, decodedExtn));
+
+cleanup:
+    asn_free(get_Extension_desc(), extn);
+    return ret;
+}
+
+int Util::encodeExtension (
+        const string& extnId,
+        const bool critical,
+        const ByteArray* baExtnValue,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    Extension_t* extn = nullptr;
+    BOOLEAN_t cr = true;
+
+    if (extnId.empty() || !baExtnValue || !baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(extn, Extension_t);
+
+    DO(oidToAsn1(&extn->extnID, extnId));
+    if (critical) {
+        CHECK_NOT_NULL(extn->critical = (BOOLEAN_t*)asn_copy_with_alloc(get_BOOLEAN_desc(), &cr));
+    }
+    DO(asn_ba2OCTSTRING(baExtnValue, &extn->extnValue));
+
+    DO(asn_encode_ba(get_Extension_desc(), extn, baEncoded));
+
+cleanup:
+    asn_free(get_Extension_desc(), extn);
+    return ret;
+}
+
+int Util::extensionFromAsn1 (
+        const Extension_t& asn1,
+        UapkiNS::Extension& extn
+)
+{
+    int ret = RET_OK;
+
+    //  =extnId=
+    DO(oidFromAsn1((OBJECT_IDENTIFIER_t*)&asn1.extnID, extn.extnId));
+
+    //  =critical=, optional
+    if (asn1.critical) {
+        extn.critical = *asn1.critical;
+    }
+
+    //  =extnValue=
+    DO(asn_OCTSTRING2ba(&asn1.extnValue, &extn.baExtnValue));
+
+cleanup:
     return ret;
 }
 
@@ -651,13 +737,15 @@ cleanup:
     return ret;
 }
 
-int Util::decodeOctetString (const ByteArray* baEncoded, ByteArray** baData)
+int Util::decodeOctetString (
+        const ByteArray* baEncoded,
+        ByteArray** baData
+)
 {
     int ret = RET_OK;
-    OCTET_STRING_t* prim_octetstr = NULL;
+    OCTET_STRING_t* prim_octetstr = nullptr;
 
-    CHECK_PARAM(baEncoded != NULL);
-    CHECK_PARAM(baData != NULL);
+    if (!baEncoded || !baData) return RET_UAPKI_INVALID_PARAMETER;
 
     CHECK_NOT_NULL(prim_octetstr = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), baEncoded));
     DO(asn_OCTSTRING2ba(prim_octetstr, baData));
@@ -795,7 +883,32 @@ cleanup:
     return ret;
 }
 
-int Util::pbufToStr (const uint8_t* buf, const size_t len, char** str)
+int Util::oidFromAsn1 (
+        OBJECT_IDENTIFIER_t* oid,
+        string& sOid
+)
+{
+    char* s_oid = nullptr;
+    const int ret = asn_oid_to_text(oid, &s_oid);
+    if ((ret == RET_OK) && s_oid) {
+        sOid = string(s_oid);
+    }
+    return ret;
+}
+
+int Util::oidToAsn1 (
+        OBJECT_IDENTIFIER_t* oid,
+        const string& sOid
+)
+{
+    return asn_set_oid_from_text(sOid.c_str(), oid);
+}
+
+int Util::pbufToStr (
+        const uint8_t* buf,
+        const size_t len,
+        char** str
+)
 {
     int ret = RET_OK;
 

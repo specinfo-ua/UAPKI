@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-03
+//  Last update: 2023-05-05
 
 #ifndef UAPKI_NS_UTIL_H
 #define UAPKI_NS_UTIL_H
@@ -42,6 +42,12 @@ namespace Util {
     int algorithmIdentifierFromAsn1 (const AlgorithmIdentifier_t& asn1, UapkiNS::AlgorithmIdentifier& algoId);
     int algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const char* algo, const ByteArray* baParams);
     int algorithmIdentifierToAsn1 (AlgorithmIdentifier_t& asn1, const UapkiNS::AlgorithmIdentifier& algoId);
+    int encodeAlgorithmIdentifier (
+        const std::string& algoId,
+        const ByteArray* baParams,
+        ByteArray** baEncoded
+    );
+
     int attributeFromAsn1 (const Attribute_t& asn1, UapkiNS::Attribute& attr);
     int attributeToAsn1 (Attribute_t& asn1, const char* type, const ByteArray* baValues);
     int attributeToAsn1 (Attribute_t& asn1, const UapkiNS::Attribute& attr);
@@ -70,6 +76,20 @@ namespace Util {
         const char* extnId,
         const bool critical,
         const ByteArray* baExtnValue
+    );
+    int decodeExtension (
+        const ByteArray* baEncoded,
+        UapkiNS::Extension& extn
+    );
+    int encodeExtension (
+        const std::string& extnId,
+        const bool critical,
+        const ByteArray* baExtnValue,
+        ByteArray** baEncoded
+    );
+    int extensionFromAsn1 (
+        const Extension_t& asn1,
+        UapkiNS::Extension& extn
     );
     const Extension_t* extensionFromExtensions (
         const Extensions_t* extns,
@@ -139,7 +159,10 @@ namespace Util {
     int decodeAnyString (const ByteArray* baEncoded, char** str);
     int decodeBmpString (const ByteArray* baEncoded, char** str);
     int decodeEnumerated (const ByteArray* baEncoded, uint32_t* enumValue);
-    int decodeOctetString (const ByteArray* baEncoded, ByteArray** baData);
+    int decodeOctetString (
+        const ByteArray* baEncoded,
+        ByteArray** baData
+    );
 
     int encodeBmpString (const char* strUtf8, ByteArray** baEncoded);
     int encodeIa5String (const char* strLatin, ByteArray** baEncoded);
@@ -149,7 +172,19 @@ namespace Util {
     int encodePrintableString (const char* strLatin, ByteArray** baEncoded);
     int encodeUtf8string (const char* strUtf8, ByteArray** baEncoded);
 
-    int pbufToStr (const uint8_t* buf, const size_t len, char** str);
+    int oidFromAsn1 (
+        OBJECT_IDENTIFIER_t* oid,
+        std::string& sOid
+    );
+    int oidToAsn1 (
+        OBJECT_IDENTIFIER_t* oid,
+        const std::string& sOid
+    );
+    int pbufToStr (
+        const uint8_t* buf,
+        const size_t len,
+        char** str
+    );
 
     std::string baToHex (
         const ByteArray* baData
