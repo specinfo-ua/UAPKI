@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef UAPKI_NS_CERTREQ_BUILDER_H
-#define UAPKI_NS_CERTREQ_BUILDER_H
+#ifndef UAPKI_CERTREQ_BUILDER_H
+#define UAPKI_CERTREQ_BUILDER_H
 
 
 #include "uapki-ns.h"
 #include "uapkif.h"
-
-
-using namespace std;
 
 
 namespace UapkiNS {
@@ -42,7 +39,7 @@ namespace UapkiNS {
 class CertReqBuilder {
     CertificationRequestInfo_t*
                 m_TbsCsrInfo;
-    string      m_KeyAlgo;
+    std::string m_KeyAlgo;
     ByteArray*  m_BaTbsEncoded;
     ByteArray*  m_BaCsrEncoded;
 
@@ -50,25 +47,70 @@ public:
     CertReqBuilder (void);
     ~CertReqBuilder (void);
 
-    int init (const uint32_t version = 1);
-    int setSubject (const ByteArray* baNameEncoded);
-    int setSubject (const vector<UapkiNS::RdName>& rdNames);
-    int setSubjectPublicKeyInfo (const ByteArray* baSpkiEncoded);
-    int setSubjectPublicKeyInfo (const ByteArray* baAlgoId, const ByteArray* baSubjectPublicKey);
-    int setSubjectPublicKeyInfo (const UapkiNS::AlgorithmIdentifier& algorithm, const ByteArray* baSubjectPublicKey);
-    int addExtensions (const vector<UapkiNS::Extension>& extensions);
-    const string& getKeyAlgo (void) const { return m_KeyAlgo; }
+    int init (
+        const uint32_t version = 1
+    );
+    int setSubject (
+        const ByteArray* baNameEncoded
+    );
+    int setSubject (
+        const std::vector<UapkiNS::RdName>& rdNames
+    );
+    int setSubjectPublicKeyInfo (
+        const ByteArray* baSpkiEncoded
+    );
+    int setSubjectPublicKeyInfo (
+        const ByteArray* baAlgoId,
+        const ByteArray* baSubjectPublicKey
+    );
+    int setSubjectPublicKeyInfo (
+        const UapkiNS::AlgorithmIdentifier& algorithm,
+        const ByteArray* baSubjectPublicKey
+    );
+    int addExtensions (
+        const ByteArray* baExtensionsEncoded
+    );
+    int addExtensions (
+        const std::vector<UapkiNS::Extension>& extensions
+    );
+    int addExtensions (
+        const std::vector<ByteArray*>& vbaEncodedExtensions
+    );
+    const std::string& getKeyAlgo (void) const {
+        return m_KeyAlgo;
+    }
 
     int encodeTbs (void);
-    const ByteArray* getTbsEncoded (void) const { return m_BaTbsEncoded; }
+    const ByteArray* getTbsEncoded (void) const {
+        return m_BaTbsEncoded;
+    }
 
-    int encodeCertRequest (const char* signAlgo, const ByteArray* baSignAlgoParam, const ByteArray* baSignature);
-    int encodeCertRequest (const UapkiNS::AlgorithmIdentifier& aidSignature, const ByteArray* baSignature);
-    ByteArray* getCsrEncoded (const bool move = false);
+    int encodeCertRequest (
+        const char* signAlgo,
+        const ByteArray* baSignAlgoParam,
+        const ByteArray* baSignature
+    );
+    int encodeCertRequest (
+        const UapkiNS::AlgorithmIdentifier& aidSignature,
+        const ByteArray* baSignature
+    );
+    ByteArray* getCsrEncoded (
+        const bool move = false
+    );
 
 public:
-    static int encodeExtensions (const vector<UapkiNS::Extension>& extensions, ByteArray** baEncoded);
-    static int nameAddRdName (Name_t* name, const UapkiNS::RdName& rdName);
+    static int encodeExtensions (
+        const std::vector<UapkiNS::Extension>& extensions,
+        ByteArray** baEncoded
+    );
+    static int encodeExtensions (
+        const std::vector<ByteArray*>& vbaEncodedExtensions,
+        ByteArray** baEncoded
+    );
+    static int nameAddRdName (
+        Name_t* name,
+        const UapkiNS::RdName& rdName
+    );
 
 };  //  end class CertReqBuilder
 
