@@ -64,9 +64,8 @@ cleanup:
 static int parse_ecdsa_pubkey (const ByteArray* baPubkey, ByteArray** baQx, ByteArray** baQy)
 {
     int ret = RET_OK;
-    ByteArray* ba_Qx = NULL;
-    ByteArray* ba_Qy = NULL;
-    const uint8_t* buf = NULL;
+    SmartBA sba_qx, sba_qy;
+    const uint8_t* buf = nullptr;
     size_t len = 0;
 
     CHECK_NOT_NULL(baPubkey);
@@ -79,24 +78,25 @@ static int parse_ecdsa_pubkey (const ByteArray* baPubkey, ByteArray** baQx, Byte
         SET_ERROR(RET_INVALID_PUBLIC_KEY);
     }
     len = (len - 1) / 2;
-    CHECK_NOT_NULL(ba_Qx = ba_alloc_from_uint8(&buf[1], len));
-    CHECK_NOT_NULL(ba_Qy = ba_alloc_from_uint8(&buf[len + 1], len));
 
-    *baQx = ba_Qx;
-    ba_Qx = NULL;
-    *baQy = ba_Qy;
-    ba_Qy = NULL;
+    if (
+        !sba_qx.set(ba_alloc_from_uint8(&buf[1], len)) ||
+        !sba_qy.set(ba_alloc_from_uint8(&buf[len + 1], len))
+    ) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+
+    *baQx = sba_qx.pop();
+    *baQy = sba_qy.pop();
 
 cleanup:
-    ba_free(ba_Qx);
-    ba_free(ba_Qy);
     return ret;
 }
 
 static int parse_ecdsa_signvalue (const ByteArray* baSignature, ByteArray** baR, ByteArray** baS)
 {
     int ret = RET_OK;
-    ECDSA_Sig_Value_t* ec_sig = NULL;
+    ECDSA_Sig_Value_t* ec_sig = nullptr;
 
     CHECK_PARAM(baSignature != NULL);
     CHECK_PARAM(baR != NULL);
@@ -120,11 +120,8 @@ int Verify::verifyEcSign (
 )
 {
     int ret = RET_OK;
-    EcCtx* ec_ctx = NULL;
-    ByteArray* ba_Qx = NULL;
-    ByteArray* ba_Qy = NULL;
-    ByteArray* ba_r = NULL;
-    ByteArray* ba_s = NULL;
+    EcCtx* ec_ctx = nullptr;
+    SmartBA sba_qx, sba_qy, sba_r, sba_s;
 
     CHECK_NOT_NULL(baPubkey);
     CHECK_NOT_NULL(baHash);
@@ -134,20 +131,19 @@ int Verify::verifyEcSign (
     switch (signAlgo)
     {
     case SIGN_DSTU4145:
-        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &ba_Qx, &ba_Qy));
-        DO(ba_swap(ba_Qx));
-        DO(ba_swap(ba_Qy));
-        DO(parse_dstu_signvalue(baSignValue, &ba_r, &ba_s));
-        DO(ec_init_verify(ec_ctx, ba_Qx, ba_Qy));
-        DO(dstu4145_verify(ec_ctx, baHash, ba_r, ba_s));
+        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &sba_qx, &sba_qy));
+        DO(ba_swap(sba_qx.get()));
+        DO(ba_swap(sba_qy.get()));
+        DO(parse_dstu_signvalue(baSignValue, &sba_r, &sba_s));
+        DO(ec_init_verify(ec_ctx, sba_qx.get(), sba_qy.get()));
+        DO(dstu4145_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
         break;
     case SIGN_ECDSA:
-        DO(parse_ecdsa_pubkey(baPubkey, &ba_Qx, &ba_Qy));
-        DO(parse_ecdsa_signvalue(baSignValue, &ba_r, &ba_s));
-        DO(ec_init_verify(ec_ctx, ba_Qx, ba_Qy));
-        DO(ecdsa_verify(ec_ctx, baHash, ba_r, ba_s));
+        DO(parse_ecdsa_pubkey(baPubkey, &sba_qx, &sba_qy));
+        DO(parse_ecdsa_signvalue(baSignValue, &sba_r, &sba_s));
+        DO(ec_init_verify(ec_ctx, sba_qx.get(), sba_qy.get()));
+        DO(ecdsa_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
         break;
-    //todo: case other EC-algos
     default:
         SET_ERROR(RET_UNSUPPORTED);
         break;
@@ -155,10 +151,6 @@ int Verify::verifyEcSign (
 
 cleanup:
     ec_free(ec_ctx);
-    ba_free(ba_Qx);
-    ba_free(ba_Qy);
-    ba_free(ba_r);
-    ba_free(ba_s);
     return ret;
 }
 
@@ -239,7 +231,7 @@ cleanup:
 static int parse_ecdsa_spki (const SubjectPublicKeyInfo_t* spki, EcParamsId* ecParamsId, ByteArray** baPubkey)
 {
     int ret = RET_OK;
-    OBJECT_IDENTIFIER_t* oid_namedcurve = NULL;
+    OBJECT_IDENTIFIER_t* oid_namedcurve = nullptr;
 
     CHECK_NOT_NULL(oid_namedcurve = (OBJECT_IDENTIFIER_t*)asn_any2type(spki->algorithm.parameters, get_OBJECT_IDENTIFIER_desc()));
     *ecParamsId = ecid_from_OID(oid_namedcurve);
@@ -256,18 +248,17 @@ cleanup:
 static int parse_rsa_spki (const SubjectPublicKeyInfo_t* spki, ByteArray** baPubkeyN, ByteArray** baPubkeyE)
 {
     int ret = RET_OK;
-    RSAPublicKey_t* rsa_pubkey = NULL;
-    ByteArray* ba_pubkey = NULL;
+    RSAPublicKey_t* rsa_pubkey = nullptr;
+    SmartBA sba_pubkey;
 
-    DO(asn_BITSTRING2ba(&spki->subjectPublicKey, &ba_pubkey));
+    DO(asn_BITSTRING2ba(&spki->subjectPublicKey, &sba_pubkey));
 
-    CHECK_NOT_NULL(rsa_pubkey = (RSAPublicKey_t*)asn_decode_ba_with_alloc(get_RSAPublicKey_desc(), ba_pubkey));
+    CHECK_NOT_NULL(rsa_pubkey = (RSAPublicKey_t*)asn_decode_ba_with_alloc(get_RSAPublicKey_desc(), sba_pubkey.get()));
     DO(asn_INTEGER2ba(&rsa_pubkey->modulus, baPubkeyN));
     DO(asn_INTEGER2ba(&rsa_pubkey->publicExponent, baPubkeyE));
 
 cleanup:
     asn_free(get_RSAPublicKey_desc(), rsa_pubkey);
-    ba_free(ba_pubkey);
     return ret;
 }
 
@@ -322,9 +313,7 @@ int Verify::verifySignature (
 {
     int ret = RET_OK;
     const ByteArray* ref_ba;
-    ByteArray* ba_hash = NULL;
-    ByteArray* ba_pubkey = NULL;
-    ByteArray* ba_pubkey_rsae = NULL;
+    SmartBA sba_hash, sba_pubkey, sba_pubkey_rsae;
     HashAlg hash_algo = HASH_ALG_UNDEFINED;
     SignAlg key_algo = SIGN_UNDEFINED;
     SignAlg sign_algo = SIGN_UNDEFINED;
@@ -342,8 +331,8 @@ int Verify::verifySignature (
     }
 
     if (!isHash) {
-        DO(hash(hash_algo, baData, &ba_hash));
-        ref_ba = ba_hash;
+        DO(hash(hash_algo, baData, &sba_hash));
+        ref_ba = sba_hash.get();
     }
     else {
         if (hash_get_size(hash_algo) != ba_get_len(baData)) {
@@ -352,19 +341,19 @@ int Verify::verifySignature (
         ref_ba = baData;
     }
 
-    DO(parseSpki(baSignerSPKI, &key_algo, &ec_paramsid, &ba_pubkey, &ba_pubkey_rsae));
+    DO(parseSpki(baSignerSPKI, &key_algo, &ec_paramsid, &sba_pubkey, &sba_pubkey_rsae));
     if (key_algo != sign_algo) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
     switch (sign_algo) {
     case SIGN_DSTU4145:
-        DO(verifyEcSign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
+        DO(verifyEcSign(sign_algo, ec_paramsid, sba_pubkey.get(), ref_ba, baSignValue));
         break;
     case SIGN_ECDSA:
-        DO(verifyEcSign(sign_algo, ec_paramsid, ba_pubkey, ref_ba, baSignValue));
+        DO(verifyEcSign(sign_algo, ec_paramsid, sba_pubkey.get(), ref_ba, baSignValue));
         break;
     case SIGN_RSA_PKCS_1_5:
-        DO(verifyRsaV15Sign(hash_algo, ba_pubkey, ba_pubkey_rsae, ref_ba, baSignValue));
+        DO(verifyRsaV15Sign(hash_algo, sba_pubkey.get(), sba_pubkey_rsae.get(), ref_ba, baSignValue));
         break;
     default:
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -372,9 +361,6 @@ int Verify::verifySignature (
     }
 
 cleanup:
-    ba_free(ba_hash);
-    ba_free(ba_pubkey);
-    ba_free(ba_pubkey_rsae);
     return ret;
 }
 
