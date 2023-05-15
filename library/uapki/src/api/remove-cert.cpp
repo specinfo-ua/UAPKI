@@ -28,6 +28,7 @@
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
+#include "parson-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
 
@@ -39,28 +40,62 @@
 int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    CerStore* cer_store = nullptr;
-    UapkiNS::SmartBA sba_certid, sba_encoded;
-    bool permanent = false;
+    UapkiNS::SmartBA sba_certid, sba_encoded, sba_keyid;
+    CerStore::Item* cer_item = nullptr;
+    const bool present_bytes = ParsonHelper::jsonObjectHasValue(joParams, "bytes", JSONString);
+    const bool present_certid = ParsonHelper::jsonObjectHasValue(joParams, "certId", JSONString);
+    const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
+    const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
 
-    cer_store = get_cerstore();
-    if (!cer_store) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    LibraryConfig* lib_config = get_config();
+    if (!lib_config) return RET_UAPKI_GENERAL_ERROR;
+    if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
+
+    CerStore* cer_store = get_cerstore();
+    if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
+
+    if (
+        (present_bytes && present_certid) ||
+        (!present_bytes && !present_certid)
+    ) {
+        return RET_UAPKI_INVALID_PARAMETER;
     }
 
-    if (!sba_certid.set(json_object_get_base64(joParams, "certId"))) {
-        CerStore::Item* cer_item = nullptr;
-        if (!sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    if (!from_storage) {
+        if (!sba_certid.set(json_object_get_base64(joParams, "certId"))) {
+            if (!sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
+                SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+            }
+
+            DO(cer_store->getCertByEncoded(sba_encoded.get(), &cer_item));
+            if (!sba_certid.set(ba_copy_with_alloc(cer_item->baCertId, 0, 0))) {
+                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+            }
         }
 
-        DO(cer_store->getCertByEncoded(sba_encoded.get(), &cer_item));
-        if (!sba_certid.set(ba_copy_with_alloc(cer_item->baCertId, 0, 0))) {
+        DO(cer_store->removeCert(sba_certid.get(), permanent));
+    }
+    else {
+        CmStorageProxy* storage = CmProviders::openedStorage();
+        if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
+
+        if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
+            DO(CerStore::parseCert(sba_encoded.get(), &cer_item));
+            (void)sba_encoded.set(nullptr);
+            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->baKeyId, 0, 0));
+            delete cer_item;
+        }
+        else if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
+            DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
+            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->baKeyId, 0, 0));
+        }
+
+        if (sba_keyid.empty()) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
         }
-    }
 
-    DO(cer_store->removeCert(sba_certid.get(), permanent));
+        DO(storage->sessionDeleteCertificate(sba_keyid.get()));
+    }
 
 cleanup:
     return ret;

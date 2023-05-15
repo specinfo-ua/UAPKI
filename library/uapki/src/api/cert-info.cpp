@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2023, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,9 +27,11 @@
 
 #include "api-json-internal.h"
 #include "global-objects.h"
+#include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "store-util.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 
 
 #undef FILE_MARKER
@@ -39,25 +41,22 @@
 int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    ByteArray* ba_certid = nullptr;
-    ByteArray* ba_encoded = nullptr;
+    UapkiNS::SmartBA sba_certid, sba_encoded;
 
-    ba_encoded = json_object_get_base64(joParams, "bytes");
-    if (ba_encoded) {
+    if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
         CerStore::Item* cer_item = nullptr;
-        DO(CerStore::parseCert(ba_encoded, &cer_item));
-        ba_encoded = nullptr;
+        DO(CerStore::parseCert(sba_encoded.get(), &cer_item));
+        sba_encoded.set(nullptr);
 
         DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
         delete cer_item;
     }
     else {
-        ba_certid = json_object_get_base64(joParams, "certId");
-        if (ba_certid) {
+        if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
             CerStore* cer_store = get_cerstore();
             if (cer_store) {
                 CerStore::Item* cer_item = nullptr;
-                DO(cer_store->getCertByCertId(ba_certid, &cer_item));
+                DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
                 DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
             }
             else {
@@ -70,7 +69,5 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
     }
 
 cleanup:
-    ba_free(ba_certid);
-    ba_free(ba_encoded);
     return ret;
 }
