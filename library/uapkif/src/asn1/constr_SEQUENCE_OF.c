@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constr_sequence_of.c"
+
 #include "asn_internal.h"
 #include "constr_SEQUENCE_OF.h"
 #include "asn_SEQUENCE_OF.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constr_sequence_of.c"
 /*
  * The DER encoder of the SEQUENCE OF type.
  */
@@ -269,4 +269,5 @@ SEQUENCE_OF_encode_uper(asn_TYPE_descriptor_t *td,
 
     ASN__ENCODED_OK(er);
 }
+
 

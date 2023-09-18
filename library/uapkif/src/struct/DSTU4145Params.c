@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/DSTU4145Params.c"
+
 #include "DSTU4145Params.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/DSTU4145Params.c"
 
 static asn_TYPE_member_t asn_MBR_DSTU4145Params_1[] = {
     {
@@ -100,3 +99,5 @@ asn_TYPE_descriptor_t *get_DSTU4145Params_desc(void)
 {
     return &DSTU4145Params_desc;
 }
+
+

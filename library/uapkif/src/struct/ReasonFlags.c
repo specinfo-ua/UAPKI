@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ReasonFlags.c"
+
 #include "ReasonFlags.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ReasonFlags.c"
 
 int
 ReasonFlags_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -146,3 +145,5 @@ asn_TYPE_descriptor_t *get_ReasonFlags_desc(void)
 {
     return &ReasonFlags_desc;
 }
+
+

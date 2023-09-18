@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/BuiltInDomainDefinedAttributes.c"
+
 #include "BuiltInDomainDefinedAttributes.h"
 
 #include "asn_internal.h"
 
 #include "BuiltInDomainDefinedAttribute.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/BuiltInDomainDefinedAttributes.c"
 
 static asn_TYPE_member_t asn_MBR_BuiltInDomainDefinedAttributes_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_BuiltInDomainDefinedAttributes_desc(void)
 {
     return &BuiltInDomainDefinedAttributes_desc;
 }
+
+

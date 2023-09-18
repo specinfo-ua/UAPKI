@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/stracktrace.c"
+
 #include "stacktrace.h"
 
 #include <string.h>
 #include <stdlib.h>
 
 #include "pthread-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/stracktrace.c"
 
 typedef struct StackTraceCtx_st {
     char *msg;

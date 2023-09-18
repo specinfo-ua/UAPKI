@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/des.c"
+
 #include <memory.h>
 
 #include "des.h"
@@ -35,9 +37,6 @@
 #include "macros-internal.h"
 
 #define DES_BLOCK_LEN 8
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/des.c"
 
 typedef enum {
     ECB,
@@ -2335,14 +2334,19 @@ cleanup:
 int des_generate_key(size_t key_len, ByteArray **key)
 {
     int ret = RET_OK;
+    ByteArray* k = NULL;
 
-    CHECK_PARAM(key_len == 8 || key_len == 16 || key_len == 24)
+    CHECK_PARAM(key_len == 8 || key_len == 16 || key_len == 24);
 
-    CHECK_NOT_NULL(*key = ba_alloc_by_len(key_len));
-    DO(drbg_random(*key));
+    CHECK_NOT_NULL(k = ba_alloc_by_len(key_len));
+    DO(drbg_random(k));
+
+    *key = k;
+    k = NULL;
 
 cleanup:
 
+    ba_free(k);
     return ret;
 }
 

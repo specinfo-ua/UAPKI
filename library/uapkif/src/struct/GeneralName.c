@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/GeneralName.c"
+
 #include "GeneralName.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/GeneralName.c"
 
 static asn_TYPE_member_t asn_MBR_GeneralName_1[] = {
     {
@@ -172,3 +171,5 @@ asn_TYPE_descriptor_t *get_GeneralName_desc(void)
 {
     return &GeneralName_desc;
 }
+
+

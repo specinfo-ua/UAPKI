@@ -33,8 +33,8 @@
  * implementation deals with the standard (machine-specific) representation
  * of them instead of using the platform-independent buffer.
  */
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/NativeEnumerated.c"
+
+#define FILE_MARKER "uapkif/asn1/NativeEnumerated.c"
 
 #include "asn_internal.h"
 #include "NativeEnumerated.h"
@@ -282,4 +282,5 @@ NativeEnumerated_encode_uper(asn_TYPE_descriptor_t *td,
 
     ASN__ENCODED_OK(er);
 }
+
 

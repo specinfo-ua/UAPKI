@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AuthorityKeyIdentifier.c"
+
 #include "AuthorityKeyIdentifier.h"
 
 #include "asn_internal.h"
 
 #include "GeneralNames.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AuthorityKeyIdentifier.c"
 
 static asn_TYPE_member_t asn_MBR_AuthorityKeyIdentifier_1[] = {
     {
@@ -111,3 +111,5 @@ asn_TYPE_descriptor_t *get_AuthorityKeyIdentifier_desc(void)
 {
     return &AuthorityKeyIdentifier_desc;
 }
+
+

@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/Object_identifier.c"
+
 #include "asn_internal.h"
 #include "INTEGER.h"
 #include "OBJECT_IDENTIFIER.h"
 #include "OCTET_STRING.h"
 #include <limits.h>    /* for CHAR_BIT */
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/Object_identifier.c"
 
 /*
  * OBJECT IDENTIFIER basic type description.
@@ -825,7 +824,6 @@ OBJECT_IDENTIFIER_parse_arcs(const char *oid_text, ssize_t oid_txt_length,
                 }
                 errno = EINVAL;    /* Broken OID */
                 return -1;
-                break;
             case ST_AFTERVALUE:
                 state = ST_WAITDIGITS;
                 continue;

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SignaturePolicyIdentifier.c"
+
 #include "SignaturePolicyIdentifier.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SignaturePolicyIdentifier.c"
 
 static asn_TYPE_member_t asn_MBR_SignaturePolicyIdentifier_1[] = {
     {
@@ -84,3 +83,5 @@ asn_TYPE_descriptor_t *get_SignaturePolicyIdentifier_desc(void)
 {
     return &SignaturePolicyIdentifier_desc;
 }
+
+

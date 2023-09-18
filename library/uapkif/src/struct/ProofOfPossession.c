@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ProofOfPossession.c"
+
 #include "ProofOfPossession.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ProofOfPossession.c"
 
 static asn_TYPE_member_t asn_MBR_ProofOfPossession_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct ProofOfPossession, choice.raVerified),
@@ -113,3 +112,5 @@ asn_TYPE_descriptor_t* get_ProofOfPossession_desc(void)
 {
     return &ProofOfPossession_desc;
 }
+
+

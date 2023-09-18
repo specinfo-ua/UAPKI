@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/asn_sequence_of.c"
+
 #include "asn_internal.h"
 #include "asn_SEQUENCE_OF.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/asn_sequence_of.c"
 
 typedef A_SEQUENCE_OF(void) asn_sequence;
 
@@ -70,4 +69,5 @@ asn_sequence_del(void *asn_sequence_of_x, int number, int _do_free)
         }
     }
 }
+
 

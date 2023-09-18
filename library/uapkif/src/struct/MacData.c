@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/MacData.c"
+
 #include "MacData.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/MacData.c"
 
 static int asn_DFL_4_set_1(int set_value, void **sptr)
 {
@@ -136,3 +135,5 @@ asn_TYPE_descriptor_t *get_MacData_desc(void)
 {
     return &MacData_desc;
 }
+
+

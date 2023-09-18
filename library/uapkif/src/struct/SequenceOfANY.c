@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SequenceOfANY.c"
+
 #include "SequenceOfANY.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SequenceOfANY.c"
 
 static asn_TYPE_member_t asn_MBR_SequenceOfANY_1[] = {
     { ATF_OPEN_TYPE | ATF_POINTER, 0, 0,
@@ -80,3 +79,5 @@ asn_TYPE_descriptor_t* get_SequenceOfANY_desc(void)
 {
     return &SequenceOfANY_desc;
 }
+
+

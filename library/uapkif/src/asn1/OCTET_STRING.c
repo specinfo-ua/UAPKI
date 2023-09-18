@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/OCTET_STRING.c"
+
 #include "asn_internal.h"
 #include "OCTET_STRING.h"
 #include "BIT_STRING.h"    /* for .bits_unused member */
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/OCTET_STRING.c"
 
 /*
  * OCTET STRING basic type description.
@@ -498,7 +497,6 @@ phase1:
             PREV_PHASE(ctx);
             goto phase1;
         }
-        break;
     case 3:
 phase3:
         /*
@@ -2028,4 +2026,5 @@ OCTET_STRING_new_fromBuf(asn_TYPE_descriptor_t *td, const char *str, int len)
 
     return st;
 }
+
 

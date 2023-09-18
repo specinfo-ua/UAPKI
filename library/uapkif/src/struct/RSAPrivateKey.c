@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RSAPrivateKey.c"
+
 #include "RSAPrivateKey.h"
 
 #include "asn_internal.h"
 #include "OtherPrimeInfos.h"
 #include "constr_SEQUENCE.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/RSAPrivateKey.c"
 
 static asn_TYPE_member_t asn_MBR_RSAPrivateKey_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct RSAPrivateKey, version),
@@ -179,3 +178,5 @@ asn_TYPE_descriptor_t *get_RSAPrivateKey_desc(void)
 {
     return &RSAPrivateKey_desc;
 }
+
+ 

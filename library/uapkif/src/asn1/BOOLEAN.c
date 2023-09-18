@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/BOOLEAN.c"
+
 #include "asn_internal.h"
 #include "asn_codecs_prim.h"
 #include "BOOLEAN.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/BOOLEAN.c"
 /*
  * BOOLEAN basic type description.
  */
@@ -338,3 +338,5 @@ BOOLEAN_encode_uper(asn_TYPE_descriptor_t *td,
 
     ASN__ENCODED_OK(er);
 }
+
+

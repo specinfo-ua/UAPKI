@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-ec2m-internal.c"
+
 #include "math-ec2m-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-ec2m-internal.c"
 
 static int ec2m_points_to_affine(EcGf2mCtx *ctx, ECPoint **array, int off, int len)
 {

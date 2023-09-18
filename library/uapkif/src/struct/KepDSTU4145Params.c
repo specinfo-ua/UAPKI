@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/KepDSTU4145Params.c"
+
 #include "KepDSTU4145Params.h"
 
 #include "asn_internal.h"
 #include "constr_SEQUENCE.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/KepDSTU4145Params.c"
 
 static int
 memb_dke_constraint_1(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -159,3 +158,5 @@ asn_TYPE_descriptor_t *get_KepDSTU4145Params_desc(void)
 {
     return &KepDSTU4145Params_desc;
 }
+
+ 

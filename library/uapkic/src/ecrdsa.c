@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/ecrdsa.c"
+
 #include <string.h>
 #include "ecrdsa.h"
 #include "ec-internal.h"
@@ -32,9 +34,6 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 #include "hash.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/ecrdsa.c"
 
 int ecrdsa_generate_privkey(const EcCtx *ctx, ByteArray **d)
 {

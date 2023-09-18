@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SharedInfo.c"
+
 #include "SharedInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/struct/SharedInfo.c"
 
 static asn_TYPE_member_t asn_MBR_SharedInfo_1[] = {
     {
@@ -110,3 +109,5 @@ asn_TYPE_descriptor_t *get_SharedInfo_desc(void)
 {
     return &SharedInfo_desc;
 }
+
+

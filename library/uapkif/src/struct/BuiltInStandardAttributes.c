@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/BuiltInStandardAttributes.c"
+
 #include "BuiltInStandardAttributes.h"
 
 #include "asn_internal.h"
@@ -35,8 +37,6 @@
 #include "PrivateDomainName.h"
 #include "PersonalName.h"
 #include "OrganizationalUnitNames.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/BuiltInStandardAttributes.c"
 
 static asn_TYPE_member_t asn_MBR_BuiltInStandardAttributes_1[] = {
     {
@@ -181,3 +181,5 @@ asn_TYPE_descriptor_t *get_BuiltInStandardAttributes_desc(void)
 {
     return &BuiltInStandardAttributes_desc;
 }
+
+

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PBKDF2-Salt.c"
+
 #include "PBKDF2-Salt.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PBKDF2-Salt.c"
 
 static asn_TYPE_member_t asn_MBR_PBKDF2_Salt_1[] = {
     {
@@ -95,3 +94,5 @@ asn_TYPE_descriptor_t *get_PBKDF2_Salt_desc(void)
 {
     return &PBKDF2_Salt_desc;
 }
+
+

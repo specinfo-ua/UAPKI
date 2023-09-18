@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertificateSerialNumber.c"
+
 #include "CertificateSerialNumber.h"
 
 #include "asn_internal.h"
 #include "INTEGER.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertificateSerialNumber.c"
 
 int
 CertificateSerialNumber_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -153,3 +152,5 @@ asn_TYPE_descriptor_t *get_CertificateSerialNumber_desc(void)
 {
     return &CertificateSerialNumber_desc;
 }
+
+

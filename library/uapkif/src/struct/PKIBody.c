@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKIBody.c"
+
 #include "PKIBody.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKIBody.c"
 
 static asn_TYPE_member_t asn_MBR_PKIBody_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct PKIBody, choice.ir),
@@ -343,3 +342,5 @@ asn_TYPE_descriptor_t* get_PKIBody_desc(void)
 {
     return &PKIBody_desc;
 }
+
+

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/TerminalIdentifier.c"
+
 #include "TerminalIdentifier.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/TerminalIdentifier.c"
 
 int
 TerminalIdentifier_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -146,3 +145,5 @@ asn_TYPE_descriptor_t *get_TerminalIdentifier_desc(void)
 {
     return &TerminalIdentifier_desc;
 }
+
+

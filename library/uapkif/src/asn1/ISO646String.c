@@ -26,11 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/ISO646String.c"
+
 #include "asn_internal.h"
 #include "ISO646String.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/ISO646String.c"
 /*
  * ISO646String basic type description.
  */
@@ -71,3 +71,5 @@ asn_TYPE_descriptor_t *get_ISO646String_desc(void)
 {
     return &ISO646String_desc;
 }
+
+

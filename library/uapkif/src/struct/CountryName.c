@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CountryName.c"
+
 #include "CountryName.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CountryName.c"
 
 static asn_TYPE_member_t asn_MBR_CountryName_1[] = {
     {
@@ -100,3 +99,5 @@ asn_TYPE_descriptor_t *get_CountryName_desc(void)
 {
     return &CountryName_desc;
 }
+
+

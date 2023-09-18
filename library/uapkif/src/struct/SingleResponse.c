@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SingleResponse.c"
+
 #include "SingleResponse.h"
 
 #include "asn_internal.h"
 
 #include "Extensions.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SingleResponse.c"
 
 static asn_TYPE_member_t asn_MBR_SingleResponse_1[] = {
     {
@@ -135,3 +135,5 @@ asn_TYPE_descriptor_t *get_SingleResponse_desc(void)
 {
     return &SingleResponse_desc;
 }
+
+

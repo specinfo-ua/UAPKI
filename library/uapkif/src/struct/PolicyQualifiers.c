@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PolicyQualifiers.c"
+
 #include "PolicyQualifiers.h"
 
 #include "asn_internal.h"
 
 #include "PolicyQualifierInfo.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PolicyQualifiers.c"
 
 static asn_TYPE_member_t asn_MBR_PolicyQualifiers_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_PolicyQualifiers_desc(void)
 {
     return &PolicyQualifiers_desc;
 }
+
+

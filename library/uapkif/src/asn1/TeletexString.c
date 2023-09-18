@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/TeletexString.c"
+
 #include "asn_internal.h"
 #include "TeletexString.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/TeletexString.c"
 
 /*
  * TeletexString basic type description.
@@ -203,4 +202,5 @@ asn_TYPE_descriptor_t *get_TeletexString_desc(void)
  *         G2: ESC 2/6 4/0 ESC 2/4 2/10 4/2 ("&@" "$*B")
  *         G3: ESC 2/6 4/0 ESC 2/4 2/11 4/2 ("&@" "$+B")
  */
+
 

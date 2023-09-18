@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RSAPublicKey.c"
+
 #include "RSAPublicKey.h"
 
 #include "asn_internal.h"
 #include "constr_SEQUENCE.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/RSAPublicKey.c"
 
 static asn_TYPE_member_t asn_MBR_RSAPublicKey_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct RSAPublicKey, modulus),
@@ -98,3 +97,5 @@ asn_TYPE_descriptor_t *get_RSAPublicKey_desc(void)
 {
     return &RSAPublicKey_desc;
 }
+
+ 

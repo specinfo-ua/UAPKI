@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/ObjectDescriptor.c"
+
 #include "asn_internal.h"
 #include "ObjectDescriptor.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/ObjectDescriptor.c"
 
 /*
  * ObjectDescriptor basic type description.
@@ -67,4 +66,5 @@ asn_TYPE_descriptor_t *get_asn_ObjectDescriptor_desc(void)
 {
     return &ObjectDescriptor_desc;
 }
+
 

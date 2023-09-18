@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SubjectInfoAccess.c"
+
 #include "SubjectInfoAccess.h"
 
 #include "asn_internal.h"
 
 #include "AccessDescription.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SubjectInfoAccess.c"
 
 static asn_TYPE_member_t asn_MBR_SubjectInfoAccess_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_SubjectInfoAccess_desc(void)
 {
     return &SubjectInfoAccess_desc;
 }
+
+

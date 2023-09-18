@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/asn_set_of.c"
+
 #include "asn_internal.h"
 #include "asn_SET_OF.h"
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/asn_set_of.c"
 
 /*
  * Add another element into the set.
@@ -121,4 +120,5 @@ asn_set_empty(void *asn_set_of_x)
     }
 
 }
+
 

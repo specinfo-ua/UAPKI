@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constr_sequence.c"
+
 #include "asn_internal.h"
 #include "constr_SEQUENCE.h"
 #include "per_opentype.h"
 #include "asn1-utils.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constr_sequence.c"
 
 /*
  * Number of bytes left for this structure.
@@ -1571,4 +1570,5 @@ SEQUENCE_encode_uper(asn_TYPE_descriptor_t *td,
 
     ASN__ENCODED_OK(er);
 }
+
 

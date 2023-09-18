@@ -25,14 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/ec-internal.c"
+
 #include <string.h>
 
 #include "ec-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/ec-internal.c"
 
 /** Параметры для поля GF(2^173). */
 static const int F_M173_ONB[5] = {173, 10, 2, 1, 0};

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKIXTime.c"
+
 #include "PKIXTime.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKIXTime.c"
 
 static asn_TYPE_member_t asn_MBR_PKIXTime_1[] = {
     {
@@ -95,3 +94,5 @@ asn_TYPE_descriptor_t *get_PKIXTime_desc(void)
 {
     return &PKIXTime_desc;
 }
+
+

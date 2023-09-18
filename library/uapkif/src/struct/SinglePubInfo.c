@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SinglePubInfo.c"
+
 #include "SinglePubInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SinglePubInfo.c"
 
 static asn_TYPE_member_t asn_MBR_SinglePubInfo_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct SinglePubInfo, pubMethod),
@@ -105,3 +104,5 @@ asn_TYPE_descriptor_t* get_SinglePubInfo_desc(void)
 {
     return &SinglePubInfo_desc;
 }
+
+

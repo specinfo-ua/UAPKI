@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/OriginatorPublicKey.c"
+
 #include "OriginatorPublicKey.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/OriginatorPublicKey.c"
 
 static asn_TYPE_member_t asn_MBR_OriginatorPublicKey_1[] = {
     {
@@ -99,3 +98,5 @@ asn_TYPE_descriptor_t *get_OriginatorPublicKey_desc(void)
 {
     return &OriginatorPublicKey_desc;
 }
+
+

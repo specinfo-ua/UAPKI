@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/DigestAlgorithmIdentifiers.c"
+
 #include "DigestAlgorithmIdentifiers.h"
 
 #include "asn_internal.h"
 
 #include "DigestAlgorithmIdentifier.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/DigestAlgorithmIdentifiers.c"
 
 static asn_TYPE_member_t asn_MBR_DigestAlgorithmIdentifiers_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_DigestAlgorithmIdentifiers_desc(void)
 {
     return &DigestAlgorithmIdentifiers_desc;
 }
+
+

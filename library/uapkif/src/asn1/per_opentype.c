@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/per_opentype.c"
+
 #include "asn_internal.h"
 #include "per_support.h"
 #include "constr_TYPE.h"
 #include "per_opentype.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/per_opentype.c"
 
 typedef struct uper_ugot_key {
     asn_per_data_t oldpd;    /* Old per data source */
@@ -430,3 +429,5 @@ per_skip_bits(asn_per_data_t *pd, int skip_nbits)
     }
     return hasNonZeroBits;
 }
+
+

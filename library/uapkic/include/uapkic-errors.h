@@ -68,7 +68,6 @@ extern "C" {
 #define RET_SELF_TEST_NOT_ALLOWED        32
 #define RET_SELF_TEST_FAIL               33
 
-
 #ifdef  __cplusplus
 }
 #endif

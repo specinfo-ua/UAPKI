@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/OptionalValidity.c"
+
 #include "OptionalValidity.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/OptionalValidity.c"
 
 static asn_TYPE_member_t asn_MBR_OptionalValidity_1[] = {
     { ATF_POINTER, 2, offsetof(struct OptionalValidity, notBefore),
@@ -97,3 +96,5 @@ asn_TYPE_descriptor_t* get_OptionalValidity_desc(void)
 {
     return &OptionalValidity_desc;
 }
+
+

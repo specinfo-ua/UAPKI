@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/UniversalString.c"
+
 #include "asn_internal.h"
 #include "UniversalString.h"
 #include "UTF8String.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/UniversalString.c"
 /*
  * UniversalString basic type description.
  */
@@ -240,4 +240,5 @@ UniversalString_print(asn_TYPE_descriptor_t *td, const void *sptr, int ilevel,
 
     return 0;
 }
+
 

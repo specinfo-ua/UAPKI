@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AuthenticatedSafe.c"
+
 #include "AuthenticatedSafe.h"
 
 #include "asn_internal.h"
 
 #include "ContentInfo.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AuthenticatedSafe.c"
 
 static asn_TYPE_member_t asn_MBR_AuthenticatedSafe_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_AuthenticatedSafe_desc(void)
 {
     return &AuthenticatedSafe_desc;
 }
+
+

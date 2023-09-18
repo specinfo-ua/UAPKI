@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-ecp-internal.c"
+
 #include "math-ecp-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-ecp-internal.c"
 
 EcGfpCtx *ecp_alloc(const WordArray *p, const WordArray *a, const WordArray *b)
 {

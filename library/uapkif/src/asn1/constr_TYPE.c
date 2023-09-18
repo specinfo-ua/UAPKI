@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constr_type.c"
+
 #include "asn_internal.h"
 #include "constr_TYPE.h"
 #include <errno.h>
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constr_type.c"
 /*
  * Version of the ASN.1 infrastructure shipped with compiler.
  */
@@ -115,3 +115,5 @@ void ASN_DEBUG_f(const char *fmt, ...)
     fprintf(stderr, "\n");
     va_end(ap);
 }
+
+

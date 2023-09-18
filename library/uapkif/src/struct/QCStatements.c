@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/QCStatements.c"
+
 #include "QCStatements.h"
 
 #include "asn_internal.h"
 
 #include "QCStatement.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/QCStatements.c"
 
 static asn_TYPE_member_t asn_MBR_QCStatements_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_QCStatements_desc(void)
 {
     return &QCStatements_desc;
 }
+
+

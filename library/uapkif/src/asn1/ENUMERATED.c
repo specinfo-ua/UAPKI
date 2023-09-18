@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/enumerated.c"
+
 #include "asn_internal.h"
 #include "ENUMERATED.h"
 #include "NativeEnumerated.h"
 #include "asn_codecs_prim.h"    /* Encoder and decoder of a primitive type */
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/enumerated.c"
 /*
  * ENUMERATED basic type description.
  */
@@ -104,4 +104,5 @@ ENUMERATED_encode_uper(asn_TYPE_descriptor_t *td,
 
     return NativeEnumerated_encode_uper(td, constraints, &value, po);
 }
+
 

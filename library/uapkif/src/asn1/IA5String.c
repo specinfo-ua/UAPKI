@@ -26,11 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/IA5String.c"
+
 #include "asn_internal.h"
 #include "IA5String.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/IA5String.c"
 /*
  * IA5String basic type description.
  */
@@ -106,4 +106,5 @@ IA5String_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
 
     return 0;
 }
+
 

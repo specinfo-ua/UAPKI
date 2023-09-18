@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CompleteCertificateRefs.c"
+
 #include "CompleteCertificateRefs.h"
 #include "asn_internal.h"
 #include "OtherCertID.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CompleteCertificateRefs.c"
 
 static asn_TYPE_member_t asn_MBR_CompleteCertificateRefs_1[] = {
     {
@@ -81,3 +80,5 @@ asn_TYPE_descriptor_t *get_CompleteCertificateRefs_desc(void)
 {
     return &CompleteCertificateRefs_desc;
 }
+
+

@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/ripemd.c"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -33,9 +35,6 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/ripemd.c"
 
 #define BYTES_TO_DWORD(strptr)                          \
             (( *((strptr) + 3) << 24) |                 \
@@ -401,7 +400,7 @@ cleanup:
 int ripemd_final(RipemdCtx *ctx, ByteArray **hash_code)
 {
     uint32_t X[16]; /* message words */
-    uint8_t *strptr = NULL;
+    const uint8_t *strptr = NULL;
     int8_t *H = NULL;
     size_t i;
     int ret = RET_OK;

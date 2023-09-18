@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/OtherHashAlgAndValue.c"
+
 #include "OtherHashAlgAndValue.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/OtherHashAlgAndValue.c"
 
 static asn_TYPE_member_t asn_MBR_OtherHashAlgAndValue_1[] = {
     {
@@ -99,3 +98,5 @@ asn_TYPE_descriptor_t *get_OtherHashAlgAndValue_desc(void)
 {
     return &OtherHashAlgAndValue_desc;
 }
+
+

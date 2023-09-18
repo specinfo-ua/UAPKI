@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CompleteRevocationRefs.c"
+
 #include "CompleteRevocationRefs.h"
 
 #include "asn_internal.h"
 
 #include "CrlOcspRef.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CompleteRevocationRefs.c"
 
 static asn_TYPE_member_t asn_MBR_CompleteRevocationRefs_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_CompleteRevocationRefs_desc(void)
 {
     return &CompleteRevocationRefs_desc;
 }
+
+

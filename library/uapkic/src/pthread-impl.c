@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/pthread-impl.c"
+
 #include "pthread-internal.h"
 #include <string.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/pthread-impl.c"
 
 #ifdef _WIN32
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*startup)(void *), void *params)

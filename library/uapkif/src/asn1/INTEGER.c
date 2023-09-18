@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/INTEGER.c"
+
 #include <stdio.h>
 #include "asn_internal.h"
 #include "INTEGER.h"
 #include "asn_codecs_prim.h"    /* Encoder and decoder of a primitive type */
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/INTEGER.c"
 
 /*
  * INTEGER basic type description.
@@ -1207,4 +1206,5 @@ asn_strtol_lim(const char *str, const char **end, long *lp) {
     *lp = sign * l;
     return ASN_STRTOL_OK;
 }
+
 

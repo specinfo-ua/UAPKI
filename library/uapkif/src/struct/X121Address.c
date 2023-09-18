@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/X121Address.c"
+
 #include "X121Address.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/X121Address.c"
 
 int
 X121Address_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -146,3 +145,5 @@ asn_TYPE_descriptor_t *get_X121Address_desc(void)
 {
     return &X121Address_desc;
 }
+
+

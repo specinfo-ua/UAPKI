@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/per_encoder.c"
+
 #include "asn_application.h"
 #include "asn_internal.h"
 #include "per_encoder.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/per_encoder.c"
 
 static asn_enc_rval_t uper_encode_internal(asn_TYPE_descriptor_t *td, asn_per_constraints_t *, void *sptr,
         asn_app_consume_bytes_f *cb, void *app_key);
@@ -195,4 +194,5 @@ uper_encode_internal(asn_TYPE_descriptor_t *td, asn_per_constraints_t *constrain
 
     return er;
 }
+
 

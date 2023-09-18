@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertOrEncCert.c"
+
 #include "CertOrEncCert.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertOrEncCert.c"
 
 static asn_TYPE_member_t asn_MBR_CertOrEncCert_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct CertOrEncCert, choice.certificate),
@@ -93,3 +92,5 @@ asn_TYPE_descriptor_t* get_CertOrEncCert_desc(void)
 {
     return &CertOrEncCert_desc;
 }
+
+

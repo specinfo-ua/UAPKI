@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/EDIPartyName.c"
+
 #include "EDIPartyName.h"
 
 #include "asn_internal.h"
 
 #include "DirectoryString.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/EDIPartyName.c"
 
 static asn_TYPE_member_t asn_MBR_EDIPartyName_1[] = {
     {
@@ -100,3 +100,5 @@ asn_TYPE_descriptor_t *get_EDIPartyName_desc(void)
 {
     return &EDIPartyName_desc;
 }
+
+

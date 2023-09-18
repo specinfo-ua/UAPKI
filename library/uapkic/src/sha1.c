@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/sha1.c"
+
 #include <stddef.h>
 #include <memory.h>
 
@@ -34,9 +36,6 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/sha1.c"
 
 #define SCHEDULE(i)                                                             \
     temp = schedule[(i - 3) & 0xF] ^ schedule[(i - 8) & 0xF]^               \

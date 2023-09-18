@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ATSHashIndexFull.c"
+
 #include "ATSHashIndex.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/ATSHashIndexFull.c"
 
 static asn_TYPE_member_t asn_MBR_certificatesHashIndex_3[] = {
     { ATF_POINTER, 0, 0,
@@ -249,3 +248,5 @@ asn_TYPE_descriptor_t* get_ATSHashIndexFull_desc(void)
 {
     return &ATSHashIndexFull_desc;
 }
+
+ 

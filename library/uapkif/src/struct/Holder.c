@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Holder.c"
+
 #include "Holder.h"
 
 #include "asn_internal.h"
@@ -33,8 +35,6 @@
 #include "IssuerSerial.h"
 #include "GeneralNames.h"
 #include "ObjectDigestInfo.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Holder.c"
 
 static asn_TYPE_member_t asn_MBR_Holder_1[] = {
     {
@@ -113,3 +113,5 @@ asn_TYPE_descriptor_t *get_Holder_desc(void)
 {
     return &Holder_desc;
 }
+
+

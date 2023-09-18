@@ -48,8 +48,9 @@
 extern "C" {
 #endif
 
-#undef FILE_MARKER
-#define FILE_MARKER "unknown_file"
+#ifndef FILE_MARKER
+#define FILE_MARKER "undefined"
+#endif
 
 typedef struct ErrorCtx_st {
     char *file;

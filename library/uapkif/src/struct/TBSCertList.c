@@ -26,14 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/TBSCertList.c"
+
 #include "TBSCertList.h"
 
 #include "asn_internal.h"
 
 #include "RevokedCertificates.h"
 #include "Extensions.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/TBSCertList.c"
 
 static asn_TYPE_member_t asn_MBR_TBSCertList_1[] = {
     {
@@ -158,3 +158,5 @@ asn_TYPE_descriptor_t *get_TBSCertList_desc(void)
 {
     return &TBSCertList_desc;
 }
+
+

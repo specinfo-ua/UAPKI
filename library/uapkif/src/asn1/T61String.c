@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/T61String.c"
+
 #include "asn_internal.h"
 #include "T61String.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/T61String.c"
 
 /*
  * T61String basic type description.
@@ -67,3 +66,5 @@ asn_TYPE_descriptor_t *get_T61String_desc(void)
 {
     return &T61String_desc;
 }
+
+

@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/dstu8845.c"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -1041,19 +1043,24 @@ void dstu8845_free(Dstu8845Ctx *ctx)
     }
 }
 
-int dstu8845_generate_key(size_t key_len, ByteArray** key)
+int dstu8845_generate_key(size_t key_len, ByteArray **key)
 {
     int ret = RET_OK;
+    ByteArray* k = NULL;
 
     if ((key_len != 32) & (key_len != 64)) {
         SET_ERROR(RET_INVALID_KEY_SIZE);
     }
 
-    CHECK_NOT_NULL(*key = ba_alloc_by_len(key_len));
-    DO(drbg_random(*key));
+    CHECK_NOT_NULL(k = ba_alloc_by_len(key_len));
+    DO(drbg_random(k));
+
+    *key = k;
+    k = NULL;
 
 cleanup:
 
+    ba_free(k);
     return ret;
 }
 

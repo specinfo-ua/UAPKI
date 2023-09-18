@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/keywrap.c"
+
 #include <memory.h>
 
 #include "macros-internal.h"
@@ -32,9 +34,6 @@
 #include "drbg.h"
 #include "dstu7624.h"
 #include "gost28147.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/keywrap.c"
 
 #define DSTU7624_WRAP_IV_SIZE   32
 #define DSTU7624_WRAP_KEY_SIZE  32

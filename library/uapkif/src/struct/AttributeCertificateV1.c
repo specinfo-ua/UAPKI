@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AttributeCertificateV1.c"
+
 #include "AttributeCertificateV1.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AttributeCertificateV1.c"
 
 static asn_TYPE_member_t asn_MBR_AttributeCertificateV1_1[] = {
     {
@@ -110,3 +109,5 @@ asn_TYPE_descriptor_t *get_AttributeCertificateV1_desc(void)
 {
     return &AttributeCertificateV1_desc;
 }
+
+

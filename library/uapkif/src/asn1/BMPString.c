@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/BMPString.c"
+
 #include "asn_internal.h"
 #include "BMPString.h"
 #include "UTF8String.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/BMPString.c"
 /*
  * BMPString basic type description.
  */
@@ -231,4 +231,5 @@ BMPString_print(asn_TYPE_descriptor_t *td, const void *sptr, int ilevel,
 
     return 0;
 }
+
 

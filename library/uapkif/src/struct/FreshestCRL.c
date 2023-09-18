@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/FreshestCRL.c"
+
 #include "FreshestCRL.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/FreshestCRL.c"
 
 int
 FreshestCRL_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -164,3 +163,5 @@ asn_TYPE_descriptor_t *get_FreshestCRL_desc(void)
 {
     return &FreshestCRL_desc;
 }
+
+

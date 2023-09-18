@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/DisplayText.c"
+
 #include "DisplayText.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/DisplayText.c"
 
 static int check_permitted_alphabet_2(const void *sptr)
 {
@@ -231,3 +230,5 @@ asn_TYPE_descriptor_t *get_DisplayText_desc(void)
 {
     return &DisplayText_desc;
 }
+
+

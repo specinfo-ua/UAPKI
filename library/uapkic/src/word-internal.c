@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/word-internal.c"
+
 #include <string.h>
 
 #include "word-internal.h"
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/word-internal.c"
 
 WordArray *wa_alloc(size_t len)
 {

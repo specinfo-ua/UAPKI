@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AttCertIssuer.c"
+
 #include "AttCertIssuer.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AttCertIssuer.c"
 
 static asn_TYPE_member_t asn_MBR_AttCertIssuer_1[] = {
     {
@@ -95,3 +94,5 @@ asn_TYPE_descriptor_t *get_AttCertIssuer_desc(void)
 {
     return &AttCertIssuer_desc;
 }
+
+

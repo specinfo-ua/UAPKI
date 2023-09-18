@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Extension.c"
+
 #include "Extension.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Extension.c"
 
 static asn_TYPE_member_t asn_MBR_Extension_1[] = {
     {
@@ -110,3 +109,5 @@ asn_TYPE_descriptor_t *get_Extension_desc(void)
 {
     return &Extension_desc;
 }
+
+

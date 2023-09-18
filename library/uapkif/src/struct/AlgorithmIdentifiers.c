@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AlgorithmIdentifiers.c"
+
 #include "AlgorithmIdentifiers.h"
 
 #include "asn_internal.h"
 
 #include "AlgorithmIdentifier.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AlgorithmIdentifiers.c"
 
 static asn_TYPE_member_t asn_MBR_AlgorithmIdentifiers_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_AlgorithmIdentifiers_desc(void)
 {
     return &AlgorithmIdentifiers_desc;
 }
+
+

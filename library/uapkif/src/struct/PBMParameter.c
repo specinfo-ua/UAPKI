@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PBMParameter.c"
+
 #include "PBMParameter.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PBMParameter.c"
 
 static asn_TYPE_member_t asn_MBR_PBMParameter_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct PBMParameter, salt),
@@ -117,3 +116,5 @@ asn_TYPE_descriptor_t* get_PBMParameter_desc(void)
 {
     return &PBMParameter_desc;
 }
+
+

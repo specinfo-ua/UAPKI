@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/byte-utils-internal.c"
+
 #include <stddef.h>
 #include <string.h>
 
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/byte-utils-internal.c"
 
 const int big_endian_test = 1;
 #define is_bigendian() ((*(char*)&big_endian_test) == 0)

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/ber_tlv_length.c"
+
 #include "asn_internal.h"
 #include "ber_tlv_length.h"
 #include "ber_tlv_tag.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/ber_tlv_length.c"
 
 ssize_t
 ber_fetch_length(int _is_constructed, const void *bufptr, size_t size,
@@ -220,4 +219,5 @@ der_tlv_length_serialize(ber_tlv_len_t len, void *bufp, size_t size)
 
     return required_size + 1;
 }
+
 

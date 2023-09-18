@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RevocationInfoChoices.c"
+
 #include "RevocationInfoChoices.h"
 
 #include "asn_internal.h"
 
 #include "RevocationInfoChoice.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/RevocationInfoChoices.c"
 
 static asn_TYPE_member_t asn_MBR_RevocationInfoChoices_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_RevocationInfoChoices_desc(void)
 {
     return &RevocationInfoChoices_desc;
 }
+
+

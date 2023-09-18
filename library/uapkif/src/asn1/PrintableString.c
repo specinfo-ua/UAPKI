@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/PrintableString.c"
+
 #include "asn_internal.h"
 #include "PrintableString.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/PrintableString.c"
 
 /*
  * ASN.1:1984 (X.409)
@@ -142,3 +141,5 @@ PrintableString_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
 
     return 0;
 }
+
+

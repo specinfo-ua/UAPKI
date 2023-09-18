@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-gf2m-internal.c"
+
 #include <stdint.h>
 #include <string.h>
 
 #include "math-gf2m-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-gf2m-internal.c"
 
 /* Таблица предварительных вычислений для возведения у квадрат. */
 static const uint16_t GF2M_SQR_PRECOMP[256] = {

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-gfp-internal.c"
+
 #include "math-gfp-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-gfp-internal.c"
 
 static WordArray *gfp_mod_inv_ext_euclid(const WordArray *in, const WordArray *p)
 {

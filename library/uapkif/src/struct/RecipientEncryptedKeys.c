@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RecipientEncryptedKeys.c"
+
 #include "RecipientEncryptedKeys.h"
 
 #include "asn_internal.h"
 
 #include "RecipientEncryptedKey.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/RecipientEncryptedKeys.c"
 
 static asn_TYPE_member_t asn_MBR_RecipientEncryptedKeys_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_RecipientEncryptedKeys_desc(void)
 {
     return &RecipientEncryptedKeys_desc;
 }
+
+

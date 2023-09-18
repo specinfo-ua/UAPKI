@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/GeneralizedTime.c"
+
 #include "asn_internal.h"
 #include "asn1-utils.h"
 #include "GeneralizedTime.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/GeneralizedTime.c"
 
 #ifdef    __CYGWIN__
 #include "/usr/include/time.h"
@@ -145,3 +144,5 @@ GeneralizedTime_print(asn_TYPE_descriptor_t *td, const void *sptr, int ilevel,
         return (cb("<absent>", 8, app_key) < 0) ? -1 : 0;
     }
 }
+
+

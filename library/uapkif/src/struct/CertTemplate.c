@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertTemplate.c"
+
 #include "CertTemplate.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertTemplate.c"
 
 static asn_TYPE_member_t asn_MBR_CertTemplate_1[] = {
     { ATF_POINTER, 10, offsetof(struct CertTemplate, version),
@@ -177,3 +176,5 @@ asn_TYPE_descriptor_t* get_CertTemplate_desc(void)
 {
     return &CertTemplate_desc;
 }
+
+

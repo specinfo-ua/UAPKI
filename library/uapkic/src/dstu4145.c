@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/dstu4145.c"
+
 #include <string.h>
 
 #include "dstu4145.h"
@@ -34,9 +36,6 @@
 #include "ec-cache-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/dstu4145.c"
 
 int dstu4145_generate_privkey(const EcCtx *ctx, ByteArray **d)
 {

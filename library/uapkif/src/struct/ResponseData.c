@@ -26,14 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ResponseData.c"
+
 #include "ResponseData.h"
 
 #include "asn_internal.h"
 
 #include "Extensions.h"
 #include "SingleResponse.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ResponseData.c"
 
 static int asn_DFL_2_set_0(int set_value, void **sptr)
 {
@@ -206,3 +206,5 @@ asn_TYPE_descriptor_t *get_ResponseData_desc(void)
 {
     return &ResponseData_desc;
 }
+
+

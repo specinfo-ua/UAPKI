@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKIMessage.c"
+
 #include "PKIMessage.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKIMessage.c"
 
 static asn_TYPE_member_t asn_MBR_PKIMessage_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct PKIMessage, header),
@@ -143,3 +142,5 @@ asn_TYPE_descriptor_t* get_PKIMessage_desc(void)
 {
     return &PKIMessage_desc;
 }
+
+

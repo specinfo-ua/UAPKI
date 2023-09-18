@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/KeyAgreeRecipientIdentifier.c"
+
 #include "KeyAgreeRecipientIdentifier.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/KeyAgreeRecipientIdentifier.c"
 
 static asn_TYPE_member_t asn_MBR_KeyAgreeRecipientIdentifier_1[] = {
     {
@@ -95,3 +94,5 @@ asn_TYPE_descriptor_t *get_KeyAgreeRecipientIdentifier_desc(void)
 {
     return &KeyAgreeRecipientIdentifier_desc;
 }
+
+

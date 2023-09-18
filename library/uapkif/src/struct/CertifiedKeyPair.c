@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertifiedKeyPair.c"
+
 #include "CertifiedKeyPair.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertifiedKeyPair.c"
 
 static asn_TYPE_member_t asn_MBR_CertifiedKeyPair_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct CertifiedKeyPair, certOrEncCert),
@@ -108,3 +107,5 @@ asn_TYPE_descriptor_t* get_CertifiedKeyPair_desc(void)
 {
     return &CertifiedKeyPair_desc;
 }
+
+

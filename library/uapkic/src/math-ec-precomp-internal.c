@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-ec-precomp-internal.c"
+
 #include "math-ec-precomp-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-ec-precomp-internal.c"
 
 EcPrecomp *ec_copy_precomp_with_alloc(EcPrecomp *precomp)
 {

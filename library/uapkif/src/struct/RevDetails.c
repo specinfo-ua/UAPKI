@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RevDetails.c"
+
 #include "RevDetails.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/RevDetails.c"
 
 static asn_TYPE_member_t asn_MBR_RevDetails_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct RevDetails, certDetails),
@@ -97,3 +96,5 @@ asn_TYPE_descriptor_t* get_RevDetails_desc(void)
 {
     return &RevDetails_desc;
 }
+
+

@@ -25,15 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/eckcdsa.c"
+
 #include <string.h>
 #include "eckcdsa.h"
 #include "ec-internal.h"
 #include "ec-cache-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/eckcdsa.c"
 
 int eckcdsa_generate_privkey(const EcCtx *ctx, ByteArray **d)
 {

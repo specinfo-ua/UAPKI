@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/xer_support.c"
+
 #include "asn_application.h"
 #include "asn_internal.h"
 #include "xer_support.h"        /* XER/XML parsing support */
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/xer_support.c"
 
 /*
  * Decode the XER encoding of a given type.
@@ -423,3 +422,5 @@ xer_skip_unknown(xer_check_tag_e tcv, ber_tlv_len_t *depth)
         return -1;
     }
 }
+
+

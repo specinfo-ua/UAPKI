@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/entropy.c"
+
 #include <time.h>
 #include <string.h>
 
@@ -43,9 +45,6 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 #include "byte-utils-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/entropy.c"
 
 #ifndef __EMSCRIPTEN__
 static int os_prng(void *rnd, size_t size)

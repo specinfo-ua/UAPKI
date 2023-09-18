@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/OtherPrimeInfo.c"
+
 #include "OtherPrimeInfo.h"
 
 #include "asn_internal.h"
 #include "constr_SEQUENCE.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/OtherPrimeInfo.c"
 
 static asn_TYPE_member_t asn_MBR_OtherPrimeInfo_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct OtherPrimeInfo, prime),
@@ -108,3 +107,5 @@ asn_TYPE_descriptor_t *get_OtherPrimeInfo_desc(void)
 {
     return &OtherPrimeInfo_desc;
 }
+
+ 

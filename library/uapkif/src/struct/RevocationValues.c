@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/RevocationValues.c"
+
 #include "RevocationValues.h"
 #include "asn_internal.h"
 #include "CertificateList.h"
 #include "BasicOCSPResponse.h"
 #include "OtherRevVals.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/struct/RevocationValues.c"
 
 static asn_TYPE_member_t asn_MBR_crlVals_2[] = {
     {
@@ -204,3 +203,5 @@ asn_TYPE_descriptor_t *get_RevocationValues_desc(void)
 {
     return &RevocationValues_desc;
 }
+
+

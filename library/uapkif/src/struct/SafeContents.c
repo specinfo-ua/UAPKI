@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SafeContents.c"
+
 #include "SafeContents.h"
 
 #include "asn_internal.h"
-
 #include "SafeBag.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SafeContents.c"
 
 static asn_TYPE_member_t asn_MBR_SafeContents_1[] = {
     {
@@ -82,3 +81,5 @@ asn_TYPE_descriptor_t *get_SafeContents_desc(void)
 {
     return &SafeContents_desc;
 }
+
+

@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-ec-point-internal.c"
+
 #include "math-ec-point-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-ec-point-internal.c"
 
 ECPoint *ec_point_alloc(size_t len)
 {

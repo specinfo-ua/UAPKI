@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AttCertVersionV1.c"
+
 #include "AttCertVersionV1.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AttCertVersionV1.c"
 
 int
 AttCertVersionV1_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -146,3 +145,5 @@ asn_TYPE_descriptor_t *get_AttCertVersionV1_desc(void)
 {
     return &AttCertVersionV1_desc;
 }
+
+

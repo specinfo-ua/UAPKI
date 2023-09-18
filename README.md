@@ -20,9 +20,9 @@ Expert conclusion on the results of the Ukrainian state expertise in the field o
 ## Supported cryptographic algorithms
 
 + Digital signatures: DSTU 4145-2002, ECDSA, RSA, EC-GDSA, EC-RDSA, SM2-DSA
-+ Hashes: DSTU 7564:2014 (Kalyna), GOST 34.311-95, MD5, SHA1, SHA2, SHA3, WHIRLPOOL, RIPEMD, GOST R 34.11-2012, SM3
++ Hashes: DSTU 7564:2014 (Kupyna), GOST 34.311-95, MD5, SHA1, SHA2, SHA3, WHIRLPOOL, RIPEMD, GOST R 34.11-2012, SM3
 + HMACs based at all hashes
-+ Symmetric ciphers: DSTU 7624:2014 (Kupyna), DSTU 8845:2019 (Strumok), GOST 28147-89 (Magma), AES, DES, TDES
++ Symmetric ciphers: DSTU 7624:2014 (Kalyna), DSTU 8845:2019 (Strumok), GOST 28147-89 (Magma), AES, DES, TDES
 + Asymmetric ciphers: RSA
 + Key agreement: ECDH
 

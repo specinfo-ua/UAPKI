@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/EncryptedValue.c"
+
 #include "EncryptedValue.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/EncryptedValue.c"
 
 static asn_TYPE_member_t asn_MBR_EncryptedValue_1[] = {
     { ATF_POINTER, 5, offsetof(struct EncryptedValue, intendedAlg),
@@ -137,3 +136,5 @@ asn_TYPE_descriptor_t* get_EncryptedValue_desc(void)
 {
     return &EncryptedValue_desc;
 }
+
+

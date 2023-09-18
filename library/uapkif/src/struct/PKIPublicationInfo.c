@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKIPublicationInfo.c"
+
 #include "PKIPublicationInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKIPublicationInfo.c"
 
 static asn_TYPE_member_t asn_MBR_PKIPublicationInfo_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct PKIPublicationInfo, action),
@@ -97,3 +96,5 @@ asn_TYPE_descriptor_t* get_PKIPublicationInfo_desc(void)
 {
     return &PKIPublicationInfo_desc;
 }
+
+

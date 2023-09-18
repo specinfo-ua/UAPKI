@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/math-int-internal.c"
+
 #include <memory.h>
 
 #include "drbg.h"
 #include "math-int-internal.h"
 #include "math-gfp-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/math-int-internal.c"
 
 static size_t words_len(const word_t *a, size_t len)
 {
@@ -1102,9 +1101,9 @@ int int_get_naf_extra_add(const WordArray *in, const int *naf, int width, int *e
     int extra_add_local = 0;
     size_t bitlen = 0;
 
-    CHECK_PARAM(in != NULL)
-    CHECK_PARAM(naf != NULL)
-    CHECK_PARAM(extra_addition != NULL)
+    CHECK_PARAM(in != NULL);
+    CHECK_PARAM(naf != NULL);
+    CHECK_PARAM(extra_addition != NULL);
 
     bitlen = int_bit_len(in);
 
@@ -1134,9 +1133,9 @@ int int_get_naf(const WordArray *in, int width, int **out)
     int ret = RET_OK;
     size_t bitlen = 0;
 
-    CHECK_PARAM(in != NULL)
-    CHECK_PARAM(out != NULL)
-    CHECK_PARAM(width >= 0)
+    CHECK_PARAM(in != NULL);
+    CHECK_PARAM(out != NULL);
+    CHECK_PARAM(width >= 0);
 
     bitlen = in->len << WORD_BIT_LEN_SHIFT;
     word_t carry = 0;

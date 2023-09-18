@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PBKDF2-params.c"
+
 #include "PBKDF2-params.h"
 
 #include "asn_internal.h"
 
 #include "AlgorithmIdentifier.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PBKDF2-params.c"
 
 static int
 memb_iterationCount_constraint_1(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -187,3 +187,5 @@ asn_TYPE_descriptor_t *get_PBKDF2_params_desc(void)
 {
     return &PBKDF2_params_desc;
 }
+
+

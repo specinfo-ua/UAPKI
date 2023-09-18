@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Name.c"
+
 #include "Name.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Name.c"
 
 static asn_TYPE_member_t asn_MBR_Name_1[] = {
     {
@@ -84,3 +83,5 @@ asn_TYPE_descriptor_t *get_Name_desc(void)
 {
     return &Name_desc;
 }
+
+

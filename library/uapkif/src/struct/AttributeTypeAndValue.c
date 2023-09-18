@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AttributeTypeAndValue.c"
+
 #include "AttributeTypeAndValue.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AttributeTypeAndValue.c"
 
 static asn_TYPE_member_t asn_MBR_AttributeTypeAndValue_1[] = {
     {
@@ -98,3 +97,5 @@ asn_TYPE_descriptor_t *get_AttributeTypeAndValue_desc(void)
 {
     return &AttributeTypeAndValue_desc;
 }
+
+

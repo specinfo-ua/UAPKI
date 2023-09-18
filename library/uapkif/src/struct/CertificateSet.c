@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertificateSet.c"
+
 #include "CertificateSet.h"
 
 #include "asn_internal.h"
 
 #include "CertificateChoices.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertificateSet.c"
 
 static asn_TYPE_member_t asn_MBR_CertificateSet_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_CertificateSet_desc(void)
 {
     return &CertificateSet_desc;
 }
+
+

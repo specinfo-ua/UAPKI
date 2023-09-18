@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Accuracy.c"
+
 #include "Accuracy.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Accuracy.c"
 
 static int
 memb_millis_constraint_1(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -162,3 +161,5 @@ asn_TYPE_descriptor_t *get_Accuracy_desc(void)
 {
     return &Accuracy_desc;
 }
+
+

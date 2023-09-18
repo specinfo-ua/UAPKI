@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CrlValidatedID.c"
+
 #include "CrlValidatedID.h"
 
 #include "asn_internal.h"
 
 #include "CrlIdentifier.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CrlValidatedID.c"
 
 static asn_TYPE_member_t asn_MBR_CrlValidatedID_1[] = {
     {
@@ -100,3 +100,5 @@ asn_TYPE_descriptor_t *get_CrlValidatedID_desc(void)
 {
     return &CrlValidatedID_desc;
 }
+
+

@@ -63,7 +63,7 @@
 #include "pbkdf.h"
 #include "keywrap.h"
 #include "paddings.h"
-#include "stacktrace.h"
+//#include "stacktrace.h"
 #include "uapkic-errors.h"
 
 

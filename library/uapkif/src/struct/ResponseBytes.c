@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ResponseBytes.c"
+
 #include "ResponseBytes.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ResponseBytes.c"
 
 static asn_TYPE_member_t asn_MBR_ResponseBytes_1[] = {
     {
@@ -99,3 +98,5 @@ asn_TYPE_descriptor_t *get_ResponseBytes_desc(void)
 {
     return &ResponseBytes_desc;
 }
+
+

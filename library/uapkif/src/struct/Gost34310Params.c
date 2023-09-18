@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Gost34310Params.c"
+
 #include "Gost34310Params.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Gost34310Params.c"
 
 static asn_TYPE_member_t asn_MBR_sequence_2[] = {
     {
@@ -173,3 +172,5 @@ asn_TYPE_descriptor_t *get_Gost34310Params_desc(void)
 {
     return &Gost34310Params_desc;
 }
+
+

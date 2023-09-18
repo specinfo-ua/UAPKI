@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/NULL.c"
+
 #include "asn_internal.h"
 #include "asn_codecs_prim.h"
 #include "NULL.h"
 #include "BOOLEAN.h"    /* Implemented in terms of BOOLEAN type */
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/NULL.c"
 /*
  * NULL basic type description.
  */
@@ -187,3 +187,5 @@ NULL_encode_uper(asn_TYPE_descriptor_t *td, asn_per_constraints_t *constraints,
     er.encoded = 0;
     ASN__ENCODED_OK(er);
 }
+
+

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertRequest.c"
+
 #include "CertRequest.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertRequest.c"
 
 static asn_TYPE_member_t asn_MBR_CertRequest_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct CertRequest, certReqId),
@@ -107,3 +106,5 @@ asn_TYPE_descriptor_t* get_CertRequest_desc(void)
 {
     return &CertRequest_desc;
 }
+
+

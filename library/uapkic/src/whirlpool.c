@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/whirlpool.c"
+
 #include <string.h>
 #include <stddef.h>
 
@@ -32,9 +34,6 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/whirlpool.c"
 
 struct WhirlpoolCtx_st {
     uint64_t length, state[8];
@@ -331,5 +330,3 @@ cleanup:
     whirlpool_free(ctx);
     return ret;
 }
-
-

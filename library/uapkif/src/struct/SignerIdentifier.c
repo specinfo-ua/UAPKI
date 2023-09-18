@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SignerIdentifier.c"
+
 #include "SignerIdentifier.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SignerIdentifier.c"
 
 static asn_TYPE_member_t asn_MBR_SignerIdentifier_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct SignerIdentifier, choice.issuerAndSerialNumber),
@@ -93,3 +92,5 @@ asn_TYPE_descriptor_t* get_SignerIdentifier_desc(void)
 {
     return &SignerIdentifier_desc;
 }
+
+

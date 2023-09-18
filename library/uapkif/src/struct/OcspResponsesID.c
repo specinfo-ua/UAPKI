@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/OcspResponsesID.c"
+
 #include "OcspResponsesID.h"
 
 #include "asn_internal.h"
 
 #include "OtherHash.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/OcspResponsesID.c"
 
 static asn_TYPE_member_t asn_MBR_OcspResponsesID_1[] = {
     {
@@ -100,3 +100,5 @@ asn_TYPE_descriptor_t *get_OcspResponsesID_desc(void)
 {
     return &OcspResponsesID_desc;
 }
+
+

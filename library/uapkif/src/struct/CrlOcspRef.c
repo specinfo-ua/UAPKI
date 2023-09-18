@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CrlOcspRef.c"
+
 #include "CrlOcspRef.h"
 
 #include "asn_internal.h"
@@ -33,8 +35,6 @@
 #include "CRLListID.h"
 #include "OcspListID.h"
 #include "OtherRevRefs.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CrlOcspRef.c"
 
 static asn_TYPE_member_t asn_MBR_CrlOcspRef_1[] = {
     {
@@ -113,3 +113,5 @@ asn_TYPE_descriptor_t *get_CrlOcspRef_desc(void)
 {
     return &CrlOcspRef_desc;
 }
+
+

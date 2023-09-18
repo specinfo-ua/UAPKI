@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/md5.c"
+
 #include <inttypes.h>
 #include <memory.h>
 
@@ -33,9 +35,6 @@
 #include "byte-array-internal.h"
 #include "macros-internal.h"
 #include "byte-utils-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/md5.c"
 
 struct MD5Ctx_st {
     uint32_t state[4]; /* state (ABCD) */

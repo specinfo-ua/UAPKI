@@ -26,10 +26,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "asn_internal.h"
+#define FILE_MARKER "uapkif/asn1/ber_decoder.c"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/ber_decoder.c"
+#include "asn_internal.h"
 
 #undef    ADVANCE
 #define    ADVANCE(num_bytes)    do {                    \
@@ -332,3 +331,5 @@ ber_check_tags(asn_codec_ctx_t *opt_codec_ctx,
 
     RETURN(RC_OK);
 }
+
+

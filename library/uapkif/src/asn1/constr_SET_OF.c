@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constr_set_of.c"
+
 #include "asn_internal.h"
 #include "constr_SET_OF.h"
 #include "asn_SET_OF.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constr_set_of.c"
 
 /*
  * Number of bytes left for this structure.
@@ -1250,4 +1249,5 @@ SET_OF_decode_uper(asn_codec_ctx_t *opt_codec_ctx, asn_TYPE_descriptor_t *td,
     rv.consumed = 0;
     return rv;
 }
+
 

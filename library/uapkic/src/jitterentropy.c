@@ -26,6 +26,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/jitterentropy.c"
+
 #include "jitterentropy-internal.h"
 
  /* Timer-less entropy source */
@@ -157,7 +159,7 @@ static inline void* jent_zalloc(size_t len)
 static inline void jent_zfree(void* ptr, unsigned int len)
 {
 	if (ptr) {
-		memset(ptr, 0, len);
+		secure_zero(ptr, len);
 		free(ptr);
 	}
 }
@@ -787,7 +789,7 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 			tocopy = (DATA_SIZE_BITS / 8);
 		else
 			tocopy = len;
-		memcpy(p, &ec->data->buf, tocopy);
+		memcpy(p, ba_get_buf_const(ec->data), tocopy);
 
 		len -= tocopy;
 		p += tocopy;

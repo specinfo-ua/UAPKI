@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/BasicConstraints.c"
+
 #include "BasicConstraints.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/BasicConstraints.c"
 
 static int
 memb_pathLenConstraint_constraint_1(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -127,3 +126,5 @@ asn_TYPE_descriptor_t *get_BasicConstraints_desc(void)
 {
     return &BasicConstraints_desc;
 }
+
+

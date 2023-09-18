@@ -26,12 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/per_decoder.c"
+
 #include "asn_application.h"
 #include "asn_internal.h"
 #include "per_decoder.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/per_decoder.c"
 /*
  * Decode a "Production of a complete encoding", X.691#10.1.
  * The complete encoding contains at least one byte, and is an integral
@@ -127,4 +127,5 @@ uper_decode(asn_codec_ctx_t *opt_codec_ctx, asn_TYPE_descriptor_t *td, void **sp
     }
     return rval;
 }
+
 

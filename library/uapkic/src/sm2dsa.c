@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/sm2dsa.c"
+
 #include <string.h>
 #include "sm2dsa.h"
 #include "ec-internal.h"
@@ -32,9 +34,6 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 #include "sm3.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/sm2dsa.c"
 
 int sm2dsa_generate_privkey(const EcCtx *ctx, ByteArray **d)
 {

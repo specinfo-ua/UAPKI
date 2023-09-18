@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/asn_codecs_prim.c"
+
 #include "asn_internal.h"
 #include "asn_codecs_prim.h"
 #include <errno.h>
@@ -33,9 +35,6 @@
 /*
  * Decode an always-primitive type.
  */
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/asn_codecs_prim.c"
 
 asn_dec_rval_t
 ber_decode_primitive(asn_codec_ctx_t *opt_codec_ctx,
@@ -355,4 +354,3 @@ xer_decode_primitive(asn_codec_ctx_t *opt_codec_ctx,
     }
     return rc;
 }
-

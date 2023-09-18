@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/der_encoder.c"
+
 #include "asn_internal.h"
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/der_encoder.c"
 
 static ssize_t der_write_TL(ber_tlv_tag_t tag, ber_tlv_len_t len,
         asn_app_consume_bytes_f *cb, void *app_key, int constructed);
@@ -248,3 +247,5 @@ der_write_TL(ber_tlv_tag_t tag, ber_tlv_len_t len,
 
     return size;
 }
+
+

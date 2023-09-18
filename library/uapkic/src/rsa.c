@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/rsa.c"
+
 #include <memory.h>
 
 #include "rsa.h"
@@ -34,9 +36,6 @@
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
 #include "drbg.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/rsa.c"
 
 typedef enum {
     RSA_MODE_NONE = 0,
@@ -63,17 +62,19 @@ struct RsaCtx_st {
 #define MIN_RSA_BITS     (512)
 #define MAX_RSA_BITS    (8192)
 
-#define WA_TO_BE_WITH_TRUNC(wa, ba) {                   \
-    CHECK_NOT_NULL(ba = wa_to_ba(wa));                  \
-    DO(ba_change_len(ba, (int_bit_len(wa) + 7) >> 3));  \
-    DO(ba_swap(ba));                                    \
-}
+#define WA_TO_BE_WITH_TRUNC(wa, ba)                         \
+    do {                                                    \
+        CHECK_NOT_NULL(ba = wa_to_ba(wa));                  \
+        DO(ba_change_len(ba, (int_bit_len(wa) + 7) >> 3));  \
+        DO(ba_swap(ba));                                    \
+    } while(0)
 
-#define WA_TO_BE_WITH_N_LEN(ctx, wa, ba) {                   \
-    CHECK_NOT_NULL(ba = wa_to_ba(wa));                  \
-    DO(ba_change_len(ba, (int_bit_len((ctx)->gfp->p) + 7) >> 3));  \
-    DO(ba_swap(ba));                                    \
-}
+#define WA_TO_BE_WITH_N_LEN(ctx, wa, ba)                    \
+    do {                                                    \
+        CHECK_NOT_NULL(ba = wa_to_ba(wa));                  \
+        DO(ba_change_len(ba, (int_bit_len((ctx)->gfp->p) + 7) >> 3)); \
+        DO(ba_swap(ba));                                    \
+    } while(0)
 
 static int mgf(HashAlg hash_alg, const void *seed, size_t seed_len, uint8_t *mask, size_t mask_len)
 {
@@ -155,7 +156,7 @@ cleanup:
     return ret;
 }
 
-static int rsa_encrypt_pkcs1_v1_5(RsaCtx *ctx, const ByteArray *data, ByteArray **out)
+static int rsa_encrypt_pkcs1_v1_5(const RsaCtx *ctx, const ByteArray *data, ByteArray **out)
 {
     uint8_t *m = NULL;
     size_t len;
@@ -217,7 +218,7 @@ cleanup:
     return ret;
 }
 
-static int rsa_decrypt_pkcs1_v1_5(RsaCtx *ctx, const ByteArray *data, ByteArray **out)
+static int rsa_decrypt_pkcs1_v1_5(const RsaCtx *ctx, const ByteArray *data, ByteArray **out)
 {
     size_t i;
     uint8_t *m = NULL;
@@ -259,7 +260,7 @@ cleanup:
     return ret;
 }
 
-static int rsa_encrypt_oaep(RsaCtx *ctx, const ByteArray *msg, const ByteArray *L, const ByteArray* seed, ByteArray **out)
+static int rsa_encrypt_oaep(const RsaCtx *ctx, const ByteArray *msg, const ByteArray *L, const ByteArray* seed, ByteArray **out)
 {
     WordArray *wm = NULL;
     WordArray *wout = NULL;
@@ -275,16 +276,16 @@ static int rsa_encrypt_oaep(RsaCtx *ctx, const ByteArray *msg, const ByteArray *
 
     hlen = hash_get_size(ctx->hash_alg);
     len = ctx->gfp->p->len * WORD_BYTE_LENGTH;
-    dblen = (uint8_t)(len - hlen - 1);
 
     if (len < (hlen * 2 + 2)) {
-        SET_ERROR(RET_INVALID_CTX);
+        SET_ERROR(RET_DATA_TOO_LONG);
     }
 
     if (msg->len > (len - hlen * 2 - 2)) {
         SET_ERROR(RET_DATA_TOO_LONG);
     }
 
+    dblen = len - hlen - 1;
 
     MALLOC_CHECKED(em, len);
 
@@ -368,7 +369,12 @@ static int rsa_decrypt_oaep(RsaCtx *ctx, const ByteArray *msg, ByteArray **out)
 
     hlen = hash_get_size(ctx->hash_alg);
     len = ctx->gfp->p->len * WORD_BYTE_LENGTH;
-    dblen = (uint8_t)(len - hlen - 1);
+
+    if (len < (2 * hlen + 2)) {
+        SET_ERROR(RET_VERIFY_FAILED);
+    }
+
+    dblen = len - hlen - 1;
 
     DO(ba_to_uint8_with_alloc(msg, &c, &c_len));
     CHECK_NOT_NULL(c);
@@ -377,10 +383,6 @@ static int rsa_decrypt_oaep(RsaCtx *ctx, const ByteArray *msg, ByteArray **out)
     db = (uint8_t *)c + 1 + hlen;
 
     CHECK_NOT_NULL(lhash = oaep_get_lhash(ctx->hash_alg, ctx->label));
-
-    if (len < (2 * hlen + 2)) {
-        SET_ERROR(RET_VERIFY_FAILED);
-    }
 
     DO(rsaedp(ctx->gfp, ctx->d, wc, &wem));
 
@@ -1259,7 +1261,7 @@ static int rsa_pss_encode(RsaCtx* ctx, const ByteArray* H, const ByteArray* salt
     }
 
     MALLOC_CHECKED(mask, modulus_len - hlen - 1 - offset);
-    DO(mgf(ctx->hash_alg, hash->buf, hash->len, mask, modulus_len - hlen - 1 - offset))
+    DO(mgf(ctx->hash_alg, hash->buf, hash->len, mask, modulus_len - hlen - 1 - offset));
 
     // mask DB
     for (i = 0; i < (modulus_len - hlen - 1 - offset); i++) {
@@ -1318,7 +1320,7 @@ static int rsa_pss_decode_check(RsaCtx* ctx, const ByteArray* H, const ByteArray
     }
 
     MALLOC_CHECKED(mask, modulus_len - hlen - 1 - offset);
-    DO(mgf(ctx->hash_alg, encoded->buf + modulus_len - hlen - 1, hlen, mask, modulus_len - hlen - 1 - offset))
+    DO(mgf(ctx->hash_alg, encoded->buf + modulus_len - hlen - 1, hlen, mask, modulus_len - hlen - 1 - offset));
 
     if (offset == 0) {
         mask[0] &= 0xFF >> ((modulus_len << 3) - msb);

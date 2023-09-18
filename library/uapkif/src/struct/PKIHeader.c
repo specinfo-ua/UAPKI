@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKIHeader.c"
+
 #include "PKIHeader.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKIHeader.c"
 
 static asn_TYPE_member_t asn_MBR_PKIHeader_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct PKIHeader, pvno),
@@ -213,3 +212,5 @@ asn_TYPE_descriptor_t* get_PKIHeader_desc(void)
 {
     return &PKIHeader_desc;
 }
+
+

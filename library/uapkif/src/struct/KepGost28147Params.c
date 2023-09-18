@@ -26,13 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/KepGost28147Params.c"
+
 #include "KepGost28147Params.h"
 
 #include "asn_internal.h"
 #include "constr_SEQUENCE.h"
-
-#undef FILE_MARKER 
-#define FILE_MARKER "struct/KepGost28147Params.c"
 
 static int
 memb_dke_constraint_1(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -187,3 +186,5 @@ asn_TYPE_descriptor_t *get_KepGost28147Params_desc(void)
 {
     return &KepGost28147Params_desc;
 }
+
+ 

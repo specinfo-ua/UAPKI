@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertID.c"
+
 #include "CertID.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertID.c"
 
 static asn_TYPE_member_t asn_MBR_CertID_1[] = {
     {
@@ -121,3 +120,5 @@ asn_TYPE_descriptor_t *get_CertID_desc(void)
 {
     return &CertID_desc;
 }
+
+

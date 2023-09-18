@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/X509Tbs.c"
+
 #include "X509Tbs.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/struct/X509Tbs.c"
 
 static asn_TYPE_member_t asn_MBR_X509Tbs_1[] = {
     { ATF_OPEN_TYPE | ATF_NOFLAGS, 0, offsetof(struct X509Tbs, tbsData),
@@ -106,3 +105,5 @@ asn_TYPE_descriptor_t *get_X509Tbs_desc(void)
 {
     return &X509Tbs_desc;
 }
+
+

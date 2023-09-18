@@ -26,14 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/byte-array-internal.c"
+
 #include <string.h>
 
 #include "byte-array-internal.h"
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/byte-array-internal.c"
 
 ByteArray *ba_alloc_from_uint8_be(const uint8_t *buf, size_t buf_len)
 {

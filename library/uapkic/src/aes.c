@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/aes.c"
+
 #include <memory.h>
 
 #include "macros-internal.h"
@@ -34,8 +36,6 @@
 #include "byte-utils-internal.h"
 #include "drbg.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/aes.c"
 #define AES_BLOCK_LEN 16
 #define AES_KEY128_LEN 16
 #define AES_KEY192_LEN 24
@@ -1418,10 +1418,10 @@ static int decrypt_cbc(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
     CHECK_NOT_NULL(out = ba_copy_with_alloc(src, 0, 0));
 
     for (; data_off + AES_BLOCK_LEN <= src->len; data_off += AES_BLOCK_LEN) {
-        memcpy(&ctx->gamma[AES_BLOCK_LEN], &out->buf[data_off], AES_BLOCK_LEN);
+        memcpy(ctx->feed, &out->buf[data_off], AES_BLOCK_LEN);
         block_decrypt(ctx, &out->buf[data_off], &out->buf[data_off]);
         aes_xor(&out->buf[data_off], ctx->gamma, &out->buf[data_off]);
-        memcpy(ctx->gamma, &ctx->gamma[AES_BLOCK_LEN], AES_BLOCK_LEN);
+        memcpy(ctx->gamma, ctx->feed, AES_BLOCK_LEN);
     }
 
     *dst = out;
@@ -1511,14 +1511,19 @@ cleanup:
 int aes_generate_key(size_t key_len, ByteArray **key)
 {
     int ret = RET_OK;
+    ByteArray* k = NULL;
 
-    CHECK_PARAM(key_len == 16 || key_len == 24 || key_len == 32)
+    CHECK_PARAM(key_len == 16 || key_len == 24 || key_len == 32);
 
-    CHECK_NOT_NULL(*key = ba_alloc_by_len(key_len));
-    DO(drbg_random(*key));
+    CHECK_NOT_NULL(k = ba_alloc_by_len(key_len));
+    DO(drbg_random(k));
+
+    *key = k;
+    k = NULL;
 
 cleanup:
 
+    ba_free(k);
     return ret;
 }
 

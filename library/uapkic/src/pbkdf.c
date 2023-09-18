@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/pbkdf.c"
+
 #ifdef _WIN32
 #include <windows.h>
 #elif defined(__linux__) || defined(__APPLE__) || defined(__GNUC__)
@@ -38,9 +40,6 @@
 #include "byte-array-internal.h"
 #include "pbkdf.h"
 #include "hmac.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/pbkdf.c"
 
  //PBKDF1 && PBKDF2
  //RFC: https://www.ietf.org/rfc/rfc2898.txt

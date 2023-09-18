@@ -26,14 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SignedData.c"
+
 #include "SignedData.h"
 
 #include "asn_internal.h"
 
 #include "CertificateSet.h"
 #include "RevocationInfoChoices.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/SignedData.c"
 
 static asn_TYPE_member_t asn_MBR_SignedData_1[] = {
     {
@@ -145,3 +145,5 @@ asn_TYPE_descriptor_t *get_SignedData_desc(void)
 {
     return &SignedData_desc;
 }
+
+

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/SignerInfo.c"
+
 #include "SignerInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/struct/SignerInfo.c"
 
 static asn_TYPE_member_t asn_MBR_SignerInfo_1[] = {
     { ATF_NOFLAGS, 0, offsetof(struct SignerInfo, version),
@@ -144,3 +143,5 @@ asn_TYPE_descriptor_t* get_SignerInfo_desc(void)
 {
     return &SignerInfo_desc;
 }
+
+

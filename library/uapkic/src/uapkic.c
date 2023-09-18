@@ -25,9 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
  
+#define FILE_MARKER "uapkic/uapkic.c"
+
 #include "uapkic.h"
 #include "macros-internal.h"
-
 
 uint32_t uapkic_self_test(void)
 {

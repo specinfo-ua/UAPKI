@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/xer_encoder.c"
+
 #include "asn_internal.h"
 #include <stdio.h>
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/xer_encoder.c"
 
 /*
  * The XER encoder of any type. May be invoked by the application.
@@ -104,3 +103,5 @@ xer_fprint(FILE *stream, asn_TYPE_descriptor_t *td, void *sptr)
 
     return fflush(stream);
 }
+
+

@@ -25,15 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/drbg.c"
+
 #include <string.h>
 #include "drbg.h"
 #include "pthread-internal.h"
 #include "entropy-internal.h"
 #include "macros-internal.h"
 #include "byte-array-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/drbg.c"
 
 #include "hmac.h"
 

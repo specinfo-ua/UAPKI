@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/AttributeCertificateInfo.c"
+
 #include "AttributeCertificateInfo.h"
 
 #include "asn_internal.h"
 
 #include "Extensions.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/AttributeCertificateInfo.c"
 
 static asn_TYPE_member_t asn_MBR_AttributeCertificateInfo_1[] = {
     {
@@ -178,3 +178,5 @@ asn_TYPE_descriptor_t *get_AttributeCertificateInfo_desc(void)
 {
     return &AttributeCertificateInfo_desc;
 }
+
+

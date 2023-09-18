@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ExtendedKeyUsage.c"
+
 #include "ExtendedKeyUsage.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ExtendedKeyUsage.c"
 
 static asn_TYPE_member_t asn_MBR_ExtendedKeyUsage_1[] = {
     {
@@ -81,3 +80,5 @@ asn_TYPE_descriptor_t *get_ExtendedKeyUsage_desc(void)
 {
     return &ExtendedKeyUsage_desc;
 }
+
+

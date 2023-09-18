@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/RELATIVE-OID.c"
+
 #include "asn_internal.h"
 #include "RELATIVE-OID.h"
 #include "OCTET_STRING.h"
 #include "asn_codecs_prim.h"    /* Encoder and decoder of a primitive type */
 #include <limits.h>    /* for CHAR_BIT */
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/RELATIVE-OID.c"
 
 /*
  * RELATIVE-OID basic type description.
@@ -296,4 +295,5 @@ RELATIVE_OID_set_arcs(RELATIVE_OID_t *roid, void *arcs, unsigned int arc_type_si
 
     return 0;
 }
+
 

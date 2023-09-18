@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/sha2.c"
+
 #include <string.h>
 #include <stddef.h>
 
@@ -33,9 +35,6 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/sha2.c"
 
 #define SHA224_DIGEST_SIZE (224 >> 3)
 #define SHA256_DIGEST_SIZE (256 >> 3)

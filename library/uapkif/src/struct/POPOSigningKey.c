@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/POPOSigningKey.c"
+
 #include "POPOSigningKey.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/POPOSigningKey.c"
 
 static asn_TYPE_member_t asn_MBR_POPOSigningKey_1[] = {
     { ATF_POINTER, 1, offsetof(struct POPOSigningKey, poposkInput),
@@ -107,3 +106,5 @@ asn_TYPE_descriptor_t* get_POPOSigningKey_desc(void)
 {
     return &POPOSigningKey_desc;
 }
+
+

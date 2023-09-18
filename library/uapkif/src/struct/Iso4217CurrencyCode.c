@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/Iso4217CurrencyCode.c"
+
 #include "Iso4217CurrencyCode.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/Iso4217CurrencyCode.c"
 
 static const int permitted_alphabet_table_2[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /*                  */
@@ -177,3 +176,5 @@ asn_TYPE_descriptor_t *get_Iso4217CurrencyCode_desc(void)
 {
     return &Iso4217CurrencyCode_desc;
 }
+
+

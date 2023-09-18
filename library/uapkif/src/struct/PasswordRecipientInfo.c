@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PasswordRecipientInfo.c"
+
 #include "PasswordRecipientInfo.h"
 
 #include "asn_internal.h"
 
 #include "KeyDerivationAlgorithmIdentifier.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PasswordRecipientInfo.c"
 
 static asn_TYPE_member_t asn_MBR_PasswordRecipientInfo_1[] = {
     {
@@ -122,3 +122,5 @@ asn_TYPE_descriptor_t *get_PasswordRecipientInfo_desc(void)
 {
     return &PasswordRecipientInfo_desc;
 }
+
+

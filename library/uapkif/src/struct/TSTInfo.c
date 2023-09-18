@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/TSTInfo.c"
+
 #include "TSTInfo.h"
 
 #include "asn_internal.h"
@@ -33,8 +35,6 @@
 #include "Accuracy.h"
 #include "GeneralName.h"
 #include "Extensions.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/TSTInfo.c"
 
 static asn_TYPE_member_t asn_MBR_TSTInfo_1[] = {
     {
@@ -179,3 +179,5 @@ asn_TYPE_descriptor_t *get_TSTInfo_desc(void)
 {
     return &TSTInfo_desc;
 }
+
+

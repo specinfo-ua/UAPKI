@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/TBSCertificate.c"
+
 #include "TBSCertificate.h"
 
 #include "asn_internal.h"
 
 #include "Extensions.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/TBSCertificate.c"
 
 static int asn_DFL_2_set_0(int set_value, void **sptr)
 {
@@ -214,3 +214,5 @@ asn_TYPE_descriptor_t *get_TBSCertificate_desc(void)
 {
     return &TBSCertificate_desc;
 }
+
+

@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertificationRequestInfo.c"
+
 #include "CertificationRequestInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertificationRequestInfo.c"
 
 static asn_TYPE_member_t asn_MBR_CertificationRequestInfo_1[] = {
     {
@@ -121,3 +120,5 @@ asn_TYPE_descriptor_t *get_CertificationRequestInfo_desc(void)
 {
     return &CertificationRequestInfo_desc;
 }
+
+

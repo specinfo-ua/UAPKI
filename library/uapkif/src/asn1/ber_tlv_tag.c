@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/bet_tlv_tag.c"
+
 #include "asn_internal.h"
 #include "ber_tlv_tag.h"
 #include <errno.h>
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/bet_tlv_tag.c"
 
 ssize_t
 ber_fetch_tag(const void *ptr, size_t size, ber_tlv_tag_t *tag_r)
@@ -189,4 +188,5 @@ ber_tlv_tag_serialize(ber_tlv_tag_t tag, void *bufp, size_t size)
 
     return required_size + 1;
 }
+
 

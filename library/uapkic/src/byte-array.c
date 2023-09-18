@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/byte-array.c"
+
 #include <stddef.h>
 #include <string.h>
 
@@ -33,9 +35,6 @@
 #include "byte-array-internal.h"
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/byte-array.c"
 
 ByteArray *ba_alloc(void)
 {
@@ -771,4 +770,3 @@ int ba_to_str_with_alloc (const ByteArray* ba, size_t off, size_t len, char** st
 cleanup:
     return ret;
 }
-

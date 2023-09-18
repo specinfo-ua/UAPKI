@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/CertRepMessage.c"
+
 #include "CertRepMessage.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/CertRepMessage.c"
 
 static asn_TYPE_member_t asn_MBR_CertRepMessage_1[] = {
     { ATF_POINTER, 1, offsetof(struct CertRepMessage, caPubs),
@@ -97,3 +96,5 @@ asn_TYPE_descriptor_t* get_CertRepMessage_desc(void)
 {
     return &CertRepMessage_desc;
 }
+
+

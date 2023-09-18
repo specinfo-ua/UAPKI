@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/xer_support.c"
+
 #include "asn_system.h"
 #include "xer_support.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/xer_support.c"
 
 /* Parser states */
 typedef enum {
@@ -257,4 +256,5 @@ finish:
     *stateContext = (int)state;
     return chunk_start - (const char *)xmlbuf;
 }
+
 

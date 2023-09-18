@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/ec_params.c"
+
 #include <string.h>
 #include "ec-internal.h"
 #include "ec-cache-internal.h"
@@ -32,9 +34,6 @@
 #include "math-ec2m-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/ec_params.c"
 
 static void ec_params_free(EcParamsCtx* params)
 {

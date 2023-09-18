@@ -26,13 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/ESSCertIDv2s.c"
+
 #include "ESSCertIDv2s.h"
 
 #include "asn_internal.h"
 
 #include "ESSCertIDv2.h"
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/ESSCertIDv2s.c"
 
 static asn_TYPE_member_t asn_MBR_ESSCertIDv2s_1[] = {
     {
@@ -82,3 +82,5 @@ asn_TYPE_descriptor_t *get_ESSCertIDv2s_desc(void)
 {
     return &ESSCertIDv2s_desc;
 }
+
+

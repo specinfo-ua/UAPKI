@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constr_set.c"
+
 #include "asn_internal.h"
 #include "constr_SET.h"
 #include "asn1-utils.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constr_set.c"
 
 /* Check that all the mandatory members are present */
 static int _SET_is_populated(asn_TYPE_descriptor_t *td, void *st);
@@ -1101,3 +1100,5 @@ SET_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
 
     return 0;
 }
+
+

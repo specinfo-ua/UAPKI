@@ -26,15 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/per_support.c"
+
 #include <assert.h>
 #include <stdint.h>
 
 #include "asn_system.h"
 #include "asn_internal.h"
 #include "per_support.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/per_support.c"
 
 char *
 per_data_string(asn_per_data_t *pd)
@@ -574,4 +573,5 @@ uper_put_nslength(asn_per_outp_t *po, size_t length)
 
     return 0;
 }
+
 

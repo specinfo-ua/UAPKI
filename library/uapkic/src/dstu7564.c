@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/dstu7564.c"
+
 #include <memory.h>
 #include <stdbool.h>
 
@@ -33,9 +35,6 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/dstu7564.c"
 
 #define UINT64_LEN 8
 #define ROWS 8
@@ -601,7 +600,7 @@ cleanup:
 
     if (ret != RET_OK) {
         dstu7564_free(out);
-        ctx = NULL;
+        out = NULL;
     }
 
     return out;

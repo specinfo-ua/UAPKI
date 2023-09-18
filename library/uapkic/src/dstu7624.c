@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/dstu7624.c"
+
 #include <stdio.h>
 #include <memory.h>
 
@@ -36,9 +38,6 @@
 #include "byte-array-internal.h"
 #include "math-gf2m-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/dstu7624.c"
 
 #define REDUCTION_POLYNOMIAL 0x11d  /* x^8 + x^4 + x^3 + x^2 + 1 */
 #define ROWS 8
@@ -1477,14 +1476,19 @@ void dstu7624_free(Dstu7624Ctx *ctx)
 int dstu7624_generate_key(size_t key_len, ByteArray **key)
 {
     int ret = RET_OK;
+    ByteArray *k = NULL;
 
-    CHECK_PARAM(key_len == 16 || key_len == 32 || key_len == 64)
+    CHECK_PARAM(key_len == 16 || key_len == 32 || key_len == 64);
 
-    CHECK_NOT_NULL(*key = ba_alloc_by_len(key_len));
-    DO(drbg_random(*key));
+    CHECK_NOT_NULL(k = ba_alloc_by_len(key_len));
+    DO(drbg_random(k));
+
+    *key = k;
+    k = NULL;
 
 cleanup:
 
+    ba_free(k);
     return ret;
 }
 
@@ -2398,7 +2402,7 @@ static int p_help_round_key(const ByteArray *key, Dstu7624Ctx *ctx, uint64_t *hr
 cleanup:
 
     if (key64) {
-        memset(key64, 0, key64_len * sizeof(uint64_t));
+        secure_zero(key64, key64_len * sizeof(uint64_t));
     }
     free(key64);
 
@@ -2463,7 +2467,7 @@ static int p_key_shift(const uint8_t *key, Dstu7624Ctx *ctx, uint64_t **key_shif
 cleanup:
 
     if (key_shift_ptr) {
-        memset(key_shift_ptr, 0, shift_key_size);
+        secure_zero(key_shift_ptr, shift_key_size);
     }
     free(key_shift_ptr);
 

@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/gost34311.c"
+
 #include <string.h>
 
 #include "gost28147.h"
@@ -33,9 +35,6 @@
 #include "byte-array-internal.h"
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/gost34311.c"
 
 void base_cycle32(Gost28147Ctx *ctx, uint32_t src[8], const uint32_t k[32]);
 

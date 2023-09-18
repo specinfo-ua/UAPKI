@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/PKCS8ShroudedKeyBag.c"
+
 #include "PKCS8ShroudedKeyBag.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/PKCS8ShroudedKeyBag.c"
 
 int
 PKCS8ShroudedKeyBag_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
@@ -146,3 +145,5 @@ asn_TYPE_descriptor_t *get_PKCS8ShroudedKeyBag_desc(void)
 {
     return &PKCS8ShroudedKeyBag_desc;
 }
+
+

@@ -26,11 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/constraints.c"
+
 #include "asn_internal.h"
 #include "constraints.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/constraints.c"
 int
 asn_generic_no_constraint(asn_TYPE_descriptor_t *type_descriptor,
         const void *struct_ptr, asn_app_constraint_failed_f *cb, void *key)
@@ -126,4 +126,5 @@ asn_check_constraints(asn_TYPE_descriptor_t *type_descriptor,
 
     return ret;
 }
+
 

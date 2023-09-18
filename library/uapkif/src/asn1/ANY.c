@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/ANY.c"
+
 #include <errno.h>
 
 #include "asn_internal.h"
@@ -200,4 +202,5 @@ static int ANY__consume_bytes(const void *buffer, size_t size, void *key)
 cleanup:
     return ret;
 }
+
 

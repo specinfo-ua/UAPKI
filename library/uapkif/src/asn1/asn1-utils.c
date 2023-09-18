@@ -25,18 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/asn1-utils.c"
+
 #include "asn1-utils.h"
 #include "macros-internal.h"
 #include <time.h>
 
-
 #if defined(_USE_32BIT_TIME_T) || (defined(__TIMESIZE) && (__TIMESIZE != 64))
 #error Supported only 64bit time
 #endif
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/asn1-utils.c"
 
 struct _callback_arg {
     uint8_t *buffer;
@@ -1456,3 +1453,5 @@ int asn_time2GT (
 cleanup:
     return ret;
 }
+
+

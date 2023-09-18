@@ -26,6 +26,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkic/gost28147.c"
+
 #include <string.h>
 #include <stdbool.h>
 
@@ -34,9 +36,6 @@
 #include "byte-array-internal.h"
 #include "byte-utils-internal.h"
 #include "macros-internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "uapkic/gost28147.c"
 
 #define SBOX_LEN                 128
 #define KEY_LEN                  32
@@ -832,12 +831,17 @@ cleanup:
 int gost28147_generate_key(ByteArray **key)
 {
     int ret = RET_OK;
+    ByteArray *k = NULL;
 
-    CHECK_NOT_NULL(*key = ba_alloc_by_len(32));
-    DO(drbg_random(*key));
+    CHECK_NOT_NULL(k = ba_alloc_by_len(32));
+    DO(drbg_random(k));
+
+    *key = k;
+    k = NULL;
 
 cleanup:
 
+    ba_free(k);
     return ret;
 }
 

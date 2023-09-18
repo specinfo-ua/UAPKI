@@ -26,12 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/struct/KEKRecipientInfo.c"
+
 #include "KEKRecipientInfo.h"
 
 #include "asn_internal.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "pkix/struct/KEKRecipientInfo.c"
 
 static asn_TYPE_member_t asn_MBR_KEKRecipientInfo_1[] = {
     {
@@ -121,3 +120,5 @@ asn_TYPE_descriptor_t *get_KEKRecipientInfo_desc(void)
 {
     return &KEKRecipientInfo_desc;
 }
+
+

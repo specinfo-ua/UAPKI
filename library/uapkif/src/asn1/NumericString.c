@@ -26,11 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapkif/asn1/NumericString.c"
+
 #include "asn_internal.h"
 #include "NumericString.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "asn1/NumericString.c"
 
 /*
  * NumericString basic type description.
@@ -152,3 +151,5 @@ NumericString_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
 
     return 0;
 }
+
+
