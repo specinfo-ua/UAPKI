@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/cm-storage-proxy.cpp"
+
 #include "cm-storage-proxy.h"
 #include "oid-utils.h"
 #include "uapki-errors.h"
@@ -35,6 +37,9 @@
 #ifndef DEBUG_OUTCON
 #define DEBUG_OUTCON(expression) expression
 #endif
+
+
+using namespace std;
 
 
 CmStorageProxy::CmStorageProxy (void)
@@ -57,22 +62,32 @@ CmStorageProxy::~CmStorageProxy (void)
     }
 }
 
-bool CmStorageProxy::load (const string& libName, const string& dir)
+bool CmStorageProxy::load (
+        const string& libName,
+        const string& dir
+)
 {
     return m_CmLoader.load(libName, dir);
 }
 
-void CmStorageProxy::cmFree (void* block)
+void CmStorageProxy::cmFree (
+        void* block
+)
 {
     m_CmLoader.blockFree(block);
 }
 
-void CmStorageProxy::cmbaFree (CM_BYTEARRAY* ba)
+void CmStorageProxy::cmbaFree (
+        CM_BYTEARRAY* ba
+)
 {
     m_CmLoader.baFree(ba);
 }
 
-void CmStorageProxy::arrayCmbaFree (const uint32_t count, CM_BYTEARRAY** arrayBa)
+void CmStorageProxy::arrayCmbaFree (
+        const uint32_t count,
+        CM_BYTEARRAY** arrayBa
+)
 {
     if ((count > 0) && arrayBa) {
         for (uint32_t i = 0; i < count; i++) {
@@ -83,7 +98,9 @@ void CmStorageProxy::arrayCmbaFree (const uint32_t count, CM_BYTEARRAY** arrayBa
     }
 }
 
-int CmStorageProxy::providerInfo (string& providerInfo)
+int CmStorageProxy::providerInfo (
+        string& providerInfo
+)
 {
     providerInfo.clear();
 
@@ -98,7 +115,9 @@ int CmStorageProxy::providerInfo (string& providerInfo)
     return RET_OK;
 }
 
-int CmStorageProxy::providerInit (const string& providerParams)
+int CmStorageProxy::providerInit (
+        const string& providerParams
+)
 {
     const int ret = m_CmLoader.init(!providerParams.empty() ? (const CM_JSON_PCHAR)providerParams.c_str() : nullptr);
     m_IsInitialized = (ret == RET_OK);
@@ -117,7 +136,9 @@ int CmStorageProxy::providerDeinit (void)
     return ret;
 }
 
-int CmStorageProxy::storageList (string& storageList)
+int CmStorageProxy::storageList (
+        string& storageList
+)
 {
     CM_JSON_PCHAR json_listuris = nullptr;
     const int ret = m_CmLoader.listStorages(&json_listuris);
@@ -128,7 +149,10 @@ int CmStorageProxy::storageList (string& storageList)
     return ret;
 }
 
-int CmStorageProxy::storageInfo (const string& storageId, string& storageInfo)
+int CmStorageProxy::storageInfo (
+        const string& storageId,
+        string& storageInfo
+)
 {
     CM_JSON_PCHAR json_storageinfo = nullptr;
     const int ret = m_CmLoader.storageInfo(storageId.c_str(), &json_storageinfo);
@@ -139,7 +163,11 @@ int CmStorageProxy::storageInfo (const string& storageId, string& storageInfo)
     return ret;
 }
 
-int CmStorageProxy::storageOpen (const string& storageId, const CM_OPEN_MODE openMode, const string& openParams)
+int CmStorageProxy::storageOpen (
+        const string& storageId,
+        const CM_OPEN_MODE openMode,
+        const string& openParams
+)
 {
     const int ret = m_CmLoader.open(
         storageId.c_str(),
@@ -165,13 +193,19 @@ int CmStorageProxy::storageClose (void)
     return ret;
 }
 
-int CmStorageProxy::storageFormat (const string& storageId, const char* soPassword, const char* userPassword)
+int CmStorageProxy::storageFormat (
+        const string& storageId,
+        const char* soPassword,
+        const char* userPassword
+)
 {
     const int ret = m_CmLoader.format(storageId.c_str(), soPassword, userPassword);
     return ret;
 }
 
-int CmStorageProxy::sessionInfo (string& sessionInfo)
+int CmStorageProxy::sessionInfo (
+        string& sessionInfo
+)
 {
     CM_JSON_PCHAR json_sesinfo = nullptr;
     const int ret = (int)m_Session->info(m_Session, &json_sesinfo);
@@ -182,7 +216,10 @@ int CmStorageProxy::sessionInfo (string& sessionInfo)
     return ret;
 }
 
-int CmStorageProxy::sessionMechanismParameters (const string& mechanismId, string& parameterIds)
+int CmStorageProxy::sessionMechanismParameters (
+        const string& mechanismId,
+        string& parameterIds
+)
 {
     CM_JSON_PCHAR json_paramids = nullptr;
     const int ret = (int)m_Session->mechanismParameters(m_Session, (CM_UTF8_CHAR*)mechanismId.c_str(), &json_paramids);
@@ -193,7 +230,10 @@ int CmStorageProxy::sessionMechanismParameters (const string& mechanismId, strin
     return ret;
 }
 
-int CmStorageProxy::sessionLogin (const char* password, const void* reserved)
+int CmStorageProxy::sessionLogin (
+        const char* password,
+        const void* reserved
+)
 {
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
 
@@ -213,8 +253,12 @@ int CmStorageProxy::sessionLogout (void)
     return ret;
 }
 
-int CmStorageProxy::sessionCreateKey (const string& keyParam)
+int CmStorageProxy::sessionCreateKey (
+        const string& keyParam
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->createKey) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -222,8 +266,13 @@ int CmStorageProxy::sessionCreateKey (const string& keyParam)
     return ret;
 }
 
-int CmStorageProxy::sessionDeleteKey (const ByteArray* baKeyId, const bool deleteRelatedObjects)
+int CmStorageProxy::sessionDeleteKey (
+        const ByteArray* baKeyId,
+        const bool deleteRelatedObjects
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->deleteKey) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -231,8 +280,14 @@ int CmStorageProxy::sessionDeleteKey (const ByteArray* baKeyId, const bool delet
     return ret;
 }
 
-int CmStorageProxy::sessionImportKey (const ByteArray* baP8container, const char* password, const string& keyParam)
+int CmStorageProxy::sessionImportKey (
+        const ByteArray* baP8container,
+        const char* password,
+        const string& keyParam
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->importKey) return RET_UAPKI_NOT_SUPPORTED;
     if (!baP8container) return RET_UAPKI_INVALID_PARAMETER;
@@ -247,8 +302,12 @@ int CmStorageProxy::sessionImportKey (const ByteArray* baP8container, const char
     return ret;
 }
 
-int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds)
+int CmStorageProxy::sessionListKeys (
+        vector<ByteArray*>& vbaKeyIds
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->listKeys) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -265,8 +324,13 @@ int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds)
     return ret;
 }
 
-int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds, string& infoKeys)
+int CmStorageProxy::sessionListKeys (
+        vector<ByteArray*>& vbaKeyIds,
+        string& infoKeys
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->listKeys) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -289,8 +353,12 @@ int CmStorageProxy::sessionListKeys (vector<ByteArray*>& vbaKeyIds, string& info
     return ret;
 }
 
-int CmStorageProxy::sessionSelectKey (const ByteArray* baKeyId)
+int CmStorageProxy::sessionSelectKey (
+        const ByteArray* baKeyId
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->selectKey) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -298,8 +366,12 @@ int CmStorageProxy::sessionSelectKey (const ByteArray* baKeyId)
     return ret;
 }
 
-int CmStorageProxy::sessionAddCertificate (const ByteArray* baCert)
+int CmStorageProxy::sessionAddCertificate (
+        const ByteArray* baCert
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->addCertificate) return RET_UAPKI_NOT_SUPPORTED;
     if (!baCert) return RET_UAPKI_INVALID_PARAMETER;
@@ -308,8 +380,12 @@ int CmStorageProxy::sessionAddCertificate (const ByteArray* baCert)
     return ret;
 }
 
-int CmStorageProxy::sessionDeleteCertificate (const ByteArray* baKeyId)
+int CmStorageProxy::sessionDeleteCertificate (
+        const ByteArray* baKeyId
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->deleteCertificate) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -317,8 +393,12 @@ int CmStorageProxy::sessionDeleteCertificate (const ByteArray* baKeyId)
     return ret;
 }
 
-int CmStorageProxy::sessionGetCertificates (vector<ByteArray*>& vbaCerts)
+int CmStorageProxy::sessionGetCertificates (
+        vector<ByteArray*>& vbaCerts
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->getCertificates) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -335,8 +415,12 @@ int CmStorageProxy::sessionGetCertificates (vector<ByteArray*>& vbaCerts)
     return ret;
 }
 
-int CmStorageProxy::sessionChangePassword (const char* newPassword)
+int CmStorageProxy::sessionChangePassword (
+        const char* newPassword
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->changePassword) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -344,8 +428,12 @@ int CmStorageProxy::sessionChangePassword (const char* newPassword)
     return ret;
 }
 
-int CmStorageProxy::sessionRandomBytes (ByteArray* baBuffer)
+int CmStorageProxy::sessionRandomBytes (
+        ByteArray* baBuffer
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->randomBytes) return RET_UAPKI_NOT_SUPPORTED;
     if (!baBuffer) return RET_UAPKI_INVALID_PARAMETER;
@@ -354,8 +442,13 @@ int CmStorageProxy::sessionRandomBytes (ByteArray* baBuffer)
     return ret;
 }
 
-int CmStorageProxy::keyGetInfo (string& keyInfo, ByteArray** baKeyId)
+int CmStorageProxy::keyGetInfo (
+        string& keyInfo,
+        ByteArray** baKeyId
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getInfo) return RET_UAPKI_NOT_SUPPORTED;
@@ -376,8 +469,12 @@ int CmStorageProxy::keyGetInfo (string& keyInfo, ByteArray** baKeyId)
     return ret;
 }
 
-int CmStorageProxy::keyGetInfo (ByteArray** baKeyId)
+int CmStorageProxy::keyGetInfo (
+        ByteArray** baKeyId
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getInfo) return RET_UAPKI_NOT_SUPPORTED;
@@ -392,8 +489,12 @@ int CmStorageProxy::keyGetInfo (ByteArray** baKeyId)
     return ret;
 }
 
-int CmStorageProxy::keyGetInfo (string& keyInfo)
+int CmStorageProxy::keyGetInfo (
+        string& keyInfo
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getInfo) return RET_UAPKI_NOT_SUPPORTED;
@@ -409,8 +510,13 @@ int CmStorageProxy::keyGetInfo (string& keyInfo)
     return ret;
 }
 
-int CmStorageProxy::keyGetPublicKey (ByteArray** baAlgoId, ByteArray** baPublicKey)
+int CmStorageProxy::keyGetPublicKey (
+        ByteArray** baAlgoId,
+        ByteArray** baPublicKey
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getPublicKey) return RET_UAPKI_NOT_SUPPORTED;
@@ -431,8 +537,12 @@ int CmStorageProxy::keyGetPublicKey (ByteArray** baAlgoId, ByteArray** baPublicK
     return ret;
 }
 
-int CmStorageProxy::keyInitUsage (void* param)
+int CmStorageProxy::keyInitUsage (
+        void* param
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->initKeyUsage) return RET_UAPKI_NOT_SUPPORTED;
@@ -441,8 +551,12 @@ int CmStorageProxy::keyInitUsage (void* param)
     return ret;
 }
 
-int CmStorageProxy::keySetOtp (const char* otp)
+int CmStorageProxy::keySetOtp (
+        const char* otp
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->setOtp) return RET_UAPKI_NOT_SUPPORTED;
@@ -451,9 +565,15 @@ int CmStorageProxy::keySetOtp (const char* otp)
     return ret;
 }
 
-int CmStorageProxy::keySign (const string& signAlgo, const ByteArray* baSignAlgoParams,
-                    const vector<ByteArray*>& vbaHashes, vector<ByteArray*>& vbaSignatures)
+int CmStorageProxy::keySign (
+        const string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const vector<ByteArray*>& vbaHashes,
+        vector<ByteArray*>& vbaSignatures
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->sign) return RET_UAPKI_NOT_SUPPORTED;
@@ -478,8 +598,13 @@ int CmStorageProxy::keySign (const string& signAlgo, const ByteArray* baSignAlgo
     return ret;
 }
 
-int CmStorageProxy::keySignInit (const string& signAlgo, const ByteArray* baSignAlgoParams)
+int CmStorageProxy::keySignInit (
+        const string& signAlgo,
+        const ByteArray* baSignAlgoParams
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->signInit) return RET_UAPKI_NOT_SUPPORTED;
@@ -488,8 +613,12 @@ int CmStorageProxy::keySignInit (const string& signAlgo, const ByteArray* baSign
     return ret;
 }
 
-int CmStorageProxy::keySignUpdate (const ByteArray* baData)
+int CmStorageProxy::keySignUpdate (
+        const ByteArray* baData
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->signUpdate) return RET_UAPKI_NOT_SUPPORTED;
@@ -498,8 +627,12 @@ int CmStorageProxy::keySignUpdate (const ByteArray* baData)
     return ret;
 }
 
-int CmStorageProxy::keySignFinal (ByteArray** baSignature)
+int CmStorageProxy::keySignFinal (
+        ByteArray** baSignature
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->signFinal) return RET_UAPKI_NOT_SUPPORTED;
@@ -514,9 +647,15 @@ int CmStorageProxy::keySignFinal (ByteArray** baSignature)
     return ret;
 }
 
-int CmStorageProxy::keySignData (const string& signAlgo, const ByteArray* baSignAlgoParams,
-                    const ByteArray* baData, ByteArray** baSignature)
+int CmStorageProxy::keySignData (
+        const string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const ByteArray* baData,
+        ByteArray** baSignature
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->sign) return RET_UAPKI_NOT_SUPPORTED;
@@ -558,8 +697,12 @@ int CmStorageProxy::keySignData (const string& signAlgo, const ByteArray* baSign
     return ret;
 }
 
-int CmStorageProxy::keyAddCertificate (const ByteArray* baCert)
+int CmStorageProxy::keyAddCertificate (
+        const ByteArray* baCert
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->addCertificate) return RET_UAPKI_NOT_SUPPORTED;
@@ -569,8 +712,12 @@ int CmStorageProxy::keyAddCertificate (const ByteArray* baCert)
     return ret;
 }
 
-int CmStorageProxy::keyGetCertificates (vector<ByteArray*>& vbaCerts)
+int CmStorageProxy::keyGetCertificates (
+        vector<ByteArray*>& vbaCerts
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getCertificates) return RET_UAPKI_NOT_SUPPORTED;
@@ -588,9 +735,16 @@ int CmStorageProxy::keyGetCertificates (vector<ByteArray*>& vbaCerts)
     return ret;
 }
 
-int CmStorageProxy::keyGetCsr (const string& signAlgo, const ByteArray* baSignAlgoParams,
-                    const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr)
+int CmStorageProxy::keyGetCsr (
+        const string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const ByteArray* baSubject,
+        const ByteArray* baAttributes,
+        ByteArray** baCsr
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->getCsr) return RET_UAPKI_NOT_SUPPORTED;
@@ -606,15 +760,24 @@ int CmStorageProxy::keyGetCsr (const string& signAlgo, const ByteArray* baSignAl
     return ret;
 }
 
-int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
-                    const ByteArray* baSPKI, const ByteArray* baSessionKey,
-                    ByteArray** baSalt, ByteArray** baWrappedKey)
+int CmStorageProxy::keyDhWrapKey (
+        const string& kdfOid,
+        const string& wrapAlgOid,
+        const ByteArray* baSPKI,
+        const ByteArray* baSessionKey,
+        ByteArray** baSalt,
+        ByteArray** baWrappedKey
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->dhWrapKey) return RET_UAPKI_NOT_SUPPORTED;
-    if (kdfOid.empty() || wrapAlgOid.empty()
-        || !baSPKI || !baSessionKey || !baWrappedKey) return RET_UAPKI_INVALID_PARAMETER;
+    if (
+        kdfOid.empty() || wrapAlgOid.empty() ||
+        !baSPKI || !baSessionKey || !baWrappedKey
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
     vector<const ByteArray*> aba_spkis, aba_sessionkeys;
     aba_spkis.push_back(baSPKI);
@@ -658,15 +821,24 @@ int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid
     return ret;
 }
 
-int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
-                    const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
-                    vector<ByteArray*>* vbaSalts, vector<ByteArray*>& vbaWrappedKeys)
+int CmStorageProxy::keyDhWrapKey (
+        const string& kdfOid,
+        const string& wrapAlgOid,
+        const vector<ByteArray*>& vbaSPKIs,
+        const vector<ByteArray*>& vbaSessionKeys,
+        vector<ByteArray*>* vbaSalts,
+        vector<ByteArray*>& vbaWrappedKeys
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->dhWrapKey) return RET_UAPKI_NOT_SUPPORTED;
-    if (kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty()
-        || (vbaSPKIs.size() != vbaSessionKeys.size())) return RET_UAPKI_INVALID_PARAMETER;
+    if (
+        kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty() ||
+        (vbaSPKIs.size() != vbaSessionKeys.size())
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
     const uint32_t cnt_keys = (uint32_t)vbaSPKIs.size();
     CM_BYTEARRAY** cmba_salts = nullptr;
@@ -724,15 +896,24 @@ int CmStorageProxy::keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid
     return ret;
 }
 
-int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
-                    const ByteArray* baSPKI, const ByteArray* baSalt,
-                    const ByteArray* baWrappedKey, ByteArray** baSessionKey)
+int CmStorageProxy::keyDhUnwrapKey (
+        const string& kdfOid,
+        const string& wrapAlgOid,
+        const ByteArray* baSPKI,
+        const ByteArray* baSalt,
+        const ByteArray* baWrappedKey,
+        ByteArray** baSessionKey
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->dhUnwrapKey) return RET_UAPKI_NOT_SUPPORTED;
-    if (kdfOid.empty() || wrapAlgOid.empty()
-        || !baSPKI || !baWrappedKey || !baSessionKey) return RET_UAPKI_INVALID_PARAMETER;
+    if (
+        kdfOid.empty() || wrapAlgOid.empty() ||
+        !baSPKI || !baWrappedKey || !baSessionKey
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
     vector<const ByteArray*> aba_spkis, aba_salts, aba_wrappedkeys;
     aba_spkis.push_back(baSPKI);
@@ -757,15 +938,24 @@ int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgO
     return ret;
 }
 
-int CmStorageProxy::keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
-                    const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
-                    const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys)
+int CmStorageProxy::keyDhUnwrapKey (
+        const string& kdfOid,
+        const string& wrapAlgOid,
+        const vector<ByteArray*>& vbaSPKIs,
+        const vector<ByteArray*>& vbaSalts,
+        const vector<ByteArray*>& vbaWrappedKeys,
+        vector<ByteArray*>& vbaSessionKeys
+)
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
     if (!m_SelectedKey->dhUnwrapKey) return RET_UAPKI_NOT_SUPPORTED;
-    if (kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty()
-        || (vbaSPKIs.size() != vbaWrappedKeys.size())) return RET_UAPKI_INVALID_PARAMETER;
+    if (
+        kdfOid.empty() || wrapAlgOid.empty() || vbaSPKIs.empty() ||
+        (vbaSPKIs.size() != vbaWrappedKeys.size())
+    ) return RET_UAPKI_INVALID_PARAMETER;
     if (!vbaSalts.empty() && (vbaSPKIs.size() != vbaSalts.size())) return RET_UAPKI_INVALID_PARAMETER;
 
     const uint32_t cnt_keys = (uint32_t)vbaSPKIs.size();

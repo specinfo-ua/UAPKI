@@ -1,9 +1,7 @@
 {
   "comment": "Test create key-storage (OPENSSL compatible) and ECDSA-keys",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "commentOPENSSL": "openssl pkcs12 -in new-ecdsa.p12 -info -passin pass:testpassword -nodes",
+  "commentUsage": "uapki create-ecdsa-key.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -21,7 +19,7 @@
                 "createPfx": { // specific cm-provider parameters
                   "bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
                   "bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
-                  "iterations": 2000,
+                  "iterations": 10000,
                   "macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
                 }
               }
@@ -32,14 +30,16 @@
     },
     {
       "comment": "Отримання переліку провайдерів підпису (типів носіів ключів: файли, токени, смарт-картки, хмарні криптомодулі та ін.)",
-      "method": "PROVIDERS"
+      "method": "PROVIDERS",
+      "skip": false
     },
     {
       "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
       "method": "STORAGES",
       "parameters": {
         "provider": "PKCS12" // Обов'язкове (ідентифікатор провайдера зі списку що повертає метод PROVIDERS)
-      }
+      },
+      "skip": false
     },
     {
       "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
@@ -47,7 +47,8 @@
       "parameters": {
         "provider": "PKCS12", // Опціональне, по замовчанню PKCS12
         "storage": "storage-id" // Для PKCS12-provider обов'язкове, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
-      }
+      },
+      "skip": false
     },
     {
       "comment": "Створення нового сховища ключів (OPENSSL сумісний варіант)",
@@ -58,30 +59,22 @@
         "password": "testpassword",
         "openParams": {
           "createPfx": { // specific cm-provider parameters
-            "bagCipher": "2.16.840.1.101.3.4.1.22", // aes192-CBC
-            "bagKdf": "1.2.840.113549.2.10", // hmacWithSHA384
-            "iterations": 5555,
-            "macAlgo": "2.16.840.1.101.3.4.2.2" // sha-384
-            //"bagCipher": "2.16.840.1.101.3.4.1.2", // aes128-CBC
-            //"bagKdf": "1.2.840.113549.2.9", // hmacWithSHA256
-            //"iterations": 777,
-            //"macAlgo": "2.16.840.1.101.3.4.2.1" // sha-256
-            //"bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
-            //"bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
-            //"iterations": 1234,
-            //"macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
+            "bagCipher": "2.16.840.1.101.3.4.1.2", // aes128-CBC
+            "bagKdf": "1.2.840.113549.2.9", // hmacWithSHA256
+            "macAlgo": "2.16.840.1.101.3.4.2.1", // sha-256
+            "iterations": 10000
           }
         },
         "mode": "CREATE"
       }
     },
     {
-      "comment": "Створення нового ключа за алгоритмом ECDSA з параметом prime256v1",
+      "comment": "Створення нового ключа за алгоритмом ECDSA з параметром prime256v1",
       "method": "CREATE_KEY",
       "parameters": {
         "mechanismId": "1.2.840.10045.2.1",
         "parameterId": "1.2.840.10045.3.1.7",
-        "label": "Key 1, ECDSA-prime256v1"
+        "label": "Key-1 ECDSA prime256v1"
       }
     },
     {
@@ -93,12 +86,12 @@
       "method": "KEYS"
     },
     {
-      "comment": "Створення нового ключа за алгоритмом ECDSA з параметом secp384r1",
+      "comment": "Створення нового ключа за алгоритмом ECDSA з параметром secp384r1",
       "method": "CREATE_KEY",
       "parameters": {
         "mechanismId": "1.2.840.10045.2.1",
         "parameterId": "1.3.132.0.34",
-        "label": "Key 2, ECDSA-secp384r1"
+        "label": "Key-2 ECDSA secp384r1"
       }
     },
     {
@@ -110,11 +103,9 @@
       "method": "KEYS"
     },
     {
-      "comment": "Для перевірки новостворенного сховища ключів можно використувати OPENSSL",
       "method": "CLOSE"
     },
     {
-      "comment": "На приклад: openssl pkcs12 -in new-ecdsa.p12 -info -passin pass:testpassword -nodes",
       "method": "DEINIT"
     }
   ]

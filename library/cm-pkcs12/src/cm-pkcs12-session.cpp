@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,11 +29,12 @@
 #include "cm-errors.h"
 #include "cm-pkcs12.h"
 #include "cm-pkcs12-ctx.h"
-#include "cm-pkcs12-debug.h"
 #include "oids.h"
 #include "parson-helper.h"
 #include "private-key.h"
 #include "uapkif.h"
+#include "uapki-ns.h"
+#include "cm-pkcs12-debug.h"
 
 
 #define DEBUG_OUTPUT(msg)
@@ -41,6 +42,10 @@
 DEBUG_OUTPUT_FUNC
 #define DEBUG_OUTPUT(msg) debug_output(DEBUG_OUTSTREAM_DEFAULT, msg);
 #endif
+
+
+using namespace std;
+using namespace UapkiNS;
 
 
 static CM_ERROR cm_session_info (
@@ -234,22 +239,18 @@ static CM_ERROR cm_session_create_key (
     if (!json.parse((const char*)keyParam)) return RET_CM_INVALID_JSON;
 
     const char* algo = json.getString("mechanismId");
+    const char* param = json.getString("parameterId");
     if (!algo || (strlen(algo) == 0)) return RET_CM_INVALID_PARAMETER;
 
-    const char* param = json.getString("parameterId");
-    ByteArray* ba_privkey = nullptr;
-    int ret = private_key_generate(algo, param, &ba_privkey);
+    SmartBA sba_privkey;
+    int ret = private_key_generate(algo, param, &sba_privkey);
     if (ret != RET_OK) return ret;
 
     StoreBag* store_bag = new StoreBag();
-    if (!store_bag) {
-        ba_free(ba_privkey);
-        return RET_CM_GENERAL_ERROR;
-    }
+    if (!store_bag) return RET_CM_GENERAL_ERROR;
 
     store_bag->setBagId(OID_PKCS12_P8_SHROUDED_KEY_BAG);
-    store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkey);
-    ba_privkey = nullptr;
+    store_bag->setData(StoreBag::BAG_TYPE::KEY, sba_privkey.pop());
 
     param = json.getString("label");
     if (param && (strlen(param) > 0)) {
@@ -317,12 +318,11 @@ static CM_ERROR cm_session_delete_key (
         DEBUG_OUTPUT(std::string("cm_session_delete_key(), count certs: ") + std::to_string(list_certs.size()));
 
         for (size_t i = 0; i < list_certs.size(); i++) {
-            ByteArray *ba_keyid = nullptr;
-            int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
-            if ((ret == RET_OK) && (ba_cmp(ba_keyid, (ByteArray*)baKeyId) == 0)) {
+            SmartBA sba_keyid;
+            int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid);
+            if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), (ByteArray*)baKeyId) == 0)) {
                 storage.deleteBag(list_certs[i]);
             }
-            ba_free(ba_keyid);
         }
     }
 
@@ -407,22 +407,22 @@ static CM_ERROR cm_session_add_certificate (
     if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
     if (storage.isReadOnly()) return RET_CM_READONLY_SESSION;
 
-    ByteArray* ba_cert = nullptr;
-    int ret = keyid_by_cert((ByteArray*)baCertEncoded, &ba_cert);
-    ba_free(ba_cert);
-    ba_cert = nullptr;
-    //  Make copy for store
-    ba_cert = ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0);
-    if (!ba_cert) return RET_CM_GENERAL_ERROR;
+    //  Check struct cert - calculate keyId
+    SmartBA sba_keyid;
+    int ret = keyid_by_cert((ByteArray*)baCertEncoded, &sba_keyid);
+    if (ret != RET_OK) return RET_CM_INVALID_CERTIFICATE;
 
-    StoreBag *store_bag = new StoreBag();
-    if (!store_bag) {
-        ba_free(ba_cert);
+    //  Make copy for store
+    SmartBA sba_cert;
+    if (!sba_cert.set(ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0))) {
         return RET_CM_GENERAL_ERROR;
     }
 
+    StoreBag* store_bag = new StoreBag();
+    if (!store_bag) return RET_CM_GENERAL_ERROR;
+
     store_bag->setBagId(OID_PKCS12_CERT_BAG);
-    store_bag->setData((ret == RET_OK) ? StoreBag::BAG_TYPE::CERT : StoreBag::BAG_TYPE::DATA, ba_cert);
+    store_bag->setData(StoreBag::BAG_TYPE::CERT, sba_cert.pop());
 
     ret = store_bag->encodeBag();
     if (ret != RET_OK) {
@@ -457,13 +457,12 @@ static CM_ERROR cm_session_delete_certificate (
     DEBUG_OUTPUT(std::string("cm_session_delete_certificate(), count certs: ") + std::to_string(list_certs.size()));
 
     for (size_t i = 0; i < list_certs.size(); i++) {
-        ByteArray *ba_keyid = nullptr;
-        int ret = keyid_by_cert(list_certs[i]->bagValue(), &ba_keyid);
-        if ((ret == RET_OK) && (ba_cmp(ba_keyid, (ByteArray*)baKeyId) == 0)) {
+        SmartBA sba_keyid;
+        int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid);
+        if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), (ByteArray*)baKeyId) == 0)) {
             storage.deleteBag(list_certs[i]);
             flag_found = true;
         }
-        ba_free(ba_keyid);
     }
     if (!flag_found) return RET_CM_CERTIFICATE_NOT_FOUND;
 
@@ -491,24 +490,10 @@ static CM_ERROR cm_session_change_password (
     return ret;
 }   //  cm_session_change_password
 
-/*static CM_ERROR cm_session_random_bytes (
-        CM_SESSION_API* session,
-        CM_BYTEARRAY* baBuffer
+
+void CmPkcs12::assignSessionFunc (
+        CM_SESSION_API& session
 )
-{
-    DEBUG_OUTPUT("cm_session_random_bytes()");
-    if (!session) return RET_CM_NO_SESSION;
-    if (ba_get_len((ByteArray*)baBuffer) == 0) return RET_CM_INVALID_PARAMETER;
-
-    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
-    if (!ss_ctx) return RET_CM_NO_SESSION;
-
-    //TODO
-    return ret;
-}   //  cm_session_random_bytes*/
-
-
-void CmPkcs12::assignSessionFunc (CM_SESSION_API& session)
 {
     session.version             = CmPkcs12::CM_SESSION_API_V1;
     session.info                = cm_session_info;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-03
-
+#define FILE_MARKER "common/pkix/envelopeddata-helper.cpp"
 
 #include "envelopeddata-helper.h"
 #include "api-json-internal.h"
@@ -42,11 +41,16 @@
 #endif
 
 
+using namespace std;
+
+
 namespace UapkiNS {
 
 namespace Pkcs7 {
 
 EnvelopedDataBuilder::EnvelopedDataBuilder (void)
+    : m_EnvData(nullptr)
+    , m_BaEncoded(nullptr)
 {
     DEBUG_OUTCON(puts("EnvelopedDataBuilder::EnvelopedDataBuilder()"));
 }
@@ -600,7 +604,7 @@ int EnvelopedDataParser::parseKeyAgreeRecipientInfo (
         KeyAgreeRecipientInfo& kari
 )
 {
-    if (index >= m_EnvData->recipientInfos.list.count) return RET_INDEX_OUT_OF_RANGE;
+    if (index >= (size_t)m_EnvData->recipientInfos.list.count) return RET_INDEX_OUT_OF_RANGE;
 
     const RecipientInfo_t* recip_info = m_EnvData->recipientInfos.list.array[index];
     if (recip_info->present != RecipientInfo_PR_kari) return RET_UAPKI_INVALID_STRUCT;
@@ -679,7 +683,7 @@ int EnvelopedDataParser::parseUnprotectedAttrs (
     if (attrs && (attrs->list.count > 0)) {
         parsedAttrs.resize(attrs->list.count);
 
-        for (size_t i = 0; i < attrs->list.count; i++) {
+        for (int i = 0; i < attrs->list.count; i++) {
             const Attribute_t* src_attr = attrs->list.array[i];
             UapkiNS::Attribute& dst_attr = parsedAttrs[i];
 
@@ -738,28 +742,42 @@ int EnvelopedDataParser::KeyAgreeRecipientIdentifier::parse (
 
 int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toIssuerAndSN (
         ByteArray** baIssuerAndSN
-)
+) const
 {
     if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_issuerAndSerialNumber) return RET_UAPKI_INVALID_STRUCT;
 
     return asn_encode_ba(get_IssuerAndSerialNumber_desc(), &m_KarId->choice.issuerAndSerialNumber, baIssuerAndSN);
 }
 
+int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toIssuerAndSN (
+        ByteArray** baIssuer,
+        ByteArray** baSerialNumber
+) const
+{
+    if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_issuerAndSerialNumber) return RET_UAPKI_INVALID_STRUCT;
+
+    //  =issuer=
+    int ret = asn_encode_ba(get_Name_desc(), &m_KarId->choice.issuerAndSerialNumber.issuer, baIssuer);
+    if (ret != RET_OK) return ret;
+    //  =serialNumber=
+    ret = asn_INTEGER2ba(&m_KarId->choice.issuerAndSerialNumber.serialNumber, baSerialNumber);
+    if (ret != RET_OK) {
+        ba_free(*baIssuer);
+    }
+    return ret;
+}
+
 int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toRecipientKeyId (
         ByteArray** baSubjectKeyId
-)
+) const
 {
     if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_rKeyId) return RET_UAPKI_INVALID_STRUCT;
 
-    int ret = RET_OK;
-
     //  =subjectKeyIdentifier=
-    DO(asn_OCTSTRING2ba(&m_KarId->choice.rKeyId.subjectKeyIdentifier, baSubjectKeyId));
-
+    const int ret = asn_OCTSTRING2ba(&m_KarId->choice.rKeyId.subjectKeyIdentifier, baSubjectKeyId);
     //  =date= (optional) - ignored
     //  =other= (optional) - ignored
 
-cleanup:
     return ret;
 }
 
@@ -767,7 +785,7 @@ int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toRecipientKeyId (
         ByteArray** baSubjectKeyId,
         uint64_t& date,
         ByteArray** baOtherKeyAttribute
-)
+) const
 {
     if (m_KarId->present != KeyAgreeRecipientIdentifier_PR_rKeyId) return RET_UAPKI_INVALID_STRUCT;
 
@@ -778,12 +796,12 @@ int EnvelopedDataParser::KeyAgreeRecipientIdentifier::toRecipientKeyId (
     DO(asn_OCTSTRING2ba(&recip_keyid.subjectKeyIdentifier, baSubjectKeyId));
 
     //  =date= (optional)
-    if (recip_keyid.date) {//TODO: need check
+    if (recip_keyid.date) {
         DO(Util::genTimeFromAsn1(recip_keyid.date, date));
     }
 
     //  =other= (optional)
-    if (recip_keyid.other) {//TODO: need check
+    if (recip_keyid.other) {
         DO(asn_encode_ba(get_OtherKeyAttribute_desc(), &recip_keyid.other, baOtherKeyAttribute));
     }
 

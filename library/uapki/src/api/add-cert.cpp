@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/add-cert.cpp"
+
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
@@ -34,37 +36,50 @@
 #include "uapki-ns.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/add-cert.cpp"
+using namespace std;
+using namespace UapkiNS;
 
 
-static int add_cert_to_store (
-        CerStore& cerStore,
-        const ByteArray* baEncoded,
-        bool isPermanent,
-        JSON_Object* joResult
+static int add_certs_to_store (
+        Cert::CerStore& cerStore,
+        const bool trusted,
+        const bool permanent,
+        const VectorBA& vbaEncodedCerts,
+        JSON_Array* jaResults
 )
 {
     int ret = RET_OK;
-    CerStore::Item* cer_item = nullptr;
-    bool is_unique;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
+    size_t idx = 0;
 
-    DO(cerStore.addCert(baEncoded, true, isPermanent, false, is_unique, &cer_item));
+    DO(cerStore.addCerts(
+        trusted,
+        permanent,
+        vbaEncodedCerts,
+        added_ceritems
+    ));
 
-    DO(json_object_set_base64(joResult, "certId", cer_item->baCertId));
-    DO(ParsonHelper::jsonObjectSetBoolean(joResult, "isUnique", is_unique));
+    for (const auto& it : added_ceritems) {
+        DO_JSON(json_array_append_value(jaResults, json_value_init_object()));
+        JSON_Object* jo_added = json_array_get_object(jaResults, idx++);
+        DO(ParsonHelper::jsonObjectSetInt32(jo_added, "errorCode", it.errorCode));
+        if (it.errorCode == RET_OK) {
+            DO(json_object_set_base64(jo_added, "certId", it.cerItem->getCertId()));
+            DO(ParsonHelper::jsonObjectSetBoolean(jo_added, "isUnique", it.isUnique));
+        }
+    }
 
 cleanup:
     return ret;
 }   //  add_cert_to_store
 
-static int parse_added_certs (
+static int parse_add_certs (
         JSON_Object* joParams,
-        UapkiNS::VectorBA& vbaCerts
+        VectorBA& vbaEncodedCerts
 )
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_encoded;
+    SmartBA sba_encoded;
     JSON_Array* ja_certs = json_object_get_array(joParams, "certificates");
 
     if (ja_certs) {
@@ -73,11 +88,11 @@ static int parse_added_certs (
             if (!sba_encoded.set(json_array_get_base64(ja_certs, i))) {
                 SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
             }
-            vbaCerts.push_back(sba_encoded.pop());
+            vbaEncodedCerts.push_back(sba_encoded.pop());
         }
     }
     else {
-        UapkiNS::Pkcs7::SignedDataParser sdata_parser;
+        Pkcs7::SignedDataParser sdata_parser;
         if (!sba_encoded.set(json_object_get_base64(joParams, "bundle"))) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
@@ -85,33 +100,30 @@ static int parse_added_certs (
         DO(sdata_parser.parse(sba_encoded.get()));
 
         for (auto& it : sdata_parser.getCerts()) {
-            vbaCerts.push_back(it);
+            vbaEncodedCerts.push_back(it);
             it = nullptr;
         }
     }
 
 cleanup:
     return ret;
-}   //  parse_added_certs
+}   //  parse_add_certs
 
 
 int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    UapkiNS::VectorBA vba_certs;
-    JSON_Array* ja_results = nullptr;
-    size_t idx = 0;
+    LibraryConfig* lib_config = get_config();
+    Cert::CerStore* cer_store = get_cerstore();
     const bool present_certs = ParsonHelper::jsonObjectHasValue(joParams, "certificates", JSONArray);
     const bool present_bundle = ParsonHelper::jsonObjectHasValue(joParams, "bundle", JSONString);
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
     const bool to_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
+    VectorBA vba_encodedcerts;
+    JSON_Array* ja_results = nullptr;
 
-    LibraryConfig* lib_config = get_config();
-    if (!lib_config) return RET_UAPKI_GENERAL_ERROR;
+    if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
     if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
-
-    CerStore* cer_store = get_cerstore();
-    if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
     if (
         (present_certs && present_bundle) ||
@@ -120,30 +132,39 @@ int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult)
         return RET_UAPKI_INVALID_PARAMETER;
     }
 
-    DO(parse_added_certs(joParams, vba_certs));
-    if (vba_certs.empty()) return RET_UAPKI_INVALID_PARAMETER;
+    DO(parse_add_certs(joParams, vba_encodedcerts));
+    if (vba_encodedcerts.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     DO_JSON(json_object_set_value(joResult, "added", json_value_init_array()));
     ja_results = json_object_get_array(joResult, "added");
 
     if (!to_storage) {
-        for (const auto& it : vba_certs) {
-            DO_JSON(json_array_append_value(ja_results, json_value_init_object()));
-            DO(add_cert_to_store(*cer_store, it, permanent, json_array_get_object(ja_results, idx++)));
-        }
+        DO(add_certs_to_store(
+            *cer_store,
+            Cert::NOT_TRUSTED,
+            permanent,
+            vba_encodedcerts,
+            ja_results
+        ));
     }
     else {
         CmStorageProxy* storage = CmProviders::openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
-        for (const auto& it : vba_certs) {
-            DO_JSON(json_array_append_value(ja_results, json_value_init_object()));
+        for (const auto& it : vba_encodedcerts) {
             ret = storage->sessionAddCertificate(it);
             if (ret == RET_UAPKI_NOT_SUPPORTED) {
                 DO(storage->keyAddCertificate(it));
             }
-            DO(add_cert_to_store(*cer_store, it, permanent, json_array_get_object(ja_results, idx++)));
         }
+
+        DO(add_certs_to_store(
+            *cer_store,
+            Cert::NOT_TRUSTED,
+            permanent,
+            vba_encodedcerts,
+            ja_results
+        ));
     }
 
 cleanup:

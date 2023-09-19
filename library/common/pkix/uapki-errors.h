@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,8 +24,6 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-//  Last update: 2023-03-15
 
 #ifndef _UAPKI_ERRORS_H_
 #define _UAPKI_ERRORS_H_
@@ -84,7 +82,12 @@
 #define RET_UAPKI_STORAGE_NOT_OPEN                                    (UAPKI_ERROR_NAME_CODE | 0x00000019)
 
 #define RET_UAPKI_PROVIDER_NOT_LOADED                                 (UAPKI_ERROR_NAME_CODE | 0x0000001A)
+
 #define RET_UAPKI_UNSUPPORTED_CMAPI                                   (UAPKI_ERROR_NAME_CODE | 0x0000001B)
+
+#define RET_UAPKI_MANY_METHODS_ARE_RUNNING                            (UAPKI_ERROR_NAME_CODE | 0x0000001C)
+
+#define RET_UAPKI_SERIAL_METHOD_IS_RUNNING                            (UAPKI_ERROR_NAME_CODE | 0x0000001D)
 
 
 #define RET_UAPKI_FILE_OPEN_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000020)
@@ -105,6 +108,7 @@
 #define RET_UAPKI_EXTENSION_NOT_SET_CRITICAL                          (UAPKI_ERROR_NAME_CODE | 0x00000037)
 #define RET_UAPKI_INVALID_COUNT_ITEMS                                 (UAPKI_ERROR_NAME_CODE | 0x00000038)
 #define RET_UAPKI_INVALID_DIGEST                                      (UAPKI_ERROR_NAME_CODE | 0x00000039)
+#define RET_UAPKI_OTHER_RECIPIENT                                     (UAPKI_ERROR_NAME_CODE | 0x0000003A)
 
 
 #define RET_UAPKI_CERT_STORE_LOAD_ERROR                               (UAPKI_ERROR_NAME_CODE | 0x00000040)

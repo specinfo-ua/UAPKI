@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,9 +31,9 @@
 #include "cm-errors.h"
 #include "cm-export.h"
 #include "cm-pkcs12.h"
-#include "cm-pkcs12-debug.h"
 #include "parson.h"
 #include "uapkic.h"
+#include "cm-pkcs12-debug.h"
 
 
 #define DEBUG_OUTPUT(msg)
@@ -46,9 +46,9 @@ DEBUG_OUTPUT_FUNC
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS12\","                               //  required
     "\"apiVersion\": \"1.0.0\","                        //  required
-    "\"libVersion\": \"1.0.4\","                        //  required
+    "\"libVersion\": \"1.0.8\","                        //  required
     "\"description\": \"PKCS12-provider\","             //  required
-    "\"manufacturer\": \"2022 SPECINFOSYSTEMS LLC\","   //  required
+    "\"manufacturer\": \"2021 SPECINFOSYSTEMS LLC\","   //  required
     "\"supportListStorages\": false,"                   //  optional
     "\"flags\": 0"                                      //  optional
 "}";
@@ -62,7 +62,9 @@ extern "C" {
 #endif
 
 
-CM_EXPORT CM_ERROR provider_info (CM_JSON_PCHAR* providerInfo)
+CM_EXPORT CM_ERROR provider_info (
+        CM_JSON_PCHAR* providerInfo
+)
 {
     DEBUG_OUTPUT("provider_info()");
     if (!providerInfo) return RET_CM_INVALID_PARAMETER;
@@ -71,7 +73,9 @@ CM_EXPORT CM_ERROR provider_info (CM_JSON_PCHAR* providerInfo)
     return (*providerInfo != nullptr) ? RET_OK : RET_CM_GENERAL_ERROR;
 }
 
-CM_EXPORT CM_ERROR provider_init (CM_JSON_PCHAR providerParams)
+CM_EXPORT CM_ERROR provider_init (
+        CM_JSON_PCHAR providerParams
+)
 {
     DEBUG_OUTPUT("provider_init()");
     CM_ERROR cm_err = RET_CM_GENERAL_ERROR;
@@ -106,25 +110,41 @@ CM_EXPORT CM_ERROR provider_deinit (void)
     return cm_err;
 }
 
-CM_EXPORT CM_ERROR provider_open (const char* urlFilename, uint32_t mode,
-                    const CM_JSON_PCHAR params, CM_SESSION_API** session)
+CM_EXPORT CM_ERROR provider_open (
+        const char* fileName,
+        uint32_t openMode,
+        const CM_JSON_PCHAR openParams,
+        CM_SESSION_API** session
+)
 {
     DEBUG_OUTPUT("provider_open()");
-    return (cm_pkcs12) ? cm_pkcs12->open(urlFilename, mode, params, session) : RET_CM_NOT_INITIALIZED;
+    return (cm_pkcs12)
+        ? cm_pkcs12->open(
+            fileName,
+            openMode,
+            openParams,
+            session)
+        : RET_CM_NOT_INITIALIZED;
 }
 
-CM_EXPORT CM_ERROR provider_close (CM_SESSION_API* session)
+CM_EXPORT CM_ERROR provider_close (
+        CM_SESSION_API* session
+)
 {
     DEBUG_OUTPUT("provider_close()");
     return (cm_pkcs12) ? cm_pkcs12->close(session) : RET_CM_NOT_INITIALIZED;
 }
 
-CM_EXPORT void block_free (void* ptr)
+CM_EXPORT void block_free (
+        void* ptr
+)
 {
     ::free(ptr);
 }
 
-CM_EXPORT void bytearray_free (CM_BYTEARRAY* ba)
+CM_EXPORT void bytearray_free (
+        CM_BYTEARRAY* ba
+)
 {
     if (ba) {
         ba_free((ByteArray*) ba);

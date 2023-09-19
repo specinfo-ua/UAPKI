@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -61,20 +61,61 @@ int decodeDistributionPoints (
     std::vector<std::string>& uris
 );
 
-int getAuthorityInfoAccess(const Extensions_t* extns, char** urlOcsp);
-int getAuthorityKeyId(const Extensions_t* extns, ByteArray** baKeyId);
-int getBasicConstrains(const Extensions_t* extns, bool* cA, int* pathLenConstraint);
-int getCrlDistributionPoints(const Extensions_t* extns, char** urlFull);
-int getCrlInvalidityDate(const Extensions_t* extns, uint64_t* invalidityDate);
-int getCrlNumber(const Extensions_t* extns, ByteArray** baCrlNumber);
-int getCrlReason(const Extensions_t* extns, uint32_t* crlReason);
-int getDeltaCrlIndicator(const Extensions_t* extns, ByteArray** baDeltaCrlIndicator);
-int getFreshestCrl(const Extensions_t* extns, char** urlDelta);
-int getKeyUsage(const Extensions_t* extns, uint32_t* keyUsage);
-int getOcspNonce(const Extensions_t* extns, ByteArray** baNonce);
-int getSubjectDirectoryAttributes(const Extensions_t* extns, const char* oidType, ByteArray** baEncoded);
-int getSubjectKeyId(const Extensions_t* extns, ByteArray** baKeyId);
-int getTspUrl(const Extensions_t* extns, char** urlTsp);
+int getAuthorityKeyId (
+    const Extensions_t* extns,
+    ByteArray** baKeyId
+);
+int getBasicConstrains (
+    const Extensions_t* extns,
+    bool& cA,
+    int& pathLenConstraint
+);
+int getCrlInvalidityDate (
+    const Extensions_t* extns,
+    uint64_t& invalidityDate
+);
+int getCrlNumber (
+    const Extensions_t* extns,
+    ByteArray** baCrlNumber
+);
+int getCrlReason (
+    const Extensions_t* extns,
+    uint32_t& crlReason
+);
+int getCrlUris (
+    const Extensions_t* extns,
+    const char* oidExtnId,
+    std::vector<std::string>& uris
+);
+int getDeltaCrlIndicator (
+    const Extensions_t* extns,
+    ByteArray** baDeltaCrlIndicator
+);
+int getKeyUsage (
+    const Extensions_t* extns,
+    uint32_t& keyUsage
+);
+int getOcspNonce (
+    const Extensions_t* extns,
+    ByteArray** baNonce
+);
+int getOcspUris (
+    const Extensions_t* extns,
+    std::vector<std::string>& uris
+);
+int getSubjectDirectoryAttributes (
+    const Extensions_t* extns,
+    const char* oidType,
+    ByteArray** baEncoded
+);
+int getSubjectKeyId (
+    const Extensions_t* extns,
+    ByteArray** baKeyId
+);
+int getTspUris (
+    const Extensions_t* extns,
+    std::vector<std::string>& uris
+);
 
 
 }   //  end namespace ExtensionHelper

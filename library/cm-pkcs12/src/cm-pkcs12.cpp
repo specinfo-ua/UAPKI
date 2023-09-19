@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,12 +35,17 @@
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
+#include "uapki-ns.h"
 
 
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
     #define DEBUG_OUTCON(expression) expression
 #endif
+
+
+static const char* FILENAME_ON_MEMORY = "file://memory";
+
 
 static CM_ERROR err_to_cmerror (int err)
 {
@@ -65,42 +70,48 @@ CmPkcs12::~CmPkcs12 (void)
     DEBUG_OUTCON(puts("CmPkcs12::~CmPkcs12()"));
 }
 
-CM_ERROR CmPkcs12::open (const char* urlFilename, uint32_t mode, const CM_JSON_PCHAR params, CM_SESSION_API** session)
+CM_ERROR CmPkcs12::open (
+        const char* fileName,
+        uint32_t openMode,
+        const CM_JSON_PCHAR openParams,
+        CM_SESSION_API** session
+)
 {
-    DEBUG_OUTCON(printf("CmPkcs12::open(url = '%s', mode = %u)\n", urlFilename, mode));
-    if (!urlFilename || (strlen(urlFilename) == 0) || !session) return RET_CM_INVALID_PARAMETER;
+    DEBUG_OUTCON(printf("CmPkcs12::open(fileName = '%s', openMode = %u)\n", fileName, openMode));
+    if (!fileName || (strlen(fileName) == 0) || !session) return RET_CM_INVALID_PARAMETER;
 
     SessionPkcs12Context* ss_ctx = new SessionPkcs12Context();
     if (!ss_ctx) return RET_CM_GENERAL_ERROR;
 
     ss_ctx->fileStorage.storageParam().setDefault(&this->getDefaultParam());
 
-    ByteArray* ba_bytes = nullptr;
     CM_ERROR cm_err = RET_CM_INVALID_PARAMETER;
-    switch (mode) {
+    UapkiNS::SmartBA sba_pfx;
+
+    switch (openMode) {
     case OPEN_MODE_RW:
     case OPEN_MODE_RO:
-        cm_err = CmPkcs12::parseBytes(params, &ba_bytes);
-        if (cm_err == RET_OK) {
-            if (ba_get_len(ba_bytes) == 0) {
-                cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromFile(urlFilename, mode == OPEN_MODE_RO));
-            }
-            else {
-                ss_ctx->fileStorage.loadFromBuffer(ba_bytes, mode == OPEN_MODE_RO);
-                ba_bytes = nullptr;
+        if (strcmp(fileName, FILENAME_ON_MEMORY) == 0) {
+            cm_err = CmPkcs12::parseBytes(openParams, &sba_pfx);
+            if ((cm_err == RET_OK) && (sba_pfx.size() > 0)) {
+                ss_ctx->fileStorage.loadFromBuffer(sba_pfx.get(), openMode == OPEN_MODE_RO);
+                sba_pfx.set(nullptr);
             }
         }
-        ba_free(ba_bytes);
+        else {
+            cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromFile(fileName, openMode == OPEN_MODE_RO));
+        }
         break;
     case OPEN_MODE_CREATE:
-        cm_err = CmPkcs12::parseConfig(params, ss_ctx->fileStorage.storageParam());
+        cm_err = CmPkcs12::parseConfig(openParams, ss_ctx->fileStorage.storageParam());
         if (cm_err == RET_OK) {
-            ss_ctx->fileStorage.create(urlFilename);
+            ss_ctx->fileStorage.create(fileName);
         }
         break;
     default:
         break;
     }
+
     if (cm_err != RET_OK) {
         delete ss_ctx;
         return cm_err;
@@ -120,7 +131,9 @@ CM_ERROR CmPkcs12::open (const char* urlFilename, uint32_t mode, const CM_JSON_P
     return RET_OK;
 }
 
-CM_ERROR CmPkcs12::close (CM_SESSION_API* session)
+CM_ERROR CmPkcs12::close (
+        CM_SESSION_API* session
+)
 {
     DEBUG_OUTCON(puts("CmPkcs12::close()"));
     if (session && session->ctx) {
@@ -130,22 +143,27 @@ CM_ERROR CmPkcs12::close (CM_SESSION_API* session)
     return RET_OK;
 }
 
-CM_ERROR CmPkcs12::parseBytes (const CM_JSON_PCHAR jsonParams, ByteArray** baEncoded)
+CM_ERROR CmPkcs12::parseBytes (
+        const CM_JSON_PCHAR jsonParams,
+        ByteArray** baEncoded
+)
 {
     if (!jsonParams) return RET_OK;
 
     ParsonHelper json;
     if (!json.parse((const char*)jsonParams)) return RET_CM_INVALID_JSON;
 
-    //  =bytes= optional, if present then must be valid base64-encoding
-    if (!json.hasValue("bytes", JSONString)) return RET_OK;
+    if (!json.hasValue("bytes", JSONString)) return RET_CM_INVALID_PARAMETER;
 
     *baEncoded = json_object_get_base64(json.rootObject(), "bytes");
 
     return (*baEncoded) ? RET_OK : RET_CM_INVALID_JSON;
 }
 
-CM_ERROR CmPkcs12::parseConfig (const CM_JSON_PCHAR jsonParams, FileStorageParam& storageParam)
+CM_ERROR CmPkcs12::parseConfig (
+        const CM_JSON_PCHAR jsonParams,
+        FileStorageParam& storageParam
+)
 {
     if (!jsonParams) return RET_OK;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,103 +25,205 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/list-certs.cpp"
+
 #include "api-json-internal.h"
+#include "extension-helper-json.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
+#include "oid-utils.h"
+#include "store-json.h"
 #include "uapki-errors.h"
-#include "uapki-ns.h"
+#include "uapki-ns-util.h"
+#include "time-util.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/list-certs.cpp"
+using namespace std;
+using namespace UapkiNS;
 
 
-struct Pagination {
-    size_t count;
-    size_t offset;
-    size_t offsetLast;
-    size_t pageSize;
+static int basicconstraints_to_json (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    BasicConstraints_t* basic_constraints = (BasicConstraints_t*)asn_decode_ba_with_alloc(get_BasicConstraints_desc(), baEncoded);
+    if (!basic_constraints) return RET_UAPKI_INVALID_STRUCT;
 
-    Pagination (void)
-        : count(0)
-        , offset(0)
-        , offsetLast(0)
-        , pageSize(0)
-    {}
-
-    void calcParams (void)
-    {
-        offset = (offset < count) ? offset : count;
-        pageSize = (pageSize == 0) ? (count - offset) : pageSize;
-        if (pageSize == 0) pageSize = 1;
-        offsetLast = offset + pageSize;
-        offsetLast = (offsetLast < count) ? offsetLast : count;
+    if (basic_constraints->cA) {
+        const bool is_ca = (basic_constraints->cA != 0);
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isCa", is_ca));
     }
 
-    bool parseParams (
-        JSON_Object* joParams
-    )
-    {
-        const int32_t int_offset = ParsonHelper::jsonObjectGetInt32(joParams, "offset", 0);
-        if (int_offset < 0) return false;
-        offset = (size_t)int_offset;
+cleanup:
+    asn_free(get_BasicConstraints_desc(), basic_constraints);
+    return ret;
+}   //  basicconstraints_to_json
 
-        const int32_t int_pagesize = ParsonHelper::jsonObjectGetInt32(joParams, "pageSize", 0);
-        if (int_pagesize < 0) return false;
-        pageSize = (size_t)int_pagesize;
+static int certstatusinfo_to_json (
+        JSON_Object* joResult,
+        const char* keyName,
+        const Cert::CertStatusInfo& certStatusInfo
+)
+{
+    if (certStatusInfo.status == UapkiNS::CertStatus::UNDEFINED) return RET_OK;
 
-        return true;
+    int ret = RET_OK;
+    JSON_Object* jo_result = nullptr;
+
+    DO_JSON(json_object_set_value(joResult, keyName, json_value_init_object()));
+    jo_result = json_object_get_object(joResult, keyName);
+
+    DO_JSON(json_object_set_string(jo_result, "status", Crl::certStatusToStr(certStatusInfo.status)));
+    DO_JSON(json_object_set_string(jo_result, "validTime", TimeUtil::mtimeToFtime(certStatusInfo.validTime).c_str()));
+
+cleanup:
+    return ret;
+}   //  certstatusinfo_to_json
+
+static int extendedkeyusage_to_json (
+        JSON_Object* joResult,
+        const ByteArray* baEncoded
+)
+{
+    int ret = RET_OK;
+    ExtendedKeyUsage_t* ext_keyusage = (ExtendedKeyUsage_t*)asn_decode_ba_with_alloc(get_ExtendedKeyUsage_desc(), baEncoded);
+    if (!ext_keyusage) return RET_UAPKI_INVALID_STRUCT;
+
+    (void)json_object_set_value(joResult, "extKeyUsage", json_value_init_array());
+    JSON_Array* ja_keypurposeids = json_object_get_array(joResult, "extKeyUsage");
+
+    for (int i = 0; i < ext_keyusage->list.count; i++) {
+        const KeyPurposeId_t* key_purposeid = ext_keyusage->list.array[i];
+        string s_keypurposeid;
+
+        DO(Util::oidFromAsn1(key_purposeid, s_keypurposeid));
+        DO_JSON(json_array_append_string(ja_keypurposeids, s_keypurposeid.c_str()));
+
+        if (s_keypurposeid == string(OID_PKIX_KpOcspSigning)) {
+            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isOcsp", true));
+        }
+        if (s_keypurposeid == string(OID_PKIX_KpTspSigning)) {
+            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isTsp", true));
+        }
+        if (s_keypurposeid == string(OID_IIT_KEYPURPOSE_CMP_SIGNING)) {
+            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isCmp", true));
+        }
     }
 
-    int setResult (JSON_Object* joResult)
-    {
-        int ret = RET_OK;
+cleanup:
+    asn_free(get_ExtendedKeyUsage_desc(), ext_keyusage);
+    return ret;
+}   //  extendedkeyusage_to_json
 
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "count", (uint32_t)count));
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "offset", (uint32_t)offset));
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "pageSize", (uint32_t)pageSize));
+static int extensions_to_json (
+        JSON_Object* joResult,
+        const Extensions_t* extns
+)
+{
+    int ret = RET_OK;
 
-    cleanup:
-        return ret;
+    if (!extns) return RET_UAPKI_INVALID_STRUCT;
+
+    for (int i = 0; i < extns->list.count; i++) {
+        const Extension_t* extn = extns->list.array[i];
+        string s_extnid;
+
+        DO(Util::oidFromAsn1(&extn->extnID, s_extnid));
+
+        if (oid_is_equal(s_extnid.c_str(), OID_X509v3_BasicConstraints)) {
+            SmartBA sba_value;
+            DO(asn_OCTSTRING2ba(&extn->extnValue, &sba_value));
+            DO(basicconstraints_to_json(joResult, sba_value.get()));
+        }
+        else if (oid_is_equal(s_extnid.c_str(), OID_X509v3_KeyUsage)) {
+            SmartBA sba_value;
+            DO(asn_OCTSTRING2ba(&extn->extnValue, &sba_value));
+            DO_JSON(json_object_set_value(joResult, "keyUsage", json_value_init_object()));
+            DO(ExtensionHelper::DecodeToJsonObject::keyUsage(sba_value.get(), json_object_get_object(joResult, "keyUsage")));
+        }
+        else if (oid_is_equal(s_extnid.c_str(), OID_X509v3_ExtendedKeyUsage)) {
+            SmartBA sba_value;
+            DO(asn_OCTSTRING2ba(&extn->extnValue, &sba_value));
+            DO(extendedkeyusage_to_json(joResult, sba_value.get()));
+        }
     }
 
-};  //  end struct Pagination
+cleanup:
+    return ret;
+}   //  extensions_to_json
+
+static int info_to_json (
+        JSON_Object* joResult,
+        const Cert::CerItem* cerItem
+)
+{
+    int ret = RET_OK;
+    const TBSCertificate_t& tbs_cert = cerItem->getCert()->tbsCertificate;
+
+    DO(json_object_set_base64(joResult, "certId", cerItem->getCertId()));
+
+    DO(json_object_set_hex(joResult, "serialNumber", cerItem->getSerialNumber()));
+    DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
+    DO(nameToJson(json_object_get_object(joResult, "issuer"), tbs_cert.issuer));
+    DO_JSON(json_object_set_value(joResult, "validity", json_value_init_object()));
+    DO(validityToJson(joResult, cerItem));
+    DO_JSON(json_object_set_value(joResult, "subject", json_value_init_object()));
+    DO(nameToJson(json_object_get_object(joResult, "subject"), tbs_cert.subject));
+    DO_JSON(json_object_set_string(joResult, "keyAlgo", cerItem->getKeyAlgo().c_str()));
+    DO(json_object_set_hex(joResult, "subjectKeyIdentifier", cerItem->getKeyId()));
+    DO(json_object_set_hex(joResult, "authorityKeyIdentifier", cerItem->getAuthorityKeyId()));
+    DO(extensions_to_json(joResult, tbs_cert.extensions));
+
+    DO(certstatusinfo_to_json(joResult, "statusByCRL", cerItem->getCertStatusByCrl()));
+    DO(certstatusinfo_to_json(joResult, "statusByOCSP", cerItem->getCertStatusByOcsp()));
+
+cleanup:
+    return ret;
+}   //  info_to_json
 
 
 int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    CerStore* cer_store = nullptr;
-    CerStore::Item* cer_item = nullptr;
-    JSON_Array* ja_results = nullptr;
-    Pagination pa;
-    const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
-
     LibraryConfig* lib_config = get_config();
-    if (!lib_config) return RET_UAPKI_GENERAL_ERROR;
+    Cert::CerStore* cer_store = get_cerstore();
+    const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
+    const bool show_certinfos = ParsonHelper::jsonObjectGetBoolean(joParams, "showCertInfos", false);
+    Pagination pagination;
+
+    if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
     if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
-    cer_store = get_cerstore();
-    if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
+    if (!pagination.parseParams(joParams)) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!pa.parseParams(joParams)) return RET_UAPKI_INVALID_PARAMETER;
-
-    DO_JSON(json_object_set_value(joResult, "certIds", json_value_init_array()));
-    ja_results = json_object_get_array(joResult, "certIds");
+    (void)json_object_set_value(joResult, "certIds", json_value_init_array());
+    JSON_Array* ja_certids = json_object_get_array(joResult, "certIds");
+    JSON_Array* ja_certinfos = nullptr;
+    if (show_certinfos) {
+        (void)json_object_set_value(joResult, "certInfos", json_value_init_array());
+        ja_certinfos = json_object_get_array(joResult, "certInfos");
+    }
 
     if (!from_storage) {
-        DO(cer_store->getCount(pa.count));
-        pa.calcParams();
-        for (size_t idx = pa.offset; idx < pa.offsetLast; idx++) {
-            cer_item = nullptr;
-            DO(cer_store->getCertByIndex(idx, &cer_item));
-            DO_JSON(json_array_append_base64(ja_results, cer_item->baCertId));
+        const vector<Cert::CerItem*> cer_items = cer_store->getCerItems();
+        pagination.count = cer_items.size();
+        pagination.calcParams();
+        for (size_t idx = pagination.offset; idx < pagination.offsetLast; idx++) {
+            Cert::CerItem* cer_item = cer_items[idx];
+            DO(json_array_append_base64(ja_certids, cer_item->getCertId()));
+            if (show_certinfos) {
+                DO_JSON(json_array_append_value(ja_certinfos, json_value_init_object()));
+                JSON_Object* jo_certinfo = json_array_get_object(ja_certinfos, idx);
+                DO(info_to_json(jo_certinfo, cer_item));
+            }
         }
     }
     else {
         UapkiNS::VectorBA vba_certs;
-        vector<const ByteArray*> list_refcertids;
+        vector<Cert::CerItem*> cer_items;
 
         CmStorageProxy* storage = CmProviders::openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
@@ -132,21 +234,27 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
         }
 
         for (const auto& it : vba_certs) {
-            cer_item = nullptr;
+            Cert::CerItem* cer_item = nullptr;
             ret = cer_store->getCertByEncoded(it, &cer_item);
             if (ret == RET_OK) {
-                list_refcertids.push_back(cer_item->baCertId);
-                pa.count++;
+                cer_items.push_back(cer_item);
+                pagination.count++;
             }
         }
 
-        pa.calcParams();
-        for (size_t idx = pa.offset; idx < pa.offsetLast; idx++) {
-            DO_JSON(json_array_append_base64(ja_results, list_refcertids[idx]));
+        pagination.calcParams();
+        for (size_t idx = pagination.offset; idx < pagination.offsetLast; idx++) {
+            Cert::CerItem* cer_item = cer_items[idx];
+            DO(json_array_append_base64(ja_certids, cer_item->getCertId()));
+            if (show_certinfos) {
+                DO_JSON(json_array_append_value(ja_certinfos, json_value_init_object()));
+                JSON_Object* jo_certinfo = json_array_get_object(ja_certinfos, idx);
+                DO(info_to_json(jo_certinfo, cer_item));
+            }
         }
     }
 
-    DO(pa.setResult(joResult));
+    DO(pagination.setResult(joResult));
 
 cleanup:
     return ret;

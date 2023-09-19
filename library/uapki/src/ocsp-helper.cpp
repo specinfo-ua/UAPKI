@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,6 +24,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define FILE_MARKER "uapki/ocsp-helper.cpp"
 
 #include "ocsp-helper.h"
 #include "extension-helper.h"
@@ -56,57 +58,6 @@ static const char* RESPONSE_STATUS_STRINGS[8] = {
 };
 
 static OcspHelper::SingleResponseInfo singleresponseinfo_empty;
-
-
-struct OcspCertId {
-    const char* hashAlgo;
-    bool        hashAlgoParamIsNull;
-    ByteArray*  issuerNameHash;
-    ByteArray*  issuerKeyHash;
-    ByteArray*  serialNumber;
-};  //  end struct OcspCertId
-
-static int certid_hashed_issuer (OcspCertId& certId, const CerStore::Item* cerIssuer)
-{
-    int ret = RET_OK;
-    ByteArray* ba_encoded = nullptr;
-
-    DO(asn_encode_ba(get_Name_desc(), &cerIssuer->cert->tbsCertificate.subject, &ba_encoded));
-
-    certId.hashAlgo = hash_to_oid(cerIssuer->algoKeyId);
-    DO(::hash(cerIssuer->algoKeyId, ba_encoded, &certId.issuerNameHash));
-    CHECK_NOT_NULL(certId.issuerKeyHash = ba_copy_with_alloc(cerIssuer->baKeyId, 0, 0));
-
-cleanup:
-    ba_free(ba_encoded);
-    return ret;
-}   //  certid_hashed_issuer
-
-static int ocsprequest_add_certid (OCSPRequest_t& ocspRequest, const OcspCertId& certId)
-{
-    int ret = RET_OK;
-    Request_t* request = nullptr;
-    NULL_t* null_params = nullptr;
-
-    ASN_ALLOC_TYPE(request, Request_t);
-
-    DO(asn_set_oid_from_text(certId.hashAlgo, &request->reqCert.hashAlgorithm.algorithm));
-    if (certId.hashAlgoParamIsNull) {
-        ASN_ALLOC_TYPE(null_params, NULL_t);
-        DO(asn_create_any(get_NULL_desc(), null_params, &request->reqCert.hashAlgorithm.parameters));
-    }
-    DO(asn_ba2OCTSTRING(certId.issuerNameHash, &request->reqCert.issuerNameHash));
-    DO(asn_ba2OCTSTRING(certId.issuerKeyHash, &request->reqCert.issuerKeyHash));
-    DO(asn_ba2INTEGER(certId.serialNumber, &request->reqCert.serialNumber));
-
-    DO(ASN_SEQUENCE_ADD(&ocspRequest.tbsRequest.requestList.list, request));
-    request = nullptr;
-
-cleanup:
-    asn_free(get_Request_desc(), request);
-    asn_free(get_NULL_desc(), null_params);
-    return ret;
-}   //  ocsprequest_add_certid
 
 
 OcspHelper::OcspHelper (void)
@@ -156,36 +107,72 @@ int OcspHelper::init (void)
 }
 
 int OcspHelper::addCert (
-        const CerStore::Item* csiIssuer,
-        const CerStore::Item* csiSubject
+        const Cert::CerItem* cerIssuer,
+        const Cert::CerItem* cerSubject
 )
 {
-    if (!csiSubject) return RET_UAPKI_INVALID_PARAMETER;
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
 
-    return addSN(csiIssuer, csiSubject->baSerialNumber);
+    return addIssuerAndSN(cerIssuer, cerSubject->getSerialNumber());
 }
 
-int OcspHelper::addSN (
-        const CerStore::Item* csiIssuer,
+int OcspHelper::addCertId (
+        const UapkiNS::AlgorithmIdentifier& hashAlgorithm,
+        const ByteArray* baIssuerNameHash,
+        const ByteArray* baIssuerKeyHash,
         const ByteArray* baSerialNumber
 )
 {
     int ret = RET_OK;
-    OcspCertId cert_id;
+    Request_t* request = nullptr;
 
-    if (!m_OcspRequest || !csiIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
+    if (
+        !m_OcspRequest ||
+        !hashAlgorithm.isPresent() ||
+        !baIssuerNameHash ||
+        !baIssuerKeyHash ||
+        !baSerialNumber
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
-    memset(&cert_id, 0, sizeof(OcspCertId));
-    cert_id.hashAlgoParamIsNull = false;
+    ASN_ALLOC_TYPE(request, Request_t);
 
-    DO(certid_hashed_issuer(cert_id, csiIssuer));
-    cert_id.serialNumber = (ByteArray*)baSerialNumber;
+    DO(Util::algorithmIdentifierToAsn1(request->reqCert.hashAlgorithm, hashAlgorithm));
+    DO(asn_ba2OCTSTRING(baIssuerNameHash, &request->reqCert.issuerNameHash));
+    DO(asn_ba2OCTSTRING(baIssuerKeyHash, &request->reqCert.issuerKeyHash));
+    DO(asn_ba2INTEGER(baSerialNumber, &request->reqCert.serialNumber));
 
-    DO(ocsprequest_add_certid(*m_OcspRequest, cert_id));
+    DO(ASN_SEQUENCE_ADD(&m_OcspRequest->tbsRequest.requestList.list, request));
+    request = nullptr;
 
 cleanup:
-    ba_free(cert_id.issuerNameHash);
-    ba_free(cert_id.issuerKeyHash);
+    asn_free(get_Request_desc(), request);
+    return ret;
+}
+
+int OcspHelper::addIssuerAndSN (
+        const Cert::CerItem* cerIssuer,
+        const ByteArray* baSerialNumber
+)
+{
+    int ret = RET_OK;
+    UapkiNS::AlgorithmIdentifier aid_hashalgo;
+    SmartBA sba_subject, sba_issuernamehash;
+
+    if (!m_OcspRequest || !cerIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
+
+    DO(asn_encode_ba(get_Name_desc(), &cerIssuer->getCert()->tbsCertificate.subject, &sba_subject));
+
+    aid_hashalgo.algorithm = string(hash_to_oid(cerIssuer->getAlgoKeyId()));
+    DO(::hash(cerIssuer->getAlgoKeyId(), sba_subject.get(), &sba_issuernamehash));
+
+    DO(addCertId(
+        aid_hashalgo,
+        sba_issuernamehash.get(),
+        cerIssuer->getKeyId(),
+        baSerialNumber
+    ));
+
+cleanup:
     return ret;
 }
 
@@ -242,19 +229,21 @@ cleanup:
     return ret;
 }
 
-int OcspHelper::parseOcspResponse (const ByteArray* baEncoded)
+int OcspHelper::parseOcspResponse (
+        const ByteArray* baEncoded
+)
 {
-    int ret = RET_OK;
-    OCSPResponse_t* ocsp_resp = nullptr;
-    BasicOCSPResponse_t* basic_ocspresp = nullptr;
-    uint32_t status = 0;
-
     m_ResponseStatus = ResponseStatus::UNDEFINED;
     if (!baEncoded) return RET_UAPKI_OCSP_RESPONSE_INVALID;
 
-    CHECK_NOT_NULL(ocsp_resp = (OCSPResponse_t*)asn_decode_ba_with_alloc(get_OCSPResponse_desc(), baEncoded));
+    OCSPResponse_t* ocsp_resp = (OCSPResponse_t*)asn_decode_ba_with_alloc(get_OCSPResponse_desc(), baEncoded);
+    if (!ocsp_resp) return RET_UAPKI_OCSP_RESPONSE_INVALID;
 
+    int ret = RET_OK;
+    BasicOCSPResponse_t* basic_ocspresp = nullptr;
+    uint32_t status = 0;
     DO(Util::enumeratedFromAsn1(&ocsp_resp->responseStatus, &status));
+
     m_ResponseStatus = static_cast<ResponseStatus>(status);
     if (m_ResponseStatus == ResponseStatus::SUCCESSFUL) {
         ResponseBytes_t* resp_bytes = ocsp_resp->responseBytes;
@@ -262,10 +251,17 @@ int OcspHelper::parseOcspResponse (const ByteArray* baEncoded)
             SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
         }
 
-        CHECK_NOT_NULL(basic_ocspresp = (BasicOCSPResponse_t*)asn_decode_with_alloc(
-            get_BasicOCSPResponse_desc(), resp_bytes->response.buf, resp_bytes->response.size));
+        basic_ocspresp = (BasicOCSPResponse_t*)asn_decode_with_alloc(
+            get_BasicOCSPResponse_desc(), resp_bytes->response.buf, resp_bytes->response.size);
+        if (!basic_ocspresp) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+        }
 
-        CHECK_NOT_NULL(m_BaBasicOcspResponse = ba_alloc_from_uint8(resp_bytes->response.buf, (size_t)resp_bytes->response.size));
+        m_BaBasicOcspResponse = ba_alloc_from_uint8(resp_bytes->response.buf, (size_t)resp_bytes->response.size);
+        if (!m_BaBasicOcspResponse) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+        }
+
         DO(asn_encode_ba(get_ResponseData_desc(), &basic_ocspresp->tbsResponseData, &m_BaTbsResponseData));
 
         m_BasicOcspResp = basic_ocspresp;
@@ -417,7 +413,7 @@ int OcspHelper::getCerts (
         if (resp_certs->list.size == 0) {
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
-        for (size_t i = 0; i < resp_certs->list.count; i++) {
+        for (int i = 0; i < resp_certs->list.count; i++) {
             DO(asn_encode_ba(get_Certificate_desc(), resp_certs->list.array[i], &ba_cert));
             certs.push_back(ba_cert);
             ba_cert = nullptr;
@@ -533,12 +529,12 @@ int OcspHelper::scanSingleResponses (void)
         uint32_t crl_reason = 0;
 
         if (m_OcspRequest) {
-            const CertID_t* req_certid = &tbs_req->requestList.list.array[i]->reqCert;
+            const CertID_t& req_certid = tbs_req->requestList.list.array[i]->reqCert;
             if (
-                !Util::equalValuePrimitiveType(req_certid->hashAlgorithm.algorithm, resp->certID.hashAlgorithm.algorithm) ||
-                !Util::equalValueOctetString(req_certid->issuerNameHash, resp->certID.issuerNameHash) ||
-                !Util::equalValueOctetString(req_certid->issuerKeyHash, resp->certID.issuerKeyHash) ||
-                !Util::equalValuePrimitiveType(req_certid->serialNumber, resp->certID.serialNumber)
+                !Util::equalValuePrimitiveType(req_certid.hashAlgorithm.algorithm, resp->certID.hashAlgorithm.algorithm) ||
+                !Util::equalValueOctetString(req_certid.issuerNameHash, resp->certID.issuerNameHash) ||
+                !Util::equalValueOctetString(req_certid.issuerKeyHash, resp->certID.issuerKeyHash) ||
+                !Util::equalValuePrimitiveType(req_certid.serialNumber, resp->certID.serialNumber)
             ) {
                 SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
             }
@@ -575,7 +571,7 @@ cleanup:
 }
 
 int OcspHelper::verifyTbsResponseData (
-        const CerStore::Item* csiResponder,
+        const Cert::CerItem* cerResponder,
         SignatureVerifyStatus& statusSign
 )
 {
@@ -588,14 +584,14 @@ int OcspHelper::verifyTbsResponseData (
 
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
 
-    if (csiResponder->algoKeyId == HASH_ALG_GOST34311) {
+    if (cerResponder->getAlgoKeyId() == HASH_ALG_GOST34311) {
         DO(Util::bitStringEncapOctetFromAsn1(&m_BasicOcspResp->signature, &ba_signature));
     }
     else {
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, csiResponder->baSPKI, ba_signature);
+    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, cerResponder->getSpki(), ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SignatureVerifyStatus::VALID;

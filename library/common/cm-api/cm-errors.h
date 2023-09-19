@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -90,6 +90,7 @@
 #define RET_CM_PASSWORD_NOT_SET                      (CM_ERROR_NAME_CODE | 0x00000036)
 #define RET_CM_INVALID_CERTIFICATE                   (CM_ERROR_NAME_CODE | 0x00000037)
 #define RET_CM_INVALID_KEYID                         (CM_ERROR_NAME_CODE | 0x00000038)
+#define RET_CM_INVALID_WRAPPED_KEY                   (CM_ERROR_NAME_CODE | 0x00000039)
 
 
 #endif

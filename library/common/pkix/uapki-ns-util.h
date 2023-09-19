@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -119,32 +119,6 @@ namespace Util {
         ByteArray** baExtnValue
     );
 
-    int decodeOid (
-        const ByteArray* baEncoded,
-        char** oid
-    );
-    int decodePkixTime (
-        const ByteArray* baEncoded,
-        uint64_t& msTime
-    );
-    int encodeGenTime (
-        const uint64_t msTime,
-        ByteArray** baEncoded
-    );
-    int encodeOctetString (
-        const ByteArray* baData,
-        ByteArray** baEncoded
-    );
-    int encodePkixTime (
-        const PKIXTime_PR frmTime,
-        const uint64_t msTime,
-        ByteArray** baEncoded
-    );
-    int encodeUtcTime (
-        const uint64_t msTime,
-        ByteArray** baEncoded
-    );
-
     bool equalValueOctetString (
         const OCTET_STRING_t& octetString1,
         const OCTET_STRING_t& octetString2
@@ -177,7 +151,7 @@ namespace Util {
     );
     int bmpStringFromAsn1 (
         const BMPString_t* bmpStr,
-        char** str
+        std::string& sValue
     );
     int enumeratedFromAsn1 (
         const ENUMERATED_t* enumerated,
@@ -187,15 +161,19 @@ namespace Util {
     int decodeAnyString (
         const uint8_t* buf,
         const size_t len,
-        char** str
+        std::string& sValue
     );
     int decodeAnyString (
         const ByteArray* baEncoded,
-        char** str
+        std::string& sValue
     );
     int decodeBmpString (
         const ByteArray* baEncoded,
-        char** str
+        std::string& sValue
+    );
+    int decodeBoolean (
+        const ByteArray* baEncoded,
+        bool& value
     );
     int decodeEnumerated (
         const ByteArray* baEncoded,
@@ -205,9 +183,25 @@ namespace Util {
         const ByteArray* baEncoded,
         ByteArray** baData
     );
+    int decodeOid (
+        const ByteArray* baEncoded,
+        std::string& oid
+    );
+    int decodePkixTime (
+        const ByteArray* baEncoded,
+        uint64_t& msTime
+    );
 
     int encodeBmpString (
         const char* strUtf8,
+        ByteArray** baEncoded
+    );
+    int encodeBoolean (
+        const bool value,
+        ByteArray** baEncoded
+    );
+    int encodeGenTime (
+        const uint64_t msTime,
         ByteArray** baEncoded
     );
     int encodeIa5String (
@@ -222,12 +216,25 @@ namespace Util {
         const int32_t value,
         ByteArray** baEncoded
     );
+    int encodeOctetString (
+        const ByteArray* baData,
+        ByteArray** baEncoded
+    );
     int encodeOid (
         const char* oid,
         ByteArray** baEncoded
     );
+    int encodePkixTime (
+        const PKIXTime_PR frmTime,
+        const uint64_t msTime,
+        ByteArray** baEncoded
+    );
     int encodePrintableString (
         const char* strLatin,
+        ByteArray** baEncoded
+    );
+    int encodeUtcTime (
+        const uint64_t msTime,
         ByteArray** baEncoded
     );
     int encodeUtf8string (
@@ -236,7 +243,7 @@ namespace Util {
     );
 
     int oidFromAsn1 (
-        OBJECT_IDENTIFIER_t* oid,
+        const OBJECT_IDENTIFIER_t* oid,
         std::string& sOid
     );
     int oidToAsn1 (
@@ -248,9 +255,18 @@ namespace Util {
         const size_t len,
         char** str
     );
+    int pbufToStr (
+        const uint8_t* buf,
+        const size_t len,
+        std::string& sValue
+    );
 
     std::string baToHex (
         const ByteArray* baData
+    );
+    std::string joinStrings (
+        const std::vector<std::string>& strings,
+        const char separator = ';'
     );
 
 }   //  end namespace Util

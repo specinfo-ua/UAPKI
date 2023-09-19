@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/doc-verify.cpp"
+
 #include "doc-verify.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
@@ -33,7 +35,7 @@
 #include "oid-utils.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
-#include "store-util.h"
+#include "store-json.h"
 #include "time-util.h"
 #include "tsp-helper.h"
 #include "uapki-errors.h"
@@ -91,9 +93,82 @@ struct CollectVerifyStatus {
 };  //  end class CollectVerifyStatus
 
 
+
+class ValidationStatusHelper {
+    ValidationStatus&
+                m_Status;
+public:
+    ValidationStatusHelper (ValidationStatus& iValidationStatus)
+        : m_Status(iValidationStatus)
+    {}
+
+    bool isIndeterminate (void) const {
+        return (m_Status == ValidationStatus::INDETERMINATE);
+    }
+    bool isTotalFailed (void) const {
+        return (m_Status == ValidationStatus::TOTAL_FAILED);
+    }
+    bool isTotalValid (void) const {
+        return (m_Status == ValidationStatus::TOTAL_VALID);
+    }
+    bool isUndefined (void) const {
+        return (m_Status == ValidationStatus::UNDEFINED);
+    }
+
+    void setIndeterminate (void) {
+        if (isTotalValid()) {
+            m_Status = ValidationStatus::INDETERMINATE;
+        }
+    }
+    void setByCertChainItem (
+        const CertChainItem& certChainItem
+    )
+    {
+        if (certChainItem.getVerifyStatus() == Cert::VerifyStatus::VALID) {
+            switch (certChainItem.getValidationType()) {
+            case Cert::ValidationType::UNDEFINED:
+                setIndeterminate();
+                break;
+            case Cert::ValidationType::CRL:
+                setByCertStatus(certChainItem.getResultValidationByCrl().certStatus);
+                break;
+            case Cert::ValidationType::OCSP:
+                setByCertStatus(certChainItem.getResultValidationByOcsp().singleResponseInfo.certStatus);
+                break;
+            default:
+                //  Other cases (ValidationType::NONE and ValidationType::CHAIN) - no action
+                break;
+            }
+        }
+    }
+    void setByCertStatus (
+        const UapkiNS::CertStatus certStatus
+    )
+    {
+        switch (certStatus) {
+        case UapkiNS::CertStatus::GOOD:
+            //  No action
+            break;
+        case UapkiNS::CertStatus::REVOKED:
+        case UapkiNS::CertStatus::UNKNOWN:
+            setTotalFailed();
+            break;
+        default:
+            setIndeterminate();
+            break;
+        }
+    }
+    void setTotalFailed (void) {
+        m_Status = ValidationStatus::TOTAL_FAILED;
+    }
+
+};  //  end class ValidationStatusHelper
+
+
+
 AttrTimeStamp::AttrTimeStamp (void)
     : msGenTime(0)
-    , csiSigner(nullptr)
+    , cerSigner(nullptr)
     , statusDigest(DigestVerifyStatus::UNDEFINED)
     , statusSignature(SignatureVerifyStatus::UNDEFINED)
 {}
@@ -237,7 +312,7 @@ int CadesXlInfo::parseRevocationValues (
 }
 
 int CadesXlInfo::verifyCertRefs (
-        CerStore* cerStore
+        Cert::CerStore* cerStore
 )
 {
     if (!isPresentCertRefs) return RET_OK;
@@ -266,13 +341,13 @@ int CadesXlInfo::verifyCertRefs (
 
         int ret = RET_OK;
         const ByteArray* refba_cert = nullptr;
-        CerStore::Item* cer_item = nullptr;
+        Cert::CerItem* cer_item = nullptr;
         if (isPresentCertVals) {
             refba_cert = certValues[idx];
         }
         else {
-            UapkiNS::SmartBA sba_issuer;
-            ret = CerStore::issuerFromGeneralNames(it.issuerSerial.baIssuer, &sba_issuer);
+            SmartBA sba_issuer;
+            ret = Cert::issuerFromGeneralNames(it.issuerSerial.baIssuer, &sba_issuer);
             if (ret != RET_OK) {
                 statusCertRefs = status = DigestVerifyStatus::FAILED;
                 return ret;
@@ -280,11 +355,11 @@ int CadesXlInfo::verifyCertRefs (
 
             ret = cerStore->getCertByIssuerAndSN(sba_issuer.get(), it.issuerSerial.baSerialNumber, &cer_item);
             if (ret == RET_OK) {
-                refba_cert = cer_item->baEncoded;
+                refba_cert = cer_item->getEncoded();
             }
             else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
                 ByteArray* ba_iasn = nullptr;
-                ret = CerStore::encodeIssuerAndSN(sba_issuer.get(), it.issuerSerial.baSerialNumber, &ba_iasn);
+                ret = Cert::encodeIssuerAndSN(sba_issuer.get(), it.issuerSerial.baSerialNumber, &ba_iasn);
                 if (ret != RET_OK) {
                     statusCertRefs = status = DigestVerifyStatus::FAILED;
                     return ret;
@@ -300,7 +375,7 @@ int CadesXlInfo::verifyCertRefs (
             }
         }
 
-        UapkiNS::SmartBA sba_hash;
+        SmartBA sba_hash;
         ret = ::hash(hash_alg, refba_cert, &sba_hash);
         if (ret != RET_OK) {
             statusCertRefs = status = DigestVerifyStatus::FAILED;
@@ -325,167 +400,10 @@ int CadesXlInfo::verifyCertRefs (
 }
 
 
-CertChainItem::CertChainItem (
-        const CertEntity iCertEntity,
-        CerStore::Item* iCsiSubject
-)
-    : m_CertEntity(iCertEntity)
-    , m_CsiSubject(iCsiSubject)
-    , m_DataSource(DataSource::UNDEFINED)
-    , m_CsiIssuer(nullptr)
-    , m_IsExpired(true)
-    , m_IsSelfSigned(false)
-    , m_ValidationType(CerStore::ValidationType::UNDEFINED)
-    , m_CertStatus(UapkiNS::CertStatus::UNDEFINED)
-{
-}
-
-CertChainItem::~CertChainItem (void)
-{
-}
-
-bool CertChainItem::checkValidityTime (
-        const uint64_t validateTime
-)
-{
-    const int ret = m_CsiSubject->checkValidity(validateTime);
-    m_IsExpired = (ret != RET_OK);
-    return (!m_IsExpired);
-}
-
-int CertChainItem::decodeName (void)
-{
-    return CerStoreUtil::rdnameFromName(
-        m_CsiSubject->cert->tbsCertificate.subject,
-        OID_X520_CommonName,
-        m_CommonName
-    );
-}
-
-void CertChainItem::setDataSource (
-        const DataSource dataSource
-)
-{
-    m_DataSource = dataSource;
-}
-
-void CertChainItem::setCertStatus (
-        const UapkiNS::CertStatus certStatus
-)
-{
-    m_CertStatus = certStatus;
-}
-
-void CertChainItem::setIssuerAndVerify (
-        CerStore::Item* csiIssuer
-)
-{
-    if (csiIssuer) {
-        m_CsiIssuer = csiIssuer;
-    }
-    else {
-        m_CertEntity = CertEntity::ROOT;
-        m_CsiIssuer = m_CsiSubject;
-        m_IsSelfSigned = true;
-        m_ValidationType = CerStore::ValidationType::NONE;
-    }
-    (void)m_CsiSubject->verify(m_CsiIssuer);
-}
-
-void CertChainItem::setValidationType (
-    const CerStore::ValidationType validationType
-)
-{
-    m_ValidationType = validationType;
-}
-
-
-ExpectedCertItem::ExpectedCertItem (
-        const CertEntity iCertEntity
-)
-    : m_CertEntity(iCertEntity)
-    , m_IdType(IdType::UNDEFINED)
-{
-}
-
-int ExpectedCertItem::setResponderId (
-        const bool isKeyId,
-        const ByteArray* baResponderId
-)
-{
-    if (!baResponderId) return RET_UAPKI_INVALID_PARAMETER;
-
-    SmartBA& rsba_dst = (isKeyId) ? m_KeyId : m_Name;
-    if (!rsba_dst.set(ba_copy_with_alloc(baResponderId, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
-
-    m_IdType = IdType::ORS_IDTYPE;
-    return RET_OK;
-}
-
-int ExpectedCertItem::setSignerIdentifier (
-        const ByteArray* baKeyIdOrSN,
-        const ByteArray* baName
-)
-{
-    if (!baKeyIdOrSN) return RET_UAPKI_INVALID_PARAMETER;
-
-    if (!baName) {
-        if (!m_KeyId.set(ba_copy_with_alloc(baKeyIdOrSN, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
-    }
-    else {
-        if (
-            !m_SerialNumber.set(ba_copy_with_alloc(baKeyIdOrSN, 0, 0)) ||
-            !m_Name.set(ba_copy_with_alloc(baName, 0, 0))
-        ) return RET_UAPKI_GENERAL_ERROR;
-    }
-
-    m_IdType = IdType::CER_IDTYPE;
-    return RET_OK;
-}
-
-
-ExpectedCrlItem::ExpectedCrlItem (void)
-    : m_ThisUpdate(0)
-    , m_NextUpdate(0)
-{
-}
-
-int ExpectedCrlItem::set (
-        const CerStore::Item* cerSubject,
-        const CrlStore::Item* crlFull
-)
-{
-    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
-
-    if (!m_AuthorityKeyId.set(ba_copy_with_alloc(cerSubject->baAuthorityKeyId, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
-    if (!m_Name.set(ba_copy_with_alloc(cerSubject->baIssuer, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
-
-    vector<string> uris;
-    if (!crlFull) {
-        (void)cerSubject->getCrlUris(true, uris);
-    }
-    else {
-        (void)cerSubject->getCrlUris(false, uris);
-        m_ThisUpdate = crlFull->thisUpdate;
-        m_NextUpdate = crlFull->nextUpdate;
-        if (!m_BaCrlNumber.set(ba_copy_with_alloc(crlFull->baCrlNumber, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
-    }
-    for (const auto& it : uris) {
-        m_Url += it + ";";
-    }
-    if (!m_Url.empty()) {
-        m_Url.pop_back();
-    }
-
-    return RET_OK;
-}
-
-
 VerifiedSignerInfo::VerifiedSignerInfo (void)
-    : m_CerStore(nullptr)
-    , m_IsDigest(false)
+    : m_IsDigest(false)
     , m_LastError(RET_OK)
-    , m_CsiSigner(nullptr)
+    , m_CerSigner(nullptr)
     , m_ValidationStatus(ValidationStatus::UNDEFINED)
     , m_StatusSignature(SignatureVerifyStatus::UNDEFINED)
     , m_StatusMessageDigest(DigestVerifyStatus::UNDEFINED)
@@ -499,54 +417,49 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
 
 VerifiedSignerInfo::~VerifiedSignerInfo (void)
 {
-    m_CsiSigner = nullptr;
+    m_CerSigner = nullptr;
     for (auto& it : m_CertChainItems) {
-        delete it;
-    }
-    for (auto& it : m_ExpectedCertItems) {
-        delete it;
-    }
-    for (auto& it : m_ExpectedCrlItems) {
         delete it;
     }
 }
 
 int VerifiedSignerInfo::init (
-        CerStore* iCerStore,
+        LibraryConfig* iLibConfig,
+        Cert::CerStore* iCerStore,
+        Crl::CrlStore* iCrlStore,
         const bool isDigest
 )
 {
-    m_CerStore = iCerStore;
     m_IsDigest = isDigest;
-    return (m_CerStore) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
+    return CertValidator::init(iLibConfig, iCerStore, iCrlStore) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
 int VerifiedSignerInfo::addCertChainItem (
         const CertEntity certEntity,
-        CerStore::Item* cerStoreItem,
+        Cert::CerItem* cerItem,
         CertChainItem** certChainItem
 )
 {
     bool is_newitem;
-    return addCertChainItem(certEntity, cerStoreItem, certChainItem, is_newitem);
+    return addCertChainItem(certEntity, cerItem, certChainItem, is_newitem);
 }
 
 int VerifiedSignerInfo::addCertChainItem (
         const CertEntity certEntity,
-        CerStore::Item* cerStoreItem,
+        Cert::CerItem* cerItem,
         CertChainItem** certChainItem,
         bool& isNewItem
 )
 {
     for (const auto& it : m_CertChainItems) {
-        if (ba_cmp(cerStoreItem->baCertId, it->getSubjectCertId()) == 0) {
+        if (ba_cmp(cerItem->getCertId(), it->getSubjectCertId()) == 0) {
             *certChainItem = it;
             isNewItem = false;
             return RET_OK;
         }
     }
 
-    CertChainItem* certchain_item = new CertChainItem(certEntity, cerStoreItem);
+    CertChainItem* certchain_item = new CertChainItem(certEntity, cerItem);
     *certChainItem = certchain_item;
     if (!certchain_item) return RET_UAPKI_GENERAL_ERROR;
 
@@ -559,110 +472,54 @@ int VerifiedSignerInfo::addCrlCertsToChain (
         const uint64_t validateTime
 )
 {
-    vector<CerStore::Item*> crl_certs;
+    vector<Cert::CerItem*> crl_certs;
     for (const auto& it : m_CertChainItems) {
-        (void)CerStore::addCertIfUnique(crl_certs, it->getResultValidationByCrl().cerIssuer);
+        (void)Cert::addCertIfUnique(crl_certs, it->getResultValidationByCrl().cerIssuer);
     }
 
-    for (const auto& it_csi : crl_certs) {
+    for (const auto& it_cer : crl_certs) {
         CertChainItem* added_cci = nullptr;
         bool is_newitem;
-        int ret = addCertChainItem(CertEntity::CRL, it_csi, &added_cci, is_newitem);
+        int ret = addCertChainItem(CertEntity::CRL, it_cer, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
 
         if (is_newitem) {
-            vector<CerStore::Item*> chain_certs;
+            vector<Cert::CerItem*> chain_certs;
             added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(CerStore::ValidationType::NONE);
-            ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
+            added_cci->setValidationType(Cert::ValidationType::NONE);
+            ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
             if ((ret == RET_OK) && !chain_certs.empty()) {
                 //  Add one cert - issuer
-                added_cci->setIssuerAndVerify(chain_certs[0]);
+                added_cci->setIssuer(chain_certs[0]);
             }
         }
     }
     return RET_OK;
 }
 
-int VerifiedSignerInfo::addExpectedCertItem (
-        const CertEntity certEntity,
-        const ByteArray* baSidEncoded
-)
-{
-    SmartBA sba_keyid, sba_name, sba_serialnumber;
-    const int ret = CerStore::parseSid(baSidEncoded, &sba_name, &sba_serialnumber, &sba_keyid);
-    if (ret != RET_OK) return ret;
-
-    const bool is_keyid = (sba_keyid.size() > 0);
-    for (const auto& it : m_ExpectedCertItems) {
-        if (is_keyid) {
-            if (ba_cmp(sba_keyid.get(), it->getKeyId()) == 0) return RET_OK;
-        }
-        else {
-            switch (it->getIdType()) {
-            case ExpectedCertItem::IdType::CER_IDTYPE:
-                if (
-                    (ba_cmp(sba_name.get(), it->getName()) == 0) &&
-                    (ba_cmp(sba_serialnumber.get(), it->getSerialNumber()) == 0)
-                ) return RET_OK;
-                break;
-            case ExpectedCertItem::IdType::ORS_IDTYPE:
-                if ((ba_cmp(sba_name.get(), it->getName()) == 0)) return RET_OK;
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
-    ExpectedCertItem* expcert_item = new ExpectedCertItem(certEntity);
-    if (!expcert_item) return RET_UAPKI_GENERAL_ERROR;
-
-    m_ExpectedCertItems.push_back(expcert_item);
-    return expcert_item->setSignerIdentifier((is_keyid) ? sba_keyid.get() : sba_serialnumber.get(), sba_name.get());
-}
-
-int VerifiedSignerInfo::addExpectedCrlItem (
-        CerStore::Item* cerSubject,
-        CrlStore::Item* crlFull
-)
-{
-    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
-
-    for (const auto& it : m_ExpectedCrlItems) {
-        if (ba_cmp(cerSubject->baAuthorityKeyId, it->getAuthorityKeyId()) == 0) return RET_OK;
-    }
-
-    ExpectedCrlItem* expcrl_item = new ExpectedCrlItem();
-    if (!expcrl_item) return RET_UAPKI_GENERAL_ERROR;
-
-    m_ExpectedCrlItems.push_back(expcrl_item);
-    return expcrl_item->set(cerSubject, crlFull);
-}
-
 int VerifiedSignerInfo::addOcspCertsToChain (
         const uint64_t validateTime
 )
 {
-    vector<CerStore::Item*> ocsp_certs;
+    vector<Cert::CerItem*> ocsp_certs;
     for (const auto& it : m_ListAddedCerts.ocsp) {
-        (void)CerStore::addCertIfUnique(ocsp_certs, it);
+        (void)Cert::addCertIfUnique(ocsp_certs, it);
     }
 
-    for (const auto& it_csi : ocsp_certs) {
+    for (const auto& it_cer : ocsp_certs) {
         CertChainItem* added_cci = nullptr;
         bool is_newitem;
-        int ret = addCertChainItem(CertEntity::OCSP, it_csi, &added_cci, is_newitem);
+        int ret = addCertChainItem(CertEntity::OCSP, it_cer, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
 
         if (is_newitem) {
-            vector<CerStore::Item*> chain_certs;
+            vector<Cert::CerItem*> chain_certs;
             added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(CerStore::ValidationType::NONE);
-            ret = m_CerStore->getChainCerts(added_cci->getSubject(), chain_certs);
+            added_cci->setValidationType(Cert::ValidationType::NONE);
+            ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
             if ((ret == RET_OK) && !chain_certs.empty()) {
                 //  Add one cert - issuer
-                added_cci->setIssuerAndVerify(chain_certs[0]);
+                added_cci->setIssuer(chain_certs[0]);
             }
         }
     }
@@ -672,31 +529,30 @@ int VerifiedSignerInfo::addOcspCertsToChain (
 int VerifiedSignerInfo::buildCertChain (void)
 {
     int ret = RET_OK;
-    vector<CerStore::Item*> tsp_certs;
+    vector<Cert::CerItem*> tsp_certs;
 
     //  Build chain for Singer
-    if (m_CsiSigner) {
-        const ByteArray* ba_keyid_certnotfound = nullptr;
-        vector<CerStore::Item*> chain_certs;
+    if (m_CerSigner) {
+        const ByteArray* ba_authkeyid_notfound = nullptr;
+        vector<Cert::CerItem*> chain_certs;
         CertChainItem* added_cci = nullptr;
 
-        DO(addCertChainItem(CertEntity::SIGNER, m_CsiSigner, &added_cci));
-        ret = m_CerStore->getChainCerts(m_CsiSigner, chain_certs, &ba_keyid_certnotfound);
+        (void)m_CerSigner->verify(nullptr);
+        DO(addCertChainItem(CertEntity::SIGNER, m_CerSigner, &added_cci));
+        ret = getCerStore()->getChainCerts(m_CerSigner, chain_certs, &ba_authkeyid_notfound);
         if (ret == RET_OK) {
             for (const auto& it : chain_certs) {
-                added_cci->setIssuerAndVerify(it);
+                added_cci->setIssuer(it);
                 DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
             }
-            added_cci->setIssuerAndVerify(nullptr);
+            added_cci->setRoot();
         }
         else {
             m_LastError = ret;
             if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
-                UapkiNS::SmartBA sba_sid;
-                DO(CerStore::keyIdToSid(ba_keyid_certnotfound, &sba_sid));
-                DO(addExpectedCertItem(CertEntity::INTERMEDIATE, sba_sid.get()));
+                DO(addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound));
                 for (const auto& it : chain_certs) {
-                    added_cci->setIssuerAndVerify(it);
+                    added_cci->setIssuer(it);
                     DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
                 }
             }
@@ -705,30 +561,28 @@ int VerifiedSignerInfo::buildCertChain (void)
 
     //  Build chain for TSP
     for (const auto& it : m_ListAddedCerts.tsp) {
-        (void)CerStore::addCertIfUnique(tsp_certs, it);
+        (void)Cert::addCertIfUnique(tsp_certs, it);
     }
     for (const auto& it_tsp : tsp_certs) {
-        const ByteArray* ba_keyid_certnotfound = nullptr;
-        vector<CerStore::Item*> chain_certs;
+        const ByteArray* ba_authkeyid_notfound = nullptr;
+        vector<Cert::CerItem*> chain_certs;
         CertChainItem* added_cci = nullptr;
 
         DO(addCertChainItem(CertEntity::TSP, it_tsp, &added_cci));
-        ret = m_CerStore->getChainCerts(it_tsp, chain_certs, &ba_keyid_certnotfound);
+        ret = getCerStore()->getChainCerts(it_tsp, chain_certs, &ba_authkeyid_notfound);
         if (ret == RET_OK) {
             for (const auto& it : chain_certs) {
-                added_cci->setIssuerAndVerify(it);
+                added_cci->setIssuer(it);
                 DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
             }
-            added_cci->setIssuerAndVerify(nullptr);
+            added_cci->setIssuer(nullptr);
         }
         else {
             m_LastError = ret;
             if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
-                UapkiNS::SmartBA sba_sid;
-                DO(CerStore::keyIdToSid(ba_keyid_certnotfound, &sba_sid));
-                DO(addExpectedCertItem(CertEntity::INTERMEDIATE, sba_sid.get()));
+                DO(addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound));
                 for (const auto& it : chain_certs) {
-                    added_cci->setIssuerAndVerify(it);
+                    added_cci->setIssuer(it);
                     DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
                 }
             }
@@ -741,14 +595,20 @@ cleanup:
 
 int VerifiedSignerInfo::certValuesToStore (void)
 {
-    for (const auto& it : m_CadesXlInfo.certValues) {
-        bool is_unique;
-        CerStore::Item* cer_item = nullptr;
-        const int ret = m_CerStore->addCert(it, true, false, false, is_unique, &cer_item);
-        if (ret != RET_OK) return ret;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
+    const int ret = getCerStore()->addCerts(
+        Cert::NOT_TRUSTED,
+        Cert::NOT_PERMANENT,
+        m_CadesXlInfo.certValues,
+        added_ceritems
+    );
+    if (ret != RET_OK) return ret;
 
-        m_ListAddedCerts.certValues.push_back(cer_item);
-        m_ListAddedCerts.fromSignature.push_back(cer_item);
+    for (const auto& it : added_ceritems) {
+        if (it.cerItem) {
+            m_ListAddedCerts.certValues.push_back(it.cerItem);
+            m_ListAddedCerts.fromSignature.push_back(it.cerItem);
+        }
     }
     return RET_OK;
 }
@@ -787,7 +647,7 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
 
     if (m_SignatureFormat <= SignatureFormat::CADES_C) {
         for (const auto& it : m_CertChainItems) {
-            if (it->getValidationType() == CerStore::ValidationType::OCSP) {
+            if (it->getValidationType() == Cert::ValidationType::OCSP) {
                 rv_warns.push_back("THE STATUS OF CERTIFICATE IS FROM OCSP");
                 break;
             }
@@ -821,14 +681,14 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
             DO(ocsp_helper.getSerialNumberFromCertId(0, &sba_sn));  //  Work with one OCSP request that has one certificate
 
             for (const auto& it_cci : m_CertChainItems) {
-                if (ba_cmp(sba_sn.get(), it_cci->getSubject()->baSerialNumber) == 0) {
+                if (ba_cmp(sba_sn.get(), it_cci->getSubject()->getSerialNumber()) == 0) {
                     ResultValidationByOcsp& result_valbyocsp = it_cci->getResultValidationByOcsp();
                     result_valbyocsp.dataSource = DataSource::SIGNATURE;
                     result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
                     (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
                     result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
                     result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
-                    it_cci->setValidationType(CerStore::ValidationType::OCSP);
+                    it_cci->setValidationType(Cert::ValidationType::OCSP);
                     break;
                 }
             }
@@ -905,38 +765,40 @@ void VerifiedSignerInfo::validateSignFormat (
 
 void VerifiedSignerInfo::validateStatusCerts (void)
 {
-    if (m_ValidationStatus == ValidationStatus::TOTAL_VALID) {
-        if (!m_ExpectedCertItems.empty()) {
-            m_ValidationStatus = ValidationStatus::INDETERMINATE;
+    ValidationStatusHelper validation_status(m_ValidationStatus);
+
+    if (validation_status.isUndefined() || validation_status.isTotalFailed()) return;
+
+    //  Current value is TOTAL_VALID or INDETERMINATE
+    for (const auto& it : m_CertChainItems) {
+        switch (it->getVerifyStatus()) {
+        case Cert::VerifyStatus::VALID:
+            validation_status.setByCertChainItem(*it);
+            break;
+        case Cert::VerifyStatus::INDETERMINATE:
+        case Cert::VerifyStatus::VALID_WITHOUT_KEYUSAGE:
+            validation_status.setIndeterminate();
+            DEBUG_OUTCON(printf("VerifiedSignerInfo::validateStatusCerts() set INDETERMINATE for cert (CommonName: '%s')", it->getCommonName().c_str()));
+            break;
+        default:
+            //  Other cases (VerifyStatus::INVALID, VerifyStatus::FAILED and VerifyStatus::UNDEFINED)
+            validation_status.setTotalFailed();
+            break;
+        }
+
+        if (it->isExpired()) {
+            validation_status.setTotalFailed();
+        }
+
+        if (validation_status.isTotalFailed()) {
+            DEBUG_OUTCON(printf("VerifiedSignerInfo::validateStatusCerts() set TOTAL_FAILED for cert (CommonName: '%s')", it->getCommonName().c_str()));
             return;
         }
+    }
 
-        for (const auto& it : m_CertChainItems) {
-            if (it->isExpired() || (it->getVerifyStatus() != CerStore::VerifyStatus::VALID)) {
-                m_ValidationStatus = ValidationStatus::INDETERMINATE;
-                return;
-            }
-
-            switch (it->getValidationType()) {
-            case CerStore::ValidationType::UNDEFINED:
-                m_ValidationStatus = ValidationStatus::INDETERMINATE;
-                break;
-            case CerStore::ValidationType::CRL:
-                if (it->getResultValidationByCrl().certStatus != UapkiNS::CertStatus::GOOD) {
-                    m_ValidationStatus = ValidationStatus::INDETERMINATE;
-                    return;
-                }
-                break;
-            case CerStore::ValidationType::OCSP:
-                if (it->getResultValidationByOcsp().singleResponseInfo.certStatus != UapkiNS::CertStatus::GOOD) {
-                    m_ValidationStatus = ValidationStatus::INDETERMINATE;
-                    return;
-                }
-                break;
-            default:
-                break;
-            }
-        }
+    if (!getExpectedCertItems().empty() || !getExpectedCrlItems().empty()) {
+        validation_status.setIndeterminate();
+        DEBUG_OUTCON(printf("VerifiedSignerInfo::validateStatusCerts() set INDETERMINATE because expected certs/CRLs"));
     }
 }
 
@@ -950,8 +812,8 @@ void VerifiedSignerInfo::validateValidityTimeCerts (
 }
 
 int VerifiedSignerInfo::verifyArchiveTimeStamp (
-        const vector<CerStore::Item*>& certs,
-        const vector<CrlStore::Item*>& crls
+        const vector<Cert::CerItem*>& certs,
+        const vector<Crl::CrlItem*>& crls
 )
 {
     int ret = RET_OK;
@@ -964,10 +826,10 @@ int VerifiedSignerInfo::verifyArchiveTimeStamp (
         DO(m_ArchiveTsHelper.setSignerInfo(m_SignerInfo.getAsn1Data()));
 
         for (const auto& it : certs) {
-            DO(m_ArchiveTsHelper.addCertificate(it->baEncoded));
+            DO(m_ArchiveTsHelper.addCertificate(it->getEncoded()));
         }
         for (const auto& it : crls) {
-            DO(m_ArchiveTsHelper.addCrl(it->baEncoded));
+            DO(m_ArchiveTsHelper.addCrl(it->getEncoded()));
         }
         for (const auto& it : m_SignerInfo.getUnsignedAttrs()) {
             if (it.type != string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
@@ -1001,7 +863,7 @@ int VerifiedSignerInfo::verifyCertificateRefs (void)
 {
     if (m_SignatureFormat < SignatureFormat::CADES_C) return RET_OK;
 
-    int ret = m_CadesXlInfo.verifyCertRefs(m_CerStore);
+    int ret = m_CadesXlInfo.verifyCertRefs(getCerStore());
     if (ret != RET_OK) {
         m_LastError = ret;
     }
@@ -1012,7 +874,7 @@ int VerifiedSignerInfo::verifyCertificateRefs (void)
     }
 
     for (const auto& it : m_CadesXlInfo.expectedCertsByIssuerAndSN) {
-        ret = addExpectedCertItem(CertEntity::UNDEFINED, it);
+        ret = addExpectedCertByIssuerAndSN(CertEntity::UNDEFINED, it);
         if (ret != RET_OK) break;
     }
 
@@ -1046,9 +908,7 @@ int VerifiedSignerInfo::verifyMessageDigest (
 )
 {
     if (!baContent) {
-        m_LastError = RET_UAPKI_CONTENT_NOT_PRESENT;
-        m_StatusMessageDigest = DigestVerifyStatus::INDETERMINATE;
-        return RET_OK;
+        return RET_UAPKI_CONTENT_NOT_PRESENT;
     }
 
     if (!m_IsDigest) {
@@ -1083,31 +943,36 @@ int VerifiedSignerInfo::verifyOcspResponse (
 )
 {
     int ret = RET_OK;
-    UapkiNS::VectorBA vba_certs;
-    vector<CerStore::Item*>& added_certs = (resultValByOcsp.dataSource == DataSource::SIGNATURE)
+    VectorBA vba_encodedcerts;
+    vector<Cert::CerItem*>& added_certs = (resultValByOcsp.dataSource == DataSource::SIGNATURE)
         ? m_ListAddedCerts.fromSignature : m_ListAddedCerts.fromOnline;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
 
-    DO(ocspClient.getCerts(vba_certs));
-    for (auto& it : vba_certs) {
-        bool is_unique;
-        CerStore::Item* cer_item = nullptr;
-        DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
-        it = nullptr;
-        added_certs.push_back(cer_item);
+    DO(ocspClient.getCerts(vba_encodedcerts));
+    DO(getCerStore()->addCerts(
+        Cert::NOT_TRUSTED,
+        Cert::NOT_PERMANENT,
+        vba_encodedcerts,
+        added_ceritems
+    ));
+    for (const auto& it : added_ceritems) {
+        if (it.cerItem) {
+            added_certs.push_back(it.cerItem);
+        }
     }
 
     DO(ocspClient.getResponderId(resultValByOcsp.responderIdType, &resultValByOcsp.baResponderId));
-    if (resultValByOcsp.responderIdType == UapkiNS::Ocsp::ResponderIdType::BY_NAME) {
-        ret = m_CerStore->getCertBySubject(resultValByOcsp.baResponderId.get(), &resultValByOcsp.csiResponder);
+    if (resultValByOcsp.responderIdType == Ocsp::ResponderIdType::BY_NAME) {
+        ret = getCerStore()->getCertBySubject(resultValByOcsp.baResponderId.get(), &resultValByOcsp.cerResponder);
     }
     else {
         //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        ret = m_CerStore->getCertByKeyId(resultValByOcsp.baResponderId.get(), &resultValByOcsp.csiResponder);
+        ret = getCerStore()->getCertByKeyId(resultValByOcsp.baResponderId.get(), &resultValByOcsp.cerResponder);
     }
 
     if (ret == RET_OK) {
-        m_ListAddedCerts.ocsp.push_back(resultValByOcsp.csiResponder);
-        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.csiResponder, resultValByOcsp.statusSignature);
+        m_ListAddedCerts.ocsp.push_back(resultValByOcsp.cerResponder);
+        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.cerResponder, resultValByOcsp.statusSignature);
         if (ret == RET_VERIFY_FAILED) {
             ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED;
         }
@@ -1159,7 +1024,7 @@ int VerifiedSignerInfo::verifySignedAttribute (void)
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
-    ret = m_CerStore->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CsiSigner);
+    ret = getCerStore()->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CerSigner);
 
     //  Verify signed attributes
     if (ret == RET_OK) {
@@ -1167,7 +1032,7 @@ int VerifiedSignerInfo::verifySignedAttribute (void)
             m_SignerInfo.getSignatureAlgorithm().algorithm.c_str(),
             m_SignerInfo.getSignedAttrsEncoded(),
             false,
-            m_CsiSigner->baSPKI,
+            m_CerSigner->getSpki(),
             m_SignerInfo.getSignature()
         );
     }
@@ -1181,7 +1046,7 @@ int VerifiedSignerInfo::verifySignedAttribute (void)
     case RET_UAPKI_CERT_NOT_FOUND:
         m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         m_StatusSignature = SignatureVerifyStatus::INDETERMINATE;
-        DO(addExpectedCertItem(CertEntity::SIGNER, m_SignerInfo.getSidEncoded()));
+        DO(addExpectedCertBySID(CertEntity::SIGNER, m_SignerInfo.getSidEncoded()));
         break;
     default:
         m_StatusSignature = SignatureVerifyStatus::FAILED;
@@ -1195,22 +1060,16 @@ int VerifiedSignerInfo::verifySigningCertificateV2 (void)
 {
     if (m_StatusEssCert == DataVerifyStatus::NOT_PRESENT) return RET_OK;
 
-    //  Process simple case: present only the one ESSCertIDv2
-    const EssCertId& ess_certid = m_EssCerts[0];
-    const HashAlg hash_alg = hash_from_oid(ess_certid.hashAlgorithm.algorithm.c_str());
-    if (hash_alg == HASH_ALG_UNDEFINED) {
-        m_StatusEssCert = DigestVerifyStatus::FAILED;
-        return RET_UAPKI_UNSUPPORTED_ALG;
-    }
-
-    if (m_CsiSigner) {
-        SmartBA sba_hash;
-        const int ret = ::hash(hash_alg, m_CsiSigner->baEncoded, &sba_hash);
+    if (m_CerSigner) {
+        //  Process simple case: present only the one ESSCertIDv2
+        const UapkiNS::EssCertId& doc_esscertid = m_EssCerts[0];
+        const UapkiNS::EssCertId* cer_esscertid = nullptr;
+        const int ret = m_CerSigner->generateEssCertId(doc_esscertid.hashAlgorithm, &cer_esscertid);
         if (ret != RET_OK) {
             m_StatusEssCert = DigestVerifyStatus::FAILED;
             return ret;
         }
-        m_StatusEssCert = (ba_cmp(sba_hash.get(), ess_certid.baHashValue) == 0)
+        m_StatusEssCert = (ba_cmp(doc_esscertid.baHashValue, cer_esscertid->baHashValue) == 0)
             ? DataVerifyStatus::VALID : DataVerifyStatus::INVALID;
     }
     else {
@@ -1286,33 +1145,38 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
     int ret = RET_OK;
     Pkcs7::SignedDataParser& sdata_parser = attrTS.tsTokenParser.getSignedDataParser();
     const Pkcs7::SignedDataParser::SignerInfo& signer_info = attrTS.signerInfo;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
 
-    for (auto& it : sdata_parser.getCerts()) {
-        bool is_unique;
-        CerStore::Item* cer_item = nullptr;
-        DO(m_CerStore->addCert(it, false, false, false, is_unique, &cer_item));
-        it = nullptr;
-        m_ListAddedCerts.fromSignature.push_back(cer_item);
+    DO(getCerStore()->addCerts(
+        Cert::NOT_TRUSTED,
+        Cert::NOT_PERMANENT,
+        sdata_parser.getCerts(),
+        added_ceritems
+    ));
+    for (const auto& it : added_ceritems) {
+        if (it.cerItem) {
+            m_ListAddedCerts.fromSignature.push_back(it.cerItem);
+        }
     }
 
     switch (signer_info.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        ret = m_CerStore->getCertBySID(signer_info.getSidEncoded(), &attrTS.csiSigner);
+        ret = getCerStore()->getCertBySID(signer_info.getSidEncoded(), &attrTS.cerSigner);
         break;
     case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        ret = m_CerStore->getCertByKeyId(signer_info.getSidEncoded(), &attrTS.csiSigner);
+        ret = getCerStore()->getCertByKeyId(signer_info.getSidEncoded(), &attrTS.cerSigner);
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
     if (ret == RET_OK) {
-        m_ListAddedCerts.tsp.push_back(attrTS.csiSigner);
+        m_ListAddedCerts.tsp.push_back(attrTS.cerSigner);
         ret = UapkiNS::Verify::verifySignature(
             signer_info.getSignatureAlgorithm().algorithm.c_str(),
             signer_info.getSignedAttrsEncoded(),
             false,
-            attrTS.csiSigner->baSPKI,
+            attrTS.cerSigner->getSpki(),
             signer_info.getSignature()
         );
     }
@@ -1326,7 +1190,8 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
     case RET_UAPKI_CERT_NOT_FOUND:
         m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         attrTS.statusSignature = SignatureVerifyStatus::INDETERMINATE;
-        DO(addExpectedCertItem(CertEntity::SIGNER, signer_info.getSidEncoded()));
+        DO(addExpectedCertBySID(CertEntity::TSP, signer_info.getSidEncoded()));
+        ret = RET_UAPKI_CERT_NOT_FOUND;
         break;
     default:
         attrTS.statusSignature = SignatureVerifyStatus::FAILED;
@@ -1338,11 +1203,13 @@ cleanup:
 
 
 VerifySignedDoc::VerifySignedDoc (
-        CerStore* iCerStore,
-        CrlStore* iCrlStore,
-        const UapkiNS::Doc::Verify::VerifyOptions& iVerifyOptions
+        LibraryConfig* iLibConfig,
+        Cert::CerStore* iCerStore,
+        Crl::CrlStore* iCrlStore,
+        const Doc::Verify::VerifyOptions& iVerifyOptions
 )
-    : cerStore(iCerStore)
+    : libConfig(iLibConfig)
+    , cerStore(iCerStore)
     , crlStore(iCrlStore)
     , validateTime(TimeUtil::mtimeNow())
     , verifyOptions(iVerifyOptions)
@@ -1354,14 +1221,18 @@ VerifySignedDoc::~VerifySignedDoc (void)
 {
 }
 
-int VerifySignedDoc::parse (const ByteArray* baSignature)
+int VerifySignedDoc::parse (
+        const ByteArray* baSignature
+)
 {
     const int ret = sdataParser.parse(baSignature);
     if (ret != RET_OK) return ret;
     return (sdataParser.getCountSignerInfos() > 0) ? RET_OK : RET_UAPKI_INVALID_STRUCT;
 }
 
-void VerifySignedDoc::getContent (const ByteArray* baContent)
+void VerifySignedDoc::getContent (
+        const ByteArray* baContent
+)
 {
     refContent = (sdataParser.getEncapContentInfo().baEncapContent)
         ? sdataParser.getEncapContentInfo().baEncapContent : baContent;
@@ -1370,14 +1241,18 @@ void VerifySignedDoc::getContent (const ByteArray* baContent)
 int VerifySignedDoc::addCertsToStore (void)
 {
     int ret = RET_OK;
-    UapkiNS::VectorBA& vba_certs = sdataParser.getCerts();
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
 
-    for (size_t i = 0; i < vba_certs.size(); i++) {
-        bool is_unique;
-        CerStore::Item* cer_item = nullptr;
-        DO(cerStore->addCert(vba_certs[i], false, false, false, is_unique, &cer_item));
-        vba_certs[i] = nullptr;
-        addedCerts.push_back(cer_item);
+    DO(cerStore->addCerts(
+        Cert::NOT_TRUSTED,
+        Cert::NOT_PERMANENT,
+        sdataParser.getCerts(),
+        added_ceritems
+    ));
+    for (const auto& it : added_ceritems) {
+        if (it.cerItem) {
+            addedCerts.push_back(it.cerItem);
+        }
     }
 
 cleanup:
@@ -1390,8 +1265,8 @@ void VerifySignedDoc::detectCertSources (void)
         for (auto& it_cci : it_vsi.getCertChainItems()) {
             const ByteArray* cert_id = it_cci->getSubjectCertId();
             const bool is_found = (
-                CerStore::findCertByCertId(addedCerts, cert_id) ||
-                CerStore::findCertByCertId(it_vsi.getListAddedCerts().fromSignature, cert_id)
+                Cert::findCertByCertId(addedCerts, cert_id) ||
+                Cert::findCertByCertId(it_vsi.getListAddedCerts().fromSignature, cert_id)
             );
             it_cci->setDataSource((is_found) ? DataSource::SIGNATURE : DataSource::STORE);
         }
@@ -1407,35 +1282,6 @@ int VerifySignedDoc::getLastError (void)
     return RET_OK;
 }
 
-
-const char* certEntityToStr (
-        const CertEntity certEntity
-)
-{
-    static const char* CERT_ENTITY_STRINGS[8] = {
-        "UNDEFINED",
-        "SIGNER",
-        "INTERMEDIATE",
-        "CRL",
-        "OCSP",
-        "TSP",
-        "CA",
-        "ROOT"
-    };
-    return CERT_ENTITY_STRINGS[((uint32_t)certEntity < 8) ? (uint32_t)certEntity : 0];
-}   //  certEntityToStr
-
-const char* dataSourceToStr (
-        const DataSource dataSource
-)
-{
-    static const char* CERT_SOURCE_STRINGS[3] = {
-        "UNDEFINED",
-        "SIGNATURE",
-        "STORE"
-    };
-    return CERT_SOURCE_STRINGS[((uint32_t)dataSource < 3) ? (uint32_t)dataSource : 0];
-}   //  dataSourceToStr
 
 const char* validationStatusToStr (
         const ValidationStatus validationStatus

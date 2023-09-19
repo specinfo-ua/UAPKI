@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,13 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/session-list-keys.cpp"
+
 #include "api-json-internal.h"
 #include "cm-providers.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/session-list-keys.cpp"
+
+using namespace std;
+
+
+static JSON_Status json_object_copy_string (
+        JSON_Object* joDest,
+        JSON_Object* joSource,
+        const char* key
+)
+{
+    const string s = ParsonHelper::jsonObjectGetString(joSource, key);
+    return json_object_set_string(joDest, key, s.c_str());
+}   //  json_object_copy_string
 
 
 int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
@@ -49,6 +62,26 @@ int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
     JSON_Object* jo_resp = json.parse(s_infokeys.c_str());
     if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
 
-    ret = json_object_copy_all_items(joResult, jo_resp) == JSONSuccess ? RET_OK : RET_UAPKI_JSON_FAILURE;
+    JSON_Array* ja_dstkeyinfos = nullptr;
+    JSON_Array* ja_srckeyinfos = json.getArray("keys");
+    const size_t cnt_keys = json_array_get_count(ja_srckeyinfos);
+
+    DO_JSON(json_object_set_value(joResult, "keys", json_value_init_array()));
+    ja_dstkeyinfos = json_object_get_array(joResult, "keys");
+    for (size_t i = 0; i < cnt_keys; i++) {
+        DO_JSON(json_array_append_value(ja_dstkeyinfos, json_value_init_object()));
+        JSON_Object* jo_dstkeyinfo = json_array_get_object(ja_dstkeyinfos, i);
+        JSON_Object* jo_srckeyinfo = json_array_get_object(ja_srckeyinfos, i);
+
+        DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "id"));
+        DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "mechanismId"));
+        DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "parameterId"));
+        DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "label"));
+        DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "application"));
+        DO_JSON(json_object_set_value(jo_dstkeyinfo, "signAlgo", json_value_init_array()));
+        DO_JSON(json_array_copy_all_items(json_object_get_array(jo_dstkeyinfo, "signAlgo"), json_object_get_array(jo_srckeyinfo, "signAlgo")));
+    }
+
+cleanup:
     return ret;
 }

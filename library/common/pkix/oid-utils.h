@@ -25,15 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-04-21
-
 #ifndef UAPKI_OID_UTILS_H
 #define UAPKI_OID_UTILS_H
 
 
-#include "uapkic.h"
-#include "uapkif.h"
+#include <stddef.h>
+#include "../../uapkic/include/ec-default-params.h"
+#include "../../uapkic/include/hash.h"
 #include "oids.h"
+#include "uapkif.h"
 
 
 #ifdef __cplusplus

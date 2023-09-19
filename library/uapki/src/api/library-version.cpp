@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,15 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/library-version.cpp"
+
 #include "api-json-internal.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/library-version.cpp"
-
-
 static const char* LIB_NAME     = "UAPKI";
-static const char* LIB_VERSION  = "2.0.9";
+static const char* LIB_VERSION  = "2.0.10";
 
 
 int uapki_version (JSON_Object* joParams, JSON_Object* joResult)

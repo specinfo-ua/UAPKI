@@ -1,9 +1,6 @@
 {
   "comment": "Test API CERT_INFO",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "commentUsage": "uapki cert-info.json",
   "tasks": [
     {
       "method": "VERSION"

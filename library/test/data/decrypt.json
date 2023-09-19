@@ -1,5 +1,6 @@
 {
-  "comment": "Decrypt enveloped data, 2022-apr-25",
+  "comment": "Decrypt enveloped data",
+  "commentUsage": "uapki decrypt.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -30,7 +31,7 @@
       "method": "OPEN",
       "parameters": {
         "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
-        "storage": "", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо пуста строка, то контейнер ключів зберігається у пам'яті
+        "storage": "file://memory", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо контейнер ключів зберігається у пам'яті, то використовуються значення "file://memory".
         "password": "Test", // Для PKCS12 обов'язковий, пароль
         "mode": "RO", // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
         "openParams": {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/encrypt.cpp"
+
 #include "api-json-internal.h"
 #include "cipher-helper.h"
 #include "dstu-ns.h"
@@ -36,8 +38,6 @@
 #include "private-key.h"
 #include "uapki-ns.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/encrypt.cpp"
 
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
@@ -47,20 +47,18 @@
 //#define DEBUG_USE_FIXED_RND
 
 
-using namespace  std;
+using namespace std;
+using namespace UapkiNS;
 
 
 struct EncryptContent {
     UapkiNS::AlgorithmIdentifier
-                algo;
-    UapkiNS::SmartBA
-                data;
-    UapkiNS::SmartBA
-                secretkey;
-    UapkiNS::SmartBA
-                encrypted;
-    string      type;
-};
+            algo;
+    SmartBA data;
+    SmartBA secretkey;
+    SmartBA encrypted;
+    string  type;
+};  //  end struct EncryptContent
 
 
 static const char* OID_KDF_ALGO_DEFAULT = OID_COFACTOR_DH_DSTU7564_KDF;
@@ -68,33 +66,41 @@ static const char* SHEX_KDFPARAM_DSTU7624WRAP   = "300F060B2A8624020101010101030
 static const char* SHEX_KDFPARAM_GOST28147WRAP  = "300F060B2A862402010101010101050500";
 
 
-static int add_originator_certs (CerStore& cerStore, UapkiNS::Pkcs7::EnvelopedDataBuilder& envDataBuilder, JSON_Array* jaCerts)
+static int add_originator_certs (
+        Cert::CerStore& cerStore,
+        Pkcs7::EnvelopedDataBuilder& envDataBuilder,
+        JSON_Array* jaCerts
+)
 {
     if (!jaCerts) return RET_OK;
 
     int ret = RET_OK;
     const size_t cnt_certs = json_array_get_count(jaCerts);
     for (size_t i = 0; i < cnt_certs; i++) {
-        UapkiNS::SmartBA sba_certid;
+        SmartBA sba_certid;
         if (!sba_certid.set(json_array_get_base64(jaCerts, i))) return RET_UAPKI_INVALID_PARAMETER;
 
-        CerStore::Item* cer_item = nullptr;
+        Cert::CerItem* cer_item = nullptr;
         DO(cerStore.getCertByCertId(sba_certid.get(), &cer_item));
-        DO(envDataBuilder.addOriginatorCert(cer_item->baEncoded));
+        DO(envDataBuilder.addOriginatorCert(cer_item->getEncoded()));
     }
 
 cleanup:
     return ret;
-}
+}   //  add_originator_certs
 
-static int generate_ephemeral_privkey (const CerStore::Item& csiRecipient, ByteArray** baPrivateKeyInfo, ByteArray** baSpki)
+static int generate_ephemeral_privkey (
+        const Cert::CerItem& cerRecipient,
+        ByteArray** baPrivateKeyInfo,
+        ByteArray** baSpki
+)
 {
     int ret = RET_OK;
 
-    if (DstuNS::isDstu4145family(csiRecipient.keyAlgo)) {
-        UapkiNS::SmartBA sba_params;
+    if (DstuNS::isDstu4145family(cerRecipient.getKeyAlgo())) {
+        SmartBA sba_params;
         string s_params;
-        const ANY_t* algo_params = csiRecipient.cert->tbsCertificate.subjectPublicKeyInfo.algorithm.parameters;
+        const ANY_t* algo_params = cerRecipient.getCert()->tbsCertificate.subjectPublicKeyInfo.algorithm.parameters;
         if (!algo_params) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
@@ -104,7 +110,7 @@ static int generate_ephemeral_privkey (const CerStore::Item& csiRecipient, ByteA
         }
         DO(DstuNS::Dstu4145::decodeParams(sba_params.get(), s_params));
 
-        DO(private_key_generate(csiRecipient.keyAlgo, s_params.c_str(), baPrivateKeyInfo));
+        DO(private_key_generate(cerRecipient.getKeyAlgo().c_str(), s_params.c_str(), baPrivateKeyInfo));
         DEBUG_OUTCON(printf("generate_ephemeral_privkey(), encoded-pkinfo hex: "); ba_print(stdout, *baPrivateKeyInfo));
 
         DO(private_key_get_spki(*baPrivateKeyInfo, baSpki));
@@ -115,10 +121,17 @@ static int generate_ephemeral_privkey (const CerStore::Item& csiRecipient, ByteA
 
 cleanup:
     return ret;
-}
+}   //  generate_ephemeral_privkey
 
-static int wrap_sessionkey (const ByteArray* baPrivateKeyInfo, const string& oidDhKdf, const string& oidWrapAlgo,
-                    const ByteArray* baSpki, const ByteArray* baSessionKey, ByteArray** baSalt, ByteArray** baWrappedKey)
+static int wrap_sessionkey (
+        const ByteArray* baPrivateKeyInfo,
+        const string& oidDhKdf,
+        const string& oidWrapAlgo,
+        const ByteArray* baSpki,
+        const ByteArray* baSessionKey,
+        ByteArray** baSalt,
+        ByteArray** baWrappedKey
+)
 {
     int ret = RET_OK;
     vector<const ByteArray*> vba_spkis, vba_skeys;
@@ -150,9 +163,13 @@ cleanup:
     ::free(aba_salts);
     ::free(aba_wrappedkeys);
     return ret;
-}
+}   //  wrap_sessionkey
 
-static int parse_keyencryption_algo (JSON_Object* joRecipientInfo, UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo, string& oidWrapAlgo)
+static int parse_keyencryption_algo (
+        JSON_Object* joRecipientInfo,
+        UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo,
+        string& oidWrapAlgo
+)
 {
     int ret = RET_OK;
     string s_kdfalgo;
@@ -190,39 +207,41 @@ static int parse_keyencryption_algo (JSON_Object* joRecipientInfo, UapkiNS::Algo
 
 cleanup:
     return ret;
-}
+}   //  parse_keyencryption_algo
 
-static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::EnvelopedDataBuilder::KeyAgreeRecipientInfo* kari,
-                    EncryptContent& encryptContent, JSON_Object* joRecipientInfo)
+static int setup_kari (
+        const Cert::CerItem& cerRecipient,
+        Pkcs7::EnvelopedDataBuilder::KeyAgreeRecipientInfo* kari,
+        EncryptContent& encryptContent,
+        JSON_Object* joRecipientInfo
+)
 {
     if (!kari) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
     UapkiNS::AlgorithmIdentifier aid_keyencryption;
-    UapkiNS::SmartBA sba_ephemkey, sba_ephemspki, sba_recipissasn,sba_wrappedkey;
+    SmartBA sba_ephemkey, sba_ephemspki, sba_recipissasn,sba_wrappedkey;
     string s_keywrapalgo;
+    bool keyusage_keyagreement = false;
 
-    {   //  Check key usage: must be keyAgreement
-        bool ku_keyagreement = false;
-        DO(csiRecipient.keyUsageByBit(KeyUsage_keyAgreement, ku_keyagreement));
-        if (!ku_keyagreement) {
-            SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
-        }
+    DO(cerRecipient.keyUsageByBit(KeyUsage_keyAgreement, keyusage_keyagreement));
+    if (!keyusage_keyagreement) {
+        SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
 
     DO(parse_keyencryption_algo(joRecipientInfo, aid_keyencryption, s_keywrapalgo));
 
-    DO(generate_ephemeral_privkey(csiRecipient, &sba_ephemkey, &sba_ephemspki));
+    DO(generate_ephemeral_privkey(cerRecipient, &sba_ephemkey, &sba_ephemspki));
     DO(wrap_sessionkey(sba_ephemkey.get(),
         aid_keyencryption.algorithm,
         s_keywrapalgo,
-        csiRecipient.baSPKI,
+        cerRecipient.getSpki(),
         encryptContent.secretkey.get(),
         nullptr,
         &sba_wrappedkey
     ));
 
-    DO(csiRecipient.getIssuerAndSN(&sba_recipissasn));
+    DO(cerRecipient.getIssuerAndSN(&sba_recipissasn));
 
     DO(kari->setVersion());
     DO(kari->setOriginatorByPublicKey(sba_ephemspki.get()));
@@ -232,34 +251,41 @@ static int setup_kari (const CerStore::Item& csiRecipient, UapkiNS::Pkcs7::Envel
 
 cleanup:
     return ret;
-}
+}   //  setup_kari
 
-static int add_recipient_infos (CerStore& cerStore, UapkiNS::Pkcs7::EnvelopedDataBuilder& envDataBuilder,
-                    EncryptContent& encryptContent, JSON_Array* jaRecipientInfos)
+static int add_recipient_infos (
+        Cert::CerStore& cerStore,
+        Pkcs7::EnvelopedDataBuilder& envDataBuilder,
+        EncryptContent& encryptContent,
+        JSON_Array* jaRecipientInfos
+)
 {
     const size_t cnt_recips = json_array_get_count(jaRecipientInfos);
     if (cnt_recips == 0) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
     for (size_t i = 0; i < cnt_recips; i++) {
-        UapkiNS::SmartBA sba_certid;
-        CerStore::Item* csi_recipient = nullptr;
+        SmartBA sba_certid;
+        Cert::CerItem* cer_recipient = nullptr;
         JSON_Object* jo_recipinfo = json_array_get_object(jaRecipientInfos, i);
 
-        //  Now supported only KeyAgree, other - later
+        //  Now supported only KeyAgree
         DO(envDataBuilder.addRecipientInfo(RecipientInfo_PR_kari));
         if (!sba_certid.set(json_object_get_base64(jo_recipinfo, "certId"))) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
-        DO(cerStore.getCertByCertId(sba_certid.get(), &csi_recipient));
-        DO(setup_kari(*csi_recipient, envDataBuilder.getKeyAgreeRecipientInfo(i), encryptContent, jo_recipinfo));
+        DO(cerStore.getCertByCertId(sba_certid.get(), &cer_recipient));
+        DO(setup_kari(*cer_recipient, envDataBuilder.getKeyAgreeRecipientInfo(i), encryptContent, jo_recipinfo));
     }
 
 cleanup:
     return ret;
-}
+}   //  add_recipient_infos
 
-static int add_unprotected_attrs (UapkiNS::Pkcs7::EnvelopedDataBuilder& envDataBuilder, JSON_Array* jaAttrs)
+static int add_unprotected_attrs (
+        Pkcs7::EnvelopedDataBuilder& envDataBuilder,
+        JSON_Array* jaAttrs
+)
 {
     if (!jaAttrs) return RET_OK;
 
@@ -277,26 +303,28 @@ static int add_unprotected_attrs (UapkiNS::Pkcs7::EnvelopedDataBuilder& envDataB
 
 cleanup:
     return ret;
-}
+}   //  add_unprotected_attrs
 
-static int encrypt_content (EncryptContent& content)
+static int encrypt_content (
+        EncryptContent& content
+)
 {
     int ret = RET_OK;
 
     if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        DO(UapkiNS::Cipher::Dstu7624::cryptData(
+        DO(Cipher::Dstu7624::cryptData(
             content.algo,
             content.secretkey.get(),
-            UapkiNS::Cipher::Direction::ENCRYPT,
+            Cipher::Direction::ENCRYPT,
             content.data.get(),
             &content.encrypted
         ));
     }
     else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
-        DO(UapkiNS::Cipher::Gost28147::cryptData(
+        DO(Cipher::Gost28147::cryptData(
             content.algo,
             content.secretkey.get(),
-            UapkiNS::Cipher::Direction::ENCRYPT,
+            Cipher::Direction::ENCRYPT,
             content.data.get(),
             &content.encrypted
         ));
@@ -304,22 +332,24 @@ static int encrypt_content (EncryptContent& content)
 
 cleanup:
     return ret;
-}
+}   //  encrypt_content
 
-static int generate_secretkey (EncryptContent& content)
+static int generate_secretkey (
+        EncryptContent& content
+)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_dke, sba_iv;
+    SmartBA sba_dke, sba_iv;
 
     if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
         ba_free(content.algo.baParameters);
         content.algo.baParameters = nullptr;
-        DO(UapkiNS::Cipher::Dstu7624::generateIV(&sba_iv));
+        DO(Cipher::Dstu7624::generateIV(&sba_iv));
 #ifdef DEBUG_USE_FIXED_RND
         sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB303132333435363738394142434445464748494A4B4C4D4E"));
 #endif
-        DO(UapkiNS::Cipher::Dstu7624::encodeParams(sba_iv.get(), &content.algo.baParameters));
-        DO(UapkiNS::Cipher::Dstu7624::generateKey(32, &content.secretkey));
+        DO(Cipher::Dstu7624::encodeParams(sba_iv.get(), &content.algo.baParameters));
+        DO(Cipher::Dstu7624::generateKey(32, &content.secretkey));
 #ifdef DEBUG_USE_FIXED_RND
 content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B76191597150D29E212B92937E1A6CA2CDA925DACF3B2C7FBB8E4FFC"));
 #endif
@@ -327,13 +357,13 @@ content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B761
     else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
         sba_dke.set(content.algo.baParameters);
         content.algo.baParameters = nullptr;
-        DO(UapkiNS::Cipher::Gost28147::generateIV(&sba_iv));
+        DO(Cipher::Gost28147::generateIV(&sba_iv));
 #ifdef DEBUG_USE_FIXED_RND
 sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB"));
-sba_dke.clear(); //UapkiNS::Cipher::Gost28147::getDKE(GOST28147_SBOX_DEFAULT, &sba_dke);
+sba_dke.clear(); //Cipher::Gost28147::getDKE(GOST28147_SBOX_DEFAULT, &sba_dke);
 #endif
-        DO(UapkiNS::Cipher::Gost28147::encodeParams(sba_iv.get(), sba_dke.get(), &content.algo.baParameters));
-        DO(UapkiNS::Cipher::Gost28147::generateKey(&content.secretkey));
+        DO(Cipher::Gost28147::encodeParams(sba_iv.get(), sba_dke.get(), &content.algo.baParameters));
+        DO(Cipher::Gost28147::generateKey(&content.secretkey));
 #ifdef DEBUG_USE_FIXED_RND
 content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B76191597150D29E212B92937E1A6CA2CDA925DACF3B2C7FBB8E4FFC"));
 #endif
@@ -344,9 +374,12 @@ content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B761
 
 cleanup:
     return ret;
-}
+}   //  generate_secretkey
 
-static int parse_content (JSON_Object* joContent, EncryptContent& encryptContent)
+static int parse_content (
+        JSON_Object* joContent,
+        EncryptContent& encryptContent
+)
 {
     if (!encryptContent.data.set(json_object_get_base64(joContent, "bytes"))) return RET_UAPKI_INVALID_PARAMETER;
 
@@ -355,14 +388,14 @@ static int parse_content (JSON_Object* joContent, EncryptContent& encryptContent
     encryptContent.type = ParsonHelper::jsonObjectGetString(joContent, "type", string(OID_PKCS7_DATA));
 
     return RET_OK;
-}
+}   //  parse_content
 
 
 int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    CerStore* cer_store = nullptr;
-    UapkiNS::Pkcs7::EnvelopedDataBuilder envdata_builder;
+    Cert::CerStore* cer_store = nullptr;
+    Pkcs7::EnvelopedDataBuilder envdata_builder;
     EncryptContent econtent;
     vector<UapkiNS::Attribute> unpr_attrs;
     const uint32_t version = 2u;

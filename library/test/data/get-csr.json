@@ -1,9 +1,6 @@
 {
-  "comment": "Test GET_CSR, updated 2023-02-06",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "comment": "Test GET_CSR",
+  "commentUsage": "uapki get-csr.json",
   "tasks": [
     {
       "method": "VERSION"

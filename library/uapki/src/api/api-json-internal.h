@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -77,6 +77,8 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_crl_info (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_crls (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_remove_crl (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_digest (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult);
@@ -86,6 +88,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult);
 
 #ifdef __cplusplus
 }

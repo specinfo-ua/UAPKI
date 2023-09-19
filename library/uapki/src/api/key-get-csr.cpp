@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/key-get-csr.cpp"
+
 #include "api-json-internal.h"
 #include "certreq-builder.h"
 #include "cm-providers.h"
@@ -34,27 +36,35 @@
 #include "uapkif.h"
 #include "uapki-ns.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/key-get-csr.c"
+
+using namespace std;
+using namespace UapkiNS;
 
 
-static int build_csr (CmStorageProxy& storage, const UapkiNS::AlgorithmIdentifier& aidSignAlgo,
-                    const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr)
+static int build_csr (
+        CmStorageProxy& storage,
+        const UapkiNS::AlgorithmIdentifier& aidSignAlgo,
+        const ByteArray* baSubject,
+        const ByteArray* baAttributes,
+        ByteArray** baCsr
+)
 {
     int ret = RET_OK;
-    UapkiNS::CertReqBuilder certreq_builder;
-    UapkiNS::SmartBA sba_keyalgo, sba_pubkey, sba_signvalue;
-    //vector<UapkiNS::Extension> extns;
+    CertReqBuilder certreq_builder;
+    SmartBA sba_keyalgo, sba_pubkey, sba_signvalue;
 
     DO(certreq_builder.init(1));
 
     DO(storage.keyGetPublicKey(&sba_keyalgo, &sba_pubkey));
     DO(certreq_builder.setSubjectPublicKeyInfo(sba_keyalgo.get(), sba_pubkey.get()));
 
-    //DO(certreq_builder.addExtensions(extns));
-
     DO(certreq_builder.encodeTbs());
-    DO(storage.keySignData(aidSignAlgo.algorithm, aidSignAlgo.baParameters, certreq_builder.getTbsEncoded(), &sba_signvalue));
+    DO(storage.keySignData(
+        aidSignAlgo.algorithm,
+        aidSignAlgo.baParameters,
+        certreq_builder.getTbsEncoded(),
+        &sba_signvalue
+    ));
 
     DO(certreq_builder.encodeCertRequest(aidSignAlgo, sba_signvalue.get()));
     *baCsr = certreq_builder.getCsrEncoded(true);
@@ -63,7 +73,10 @@ cleanup:
     return ret;
 }
 
-static int get_default_signalgo (CmStorageProxy& storage, string& signAlgo)
+static int get_default_signalgo (
+        CmStorageProxy& storage,
+        string& signAlgo
+)
 {
     string s_keyinfo;
     int ret = storage.keyGetInfo(s_keyinfo);
@@ -84,8 +97,8 @@ static int get_default_signalgo (CmStorageProxy& storage, string& signAlgo)
 int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
 {
     UapkiNS::AlgorithmIdentifier aid_signalgo;
-    UapkiNS::SmartBA sba_attrs, sba_csr, sba_subject;
-    UapkiNS::CertReqBuilder certreq_builder;
+    SmartBA sba_attrs, sba_csr, sba_subject;
+    CertReqBuilder certreq_builder;
 
     CmStorageProxy* storage = CmProviders::openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;

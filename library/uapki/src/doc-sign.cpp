@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,6 +24,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define FILE_MARKER "uapki/doc-sign.cpp"
 
 #include "doc-sign.h"
 #include "api-json-internal.h"
@@ -50,13 +52,13 @@ namespace Sign {
 
 static int add_unique_cert (
         vector<SigningDoc::CerDataItem*>& certs,
-        CerStore::Item* cerStoreItem
+        Cert::CerItem* cerStoreItem
 )
 {
     if (!cerStoreItem) return RET_OK;
 
     for (const auto& it : certs) {
-        if (ba_cmp(cerStoreItem->baCertId, it->pcsiSubject->baCertId) == RET_OK) {
+        if (ba_cmp(cerStoreItem->getCertId(), it->pCerSubject->getCertId()) == RET_OK) {
             return RET_OK;
         }
     }
@@ -65,17 +67,17 @@ static int add_unique_cert (
     if (!cdi) return RET_UAPKI_GENERAL_ERROR;
 
     certs.push_back(cdi);
-    cdi->pcsiSubject = cerStoreItem;
+    cdi->pCerSubject = cerStoreItem;
     return RET_OK;
 }   //  add_unique_cert
 
 
 SigningDoc::CerDataItem::CerDataItem (void)
-    : pcsiSubject(nullptr)
-    , pcsiIssuer(nullptr)
+    : pCerSubject(nullptr)
+    , pCerIssuer(nullptr)
     , isSelfSigned(false)
-    , pcsiCrl(nullptr)
-    , pcsiResponder(nullptr)
+    , pCrl(nullptr)
+    , pCerResponder(nullptr)
 {
 }
 
@@ -85,11 +87,11 @@ SigningDoc::CerDataItem::~CerDataItem (void)
 
 int SigningDoc::CerDataItem::set (const CerDataItem& src)
 {
-    pcsiSubject = src.pcsiSubject;
-    pcsiIssuer = src.pcsiIssuer;
+    pCerSubject = src.pCerSubject;
+    pCerIssuer = src.pCerIssuer;
     isSelfSigned = src.isSelfSigned;
-    if (src.pcsiResponder) {
-        pcsiResponder = src.pcsiResponder;
+    if (src.pCerResponder) {
+        pCerResponder = src.pCerResponder;
         if (
             !basicOcspResponse.set(ba_copy_with_alloc(src.basicOcspResponse.get(), 0, 0)) ||
             !ocspIdentifier.set(ba_copy_with_alloc(src.ocspIdentifier.get(), 0, 0)) ||
@@ -124,10 +126,10 @@ SigningDoc::SignParams::~SignParams (void)
 }
 
 int SigningDoc::SignParams::addCert (
-    CerStore::Item* cerStoreItem
+    Cert::CerItem* cerItem
 )
 {
-    return add_unique_cert(chainCerts, cerStoreItem);
+    return add_unique_cert(chainCerts, cerItem);
 }
 
 int SigningDoc::SignParams::setSignatureFormat (
@@ -215,7 +217,7 @@ int SigningDoc::init (
         ));
 
         if (signParams->includeCert) {
-            const ByteArray* ba_certencoded = signParams->signer.pcsiSubject->baEncoded;
+            const ByteArray* ba_certencoded = signParams->signer.pCerSubject->getEncoded();
             DO(builder.addCertificate(ba_certencoded));
             if (m_ArchiveTsHelper.isEnabled()) {
                 DO(m_ArchiveTsHelper.addCertificate(ba_certencoded));
@@ -228,10 +230,10 @@ cleanup:
 }
 
 int SigningDoc::addCert (
-        CerStore::Item* cerStoreItem
+        Cert::CerItem* cerItem
 )
 {
-    return add_unique_cert(m_Certs, cerStoreItem);
+    return add_unique_cert(m_Certs, cerItem);
 }
 
 int SigningDoc::addArchiveAttribute (
@@ -437,7 +439,7 @@ int SigningDoc::setupSignerIdentifier (void)
     uint32_t version = 0;
 
     if (!signParams->sidUseKeyId) {
-        DO(signParams->signer.pcsiSubject->getIssuerAndSN(&sba_sid));
+        DO(signParams->signer.pCerSubject->getIssuerAndSN(&sba_sid));
         DO(signerInfo->setSid(Pkcs7::SignerIdentifierType::ISSUER_AND_SN, sba_sid.get()));
         version = 1;
     }
@@ -497,7 +499,7 @@ int SigningDoc::encodeCertValues (
     if (m_Certs.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     for (const auto& it : m_Certs) {
-        cert_values.push_back(it->pcsiSubject->baEncoded);
+        cert_values.push_back(it->pCerSubject->getEncoded());
     }
 
     attr.type = string(OID_PKCS9_CERT_VALUES);
@@ -520,14 +522,14 @@ int SigningDoc::encodeCertificateRefs (
 
     other_certids.resize(m_Certs.size());
     for (const auto& it : m_Certs) {
-        const CerStore::Item& src_cer = *it->pcsiSubject;
+        const Cert::CerItem& src_cer = *it->pCerSubject;
         OtherCertId& dst_othercertid = other_certids[idx++];
 
-        DO(::hash(signParams->hashDigest, src_cer.baEncoded, &dst_othercertid.baHashValue));
+        DO(::hash(signParams->hashDigest, src_cer.getEncoded(), &dst_othercertid.baHashValue));
         if (!dst_othercertid.hashAlgorithm.copy(signParams->aidDigest)) return RET_UAPKI_GENERAL_ERROR;
 
-        DO(CerStore::issuerToGeneralNames(src_cer.baIssuer, &dst_othercertid.issuerSerial.baIssuer));
-        CHECK_NOT_NULL(dst_othercertid.issuerSerial.baSerialNumber = ba_copy_with_alloc(src_cer.baSerialNumber, 0, 0));
+        DO(Cert::issuerToGeneralNames(src_cer.getIssuer(), &dst_othercertid.issuerSerial.baIssuer));
+        CHECK_NOT_NULL(dst_othercertid.issuerSerial.baSerialNumber = ba_copy_with_alloc(src_cer.getSerialNumber(), 0, 0));
     }
 
     attr.type = string(OID_PKCS9_CERTIFICATE_REFS);
@@ -546,7 +548,8 @@ int SigningDoc::encodeRevocationRefs (
     const SigningDoc::CerDataItem& signer = signParams->signer;
     AttributeHelper::RevocationRefsBuilder revocrefs_builder;
     AttributeHelper::RevocationRefsBuilder::CrlOcspRef* p_crlocspref = nullptr;
-    CrlStore::Item* p_crl = nullptr;
+    Crl::CrlItem* p_crl = nullptr;
+    const UapkiNS::OtherHash* p_crlhash = nullptr;
     size_t idx = 0;
 
     DO(revocrefs_builder.init());
@@ -556,10 +559,10 @@ int SigningDoc::encodeRevocationRefs (
     p_crlocspref = revocrefs_builder.getCrlOcspRef(idx++);
     switch (signParams->signatureFormat) {
     case SignatureFormat::CADES_C:
-        p_crl = signer.pcsiCrl;
+        p_crl = signer.pCrl;
         if (p_crl) {
-            DO(p_crl->getHash(signParams->aidDigest));
-            DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
+            DO(p_crl->generateHash(signParams->aidDigest, &p_crlhash));
+            DO(p_crlocspref->addCrlValidatedId(*p_crlhash, p_crl->getCrlIdentifier()));
         }
         break;
     case SignatureFormat::CADES_XL:
@@ -578,10 +581,10 @@ int SigningDoc::encodeRevocationRefs (
         p_crlocspref = revocrefs_builder.getCrlOcspRef(idx++);
         switch (signParams->signatureFormat) {
         case SignatureFormat::CADES_C:
-            p_crl = it->pcsiCrl;
+            p_crl = it->pCrl;
             if (p_crl) {
-                DO(p_crl->getHash(signParams->aidDigest));
-                DO(p_crlocspref->addCrlValidatedId(p_crl->crlHash, p_crl->baCrlIdentifier));
+                DO(p_crl->generateHash(signParams->aidDigest, &p_crlhash));
+                DO(p_crlocspref->addCrlValidatedId(*p_crlhash, p_crl->getCrlIdentifier()));
             }
             break;
         case SignatureFormat::CADES_XL:

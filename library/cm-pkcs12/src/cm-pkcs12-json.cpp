@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -50,14 +50,17 @@
     }
 
 
+using namespace std;
+
+
 const char* CmPkcs12::CM_SESSION_DESCRIPTION    = "PKCS12-file session";
-const char* CmPkcs12::CM_SESSION_MANUFACTURER   = "2023 SPECINFOSYSTEMS LLC";
+const char* CmPkcs12::CM_SESSION_MANUFACTURER   = "2021 SPECINFOSYSTEMS LLC";
 const char* CmPkcs12::CM_SESSION_MODEL          = "PKCS12-FILE";
 
 
-static const size_t DSTU_ECNAMES_NUMBER = 6;
+static const size_t DSTU_ECNAMES_NUMBER = 7;
 static const char* DSTU_ECNAMES[DSTU_ECNAMES_NUMBER] = {
-    OID_DSTU4145_PARAM_M257_PB, OID_DSTU4145_PARAM_M307_PB, OID_DSTU4145_PARAM_M367_PB, OID_DSTU4145_PARAM_M431_PB,
+    OID_DSTU4145_PARAM_M233_PB, OID_DSTU4145_PARAM_M257_PB, OID_DSTU4145_PARAM_M307_PB, OID_DSTU4145_PARAM_M367_PB, OID_DSTU4145_PARAM_M431_PB,
     OID_DSTU4145_PARAM_M233_ONB, OID_DSTU4145_PARAM_M431_ONB,
     //TODO ec-curves
 };
@@ -166,7 +169,10 @@ cleanup:
 }
 
 
-CM_ERROR CmPkcs12::keyInfoToJson (const StoreKeyInfo& keyInfo, JSON_Object* joResult)
+CM_ERROR CmPkcs12::keyInfoToJson (
+        const StoreKeyInfo& keyInfo,
+        JSON_Object* joResult
+)
 {
     CM_ERROR cm_err = RET_OK;
 
@@ -186,7 +192,9 @@ cleanup:
     return cm_err;
 }
 
-CM_ERROR CmPkcs12::listMechanisms (JSON_Array* jaMechanisms)
+CM_ERROR CmPkcs12::listMechanisms (
+        JSON_Array* jaMechanisms
+)
 {
     CM_ERROR cm_err = RET_OK;
     DO_JSON(json_array_append_string(jaMechanisms, OID_EC_KEY));
@@ -199,7 +207,10 @@ cleanup:
     return cm_err;
 }
 
-CM_ERROR CmPkcs12::mechanismParamsToJson (const char* mechanismId, CM_JSON_PCHAR* jsonResult)
+CM_ERROR CmPkcs12::mechanismParamsToJson (
+        const char* mechanismId,
+        CM_JSON_PCHAR* jsonResult
+)
 {
     ParsonHelper json;
     if (!json.create()) return RET_CM_GENERAL_ERROR;
@@ -226,7 +237,10 @@ cleanup:
     return cm_err;
 }
 
-CM_ERROR CmPkcs12::sessionInfoToJson (const string& filename, CM_JSON_PCHAR* jsonResult)
+CM_ERROR CmPkcs12::sessionInfoToJson (
+        const string& filename,
+        CM_JSON_PCHAR* jsonResult
+)
 {
     ParsonHelper json;
     if (!json.create()) return RET_CM_GENERAL_ERROR;
@@ -246,7 +260,10 @@ cleanup:
     return cm_err;
 }
 
-CM_ERROR CmPkcs12::signAlgoByMechanismId (const char* oid, JSON_Array* jaSignAlgos)
+CM_ERROR CmPkcs12::signAlgoByMechanismId (
+        const char* oid,
+        JSON_Array* jaSignAlgos
+)
 {
     size_t cnt = 0;
     const char** sign_algos = nullptr;

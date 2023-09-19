@@ -1,8 +1,9 @@
 /*
  SPDX-License-Identifier: MIT
 
- Parson 1.1.0 ( http://kgabis.github.com/parson/ )
+ Copyright (c) 2021, The UAPKI Project Authors.
  Copyright (c) 2012 - 2020 Krzysztof Gabis
+ Parson 1.1.0 ( http://kgabis.github.com/parson/ )
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +23,8 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 
- Updated: 2021-03-19
 */
+
 #ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS

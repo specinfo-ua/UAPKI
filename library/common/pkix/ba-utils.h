@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -46,6 +46,8 @@ bool ba_is_equals(ByteArray *expected, ByteArray *actual);
 void ba_free_many(int num, ...);
 
 int ba_print(FILE *stream, const ByteArray *ba);
+
+FILE* fopen_utf8(char const* utf8path, const int is_writemode);
 
 /**
  * Створює контекст масиву байт з файлу.

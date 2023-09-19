@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/uapki-ns-util.cpp"
 
 #include "uapki-ns-util.h"
 #include "iconv-utils.h"
@@ -287,8 +288,8 @@ cleanup:
 }
 
 int Util::decodeExtension (
-    const ByteArray* baEncoded,
-    UapkiNS::Extension& decodedExtn
+        const ByteArray* baEncoded,
+        UapkiNS::Extension& decodedExtn
 )
 {
     int ret = RET_OK;
@@ -397,42 +398,6 @@ int Util::extnValueFromExtensions (
     DO(asn_OCTSTRING2ba(&extn->extnValue, baExtnValue));
 
 cleanup:
-    return ret;
-}
-
-int Util::decodeOid (
-        const ByteArray* baEncoded,
-        char** oid
-)
-{
-    int ret = RET_OK;
-    OBJECT_IDENTIFIER_t* prim_oid = nullptr;
-
-    if (!baEncoded || !oid) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(prim_oid = (OBJECT_IDENTIFIER_t*)asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), baEncoded));
-    DO(asn_oid_to_text(prim_oid, oid));
-
-cleanup:
-    asn_free(get_OBJECT_IDENTIFIER_desc(), prim_oid);
-    return ret;
-}
-
-int Util::decodePkixTime (
-        const ByteArray* baEncoded,
-        uint64_t& msTime
-)
-{
-    int ret = RET_OK;
-    PKIXTime_t* pkix_time = nullptr;
-
-    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(pkix_time = (PKIXTime_t*)asn_decode_ba_with_alloc(get_PKIXTime_desc(), baEncoded));
-    DO(pkixTimeFromAsn1(pkix_time, msTime));
-
-cleanup:
-    asn_free(get_PKIXTime_desc(), pkix_time);
     return ret;
 }
 
@@ -558,7 +523,7 @@ int Util::genTimeFromAsn1 (
 {
     if (!genTime) return RET_UAPKI_INVALID_PARAMETER;
 
-    msTime = asn_GT2time(genTime, NULL);
+    msTime = asn_GT2time(genTime, nullptr);
     return RET_OK;
 }
 
@@ -593,7 +558,7 @@ int Util::utcTimeFromAsn1 (
 {
     if (!utcTime) return RET_UAPKI_INVALID_PARAMETER;
 
-    msTime = asn_UT2time(utcTime, NULL);
+    msTime = asn_UT2time(utcTime, nullptr);
     return RET_OK;
 }
 
@@ -603,23 +568,22 @@ int Util::bitStringEncapOctetFromAsn1 (
 )
 {
     int ret = RET_OK;
-    OCTET_STRING_t* octet_str = NULL;
-    ByteArray* ba_encoded = NULL;
+    OCTET_STRING_t* octet_str = nullptr;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(bsEncapOctet != NULL);
-    CHECK_PARAM(baData != NULL);
+    CHECK_PARAM(bsEncapOctet);
+    CHECK_PARAM(baData);
 
     if (bsEncapOctet->bits_unused != 0) {
         SET_ERROR(RET_UAPKI_UNEXPECTED_BIT_STRING);
     }
 
-    DO(asn_BITSTRING2ba(bsEncapOctet, &ba_encoded));
-    CHECK_NOT_NULL(octet_str = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), ba_encoded));
+    DO(asn_BITSTRING2ba(bsEncapOctet, &sba_encoded));
+    CHECK_NOT_NULL(octet_str = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), sba_encoded.get()));
     DO(asn_OCTSTRING2ba(octet_str, baData));
 
 cleanup:
     asn_free(get_OCTET_STRING_desc(), octet_str);
-    ba_free(ba_encoded);
     return ret;
 }
 
@@ -629,12 +593,12 @@ int Util::bitStringFromAsn1 (
 )
 {
     int ret = RET_OK;
-    ByteArray* ba_bitvalues = NULL;
+    ByteArray* ba_bitvalues = nullptr;
     uint32_t i, value = 0;
-    const uint8_t* buf = NULL;
+    const uint8_t* buf = nullptr;
 
-    CHECK_PARAM(bs != NULL);
-    CHECK_PARAM(bits != NULL);
+    CHECK_PARAM(bs);
+    CHECK_PARAM(bits);
 
     if (bs->bits_unused > 7) {
         SET_ERROR(RET_UAPKI_INVALID_BIT_STRING);
@@ -661,15 +625,19 @@ cleanup:
 
 int Util::bmpStringFromAsn1 (
         const BMPString_t* bmpStr,
-        char** str
+        string& sValue
 )
 {
     int ret = RET_OK;
+    char* str = nullptr;
 
-    CHECK_PARAM(bmpStr != NULL);
-    CHECK_PARAM(str != NULL);
+    CHECK_PARAM(bmpStr);
 
-    DO(utf16be_to_utf8(bmpStr->buf, bmpStr->size, str));
+    DO(utf16be_to_utf8(bmpStr->buf, bmpStr->size, &str));
+    if (str) {
+        sValue = string(str);
+        ::free(str);
+    }
 
 cleanup:
     return ret;
@@ -683,8 +651,8 @@ int Util::enumeratedFromAsn1 (
     int ret = RET_OK;
     unsigned long value = 0;
 
-    CHECK_PARAM(enumerated != NULL);
-    CHECK_PARAM(enumValue != NULL);
+    CHECK_PARAM(enumerated);
+    CHECK_PARAM(enumValue);
 
     if ((enumerated->size > 0) && (enumerated->size < 4)) {
         DO(asn_INTEGER2ulong(enumerated, &value));
@@ -701,19 +669,16 @@ cleanup:
 int Util::decodeAnyString (
         const uint8_t* buf,
         const size_t len,
-        char** str
+        string& sValue
 )
 {
     int ret = RET_OK;
-    OCTET_STRING_t* octet_str = NULL;
-    asn_TYPE_descriptor_t* desc = NULL;
+    OCTET_STRING_t* octet_str = nullptr;
+    asn_TYPE_descriptor_t* desc = nullptr;
 
-    CHECK_PARAM(buf != NULL);
-    CHECK_PARAM(str != NULL);
+    if (!buf) return RET_UAPKI_INVALID_PARAMETER;
+    if (len < 2) return RET_UAPKI_INVALID_STRUCT;
 
-    if (len < 2) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
     switch (buf[0])
     {
     case 0x0C: desc = get_UTF8String_desc(); break;
@@ -724,11 +689,11 @@ int Util::decodeAnyString (
     }
 
     octet_str = (OCTET_STRING_t*)asn_decode_with_alloc(desc, buf, len);
-    if (octet_str == NULL) {
+    if (!octet_str) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
-    DO(UapkiNS::Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, str));
+    DO(Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, sValue));
 
 cleanup:
     asn_free(get_OCTET_STRING_desc(), octet_str);
@@ -737,28 +702,43 @@ cleanup:
 
 int Util::decodeAnyString (
         const ByteArray* baEncoded,
-        char** str
+        string& sValue
 )
 {
-    return decodeAnyString(ba_get_buf_const(baEncoded), ba_get_len(baEncoded), str);
+    return decodeAnyString(ba_get_buf_const(baEncoded), ba_get_len(baEncoded), sValue);
 }
 
 int Util::decodeBmpString (
         const ByteArray* baEncoded,
-        char** str
+        string& sValue
 )
 {
     int ret = RET_OK;
-    BMPString_t* prim_bmpstr = NULL;
+    BMPString_t* prim_bmpstr = nullptr;
 
-    CHECK_PARAM(baEncoded != NULL);
-    CHECK_PARAM(str != NULL);
+    CHECK_PARAM(baEncoded);
 
     CHECK_NOT_NULL(prim_bmpstr = (BMPString_t*)asn_decode_ba_with_alloc(get_BMPString_desc(), baEncoded));
-    DO(bmpStringFromAsn1(prim_bmpstr, str));
+    DO(bmpStringFromAsn1(prim_bmpstr, sValue));
 
 cleanup:
     asn_free(get_BMPString_desc(), prim_bmpstr);
+    return ret;
+}
+
+int Util::decodeBoolean (
+        const ByteArray* baEncoded,
+        bool& value
+)
+{
+    int ret = RET_OK;
+    BOOLEAN_t* prim_boolean = nullptr;
+
+    CHECK_NOT_NULL(prim_boolean = (BOOLEAN_t*)asn_decode_ba_with_alloc(get_BOOLEAN_desc(), baEncoded));
+    value = *prim_boolean;
+
+cleanup:
+    asn_free(get_BOOLEAN_desc(), prim_boolean);
     return ret;
 }
 
@@ -768,10 +748,10 @@ int Util::decodeEnumerated (
 )
 {
     int ret = RET_OK;
-    ENUMERATED_t* prim_enum = NULL;
+    ENUMERATED_t* prim_enum = nullptr;
 
-    CHECK_PARAM(baEncoded != NULL);
-    CHECK_PARAM(enumValue != NULL);
+    CHECK_PARAM(baEncoded);
+    CHECK_PARAM(enumValue);
 
     CHECK_NOT_NULL(prim_enum = (ENUMERATED_t*)asn_decode_ba_with_alloc(get_ENUMERATED_desc(), baEncoded));
     DO(enumeratedFromAsn1(prim_enum, enumValue));
@@ -799,18 +779,54 @@ cleanup:
     return ret;
 }
 
+int Util::decodeOid (
+        const ByteArray* baEncoded,
+        string& oid
+)
+{
+    int ret = RET_OK;
+    OBJECT_IDENTIFIER_t* prim_oid = nullptr;
+
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(prim_oid = (OBJECT_IDENTIFIER_t*)asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), baEncoded));
+    DO(oidFromAsn1(prim_oid, oid));
+
+cleanup:
+    asn_free(get_OBJECT_IDENTIFIER_desc(), prim_oid);
+    return ret;
+}
+
+int Util::decodePkixTime (
+        const ByteArray* baEncoded,
+        uint64_t& msTime
+)
+{
+    int ret = RET_OK;
+    PKIXTime_t* pkix_time = nullptr;
+
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    CHECK_NOT_NULL(pkix_time = (PKIXTime_t*)asn_decode_ba_with_alloc(get_PKIXTime_desc(), baEncoded));
+    DO(pkixTimeFromAsn1(pkix_time, msTime));
+
+cleanup:
+    asn_free(get_PKIXTime_desc(), pkix_time);
+    return ret;
+}
+
 int Util::encodeBmpString (
         const char* strUtf8,
         ByteArray** baEncoded
 )
 {
     int ret = RET_OK;
-    ByteArray* ba_utf16be = NULL;
-    uint8_t* utf16 = NULL;
+    ByteArray* ba_utf16be = nullptr;
+    uint8_t* utf16 = nullptr;
     size_t utf16_len = 0;
 
-    CHECK_PARAM(strUtf8 != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(strUtf8);
+    CHECK_PARAM(baEncoded);
 
     DO(utf8_to_utf16be(strUtf8, &utf16, &utf16_len));
     CHECK_NOT_NULL(ba_utf16be = ba_alloc_from_uint8(utf16, utf16_len));
@@ -823,16 +839,35 @@ cleanup:
     return ret;
 }
 
+int Util::encodeBoolean (
+        const bool value,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    BOOLEAN_t* prim_boolean = nullptr;
+
+    CHECK_PARAM(baEncoded);
+
+    ASN_ALLOC_TYPE(prim_boolean, BOOLEAN_t);
+    *prim_boolean = value ? 1 : 0;
+    DO(asn_encode_ba(get_BOOLEAN_desc(), prim_boolean, baEncoded));
+
+cleanup:
+    asn_free(get_BOOLEAN_desc(), prim_boolean);
+    return ret;
+}
+
 int Util::encodeIa5String (
         const char* strLatin,
         ByteArray** baEncoded
 )
 {
     int ret = RET_OK;
-    IA5String_t* ia5_str = NULL;
+    IA5String_t* ia5_str = nullptr;
 
-    CHECK_PARAM(strLatin != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(strLatin);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(ia5_str, IA5String_t);
     if (strLatin) {
@@ -851,10 +886,10 @@ int Util::encodeInteger (
 )
 {
     int ret = RET_OK;
-    INTEGER_t* prim_integer = NULL;
+    INTEGER_t* prim_integer = nullptr;
 
-    CHECK_PARAM(baData != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(baData);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(prim_integer, INTEGER_t);
     DO(asn_ba2INTEGER(baData, prim_integer));
@@ -871,9 +906,9 @@ int Util::encodeInteger (
 )
 {
     int ret = RET_OK;
-    INTEGER_t* prim_integer = NULL;
+    INTEGER_t* prim_integer = nullptr;
 
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(prim_integer, INTEGER_t);
     DO(asn_long2INTEGER(prim_integer, value));
@@ -890,10 +925,10 @@ int Util::encodeOid (
 )
 {
     int ret = RET_OK;
-    OBJECT_IDENTIFIER_t* asn_oid = NULL;
+    OBJECT_IDENTIFIER_t* asn_oid = nullptr;
 
-    CHECK_PARAM(oid != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(oid);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(asn_oid, OBJECT_IDENTIFIER_t);
     DO(asn_set_oid_from_text(oid, asn_oid));
@@ -910,10 +945,10 @@ int Util::encodePrintableString (
 )
 {
     int ret = RET_OK;
-    PrintableString_t* printable_str = NULL;
+    PrintableString_t* printable_str = nullptr;
 
-    CHECK_PARAM(strLatin != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(strLatin);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(printable_str, PrintableString_t);
     if (strLatin) {
@@ -932,10 +967,10 @@ int Util::encodeUtf8string (
 )
 {
     int ret = RET_OK;
-    UTF8String_t* utf8_str = NULL;
+    UTF8String_t* utf8_str = nullptr;
 
-    CHECK_PARAM(strUtf8 != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    CHECK_PARAM(strUtf8);
+    CHECK_PARAM(baEncoded);
 
     ASN_ALLOC_TYPE(utf8_str, UTF8String_t);
     if (strUtf8) {
@@ -949,7 +984,7 @@ cleanup:
 }
 
 int Util::oidFromAsn1 (
-        OBJECT_IDENTIFIER_t* oid,
+        const OBJECT_IDENTIFIER_t* oid,
         string& sOid
 )
 {
@@ -977,8 +1012,8 @@ int Util::pbufToStr (
 {
     int ret = RET_OK;
 
-    CHECK_PARAM(buf != NULL);
-    CHECK_PARAM(str != NULL);
+    CHECK_PARAM(buf);
+    CHECK_PARAM(str);
 
     if (len > 0) {
         *str = (char*)calloc(1, len + 1);
@@ -988,11 +1023,27 @@ int Util::pbufToStr (
         memcpy(*str, buf, len);
     }
     else {
-        *str = NULL;
+        *str = nullptr;
     }
 
 cleanup:
     return ret;
+}
+
+int Util::pbufToStr (
+        const uint8_t* buf,
+        const size_t len,
+        string& sValue
+)
+{
+    if (!buf) return RET_UAPKI_INVALID_PARAMETER;
+
+    if (len > 0) {
+        sValue.resize(len);
+        memcpy((void*)sValue.data(), buf, len);
+    }
+
+    return RET_OK;
 }
 
 string Util::baToHex (
@@ -1012,5 +1063,22 @@ string Util::baToHex (
     }
     return rv_shex;
 }
+
+string Util::joinStrings (
+        const vector<string>& strings,
+        const char separator
+)
+{
+    string rv_s;
+    for (const auto& it : strings) {
+        rv_s += it;
+        rv_s.push_back(separator);
+    }
+    if (!rv_s.empty()) {
+        rv_s.pop_back();
+    }
+    return rv_s;
+}
+
 
 }   //  end namespace UapkiNS

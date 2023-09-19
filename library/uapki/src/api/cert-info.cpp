@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,43 +25,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/cert-info.cpp"
+
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
-#include "store-util.h"
+#include "store-json.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/cert-info.cpp"
+using namespace UapkiNS;
 
 
 int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_certid, sba_encoded;
+    SmartBA sba_certid, sba_encoded;
 
     if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-        CerStore::Item* cer_item = nullptr;
-        DO(CerStore::parseCert(sba_encoded.get(), &cer_item));
-        sba_encoded.set(nullptr);
+        Cert::CerItem* cer_item = nullptr;
+        DO(Cert::parseCert(sba_encoded.get(), &cer_item));
 
-        DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
+        DO(Cert::detailInfoToJson(joResult, cer_item));
         delete cer_item;
     }
     else {
+        LibraryConfig* lib_config = get_config();
+        Cert::CerStore* cer_store = get_cerstore();
+
+        if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
+        if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
+
         if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
-            CerStore* cer_store = get_cerstore();
-            if (cer_store) {
-                CerStore::Item* cer_item = nullptr;
-                DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
-                DO(CerStoreUtil::detailInfoToJson(joResult, cer_item));
-            }
-            else {
-                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-            }
+            Cert::CerItem* cer_item = nullptr;
+            DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
+            DO(Cert::detailInfoToJson(joResult, cer_item));
         }
         else {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);

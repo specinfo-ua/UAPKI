@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,10 +29,11 @@
 #include "cm-errors.h"
 #include "cm-pkcs12.h"
 #include "cm-pkcs12-ctx.h"
-#include "cm-pkcs12-debug.h"
 #include "key-wrap.h"
 #include "parson-helper.h"
 #include "private-key.h"
+#include "uapki-ns.h"
+#include "cm-pkcs12-debug.h"
 
 
 #define DEBUG_OUTPUT(msg)
@@ -40,6 +41,10 @@
 DEBUG_OUTPUT_FUNC
 #define DEBUG_OUTPUT(msg) debug_output(DEBUG_OUTSTREAM_DEFAULT, msg);
 #endif
+
+
+using namespace std;
+using namespace UapkiNS;
 
 
 static CM_ERROR cm_key_get_info (
@@ -223,17 +228,16 @@ static CM_ERROR cm_key_sign_final (
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key || !ss_ctx->activeBag || !ss_ctx->ctxHash) return RET_CM_KEY_NOT_SELECTED;
 
-    ByteArray* ba_hash = nullptr;
-    int ret = hash_final(ss_ctx->ctxHash, &ba_hash);
+    SmartBA sba_hash;
+    int ret = hash_final(ss_ctx->ctxHash, &sba_hash);
     if (ret == RET_OK) {
         ret = private_key_sign_single(
             ss_ctx->activeBag->bagValue(),
             (const char*)ss_ctx->aidSignAlgo.algorithm.c_str(),
             ss_ctx->aidSignAlgo.baParameters,
-            ba_hash,
+            sba_hash.get(),
             (ByteArray**) baSignature
         );
-        ba_free(ba_hash);
     }
     ss_ctx->resetSignLong();
     return ret;
@@ -252,7 +256,10 @@ static CM_ERROR cm_key_dh_wrap_key (
 {
     DEBUG_OUTPUT("cm_key_dh_wrap_key()");
     if (!session) return RET_CM_NO_SESSION;
-    if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaSessionKeys || !abaWrappedKeys) return RET_CM_INVALID_PARAMETER;
+    if (
+        !kdfOid || !wrapAlgOid || (count == 0) ||
+        !abaPubkeys || !abaSessionKeys || !abaWrappedKeys
+    ) return RET_CM_INVALID_PARAMETER;
 
     SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
@@ -291,7 +298,10 @@ static CM_ERROR cm_key_dh_unwrap_key (
 {
     DEBUG_OUTPUT("cm_key_dh_unwrap_key()");
     if (!session) return RET_CM_NO_SESSION;
-    if (!kdfOid || !wrapAlgOid || (count == 0) || !abaPubkeys || !abaWrappedKeys || !abaSessionKeys) return RET_CM_INVALID_PARAMETER;
+    if (!
+        kdfOid || !wrapAlgOid || (count == 0) ||
+        !abaPubkeys || !abaWrappedKeys || !abaSessionKeys
+    ) return RET_CM_INVALID_PARAMETER;
 
     SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
@@ -302,7 +312,7 @@ static CM_ERROR cm_key_dh_unwrap_key (
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
-    const int ret = key_unwrap(
+    int ret = key_unwrap(
         selected_key->bagValue(),
         (const char*)kdfOid,
         (const char*)wrapAlgOid,
@@ -312,11 +322,16 @@ static CM_ERROR cm_key_dh_unwrap_key (
         (const ByteArray**)abaWrappedKeys,
         (ByteArray***)abaSessionKeys
     );
+    if (ret != RET_OK) {
+        ret = (ret == RET_INVALID_MAC) ? RET_CM_INVALID_WRAPPED_KEY : RET_CM_GENERAL_ERROR;
+    }
     return ret;
 }   //  cm_key_dh_unwrap_key
 
 
-void CmPkcs12::assignKeyFunc (CM_KEY_API& key)
+void CmPkcs12::assignKeyFunc (
+        CM_KEY_API& key
+)
 {
     key.getInfo         = cm_key_get_info;
     key.getPublicKey    = cm_key_get_public_key;

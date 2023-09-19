@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -40,6 +40,10 @@ namespace TimeUtil {
         const std::string& fTime,
         uint64_t& msTime
     );
+    int ftimeToStime (
+        const std::string& fTime,
+        std::string& sTime
+    );
     std::string mtimeToFtime (
         const uint64_t msTime,
         const bool isLocal = false
@@ -54,6 +58,10 @@ namespace TimeUtil {
     );
     std::string tmToFtime (
         const ::tm& tmData
+    );
+
+    void msSleep (
+        const uint32_t ms
     );
 
 }   //  end namespace TimeUtil

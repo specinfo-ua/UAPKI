@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,16 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/random-bytes.cpp"
+
 #include "api-json-internal.h"
 #include "drbg.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "api/random-bytes.cpp"
 
 
 int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult)

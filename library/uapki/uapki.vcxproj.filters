@@ -48,7 +48,7 @@
     <ClCompile Include="src\cer-store.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\store-util.cpp">
+    <ClCompile Include="src\store-json.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\global-objects.cpp">
@@ -246,6 +246,24 @@
     <ClCompile Include="..\common\pkix\extension-helper-json.cpp">
       <Filter>common\pkix</Filter>
     </ClCompile>
+    <ClCompile Include="src\api\cert-status-by-ocsp.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cert-validator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\list-crls.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crl-item.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cer-item.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\remove-crl.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -275,7 +293,7 @@
     <ClInclude Include="src\cer-store.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\store-util.h">
+    <ClInclude Include="src\store-json.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\library-config.h">
@@ -394,6 +412,15 @@
     </ClInclude>
     <ClInclude Include="..\common\pkix\extension-helper-json.h">
       <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cert-validator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\crl-item.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cer-item.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

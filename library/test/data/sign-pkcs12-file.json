@@ -1,0 +1,148 @@
+{
+  "comment": "Generate PKCS7/CAdES-signature",
+  "commentUsage": "uapki sign-pkcs12-file.json",
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Ініціалізація бібліотеки",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "", // full path
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12",
+              "config": { // optional parameters
+                "createPfx": { // specific parameters
+                  "bagCipher": "2.16.840.1.101.3.4.1.22",
+                  "bagKdf": "1.2.840.113549.2.10",
+                  "iterations": 10000,
+                  "macAlgo": "2.16.840.1.101.3.4.2.2"
+                }
+              }
+            }
+          ]
+        },
+        "certCache": {
+          "path": "certs/", // full path
+          "trustedCerts": []
+        },
+        "crlCache": {
+          "path": "crls/" // full path
+        },
+        "offline": false
+      }
+    },
+    {
+      "comment": "Отримання переліку провайдерів підпису (типів носіів ключів: файли, токени, смарт-картки, хмарні криптомодулі та ін.)",
+      "method": "PROVIDERS",
+      "skip": true
+    },
+    {
+      "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
+      "method": "STORAGES",
+      "parameters": {
+        "provider": "PKCS12" // Обов'язковий (ідентифікатор провайдера зі списку що повертає метод PROVIDERS)
+      },
+      "skip": true
+    },
+    {
+      "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
+      "method": "STORAGE_INFO",
+      "parameters": {
+        "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
+        "storage": "storage-id" // для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
+      },
+      "skip": true
+    },
+    {
+      "comment": "Відкриття носія ключів",
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
+        "storage": "test-dstu-2023.p12", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
+        "password": "testpassword", // Для PKCS12 обов'язковий, пароль
+        "mode": "RO" // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
+      }
+    },
+    {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS"
+    },
+    {
+      "comment": "Обрання ключа з переліку ключів на носії (та отримання його сертифікату)",
+      "method": "SELECT_KEY",
+      "parameters": {
+        "id": "ED52D19E9459EC99AD3853A6AD4C71EB25AC4C8AB92438A2E3889D3AC044174F" // Actual key (SIGN) for 'test-dstu-2023.p12'
+      }
+    },
+    {
+      "comment": "формування підпису. Параметри наступні: CAdES-BES, attached data",
+      "method": "SIGN",
+      "parameters": {
+        "signParams": {
+          "signatureFormat": "CAdES-BES", // Обов'язковий. Підтримує формати CAdES-BES/CAdES-T/CAdES-C/CAdES-XL/CAdES-A/CMS/RAW.
+          "signAlgo": "1.2.804.2.1.1.1.1.3.1.1", // Опціональний, якщо не вказаний, то використовується перший алгоритм підпису із списку signAlgo для ключа
+          //"digestAlgo": "1.2.804.2.1.1.1.1.2.1", // Опціональний
+          "detachedData": false, // Опціональний, по замовчанню true (дані не інкапсулюються)
+          "includeCert": true, // Опціональний, по замовчанню false (додати до підпису сертифікат)
+          "includeTime": true, // Опціональний, по замовчанню false (додати до підпису час хосту (не довірений))
+          "includeContentTS": false // Опціональний, по замовчанню false (додати до підпису TSP від даних)
+        },
+        "dataTbs": [
+          {
+            "id": "doc-0", // Обов'язковий, ідентифікатор даних
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==" // обов'язковий, дані для підпису у кодировці base64
+          }
+        ]
+      },
+      "skip": false
+    },
+    {
+      "comment": "формування підпису. Параметри наступні: CAdES-BES, attached data and custom attributes",
+      "method": "SIGN",
+      "parameters": {
+        "signParams": {
+          "signatureFormat": "CAdES-BES", // Обов'язковий. Підтримує формати CAdES-BES/CAdES-T/CAdES-C/CAdES-XL/CAdES-A/CMS/RAW.
+          "signAlgo": "1.2.804.2.1.1.1.1.3.1.1", // Опціональний, якщо не вказаний, то використовується перший алгоритм підпису із списку signAlgo для ключа
+          //"digestAlgo": "1.2.804.2.1.1.1.1.2.1", // Опціональний
+          "detachedData": false, // Опціональний, по замовчанню true (дані не інкапсулюються)
+          "includeCert": true, // Опціональний, по замовчанню false (додати до підпису сертифікат)
+          "includeTime": true, // Опціональний, по замовчанню false (додати до підпису час хосту (не довірений))
+          "includeContentTS": false // Опціональний, по замовчанню false (додати до підпису TSP від даних)
+        },
+        "dataTbs": [
+          {
+            "id": "doc-0", // Обов'язковий, ідентифікатор даних
+            "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==", // обов'язковий, дані для підпису у кодировці base64
+            "signedAttributes": [
+              {
+                "type": "1.2.3.4.1",
+                "bytes": "AgEB"
+              },
+              {
+                "type": "1.2.3.4.2",
+                "bytes": "AgEC"
+              }
+            ],
+            "unsignedAttributes": [
+              {
+                "type": "2.3.4.5.1",
+                "bytes": "BQA="
+              }
+            ]
+          }
+        ]
+      },
+      "skip": false
+    },
+    {
+      "method": "CLOSE"
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}

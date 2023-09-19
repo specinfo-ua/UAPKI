@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -56,7 +56,7 @@ class FileStorage
     bool        m_IsOpen;
     std::string m_Password;
     bool        m_ReadOnly;
-    vector<StoreBag*>
+    std::vector<StoreBag*>
                 m_SafeBags;
     StoreBag*   m_SelectedKey;
     FileStorageParam
@@ -66,42 +66,106 @@ public:
     FileStorage (void);
     ~FileStorage (void);
 
-    const std::string& filename (void) const { return m_Filename; }
-    const bool isCreate (void) const { return m_IsCreate; }
-    const bool isOpen (void) const { return m_IsOpen; }
-    const char* password (void) const { return m_Password.c_str(); }
-    const bool isReadOnly (void) const { return m_ReadOnly; }
-    StoreBag* selectedKey (void) const { return m_SelectedKey; }
-    FileStorageParam& storageParam (void) { return m_StorageParam; }
+    const std::string& filename (void) const {
+        return m_Filename;
+    }
+    const bool isCreate (void) const {
+        return m_IsCreate;
+    }
+    const bool isOpen (void) const {
+        return m_IsOpen;
+    }
+    const char* password (void) const {
+        return m_Password.c_str();
+    }
+    const bool isReadOnly (void) const {
+        return m_ReadOnly;
+    }
+    StoreBag* selectedKey (void) const {
+        return m_SelectedKey;
+    }
+    FileStorageParam& storageParam (void) {
+        return m_StorageParam;
+    }
 
-    void addBag (const StoreBag* bag);
-    int changePassword (const char* password);
-    void create (const std::string& fileName);
-    int decode (const char* password);
-    void deleteBag (const StoreBag* bag);
-    vector<StoreBag*> listBags (const StoreBag::BAG_TYPE bagType);
-    void loadFromBuffer (ByteArray* baEncoded, const bool readOnly);
-    int loadFromFile (const std::string& fileName, const bool readOnly);
+    void addBag (
+        const StoreBag* bag
+    );
+    int changePassword (
+        const char* password
+    );
+    void create (
+        const std::string& fileName
+    );
+    int decode (
+        const char* password
+    );
+    void deleteBag (
+        const StoreBag* bag
+    );
+    std::vector<StoreBag*> listBags (
+        const StoreBag::BAG_TYPE bagType
+    );
+    void loadFromBuffer (
+        ByteArray* baEncoded,
+        const bool readOnly
+    );
+    int loadFromFile (
+        const std::string& fileName,
+        const bool readOnly
+    );
     void reset (void);
-    void selectKey (const StoreBag* storeBagKey);
-    void setOpen (const char* password);
-    int store (const char* password = nullptr);
+    void selectKey (
+        const StoreBag* storeBagKey
+    );
+    void setOpen (
+        const char* password
+    );
+    int store (
+        const char* password = nullptr
+    );
 
 private:
-    int decodeIit (const char* password);
-    int decodeJks (const char* password);
-    int decodePkcs12 (const char* password);
-    int decodePkcs8e (const char* password);
+    int decodeIit (
+        const char* password
+    );
+    int decodeJks (
+        const char* password
+    );
+    int decodePkcs12 (
+        const char* password
+    );
+    int decodePkcs8e (
+        const char* password
+    );
 
-    int readContents (const ByteArray* baAuthsafe, const char* password);
-    int readSafeContents (const ByteArray* baSafeContents, const char* password);
-    int encodeAuthenticatedSafe (const char* password, ByteArray** baEncoded);
-    int encodePfx (const char* password, const ByteArray* baEncoded);
+    int readContents (
+        const ByteArray* baAuthsafe,
+        const char* password
+    );
+    int readSafeContents (
+        const ByteArray* baSafeContents,
+        const char* password
+    );
+    int encodeAuthenticatedSafe (
+        const char* password,
+        ByteArray** baEncoded
+    );
+    int encodePfx (
+        const char* password,
+        const ByteArray* baEncoded
+    );
     int saveBuffer (void);
 
 public:
-    static const char* checkCipherOid (const char* oid, const char* oidDefault);
-    static const char* checkHashOid (const char* oid, const char* oidDefault);
+    static const char* checkCipherOid (
+        const char* oid,
+        const char* oidDefault
+    );
+    static const char* checkHashOid (
+        const char* oid,
+        const char* oidDefault
+    );
 
 };  //  end class FileStorage
 

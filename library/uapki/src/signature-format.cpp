@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -34,6 +34,8 @@ using namespace std;
 static const char* CADES_A_STR      = "CAdES-A";
 static const char* CADES_BES_STR    = "CAdES-BES";
 static const char* CADES_C_STR      = "CAdES-C";
+static const char* CADES_LT_STR     = "CAdES-LT";
+static const char* CADES_LTA_STR    = "CAdES-LTA";
 static const char* CADES_T_STR      = "CAdES-T";
 static const char* CADES_XL_STR     = "CAdES-XL";
 static const char* CMS_STR          = "CMS";
@@ -45,11 +47,11 @@ static const char* SIGNATURE_FORMAT_STRINGS[COUNT_SIGNATURE_FORMATS] = {
     UNDEFINED_STR,      //  0 = UNDEFINED
     RAW_STR,            //  1 = RAW
     CMS_STR,            //  2 = CMS_SID_KEYID
-    CADES_BES_STR,      //  3 = CADES_BES
-    CADES_T_STR,        //  4 = CADES_T
-    CADES_C_STR,        //  5 = CADES_C
-    CADES_XL_STR,       //  6 = CADES_XL
-    CADES_A_STR         //  7 = CADES_A
+    CADES_BES_STR,      //  3 = CADES_BES,  defined with the same name in document 'ETSI TS 101 733 V2.2.1' (TS-document)
+    CADES_T_STR,        //  4 = CADES_T,    defined with the same name in TS-document
+    CADES_C_STR,        //  5 = CADES_C,    not defined in TS-document
+    CADES_XL_STR,       //  6 = CADES_XL,   defined as CADES-LT in TS-document
+    CADES_A_STR         //  7 = CADES_A,    defined as CADES-LTA in TS-document
 };
 
 
@@ -65,10 +67,10 @@ UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
     else if (str == string(CADES_C_STR)) {
         rv = SignatureFormat::CADES_C;
     }
-    else if (str == string(CADES_XL_STR)) {
+    else if ((str == string(CADES_XL_STR)) || (str == string(CADES_LT_STR))) {
         rv = SignatureFormat::CADES_XL;
     }
-    else if (str == string(CADES_A_STR)) {
+    else if ((str == string(CADES_A_STR)) || (str == string(CADES_LTA_STR))) {
         rv = SignatureFormat::CADES_A;
     }
     else if (str == string(CMS_STR)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/extension-helper.cpp"
+
 #include "extension-helper.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
@@ -45,10 +47,10 @@ int ExtensionHelper::addOcspNonce (
 )
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_encoded;
+    SmartBA sba_encoded;
 
-    DO(UapkiNS::Util::encodeOctetString(baNonce, &sba_encoded));
-    DO(UapkiNS::Util::addToExtensions(extns, OID_PKIX_OcspNonce, false, sba_encoded.get()));
+    DO(Util::encodeOctetString(baNonce, &sba_encoded));
+    DO(Util::addToExtensions(extns, OID_PKIX_OcspNonce, false, sba_encoded.get()));
 
 cleanup:
     return ret;
@@ -60,10 +62,10 @@ int ExtensionHelper::addSubjectKeyId (
 )
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_encoded;
+    SmartBA sba_encoded;
 
-    DO(UapkiNS::Util::encodeOctetString(baSubjectKeyId, &sba_encoded));
-    DO(UapkiNS::Util::addToExtensions(extns, OID_X509v3_SubjectKeyIdentifier, false, sba_encoded.get()));
+    DO(Util::encodeOctetString(baSubjectKeyId, &sba_encoded));
+    DO(Util::addToExtensions(extns, OID_X509v3_SubjectKeyIdentifier, false, sba_encoded.get()));
 
 cleanup:
     return ret;
@@ -77,36 +79,31 @@ int ExtensionHelper::decodeAccessDescriptions (
 {
     int ret = RET_OK;
     SubjectInfoAccess_t* subject_infoaccess = nullptr;
-    char* s_accessmethod = nullptr;
-    char* s_uri = nullptr;
+    string s_accessmethod;
 
     CHECK_NOT_NULL(subject_infoaccess = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), baEncoded));
 
     for (int i = 0; i < subject_infoaccess->list.count; i++) {
         const AccessDescription_t* access_descr = subject_infoaccess->list.array[i];
 
-        DO(asn_oid_to_text(&access_descr->accessMethod, &s_accessmethod));
+        DO(Util::oidFromAsn1(&access_descr->accessMethod, s_accessmethod));
 
         if (
-            oid_is_equal(s_accessmethod, oidAccessMethod) &&
+            oid_is_equal(s_accessmethod.c_str(), oidAccessMethod) &&
             (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier) &&
             (access_descr->accessLocation.choice.uniformResourceIdentifier.size > 0)
-            ) {
-            DO(UapkiNS::Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
+        ) {
+            char* s_uri = nullptr;
+            DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
                 access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
             uris.push_back(string(s_uri));
             ::free(s_uri);
             s_uri = nullptr;
         }
-
-        ::free(s_accessmethod);
-        s_accessmethod = nullptr;
     }
 
 cleanup:
     asn_free(get_SubjectInfoAccess_desc(), subject_infoaccess);
-    ::free(s_accessmethod);
-    ::free(s_uri);
     return ret;
 }
 
@@ -123,13 +120,15 @@ int ExtensionHelper::decodeDistributionPoints (
 
     for (int i = 0; i < distrib_points->list.count; i++) {
         const DistributionPoint_t* distrib_point = distrib_points->list.array[i];
-        if (distrib_point->distributionPoint
-            && (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName)
-            && (distrib_point->distributionPoint->choice.fullName.list.count > 0)) {
+        if (
+            distrib_point->distributionPoint &&
+            (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName) &&
+            (distrib_point->distributionPoint->choice.fullName.list.count > 0)
+        ) {
             const GeneralName_t* general_name = distrib_point->distributionPoint->choice.fullName.list.array[0];
             if ((general_name->present == GeneralName_PR_uniformResourceIdentifier)
                 && (general_name->choice.uniformResourceIdentifier.size > 0)) {
-                DO(UapkiNS::Util::pbufToStr(general_name->choice.uniformResourceIdentifier.buf,
+                DO(Util::pbufToStr(general_name->choice.uniformResourceIdentifier.buf,
                     general_name->choice.uniformResourceIdentifier.size, &s_uri));
                 uris.push_back(string(s_uri));
                 ::free(s_uri);
@@ -144,47 +143,21 @@ cleanup:
     return ret;
 }
 
-int ExtensionHelper::getAuthorityInfoAccess(const Extensions_t* extns, char** urlOcsp)
-{
-    int ret = RET_OK, i;
-    SubjectInfoAccess_t* si_access = NULL;
-    ByteArray* ba_encoded = NULL;
-
-    CHECK_PARAM(urlOcsp != NULL);
-
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_PKIX_AuthorityInfoAccess, NULL, &ba_encoded));
-
-    CHECK_NOT_NULL(si_access = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), ba_encoded));
-
-    for (i = 0; i < si_access->list.count; i++) {
-        if (OID_is_equal_oid(&si_access->list.array[i]->accessMethod, OID_PKIX_OCSP)) {
-            if (si_access->list.array[i]->accessLocation.present == GeneralName_PR_uniformResourceIdentifier) {
-                const OCTET_STRING_t* octet_str = &si_access->list.array[i]->accessLocation.choice.uniformResourceIdentifier;
-                DO(UapkiNS::Util::pbufToStr(octet_str->buf, (const size_t)octet_str->size, urlOcsp));
-                //now skip - return one value only
-                break;
-            }
-        }
-    }
-
-cleanup:
-    asn_free(get_SubjectInfoAccess_desc(), si_access);
-    ba_free(ba_encoded);
-    return ret;
-}
-
-int ExtensionHelper::getAuthorityKeyId(const Extensions_t* extns, ByteArray** baKeyId)
+int ExtensionHelper::getAuthorityKeyId (
+        const Extensions_t* extns,
+        ByteArray** baKeyId
+)
 {
     int ret = RET_OK;
-    AuthorityKeyIdentifier_t* auth_keyid = NULL;
-    ByteArray* ba_encoded = NULL;
+    AuthorityKeyIdentifier_t* auth_keyid = nullptr;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(baKeyId != NULL);
+    CHECK_PARAM(baKeyId);
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_AuthorityKeyIdentifier, NULL, &ba_encoded));
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_AuthorityKeyIdentifier, nullptr, &sba_encoded));
 
-    CHECK_NOT_NULL(auth_keyid = (AuthorityKeyIdentifier_t*)asn_decode_ba_with_alloc(get_AuthorityKeyIdentifier_desc(), ba_encoded));
-    if (auth_keyid->keyIdentifier != NULL) {
+    CHECK_NOT_NULL(auth_keyid = (AuthorityKeyIdentifier_t*)asn_decode_ba_with_alloc(get_AuthorityKeyIdentifier_desc(), sba_encoded.get()));
+    if (auth_keyid->keyIdentifier) {
         DO(asn_OCTSTRING2ba(auth_keyid->keyIdentifier, baKeyId));
     }
     else {
@@ -193,280 +166,261 @@ int ExtensionHelper::getAuthorityKeyId(const Extensions_t* extns, ByteArray** ba
 
 cleanup:
     asn_free(get_AuthorityKeyIdentifier_desc(), auth_keyid);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getBasicConstrains(const Extensions_t* extns, bool* cA, int* pathLenConstraint)
+int ExtensionHelper::getBasicConstrains (
+        const Extensions_t* extns,
+        bool& cA,
+        int& pathLenConstraint
+)
 {
     int ret = RET_OK;
-    BasicConstraints_t* basic_constraints = NULL;
-    ByteArray* ba_encoded = NULL;
+    BasicConstraints_t* basic_constraints = nullptr;
+    SmartBA sba_encoded;
     bool critical = false;
 
-    CHECK_PARAM(cA != NULL);
-    CHECK_PARAM(pathLenConstraint != NULL);
+    CHECK_PARAM(cA);
+    CHECK_PARAM(pathLenConstraint);
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_BasicConstraints, &critical, &ba_encoded));
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_BasicConstraints, &critical, &sba_encoded));
 
-    CHECK_NOT_NULL(basic_constraints = (BasicConstraints_t*)asn_decode_ba_with_alloc(get_BasicConstraints_desc(), ba_encoded));
+    CHECK_NOT_NULL(basic_constraints = (BasicConstraints_t*)asn_decode_ba_with_alloc(get_BasicConstraints_desc(), sba_encoded.get()));
 
-    *cA = false;
-    if (basic_constraints->cA != NULL) {
-        *cA = (basic_constraints->cA != 0);
+    cA = false;
+    if (basic_constraints->cA) {
+        cA = (basic_constraints->cA != 0);
     }
 
-    *pathLenConstraint = -1;
-    if (basic_constraints->pathLenConstraint != NULL) {
+    pathLenConstraint = -1;
+    if (basic_constraints->pathLenConstraint) {
         long path_len;
         DO(asn_INTEGER2long(basic_constraints->pathLenConstraint, &path_len));
-        *pathLenConstraint = path_len;
+        pathLenConstraint = path_len;
     }
 
     ret = (critical) ? RET_OK : RET_UAPKI_EXTENSION_NOT_SET_CRITICAL;
 
 cleanup:
     asn_free(get_BasicConstraints_desc(), basic_constraints);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getCrlDistributionPoints(const Extensions_t* extns, char** urlFull)
+int ExtensionHelper::getCrlInvalidityDate (
+        const Extensions_t* extns,
+        uint64_t& invalidityDate
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = NULL;
-    const uint8_t* buf;
-    size_t len;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(urlFull != NULL);
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_InvalidityDate, nullptr, &sba_encoded));
 
-    ret = UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_CRLDistributionPoints, NULL, &ba_encoded);
-    if (ret == RET_OK) {
-        buf = ba_get_buf(ba_encoded);
-        len = ba_get_len(ba_encoded);
-        if ((len > 10) && (buf[0] == 0x30) && (buf[2] == 0x30) && (buf[4] == 0xA0) && (buf[6] == 0xA0) && (((size_t)buf[9] + 10) <= len)) {
-            DO(UapkiNS::Util::pbufToStr(buf + 10, buf[9], urlFull));
-        }
-    }
+    DO(Util::decodePkixTime(sba_encoded.get(), invalidityDate));
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getFreshestCrl(const Extensions_t* extns, char** urlDelta)
+int ExtensionHelper::getCrlNumber (
+        const Extensions_t* extns,
+        ByteArray** baCrlNumber
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = NULL;
-    const uint8_t* buf;
-    size_t len;
+    CRLNumber_t* crl_number = nullptr;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(urlDelta != NULL);
+    CHECK_PARAM(baCrlNumber);
 
-    ret = UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_FreshestCRL, NULL, &ba_encoded);
-    if (ret == RET_OK) {
-        buf = ba_get_buf(ba_encoded);
-        len = ba_get_len(ba_encoded);
-        if ((len > 8) && (buf[0] == 0x30) && (buf[2] == 0x30) && (buf[4] == 0xA0) && (buf[6] == 0xA0) && (((size_t)buf[9] + 10) <= len)) {
-            DO(UapkiNS::Util::pbufToStr(buf + 10, buf[9], urlDelta));
-        }
-    }
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_CRLNumber, nullptr, &sba_encoded));
 
-cleanup:
-    ba_free(ba_encoded);
-    return ret;
-}
-
-int ExtensionHelper::getCrlInvalidityDate(const Extensions_t* extns, uint64_t* invalidityDate)
-{
-    int ret = RET_OK;
-    ByteArray* ba_encoded = NULL;
-
-    CHECK_PARAM(invalidityDate != NULL);
-
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_InvalidityDate, NULL, &ba_encoded));
-
-    DO(UapkiNS::Util::decodePkixTime(ba_encoded, *invalidityDate));
-
-cleanup:
-    ba_free(ba_encoded);
-    return ret;
-}
-
-int ExtensionHelper::getCrlNumber(const Extensions_t* extns, ByteArray** baCrlNumber)
-{
-    int ret = RET_OK;
-    CRLNumber_t* crl_number = NULL;
-    ByteArray* ba_encoded = NULL;
-
-    CHECK_PARAM(baCrlNumber != NULL);
-
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_CRLNumber, NULL, &ba_encoded));
-
-    CHECK_NOT_NULL(crl_number = (CRLNumber_t*)asn_decode_ba_with_alloc(get_CRLNumber_desc(), ba_encoded));
+    CHECK_NOT_NULL(crl_number = (CRLNumber_t*)asn_decode_ba_with_alloc(get_CRLNumber_desc(), sba_encoded.get()));
     DO(asn_INTEGER2ba(crl_number, baCrlNumber));
 
 cleanup:
     asn_free(get_CRLNumber_desc(), crl_number);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getCrlReason(const Extensions_t* extns, uint32_t* crlReason)
+int ExtensionHelper::getCrlReason (
+        const Extensions_t* extns,
+        uint32_t& crlReason
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = NULL;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(crlReason != NULL);
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_CRLReason, NULL, &sba_encoded));
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_CRLReason, NULL, &ba_encoded));
-
-    DO(UapkiNS::Util::decodeEnumerated(ba_encoded, crlReason));
+    DO(Util::decodeEnumerated(sba_encoded.get(), &crlReason));
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getDeltaCrlIndicator(const Extensions_t* extns, ByteArray** baDeltaCrlIndicator)
+int ExtensionHelper::getCrlUris (
+        const Extensions_t* extns,
+        const char* oidExtnId,
+        vector<string>& uris
+)
 {
     int ret = RET_OK;
-    CRLNumber_t* deltacrl_indicator = NULL;
-    ByteArray* ba_encoded = NULL;
+    SmartBA sba_extnvalue;
+
+    DO(Util::extnValueFromExtensions(extns, oidExtnId, nullptr, &sba_extnvalue));
+
+    DO(ExtensionHelper::decodeDistributionPoints(sba_extnvalue.get(), uris));
+
+cleanup:
+    return ret;
+}
+
+int ExtensionHelper::getDeltaCrlIndicator (
+        const Extensions_t* extns,
+        ByteArray** baDeltaCrlIndicator
+)
+{
+    int ret = RET_OK;
+    CRLNumber_t* deltacrl_indicator = nullptr;
+    SmartBA sba_encoded;
     bool critical = false;
 
-    CHECK_PARAM(baDeltaCrlIndicator != NULL);
+    CHECK_PARAM(baDeltaCrlIndicator);
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_DeltaCRLIndicator, &critical, &ba_encoded));
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_DeltaCRLIndicator, &critical, &sba_encoded));
 
-    CHECK_NOT_NULL(deltacrl_indicator = (CRLNumber_t*)asn_decode_ba_with_alloc(get_CRLNumber_desc(), ba_encoded));
+    CHECK_NOT_NULL(deltacrl_indicator = (CRLNumber_t*)asn_decode_ba_with_alloc(get_CRLNumber_desc(), sba_encoded.get()));
     DO(asn_INTEGER2ba(deltacrl_indicator, baDeltaCrlIndicator));
 
     ret = (critical) ? RET_OK : RET_UAPKI_EXTENSION_NOT_SET_CRITICAL;
 
 cleanup:
     asn_free(get_CRLNumber_desc(), deltacrl_indicator);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getKeyUsage(const Extensions_t* extns, uint32_t* keyUsage)
+int ExtensionHelper::getKeyUsage (
+        const Extensions_t* extns,
+        uint32_t& keyUsage
+)
 {
     int ret = RET_OK;
-    KeyUsage_t* key_usage = NULL;
-    ByteArray* ba_encoded = NULL;
-    uint32_t u32_keyusage = 0;
+    KeyUsage_t* key_usage = nullptr;
+    SmartBA sba_encoded;
     bool critical = false;
 
-    CHECK_PARAM(extns != NULL);
-    CHECK_PARAM(keyUsage != NULL);
+    keyUsage = 0;
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_KeyUsage, &critical, &sba_encoded));
 
-    *keyUsage = 0;
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_KeyUsage, &critical, &ba_encoded));
-
-    CHECK_NOT_NULL(key_usage = (KeyUsage_t*)asn_decode_ba_with_alloc(get_KeyUsage_desc(), ba_encoded));
+    CHECK_NOT_NULL(key_usage = (KeyUsage_t*)asn_decode_ba_with_alloc(get_KeyUsage_desc(), sba_encoded.get()));
 
     for (int bit_num = 0; bit_num < 9; bit_num++) {
         int bit_flag = 0;
         DO(asn_BITSTRING_get_bit(key_usage, bit_num, &bit_flag));
         if (bit_flag) {
-            u32_keyusage |= (0x00000001 << bit_num);
+            keyUsage |= (0x00000001 << bit_num);
         }
     }
-
-    *keyUsage = u32_keyusage;
 
 cleanup:
     asn_free(get_KeyUsage_desc(), key_usage);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getOcspNonce(const Extensions_t* extns, ByteArray** baNonce)
+int ExtensionHelper::getOcspNonce (
+        const Extensions_t* extns,
+        ByteArray** baNonce
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encoded = NULL;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(extns != NULL);
-    CHECK_PARAM(baNonce != NULL);
+    CHECK_PARAM(baNonce);
 
-    ret = UapkiNS::Util::extnValueFromExtensions(extns, OID_PKIX_OcspNonce, NULL, &ba_encoded);
+    ret = Util::extnValueFromExtensions(extns, OID_PKIX_OcspNonce, nullptr, &sba_encoded);
     if (ret == RET_OK) {
-        DO(UapkiNS::Util::decodeOctetString(ba_encoded, baNonce));
+        DO(Util::decodeOctetString(sba_encoded.get(), baNonce));
     }
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::getSubjectDirectoryAttributes(const Extensions_t* extns, const char* oidType, ByteArray** baEncoded)
+int ExtensionHelper::getOcspUris (
+        const Extensions_t* extns,
+        vector<string>& uris
+)
 {
     int ret = RET_OK;
-    SubjectDirectoryAttributes_t* subj_dirattrs = NULL;
-    ByteArray* ba_encoded = NULL;
+    SmartBA sba_extnvalue;
 
-    CHECK_PARAM(oidType != NULL);
-    CHECK_PARAM(baEncoded != NULL);
+    DO(Util::extnValueFromExtensions(extns, OID_PKIX_AuthorityInfoAccess, nullptr, &sba_extnvalue));
 
-    ret = UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_SubjectDirectoryAttributes, NULL, &ba_encoded);
+    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_OCSP, uris));
+
+cleanup:
+    return ret;
+}
+
+int ExtensionHelper::getSubjectDirectoryAttributes (
+        const Extensions_t* extns,
+        const char* oidType,
+        ByteArray** baEncoded
+)
+{
+    int ret = RET_OK;
+    SubjectDirectoryAttributes_t* subjectdir_attrs = nullptr;
+    SmartBA sba_encoded;
+
+    CHECK_PARAM(oidType);
+    CHECK_PARAM(baEncoded);
+
+    ret = Util::extnValueFromExtensions(extns, OID_X509v3_SubjectDirectoryAttributes, nullptr, &sba_encoded);
     if (ret == RET_OK) {
-        CHECK_NOT_NULL(subj_dirattrs = (SubjectDirectoryAttributes_t*)asn_decode_ba_with_alloc(get_SubjectDirectoryAttributes_desc(), ba_encoded));
-        DO(UapkiNS::Util::attrValueFromAttributes((const Attributes_t*)subj_dirattrs, oidType, baEncoded));
+        CHECK_NOT_NULL(subjectdir_attrs = (SubjectDirectoryAttributes_t*)asn_decode_ba_with_alloc(get_SubjectDirectoryAttributes_desc(), sba_encoded.get()));
+        DO(Util::attrValueFromAttributes((const Attributes_t*)subjectdir_attrs, oidType, baEncoded));
     }
 
 cleanup:
-    asn_free(get_SubjectDirectoryAttributes_desc(), subj_dirattrs);
-    ba_free(ba_encoded);
+    asn_free(get_SubjectDirectoryAttributes_desc(), subjectdir_attrs);
     return ret;
 }
 
-int ExtensionHelper::getSubjectKeyId(const Extensions_t* extns, ByteArray** baKeyId)
+int ExtensionHelper::getSubjectKeyId (
+        const Extensions_t* extns,
+        ByteArray** baKeyId
+)
 {
     int ret = RET_OK;
-    SubjectKeyIdentifier_t* subj_keyid = NULL;
-    ByteArray* ba_encoded = NULL;
+    SubjectKeyIdentifier_t* subject_keyid = nullptr;
+    SmartBA sba_encoded;
 
-    CHECK_PARAM(baKeyId != NULL);
+    CHECK_PARAM(baKeyId);
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_X509v3_SubjectKeyIdentifier, NULL, &ba_encoded));
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_SubjectKeyIdentifier, nullptr, &sba_encoded));
 
-    CHECK_NOT_NULL(subj_keyid = (SubjectKeyIdentifier_t*)asn_decode_ba_with_alloc(get_SubjectKeyIdentifier_desc(), ba_encoded));
-    DO(asn_OCTSTRING2ba(subj_keyid, baKeyId));
+    CHECK_NOT_NULL(subject_keyid = (SubjectKeyIdentifier_t*)asn_decode_ba_with_alloc(get_SubjectKeyIdentifier_desc(), sba_encoded.get()));
+    DO(asn_OCTSTRING2ba(subject_keyid, baKeyId));
 
 cleanup:
-    asn_free(get_SubjectKeyIdentifier_desc(), subj_keyid);
-    ba_free(ba_encoded);
+    asn_free(get_SubjectKeyIdentifier_desc(), subject_keyid);
     return ret;
 }
 
-int ExtensionHelper::getTspUrl(const Extensions_t* extns, char** urlTsp)
+int ExtensionHelper::getTspUris (
+        const Extensions_t* extns,
+        vector<string>& uris
+)
 {
-    int ret = RET_OK, i;
-    SubjectInfoAccess_t* si_access = NULL;
-    ByteArray* ba_encoded = NULL;
+    int ret = RET_OK;
+    SmartBA sba_extnvalue;
 
-    CHECK_PARAM(extns != NULL);
-    CHECK_PARAM(urlTsp != NULL);
+    DO(Util::extnValueFromExtensions(extns, OID_PKIX_SubjectInfoAccess, nullptr, &sba_extnvalue));
 
-    DO(UapkiNS::Util::extnValueFromExtensions(extns, OID_PKIX_SubjectInfoAccess, NULL, &ba_encoded));
-
-    CHECK_NOT_NULL(si_access = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), ba_encoded));
-
-    for (i = 0; i < si_access->list.count; i++) {
-        if (OID_is_equal_oid(&si_access->list.array[i]->accessMethod, OID_PKIX_TimeStamping)) {
-            if (si_access->list.array[i]->accessLocation.present == GeneralName_PR_uniformResourceIdentifier) {
-                const OCTET_STRING_t* octet_str = &si_access->list.array[i]->accessLocation.choice.uniformResourceIdentifier;
-                DO(UapkiNS::Util::pbufToStr(octet_str->buf, (const size_t)octet_str->size, urlTsp));
-                //now skip - return one value only
-                break;
-            }
-        }
-    }
+    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_TimeStamping, uris));
 
 cleanup:
-    asn_free(get_SubjectInfoAccess_desc(), si_access);
-    ba_free(ba_encoded);
     return ret;
 }
 

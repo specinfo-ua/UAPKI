@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,17 +25,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/time-util.cpp"
+
 #include "time-util.h"
 #include "asn1-utils.h"
 #include "macros-internal.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
+#ifdef _WIN32
+ #include <windows.h>
+#else
+ #include <unistd.h>
+#endif
 
 
 using namespace std;
 
 
 static const size_t STIME_FORMAT_INDECES[14] = { 0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18 };
+
+
+static bool check_valid_ftime (
+        const string& fTime
+)
+{
+    return (
+        (fTime.length() == 19) &&
+        (fTime[4] == '-') &&
+        (fTime[7] == '-') &&
+        ((fTime[10] == ' ') || (fTime[10] == 'T')) &&
+        (fTime[13] == ':') &&
+        (fTime[16] == ':')
+    );
+}
 
 static int two_digits_to_int (
         const char* s
@@ -45,17 +67,17 @@ static int two_digits_to_int (
 }   //  two_digits_to_int
 
 
-int TimeUtil::ftimeToMtime (
+namespace TimeUtil {
+
+
+int ftimeToMtime (
         const string& fTime,
         uint64_t& msTime
 )
 {
-    if (
-        (fTime.length() != 19) ||
-        (fTime[4] != '-') || (fTime[7] != '-') ||
-        ((fTime[10] != ' ') && (fTime[10] != 'T')) ||
-        (fTime[13] != ':') || (fTime[16] != ':')
-    ) return RET_UAPKI_INVALID_PARAMETER;
+    if (!check_valid_ftime(fTime)) {
+        return RET_UAPKI_INVALID_PARAMETER;
+    }
 
     ::tm tm_data;
     tm_data.tm_year = two_digits_to_int(&fTime[0]) * 100;
@@ -69,7 +91,23 @@ int TimeUtil::ftimeToMtime (
     return RET_OK;
 }
 
-string TimeUtil::mtimeToFtime (
+int ftimeToStime (
+        const string& fTime,
+        string& sTime
+)
+{
+    if (!check_valid_ftime(fTime)) {
+        return RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    sTime.resize(14);
+    for (size_t i = 0; i < 14; i++) {
+        sTime[i] = fTime[STIME_FORMAT_INDECES[i]];
+    }
+    return RET_OK;
+}
+
+string mtimeToFtime (
         const uint64_t msTime,
         const bool isLocal
 )
@@ -82,12 +120,12 @@ string TimeUtil::mtimeToFtime (
     return rv_ftime;
 }
 
-uint64_t TimeUtil::mtimeNow (void)
+uint64_t mtimeNow (void)
 {
     return time(nullptr) * 1000;
 }
 
-string TimeUtil::stimeToFtime (
+string stimeToFtime (
         const char* sTime
 )
 {
@@ -102,7 +140,7 @@ string TimeUtil::stimeToFtime (
     return rv_stime;
 }
 
-int TimeUtil::stimeToMtime (
+int stimeToMtime (
         const string& sTime,
         uint64_t& msTime
 )
@@ -121,7 +159,7 @@ int TimeUtil::stimeToMtime (
     return RET_OK;
 }
 
-string TimeUtil::tmToFtime (
+string tmToFtime (
         const ::tm& tmData
 )
 {
@@ -131,3 +169,17 @@ string TimeUtil::tmToFtime (
     rv_ftime.resize(19);
     return rv_ftime;
 }
+
+void msSleep (
+        const uint32_t ms
+)
+{
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
+}
+
+
+}   //  end namespace TimeUtil

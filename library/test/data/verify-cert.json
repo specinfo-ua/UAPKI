@@ -1,9 +1,6 @@
 {
   "comment": "Test CERT_INFO and VERIFY_CERT",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "commentUsage": "uapki verify-cert.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -19,7 +16,7 @@
           ]
         },
         "crlCache": {
-          "path": "certs/crls/"
+          "path": "crls/"
         },
         "ocsp": {
           "nonceLen": 20

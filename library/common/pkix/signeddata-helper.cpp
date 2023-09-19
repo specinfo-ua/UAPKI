@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-02
-
+#define FILE_MARKER "common/pkix/signeddata-helper.cpp"
 
 #include "signeddata-helper.h"
 #include "api-json-internal.h"
@@ -34,10 +33,6 @@
 #include "oid-utils.h"
 #include "uapki-ns-util.h"
 #include <stdio.h>
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "common/pkix/signeddata-helper.cpp"
 
 
 #define DEBUG_OUTCON(expression)

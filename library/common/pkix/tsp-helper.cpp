@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/tsp-helper.cpp"
+
 #include "tsp-helper.h"
 #include "drbg.h"
 #include "macros-internal.h"
@@ -33,10 +35,6 @@
 #include "signeddata-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "common/pkix/tsp-helper.c"
 
 
 using namespace std;

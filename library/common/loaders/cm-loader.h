@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -38,9 +38,6 @@
 #include "dl-macros.h"
 
 
-using namespace std;
-
-
 class CmLoader
 {
     CM_PROVIDER_API m_Api;
@@ -49,25 +46,60 @@ public:
     CmLoader (void);
     ~CmLoader (void);
 
-    static string getLibName (const string& libName);
+    static std::string getLibName (
+        const std::string& libName
+    );
 
-    HANDLE_DLIB getHandle (void) const { return (HANDLE_DLIB)m_Api.hlib; }
-    bool isLoaded (void) const { return (m_Api.hlib != nullptr); }
-    bool load (const string& libName, const string& dir = string());
+    HANDLE_DLIB getHandle (void) const {
+        return (HANDLE_DLIB)m_Api.hlib;
+    }
+    bool isLoaded (void) const {
+        return (m_Api.hlib);
+    }
+    bool load (
+        const std::string& libName,
+        const std::string& dir = std::string()
+    );
     void unload (void);
 
-    const CM_PROVIDER_API* getApi (void) const { return &m_Api; }
-    int info (CM_JSON_PCHAR* providerInfo);
-    int init (const CM_JSON_PCHAR providerParams);
+    const CM_PROVIDER_API* getApi (void) const {
+        return &m_Api;
+    }
+    int info (
+        CM_JSON_PCHAR* providerInfo
+    );
+    int init (
+        const CM_JSON_PCHAR providerParams
+    );
     int deinit (void);
-    int listStorages (CM_JSON_PCHAR* listUris);
-    int storageInfo (const char* uri, CM_JSON_PCHAR* storageInfo);
-    int open (const char* uri, uint32_t mode, const CM_JSON_PCHAR createParams, CM_SESSION_API** session);
-    int close (CM_SESSION_API* session);
-    int format (const char* uri, const char* soPassword, const char* userPassword);
+    int listStorages (
+        CM_JSON_PCHAR* listUris
+    );
+    int storageInfo (
+        const char* uri,
+        CM_JSON_PCHAR* storageInfo
+    );
+    int open (
+        const char* uri,
+        uint32_t mode,
+        const CM_JSON_PCHAR openParams,
+        CM_SESSION_API** session
+    );
+    int close (
+        CM_SESSION_API* session
+    );
+    int format (
+        const char* uri,
+        const char* soPassword,
+        const char* userPassword
+    );
 
-    void blockFree (void* ptr);
-    void baFree (CM_BYTEARRAY* ba);
+    void blockFree (
+        void* ptr
+    );
+    void baFree (
+        CM_BYTEARRAY* ba
+    );
 
 };  //  end class CmLoader
 

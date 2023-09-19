@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,9 +29,10 @@
 #define UAPKI_HTTP_HELPER_H
 
 
+#include "byte-array.h"
+#include <mutex>
 #include <string>
 #include <vector>
-#include "byte-array.h"
 
 
 class HttpHelper {
@@ -41,30 +42,37 @@ public:
     static const char* CONTENT_TYPE_TSP_REQUEST;
 
     static int init (
-        const bool offlineMode
+        const bool offlineMode,
+        const char* proxyUrl,
+        const char* proxyCredentials
     );
     static void deinit (void);
 
     static bool isOfflineMode (void);
+    static const std::string& getProxyUrl (void);
+
     static int get (
-        const char* url,
+        const std::string& uri,
         ByteArray** baResponse
     );
     static int post (
-        const char* url,
+        const std::string& uri,
         const char* contentType,
         const ByteArray* baRequest,
         ByteArray** baResponse
     );
     static int post (
-        const char* url,
+        const std::string& uri,
         const char* httpContentType,
         const char* userPwd,
-        const char* authorizationBearer,
-        const char* request,
+        const std::string& authorizationBearer,
+        const std::string& request,
         ByteArray** baResponse
     );
 
+    static std::mutex& lockUri (
+        const std::string& uri
+    );
     static std::vector<std::string> randomURIs (
         const std::vector<std::string>& uris
     );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,20 +29,22 @@
 #define CM_STORAGE_PROXY_H
 
 
-#include <string>
-#include <vector>
 #include "byte-array.h"
 #include "cm-api.h"
 #include "cm-loader.h"
-
-
-using namespace std;
+#include <atomic>
+#include <mutex>
+#include <string>
+#include <vector>
 
 
 class CmStorageProxy {
     CmLoader    m_CmLoader;
-    bool        m_IsInitialized;
-    bool        m_IsAuthorizedSession;
+    std::atomic_bool
+                m_IsInitialized;
+    std::atomic_bool
+                m_IsAuthorizedSession;
+    std::mutex  m_Mutex;
     CM_SESSION_API*
                 m_Session;
     const CM_KEY_API* 
@@ -52,75 +54,206 @@ public:
     CmStorageProxy (void);
     ~CmStorageProxy (void);
 
-    bool load (const string& libName, const string& dir = string());
-    void cmFree (void* block);
-    void cmbaFree (CM_BYTEARRAY* ba);
-    void arrayCmbaFree (const uint32_t count, CM_BYTEARRAY** arrayBa);
+    bool load (
+        const std::string& libName,
+        const std::string& dir = std::string()
+    );
+    void cmFree (
+        void* block
+    );
+    void cmbaFree (
+        CM_BYTEARRAY* ba
+    );
+    void arrayCmbaFree (
+        const uint32_t count,
+        CM_BYTEARRAY** arrayBa
+    );
 
-    int providerInfo (string& providerInfo);
-    int providerInit (const string& providerParams);
+    int providerInfo (
+        std::string& providerInfo
+    );
+    int providerInit (
+        const std::string& providerParams
+    );
     int providerDeinit (void);
 
-    int storageList (string& storageList);
-    int storageInfo (const string& storageId, string& storageInfo);
-    int storageOpen (const string& storageId, const CM_OPEN_MODE openMode, const string& openParams);
+    int storageList (
+        std::string& storageList
+    );
+    int storageInfo (
+        const std::string& storageId,
+        std::string& storageInfo
+    );
+    int storageOpen (
+        const std::string& storageId,
+        const CM_OPEN_MODE openMode,
+        const std::string& openParams
+    );
     int storageClose (void);
-    int storageFormat (const string& storageId, const char* soPassword, const char* userPassword);
+    int storageFormat (
+        const std::string& storageId,
+        const char* soPassword,
+        const char* userPassword
+    );
 
-    int sessionInfo (string& sessionInfo);
-    int sessionMechanismParameters (const string& mechanismId, string& parameterIds);
-    int sessionLogin (const char* password, const void* reserved);
+    int sessionInfo (
+        std::string& sessionInfo
+    );
+    int sessionMechanismParameters (
+        const std::string& mechanismId,
+        std::string& parameterIds
+    );
+    int sessionLogin (
+        const char* password,
+        const void* reserved
+    );
     int sessionLogout (void);
 
-    int sessionCreateKey (const string& keyParam);
-    int sessionDeleteKey (const ByteArray* baKeyId, const bool deleteRelatedObjects = false);
-    int sessionImportKey (const ByteArray* baP8container, const char* password, const string& keyParam);
-    int sessionListKeys (vector<ByteArray*>& vbaKeyIds);
-    int sessionListKeys (vector<ByteArray*>& vbaKeyIds, string& infoKeys);
-    int sessionSelectKey (const ByteArray* baKeyId);
-    int sessionAddCertificate (const ByteArray* baCert);
-    int sessionDeleteCertificate (const ByteArray* baKeyId);
-    int sessionGetCertificates (vector<ByteArray*>& vbaCerts);
-    int sessionChangePassword (const char* newPassword);
-    int sessionRandomBytes (ByteArray* baBuffer);
+    int sessionCreateKey (
+        const std::string& keyParam
+    );
+    int sessionDeleteKey (
+        const ByteArray* baKeyId,
+        const bool deleteRelatedObjects = false
+    );
+    int sessionImportKey (
+        const ByteArray* baP8container,
+        const char* password,
+        const std::string& keyParam
+    );
+    int sessionListKeys (
+        std::vector<ByteArray*>& vbaKeyIds
+    );
+    int sessionListKeys (
+        std::vector<ByteArray*>& vbaKeyIds,
+        std::string& infoKeys
+    );
+    int sessionSelectKey (
+        const ByteArray* baKeyId
+    );
+    int sessionAddCertificate (
+        const ByteArray* baCert
+    );
+    int sessionDeleteCertificate (
+        const ByteArray* baKeyId
+    );
+    int sessionGetCertificates (
+        std::vector<ByteArray*>& vbaCerts
+    );
+    int sessionChangePassword (
+        const char* newPassword
+    );
+    int sessionRandomBytes (
+        ByteArray* baBuffer
+    );
 
-    int keyGetInfo (string& keyInfo, ByteArray** baKeyId);
-    int keyGetInfo (ByteArray** baKeyId);
-    int keyGetInfo (string& keyInfo);
-    int keyGetPublicKey (ByteArray** baAlgoId, ByteArray** baPublicKey);
-    int keyInitUsage (void* param);
-    int keySetOtp (const char* otp);
-    int keySign (const string& signAlgo, const ByteArray* baSignAlgoParams,
-            const vector<ByteArray*>& vbaHashes, vector<ByteArray*>& vbaSignatures);
-    int keySignInit (const string& signAlgo, const ByteArray* baSignAlgoParams);
-    int keySignUpdate (const ByteArray* baData);
-    int keySignFinal (ByteArray** baSignature);
-    int keySignData (const string& signAlgo, const ByteArray* baSignAlgoParams,
-            const ByteArray* baData, ByteArray** baSignature);
-    int keyAddCertificate (const ByteArray* baCert);
-    int keyGetCertificates (vector<ByteArray*>& vbaCerts);
-    int keyGetCsr (const string& signAlgo, const ByteArray* baSignAlgoParams,
-            const ByteArray* baSubject, const ByteArray* baAttributes, ByteArray** baCsr);
+    int keyGetInfo (
+        std::string& keyInfo,
+        ByteArray** baKeyId
+    );
+    int keyGetInfo (
+        ByteArray** baKeyId
+    );
+    int keyGetInfo (
+        std::string& keyInfo
+    );
+    int keyGetPublicKey (
+        ByteArray** baAlgoId,
+        ByteArray** baPublicKey
+    );
+    int keyInitUsage (
+        void* param
+    );
+    int keySetOtp (
+        const char* otp
+    );
+    int keySign (
+        const std::string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const std::vector<ByteArray*>& vbaHashes,
+        std::vector<ByteArray*>& vbaSignatures
+    );
+    int keySignInit (
+        const std::string& signAlgo,
+        const ByteArray* baSignAlgoParams
+    );
+    int keySignUpdate (
+        const ByteArray* baData
+    );
+    int keySignFinal (
+        ByteArray** baSignature
+    );
+    int keySignData (
+        const std::string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const ByteArray* baData,
+        ByteArray** baSignature
+    );
+    int keyAddCertificate (
+        const ByteArray* baCert
+    );
+    int keyGetCertificates (
+        std::vector<ByteArray*>& vbaCerts
+    );
+    int keyGetCsr (
+        const std::string& signAlgo,
+        const ByteArray* baSignAlgoParams,
+        const ByteArray* baSubject,
+        const ByteArray* baAttributes,
+        ByteArray** baCsr
+    );
 
-    int keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
-            const ByteArray* baSPKI, const ByteArray* baSessionKey,
-            ByteArray** baSalt, ByteArray** baWrappedKey);
-    int keyDhWrapKey (const string& kdfOid, const string& wrapAlgOid,
-            const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSessionKeys,
-            vector<ByteArray*>* vbaSalts, vector<ByteArray*>& vbaWrappedKeys);
-    int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
-            const ByteArray* baSPKI, const ByteArray* baSalt,
-            const ByteArray* baWrappedKey, ByteArray** baSessionKey);
-    int keyDhUnwrapKey (const string& kdfOid, const string& wrapAlgOid,
-            const vector<ByteArray*>& vbaSPKIs, const vector<ByteArray*>& vbaSalts,
-            const vector<ByteArray*>& vbaWrappedKeys, vector<ByteArray*>& vbaSessionKeys);
+    int keyDhWrapKey (
+        const std::string& kdfOid,
+        const std::string& wrapAlgOid,
+        const ByteArray* baSPKI,
+        const ByteArray* baSessionKey,
+        ByteArray** baSalt,
+        ByteArray** baWrappedKey
+    );
+    int keyDhWrapKey (
+        const std::string& kdfOid,
+        const std::string& wrapAlgOid,
+        const std::vector<ByteArray*>& vbaSPKIs,
+        const std::vector<ByteArray*>& vbaSessionKeys,
+        std::vector<ByteArray*>* vbaSalts,
+        std::vector<ByteArray*>& vbaWrappedKeys
+    );
+    int keyDhUnwrapKey (
+        const std::string& kdfOid,
+        const std::string& wrapAlgOid,
+        const ByteArray* baSPKI,
+        const ByteArray* baSalt,
+        const ByteArray* baWrappedKey,
+        ByteArray** baSessionKey
+    );
+    int keyDhUnwrapKey (
+        const std::string& kdfOid,
+        const std::string& wrapAlgOid,
+        const std::vector<ByteArray*>& vbaSPKIs,
+        const std::vector<ByteArray*>& vbaSalts,
+        const std::vector<ByteArray*>& vbaWrappedKeys,
+        std::vector<ByteArray*>& vbaSessionKeys
+    );
 
-    CM_SESSION_API* getCmSessionApi (void) const { return m_Session; }
-    const CM_KEY_API* getSelectedKey (void) const { return m_SelectedKey; }
-    bool isAuthorizedSession (void) const { return m_IsAuthorizedSession; }
-    bool isInitialized (void) const { return m_IsInitialized; }
-    bool isOpenedStorage (void) const { return (m_Session != nullptr); }
-    bool keyIsSelected (void) const { return (m_SelectedKey); }
+    CM_SESSION_API* getCmSessionApi (void) const {
+        return m_Session;
+    }
+    const CM_KEY_API* getSelectedKey (void) const {
+        return m_SelectedKey;
+    }
+    bool isAuthorizedSession (void) const {
+        return m_IsAuthorizedSession;
+    }
+    bool isInitialized (void) const {
+        return m_IsInitialized;
+    }
+    bool isOpenedStorage (void) const {
+        return (m_Session != nullptr);
+    }
+    bool keyIsSelected (void) const {
+        return (m_SelectedKey);
+    }
 
 };  //  end class CmStorageProxy
 

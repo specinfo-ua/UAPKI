@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/provider-list-storages.cpp"
+
 #include "api-json-internal.h"
 #include "parson-helper.h"
-
-#undef FILE_MARKER
-#define FILE_MARKER "api/provider-list-storages.cpp"
 
 
 int uapki_provider_list_storages (JSON_Object* joParams, JSON_Object* joResult)

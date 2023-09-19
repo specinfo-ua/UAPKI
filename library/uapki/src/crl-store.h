@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,157 +28,84 @@
 #ifndef UAPKI_CRL_STORE_H
 #define UAPKI_CRL_STORE_H
 
-#include "cer-store.h"
-#include "uapki-export.h"
-#include "uapki-ns.h"
-#include "verify-status.h"
+#include "cer-item.h"
+#include "crl-item.h"
+
+
+namespace UapkiNS {
+
+namespace Crl {
 
 
 class CrlStore {
-public:
-    enum class Actuality : int32_t {
-        UNDEFINED       = 0,
-        LAST_AVAILABLE  = 1,
-        OBSOLETE        = 2
-    };  //  end enum Actuality
-
-    enum class CrlType : int32_t {
-        UNDEFINED   = -1,
-        FULL        = 0,    //  CRL_V2
-        DELTA       = 1,    //  CRL_V2
-        V1          = 2
-    };  //  end enum CrlType
-
-    struct RevokedCertItem {
-        uint64_t    revocationDate;
-        UapkiNS::CrlReason
-                    crlReason;
-        uint64_t    invalidityDate;
-
-        RevokedCertItem (
-            const uint64_t iRevocationDate = 0,
-            const UapkiNS::CrlReason iCrlReason = UapkiNS::CrlReason::UNDEFINED,
-            const uint64_t iInvalidityDate = 0
-        )
-            : revocationDate(iRevocationDate)
-            , crlReason(iCrlReason)
-            , invalidityDate(iInvalidityDate)
-        {}
-        uint64_t getDate (void) const { return (invalidityDate > 0) ? invalidityDate : revocationDate; }
-    };  //  end struct RevokedCertItem
-
-    struct Item {
-        Actuality   actuality;
-        CrlType     type;
-        const ByteArray*
-                    baEncoded;
-        const CertificateList_t*
-                    crl;
-        const ByteArray*
-                    baCrlId;
-        const ByteArray*
-                    baIssuer;
-        uint64_t    thisUpdate;
-        uint64_t    nextUpdate;
-        const ByteArray*
-                    baAuthorityKeyId;
-        const ByteArray*
-                    baCrlNumber;
-        const ByteArray*
-                    baDeltaCrl;
-        CerStore::VerifyStatus
-                    statusSign;
-        UapkiNS::OtherHash
-                    crlHash;
-        const ByteArray*
-                    baCrlIdentifier;
-
-        Item (const CrlType iType);
-        ~Item (void);
-
-        size_t countRevokedCerts (void) const;
-        int getHash (
-            const UapkiNS::AlgorithmIdentifier& aidDigest
-        );
-        int revokedCerts (
-            const CerStore::Item* cerSubject,
-            std::vector<const RevokedCertItem*>& revokedItems
-        );
-        int verify (
-            const CerStore::Item* cerIssuer
-        );
-    };  //  end struct Item
-
-private:
+    std::mutex  m_Mutex;
+    std::mutex  m_MutexFirstDownloading;
     std::string m_Path;
-    std::vector<Item*>
+    bool        m_UseDeltaCrl;
+    std::vector<CrlItem*>
                 m_Items;
 
 public:
     CrlStore (void);
     ~CrlStore (void);
 
+    void setParams (
+        const std::string& path,
+        bool useDeltaCrl
+    );
+
+public:
+    //  The group of functions that have lock_guard
     int addCrl (
         const ByteArray* baEncoded,
         const bool permanent,
         bool& isUnique,
-        const Item** crlStoreItem
+        CrlItem** crlItem
     );
     int getCount (
         size_t& count
     );
-    Item* getCrl (
+    CrlItem* getCrl (
         const ByteArray* baAuthorityKeyId,
-        const CrlType type
+        const Type crlType,
+        const std::vector<std::string>& urisDelta
     );
     int getCrlByCrlId (
         const ByteArray* baCrlId,
-        const Item** crlStoreItem
+        CrlItem** crlItem
     );
-    int load (
-        const char* path
+    int getCrlByIndex (
+        const size_t index,
+        CrlItem** crlItem
     );
-    int reload (void);
-    void reset (void);
+    std::vector<CrlItem*> getCrlItems (void);
+    int load (void);
+    int removeCrl (
+        const ByteArray* baCrlId,
+        const bool permanent
+    );
 
 public:
-    static const char* certStatusToStr (
-        const UapkiNS::CertStatus status
-    );
-    static const char* crlReasonToStr (
-        const UapkiNS::CrlReason reason
-    );
-    static int decodeCrlIdentifier (
-        const ByteArray* baEncoded,
-        ByteArray** baIssuer,
-        uint64_t& issuedTime,
-        ByteArray** baCrlNumber
-    );
-    static const RevokedCertItem* findNearBefore (
-        const std::vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validateTime
-    );
-    static bool findRevokedCert (
-        const std::vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validateTime,
-        UapkiNS::CertStatus& status,
-        RevokedCertItem& revokedCertItem
-    );
-    static int parseCrl (
-        const ByteArray* baEncoded,
-        Item** crlStoreItem
-    );
+    std::mutex& getMutexFirstDownloading (void) {
+        return m_MutexFirstDownloading;
+    }
+    bool useDeltaCrl (void) const {
+        return m_UseDeltaCrl;
+    }
 
 private:
-    Item* addItem (
-        Item* crlStoreItem
+    CrlItem* addItem (
+        CrlItem* crlStoreItem
     );
     int loadDir (void);
-    int saveToFile (
-        const Item* crlStoreItem
-    );
+    int removeObsolete (void);
+    void reset (void);
 
 };  //  end class CrlStore
 
+
+}   //  end namespace Crl
+
+}   //  end namespace UapkiNS
 
 #endif

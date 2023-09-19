@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/private-key.c"
+
 #include "private-key.h"
 #include "aid.h"
 #include "cm-errors.h"
@@ -34,9 +36,6 @@
 #include "oid-utils.h"
 #include "uapkif.h"
 
-
-#undef FILE_MARKER
-#define FILE_MARKER "key.c"
 
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
@@ -228,9 +227,15 @@ cleanup:
 
 int private_key_generate(const char *alg, const char* param, ByteArray** key)
 {
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, alg) || 
-        oid_is_parent(OID_DSTU4145_WITH_GOST3411, alg)) {
-        return private_key_generate_dstu(alg, param, key);
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, alg) || 
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, alg)
+    ) {
+        return private_key_generate_dstu(
+            !oid_is_equal(alg, OID_DSTU4145_WITH_GOST3411) ? alg : OID_DSTU4145_PARAM_PB_LE,
+            param,
+            key
+        );
     }
 
     if (oid_is_equal(OID_EC_KEY, alg)) {
@@ -658,7 +663,7 @@ int spki_get_pubkey(const ByteArray* baSpki, ByteArray** baPubkey)
 {
     int ret = RET_OK;
     SubjectPublicKeyInfo_t* spki = NULL;
-    OCTET_STRING_t* os_pubkey = NULL;//a remove it - need use decode_bitstring_encap_octet()
+    OCTET_STRING_t* os_pubkey = NULL;
     char* s_algo = NULL;
     ByteArray* ba_pubkey = NULL;
 

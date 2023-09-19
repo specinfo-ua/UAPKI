@@ -54,14 +54,17 @@
     <ClCompile Include="src\api\asn1-decode.cpp" />
     <ClCompile Include="src\api\asn1-encode.cpp" />
     <ClCompile Include="src\api\cert-info.cpp" />
+    <ClCompile Include="src\api\cert-status-by-ocsp.cpp" />
     <ClCompile Include="src\api\crl-info.cpp" />
     <ClCompile Include="src\api\decrypt.cpp" />
     <ClCompile Include="src\api\digest.cpp" />
     <ClCompile Include="src\api\encrypt.cpp" />
     <ClCompile Include="src\api\get-cert.cpp" />
     <ClCompile Include="src\api\list-certs.cpp" />
+    <ClCompile Include="src\api\list-crls.cpp" />
     <ClCompile Include="src\api\random-bytes.cpp" />
     <ClCompile Include="src\api\remove-cert.cpp" />
+    <ClCompile Include="src\api\remove-crl.cpp" />
     <ClCompile Include="src\api\verify-cert.cpp" />
     <ClCompile Include="src\api\key-get-csr.cpp" />
     <ClCompile Include="src\api\key-init-usage.cpp" />
@@ -80,11 +83,14 @@
     <ClCompile Include="src\api\storage-open.cpp" />
     <ClCompile Include="src\api\session-select-key.cpp" />
     <ClCompile Include="src\api\verify.cpp" />
+    <ClCompile Include="src\cer-item.cpp" />
+    <ClCompile Include="src\cert-validator.cpp" />
     <ClCompile Include="src\cm-storage-proxy.cpp" />
+    <ClCompile Include="src\crl-item.cpp" />
     <ClCompile Include="src\doc-verify.cpp" />
     <ClCompile Include="src\global-objects.cpp" />
     <ClCompile Include="src\signature-format.cpp" />
-    <ClCompile Include="src\store-util.cpp" />
+    <ClCompile Include="src\store-json.cpp" />
     <ClCompile Include="src\cer-store.cpp" />
     <ClCompile Include="src\cm-providers.cpp" />
     <ClCompile Include="src\crl-store.cpp" />
@@ -130,11 +136,14 @@
     <ClInclude Include="include\uapki-debug.h" />
     <ClInclude Include="include\uapki-export.h" />
     <ClInclude Include="src\api\api-json-internal.h" />
+    <ClInclude Include="src\cer-item.h" />
+    <ClInclude Include="src\cert-validator.h" />
     <ClInclude Include="src\cm-storage-proxy.h" />
+    <ClInclude Include="src\crl-item.h" />
     <ClInclude Include="src\doc-verify.h" />
     <ClInclude Include="src\library-config.h" />
     <ClInclude Include="src\signature-format.h" />
-    <ClInclude Include="src\store-util.h" />
+    <ClInclude Include="src\store-json.h" />
     <ClInclude Include="src\cer-store.h" />
     <ClInclude Include="src\cm-providers.h" />
     <ClInclude Include="src\crl-store.h" />
@@ -265,7 +274,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DEBUG_CERSTOREITEM_INFO;UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DEBUG_CERITEM_INFO;UAPKI_LIBRARY;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>

@@ -1,9 +1,6 @@
 {
-  "comment": "Generate PKCS7/CAdES-signature, updated 2023-02-06",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "comment": "Generate PKCS7/CAdES-signature",
+  "commentUsage": "uapki sign-pkcs12-memory.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -16,22 +13,18 @@
           "dir": "", // full path
           "allowedProviders": [
             {
-              "lib": "cm-pkcs12",
-              "config": { // optional parameters
-                "createPfx": { // specific parameters
-                  "bagCipher": "2.16.840.1.101.3.4.1.22",
-                  "bagKdf": "1.2.840.113549.2.10",
-                  "iterations": 2000,
-                  "macAlgo": "2.16.840.1.101.3.4.2.2"
-                }
-              }
+              "lib": "cm-pkcs12"
             }
           ]
         },
         "certCache": {
           "path": "certs/", // full path
           "trustedCerts": []
-        }
+        },
+        "crlCache": {
+          "path": "crls/" // full path
+        },
+        "offline": false
       }
     },
     {
@@ -39,7 +32,7 @@
       "method": "OPEN",
       "parameters": {
         "provider": "PKCS12", // Опціональний, по замовчанню PKCS12
-        "storage": "memory", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо контейнер ключів зберігається у пам'яті, то використовуються будь-яка строка (наприклад "memory").
+        "storage": "file://memory", // Для PKCS12-provider обов'язковий, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT. Якщо контейнер ключів зберігається у пам'яті, то використовуються значення "file://memory".
         "password": "testpassword", // Для PKCS12 обов'язковий, пароль
         "mode": "RO", // Опціональний, RO - тільки читання, RW - читання/запис, CREATE - створення
         "openParams": {
@@ -59,15 +52,11 @@
       }
     },
     {
-      "comment": "формування підпису. Параметри наступні: CAdES, attached data",
+      "comment": "формування підпису. Параметри наступні: CAdES-BES, attached data",
       "method": "SIGN",
       "parameters": {
         "signParams": {
           "signatureFormat": "CAdES-BES", // Обов'язковий. Підтримує формати CAdES-BES/CAdES-T/CAdES-C/CAdES-XL/CAdES-A/CMS/RAW.
-          //"signatureFormat": "CAdES-T",
-          //"signatureFormat": "CAdES-C",
-          //"signatureFormat": "CAdES-XL",
-          //"signatureFormat": "CAdES-A",
           "signAlgo": "1.2.804.2.1.1.1.1.3.1.1", // Опціональний, якщо не вказаний, то використовується перший алгоритм підпису із списку signAlgo для ключа
           //"digestAlgo": "1.2.804.2.1.1.1.1.2.1", // Опціональний
           "detachedData": false, // Опціональний, по замовчанню true (дані не інкапсулюються)
@@ -80,7 +69,10 @@
             "id": "doc-0", // Обов'язковий, ідентифікатор даних
             "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==" // обов'язковий, дані для підпису у кодировці base64
           }
-        ]
+        ],
+        "options": {
+          "ignoreCertStatus": false
+        }
       }
     },
     {

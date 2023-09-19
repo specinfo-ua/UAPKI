@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "cm-pkcs12/storage/store-bag.cpp"
+
 #include "store-bag.h"
 #include "cm-errors.h"
 #include "iconv-utils.h"
@@ -41,6 +43,10 @@
 #ifndef DEBUG_OUTCON
     #define DEBUG_OUTCON(expression) expression
 #endif
+
+
+using namespace std;
+using namespace UapkiNS;
 
 
 static int set_bag_attributes (const vector<StoreAttr*>& storeAttrs, Attributes** bagAttributes)
@@ -112,7 +118,10 @@ StoreBag::~StoreBag (void)
     m_PtrLocalKeyId = nullptr;
 }
 
-int StoreBag::encodeBag (const char* password, const size_t iterations)
+int StoreBag::encodeBag (
+        const char* password,
+        const size_t iterations
+)
 {
     ba_free(m_EncodedBag);
     m_EncodedBag = nullptr;
@@ -148,7 +157,7 @@ int StoreBag::encodeBag (const char* password, const size_t iterations)
     DO(asn_encode_ba(get_SafeBag_desc(), safe_bag, &ba_data));
     m_EncodedBag = ba_data;
     ba_data = nullptr;
-    DEBUG_OUTCON( printf("m_EncodedBag: "); ba_print(stdout, m_EncodedBag); )
+    DEBUG_OUTCON( printf("EncodedBag: "); ba_print(stdout, m_EncodedBag); )
 
 cleanup:
     ba_free(ba_data);
@@ -156,7 +165,9 @@ cleanup:
     return ret;
 }
 
-StoreAttr* StoreBag::findAttrByOid (const char* oid)
+StoreAttr* StoreBag::findAttrByOid (
+        const char* oid
+)
 {
     for (size_t i = 0; i < m_BagAttributes.size(); i++) {
         if (oid_is_equal(m_BagAttributes[i]->oid.c_str(), oid)) {
@@ -166,7 +177,9 @@ StoreAttr* StoreBag::findAttrByOid (const char* oid)
     return nullptr;
 }
 
-bool StoreBag::getKeyInfo (StoreKeyInfo& keyInfo)
+bool StoreBag::getKeyInfo (
+        StoreKeyInfo& keyInfo
+)
 {
     char* s_param1 = nullptr;
     char* s_param2 = nullptr;
@@ -189,17 +202,13 @@ bool StoreBag::getKeyInfo (StoreKeyInfo& keyInfo)
 
     const ByteArray* ba_attrvalue = friendlyName();
     if (ba_attrvalue) {
-        if ((UapkiNS::Util::decodeBmpString(ba_attrvalue, &s_param1) == RET_OK) && s_param1) {
-            keyInfo.label = string(s_param1);
-            free(s_param1);
-            s_param1 = nullptr;
-        }
+        (void)Util::decodeBmpString(ba_attrvalue, keyInfo.label);
     }
 
-    ba_attrvalue = localKeyId();
+    ba_attrvalue = localKeyId();//getApplication()?
     if (ba_attrvalue) {
         ByteArray* ba_data = nullptr;
-        if (UapkiNS::Util::decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {
+        if (Util::decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {//now used OCTET_STRING - oid 'localKeyId'
             if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
                 keyInfo.application = string(s_param1);
                 free(s_param1);
@@ -208,6 +217,19 @@ bool StoreBag::getKeyInfo (StoreKeyInfo& keyInfo)
             ba_free(ba_data);
         }
     }
+
+    //ba_attrvalue = localKeyId();
+    //if (ba_attrvalue) {
+    //    ByteArray* ba_data = nullptr;
+    //    if (decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {
+    //        if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
+    //            keyInfo.localKeyId = string(s_param1);
+    //            free(s_param1);
+    //            s_param1 = nullptr;
+    //        }
+    //        ba_free(ba_data);
+    //    }
+    //}
 
     free(s_param1);
     free(s_param2);
@@ -222,14 +244,17 @@ void StoreBag::scanStdAttrs (void)
     m_PtrLocalKeyId = (store_attr) ? store_attr->data : nullptr;
 }
 
-void StoreBag::setBagId (const char* oid)
+void StoreBag::setBagId (
+        const string& bagId
+)
 {
-    if (oid && strlen(oid)) {
-        m_BagId = string(oid);
-    }
+    m_BagId = bagId;
 }
 
-void StoreBag::setData (const BAG_TYPE bagType, ByteArray* bagValue)
+void StoreBag::setData (
+        const BAG_TYPE bagType,
+        ByteArray* bagValue
+)
 {
     //DEBUG_OUTCON( printf("StoreBag::setData(), bagType: %d", bagType); ba_print(stdout, bagValue); )
     m_BagType = bagType;
@@ -242,16 +267,20 @@ void StoreBag::setData (const BAG_TYPE bagType, ByteArray* bagValue)
     }
 }
 
-void StoreBag::setEncodedBag (const ByteArray* baEncoded)
+void StoreBag::setEncodedBag (
+        const ByteArray* baEncoded
+)
 {
     ba_free(m_EncodedBag);
     m_EncodedBag = (ByteArray*)baEncoded;
 }
 
-bool StoreBag::setFriendlyName (const char* utf8label)
+bool StoreBag::setFriendlyName (
+        const char* utf8label
+)
 {
     ByteArray* ba_encoded = nullptr;
-    if (UapkiNS::Util::encodeBmpString(utf8label, &ba_encoded) != RET_OK) return false;
+    if (Util::encodeBmpString(utf8label, &ba_encoded) != RET_OK) return false;
 
     StoreAttr* store_attr = findAttrByOid(OID_PKCS9_FRIENDLY_NAME);
     if (!store_attr) {
@@ -269,13 +298,15 @@ bool StoreBag::setFriendlyName (const char* utf8label)
     return true;
 }
 
-bool StoreBag::setLocalKeyID (const char* hex)
+bool StoreBag::setLocalKeyID (
+        const char* hex
+)
 {
     ByteArray* ba_data = ba_alloc_from_hex(hex);
     if (!ba_data) return false;
 
     ByteArray* ba_encoded = nullptr;
-    if (UapkiNS::Util::encodeOctetString(ba_data, &ba_encoded) != RET_OK) {
+    if (Util::encodeOctetString(ba_data, &ba_encoded) != RET_OK) {
         ba_free(ba_data);
         return false;
     }
@@ -298,7 +329,10 @@ bool StoreBag::setLocalKeyID (const char* hex)
     return true;
 }
 
-void StoreBag::setPbes2Param (const char* oidKdf, const char* oidCipher)
+void StoreBag::setPbes2Param (
+        const char* oidKdf,
+        const char* oidCipher
+)
 {
     m_Pbes2param.kdf = oidKdf;
     m_Pbes2param.cipher = oidCipher;

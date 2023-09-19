@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-02-28
-
-#ifndef CM_KEY_WRAP_H
-#define CM_KEY_WRAP_H
+#ifndef UAPKI_KEY_WRAP_H
+#define UAPKI_KEY_WRAP_H
 
 #include "uapkic.h"
 #include "cm-export.h"

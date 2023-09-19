@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/remove-cert.cpp"
+
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-ba-utils.h"
@@ -33,61 +35,58 @@
 #include "uapki-ns.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/remove-cert.cpp"
+using namespace std;
+using namespace UapkiNS;
 
 
 int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_certid, sba_encoded, sba_keyid;
-    CerStore::Item* cer_item = nullptr;
-    const bool present_bytes = ParsonHelper::jsonObjectHasValue(joParams, "bytes", JSONString);
-    const bool present_certid = ParsonHelper::jsonObjectHasValue(joParams, "certId", JSONString);
+    LibraryConfig* lib_config = get_config();
+    Cert::CerStore* cer_store = get_cerstore();
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
     const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
+    SmartBA sba_certid, sba_encoded, sba_keyid;
+    Cert::CerItem* cer_item = nullptr;
 
-    LibraryConfig* lib_config = get_config();
-    if (!lib_config) return RET_UAPKI_GENERAL_ERROR;
+    if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
     if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
-    CerStore* cer_store = get_cerstore();
-    if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
-
-    if (
-        (present_bytes && present_certid) ||
-        (!present_bytes && !present_certid)
-    ) {
-        return RET_UAPKI_INVALID_PARAMETER;
-    }
-
     if (!from_storage) {
-        if (!sba_certid.set(json_object_get_base64(joParams, "certId"))) {
-            if (!sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-                SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-            }
-
+        if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
+            DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
+        }
+        else if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
             DO(cer_store->getCertByEncoded(sba_encoded.get(), &cer_item));
-            if (!sba_certid.set(ba_copy_with_alloc(cer_item->baCertId, 0, 0))) {
-                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-            }
         }
 
-        DO(cer_store->removeCert(sba_certid.get(), permanent));
+        if (cer_item) {
+            cer_item->markToRemove(true);
+        }
+
+        DO(cer_store->removeMarkedCerts(permanent));
     }
     else {
+        const bool present_bytes = ParsonHelper::jsonObjectHasValue(joParams, "bytes", JSONString);
+        const bool present_certid = ParsonHelper::jsonObjectHasValue(joParams, "certId", JSONString);
+        if (
+            (present_bytes && present_certid) ||
+            (!present_bytes && !present_certid)
+        ) {
+            return RET_UAPKI_INVALID_PARAMETER;
+        }
+
         CmStorageProxy* storage = CmProviders::openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
         if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-            DO(CerStore::parseCert(sba_encoded.get(), &cer_item));
-            (void)sba_encoded.set(nullptr);
-            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->baKeyId, 0, 0));
+            DO(Cert::parseCert(sba_encoded.get(), &cer_item));
+            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->getKeyId(), 0, 0));
             delete cer_item;
         }
         else if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
             DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
-            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->baKeyId, 0, 0));
+            (void)sba_keyid.set(ba_copy_with_alloc(cer_item->getKeyId(), 0, 0));
         }
 
         if (sba_keyid.empty()) {

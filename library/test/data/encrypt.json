@@ -1,5 +1,6 @@
 {
-  "comment": "Encrypt enveloped data, 2022-apr-25",
+  "comment": "Encrypt enveloped data",
+  "commentUsage": "uapki encrypt.json",
   "tasks": [
     {
       "method": "VERSION"

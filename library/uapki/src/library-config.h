@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,8 +29,13 @@
 #define UAPKI_LIBRARY_CONFIG_H
 
 
+#include <stddef.h>
+#include <stdint.h>
 #include <string>
 #include <vector>
+
+
+namespace UapkiNS {
 
 
 class LibraryConfig {
@@ -83,16 +88,28 @@ public:
         m_IsInitialized = false;
     }
 
-    const OcspParams& getOcsp (void) const { return m_OcspParams; }
-    bool getOffline (void) const { return m_Offline; }
-    const TspParams& getTsp (void) const { return m_TspParams; }
-    bool isInitialized (void) const { return m_IsInitialized; }
+    const OcspParams& getOcsp (void) const {
+        return m_OcspParams;
+    }
+    bool getOffline (void) const {
+        return m_Offline;
+    }
+    const TspParams& getTsp (void) const {
+        return m_TspParams;
+    }
+    bool isInitialized (void) const {
+        return m_IsInitialized;
+    }
 
-    void setInitialized (bool isInitialized) { m_IsInitialized = isInitialized; }
+    void setInitialized (bool isInitialized) {
+        m_IsInitialized = isInitialized;
+    }
     void setOcsp (const OcspParams& ocspParams) {
         m_OcspParams.nonceLen = ocspParams.nonceLen;
     }
-    void setOffline (bool offline) { m_Offline = offline; }
+    void setOffline (bool offline) {
+        m_Offline = offline;
+    }
     void setTsp (const TspParams& tspParams) {
         m_TspParams.certReq = tspParams.certReq;
         m_TspParams.forced = tspParams.forced;
@@ -103,5 +120,7 @@ public:
 
 };  //  end class LibraryConfig
 
+
+}   //  end namespace UapkiNS
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,11 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mutex>
+#define FILE_MARKER "uapki/cer-store.cpp"
+
 #include <string.h>
 #include "cer-store.h"
 #include "ba-utils.h"
-#include "crl-store.h"
+#include "crl-item.h"
 #include "dirent-internal.h"
 #include "dstu-ns.h"
 #include "extension-helper.h"
@@ -38,11 +39,6 @@
 #include "time-util.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "uapki-ns-verify.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/cer-store.cpp"
 
 
 #define DEBUG_OUTCON(expression)
@@ -52,295 +48,37 @@
 
 
 using namespace std;
-using namespace UapkiNS;
 
 
-static const char* CER_EXT = ".cer";
+static const size_t CERSTORE_RESERVE_ITEMS = 10000;
 
 
-#ifdef DEBUG_CERSTOREITEM_INFO
-string debug_cerstoreitem_info_get_commonname (const Name_t& name)
+namespace UapkiNS {
+
+namespace Cert {
+
+
+static int get_cert_by_keyid_internal (
+        const vector<CerItem*>& cerItems,
+        const ByteArray* baKeyId,
+        CerItem** cerItem
+)
 {
-    string rv_s;
-    if (name.present != Name_PR_rdnSequence) return rv_s;
-
-    for (size_t i = 0; i < name.choice.rdnSequence.list.count; i++) {
-        const RelativeDistinguishedName_t* rdname_src = name.choice.rdnSequence.list.array[i];
-        for (size_t j = 0; j < rdname_src->list.count; j++) {
-            const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
-            if (OID_is_equal_oid(&attr->type, OID_X520_CommonName)) {
-                char* s_value = nullptr;
-                int ret = Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, &s_value);
-                if (ret == RET_OK) {
-                    rv_s = string(s_value);
-                    ::free(s_value);
-                    break;
-                }
-            }
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
+    for (auto& it : cerItems) {
+        if (ba_cmp(baKeyId, it->getKeyId()) == RET_OK) {
+            *cerItem = it;
+            ret = RET_OK;
+            break;
         }
     }
-    return rv_s;
-}   //  debug_cerstoreitem_info_get_commonname
-
-void debug_cerstoreitem_info (CerStore::Item& cerStoreItem)
-{
-    cerStoreItem.devsSubject = debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.subject);
-    cerStoreItem.devsIssuerAndSn = Util::baToHex(cerStoreItem.baSerialNumber)
-        + string("; ") + debug_cerstoreitem_info_get_commonname(cerStoreItem.cert->tbsCertificate.issuer);
-    cerStoreItem.devsValidity = TimeUtil::mtimeToFtime(cerStoreItem.notBefore)
-        + string(" - ") + TimeUtil::mtimeToFtime(cerStoreItem.notAfter);
-}   //  debug_cerstoreitem_info
-#endif
-
-static int encode_issuer_and_sn (const TBSCertificate_t* tbsCert, ByteArray** baIssuerAndSN)
-{
-    int ret = RET_OK;
-    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
-
-    if (!tbsCert || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
-
-    DO(asn_copy(get_Name_desc(), &tbsCert->issuer, &issuer_and_sn->issuer));
-    DO(asn_copy(get_INTEGER_desc(), &tbsCert->serialNumber, &issuer_and_sn->serialNumber));
-
-    DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
-
-cleanup:
-    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
-    return ret;
-}   //  encode_issuer_and_sn
-
-
-
-CerStore::CertStatusInfo::CertStatusInfo (
-        const ValidationType validationType
-)
-    : type(validationType)
-    , baResult(nullptr)
-    , status(UapkiNS::CertStatus::UNDEFINED)
-    , validTime(0)
-{
-}
-
-CerStore::CertStatusInfo::~CertStatusInfo (void)
-{
-    reset();
-}
-
-bool CerStore::CertStatusInfo::isExpired (
-        const uint64_t time
-) const
-{
-    return (time > validTime);
-}
-
-void CerStore::CertStatusInfo::reset (void)
-{
-    ba_free(baResult);
-    baResult = nullptr;
-    status = UapkiNS::CertStatus::UNDEFINED;
-    validTime = 0;
-}
-
-int CerStore::CertStatusInfo::set (
-        const UapkiNS::CertStatus status,
-        const uint64_t validTime,
-        const ByteArray* baResult
-)
-{
-    reset();
-    this->status = status;
-    this->validTime = validTime;
-    this->baResult = ba_copy_with_alloc(baResult, 0, 0);
-    return (this->baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
-}
-
-
-
-CerStore::Item::Item (void)
-    : baEncoded(nullptr)
-    , cert(nullptr)
-    , baAuthorityKeyId(nullptr)
-    , baCertId(nullptr)
-    , keyAlgo(nullptr)
-    , baSerialNumber(nullptr)
-    , baKeyId(nullptr)
-    , baIssuer(nullptr)
-    , baSubject(nullptr)
-    , baSPKI(nullptr)
-    , algoKeyId(HashAlg::HASH_ALG_UNDEFINED)
-    , notBefore(0)
-    , notAfter(0)
-    , keyUsage(0)
-    , trusted(false)
-    , verifyStatus(VerifyStatus::UNDEFINED)
-    , certStatusByCrl(ValidationType::CRL)
-    , certStatusByOcsp(ValidationType::OCSP)
-{
-}
-
-CerStore::Item::~Item (void)
-{
-    ba_free((ByteArray*)baEncoded);
-    asn_free(get_Certificate_desc(), (Certificate_t*)cert);
-    ba_free((ByteArray*)baAuthorityKeyId);
-    ba_free((ByteArray*)baCertId);
-    ba_free((ByteArray*)baSerialNumber);
-    ba_free((ByteArray*)baKeyId);
-    ba_free((ByteArray*)baIssuer);
-    ba_free((ByteArray*)baSubject);
-    ba_free((ByteArray*)baSPKI);
-    ::free((char*)keyAlgo);
-    algoKeyId = HashAlg::HASH_ALG_UNDEFINED;
-    notBefore = 0;
-    notAfter = 0;
-    keyUsage = 0;
-    verifyStatus = VerifyStatus::UNDEFINED;
-}
-
-int CerStore::Item::checkValidity (
-        const uint64_t validateTime
-) const
-{
-    if ((notBefore == 0) || (notAfter == 0)) return RET_UAPKI_TIME_ERROR;
-
-    if (notBefore > validateTime) return RET_UAPKI_CERT_VALIDITY_NOT_BEFORE_ERROR;
-
-    if (notAfter < validateTime) return RET_UAPKI_CERT_VALIDITY_NOT_AFTER_ERROR;
-
-    return RET_OK;
-}
-
-int CerStore::Item::generateEssCertId (
-        const UapkiNS::AlgorithmIdentifier& aidDigest,
-        UapkiNS::EssCertId& essCertId
-) const
-{
-    return CerStore::generateEssCertId(this, aidDigest, essCertId);
-}
-
-int CerStore::Item::getCrlUris (
-        const bool isFull,
-        vector<string>& uris
-) const
-{
-    int ret = RET_OK;
-    const char* oid_extnid = isFull ? OID_X509v3_CRLDistributionPoints : OID_X509v3_FreshestCRL;
-    SmartBA sba_extnvalue;
-
-    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, oid_extnid, nullptr, &sba_extnvalue));
-
-    DO(ExtensionHelper::decodeDistributionPoints(sba_extnvalue.get(), uris));
-
-cleanup:
     return ret;
 }
-
-int CerStore::Item::getIssuerAndSN (
-        ByteArray** baIssuerAndSN
-) const
-{
-    const int ret = encode_issuer_and_sn(&cert->tbsCertificate, baIssuerAndSN);
-    return ret;
-}
-
-int CerStore::Item::getOcspUris (
-        vector<string>& uris
-) const
-{
-    int ret = RET_OK;
-    SmartBA sba_extnvalue;
-
-    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, OID_PKIX_AuthorityInfoAccess, nullptr, &sba_extnvalue));
-
-    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_OCSP, uris));
-
-cleanup:
-    return ret;
-}
-
-int CerStore::Item::getTspUris (
-        vector<string>& uris
-) const
-{
-    int ret = RET_OK;
-    SmartBA sba_extnvalue;
-
-    DO(Util::extnValueFromExtensions(cert->tbsCertificate.extensions, OID_PKIX_SubjectInfoAccess, nullptr, &sba_extnvalue));
-
-    DO(ExtensionHelper::decodeAccessDescriptions(sba_extnvalue.get(), OID_PKIX_TimeStamping, uris));
-
-cleanup:
-    return ret;
-}
-
-int CerStore::Item::keyUsageByBit (
-        const uint32_t bitNum,
-        bool& bitValue
-) const
-{
-    const uint32_t masked_bit = (uint32_t)(1 << bitNum);
-    bitValue = ((keyUsage & masked_bit) > 0);
-    return RET_OK;
-}
-
-int CerStore::Item::verify (
-        const CerStore::Item* cerIssuer
-)
-{
-    verifyStatus = VerifyStatus::INDETERMINATE;
-    if (!cerIssuer) return RET_OK;
-
-    int ret = RET_OK;
-    X509Tbs_t* x509_cert = nullptr;
-    SmartBA sba_signvalue, sba_tbs;
-    char* s_signalgo = nullptr;
-
-    CHECK_NOT_NULL(x509_cert = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded));
-    if (!sba_tbs.set(ba_alloc_from_uint8(x509_cert->tbsData.buf, x509_cert->tbsData.size))) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
-
-    DO(asn_oid_to_text(&cert->signatureAlgorithm.algorithm, &s_signalgo));
-    if (algoKeyId == HASH_ALG_GOST34311) {
-        DO(Util::bitStringEncapOctetFromAsn1(&cert->signature, &sba_signvalue));
-    }
-    else {
-        DO(asn_BITSTRING2ba(&cert->signature, &sba_signvalue));
-    }
-
-    ret = Verify::verifySignature(s_signalgo, sba_tbs.get(), false, cerIssuer->baSPKI, sba_signvalue.get());
-    switch (ret) {
-    case RET_OK:
-        verifyStatus = VerifyStatus::VALID;
-        break;
-    case RET_VERIFY_FAILED:
-        verifyStatus = VerifyStatus::INVALID;
-        break;
-    default:
-        verifyStatus = VerifyStatus::FAILED;
-        break;
-    }
-
-    if (verifyStatus == VerifyStatus::VALID) {
-        bool is_digitalsign = false;
-        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
-        if (!is_digitalsign) {
-            verifyStatus = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
-        }
-    }
-
-cleanup:
-    asn_free(get_X509Tbs_desc(), x509_cert);
-    ::free(s_signalgo);
-    return ret;
-}
-
 
 
 CerStore::CerStore (void)
 {
+    m_Items.reserve(CERSTORE_RESERVE_ITEMS);
 }
 
 CerStore::~CerStore (void)
@@ -348,234 +86,245 @@ CerStore::~CerStore (void)
     reset();
 }
 
-int CerStore::addCert (
-        const ByteArray* baEncoded,
-        const bool copyWithAlloc,
-        const bool permanent,
-        const bool trusted,
-        bool& isUnique,
-        Item** cerStoreItem
+void CerStore::setParams (
+        const string& path
 )
 {
-    int ret = RET_OK;
-    Item* cer_parsed = nullptr;
-    Item* cer_added = nullptr;
+    m_Path = path;
+}
 
-    DO(parseCert(baEncoded, &cer_parsed));
-    cer_parsed->trusted = trusted;
+int CerStore::addCerts (
+        const bool trusted,
+        const bool permanent,
+        const VectorBA& vbaEncodedCerts,
+        vector<AddedCerItem>& addedCerItems
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
 
-    if (copyWithAlloc) {
-        cer_parsed->baEncoded = ba_copy_with_alloc(baEncoded, 0, 0);
-        if (!cer_parsed->baEncoded) {
-            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    if (vbaEncodedCerts.empty()) return RET_OK;
+
+    addedCerItems.resize(vbaEncodedCerts.size());
+    for (size_t i = 0; i < vbaEncodedCerts.size(); i++) {
+        AddedCerItem& added_ceritem = addedCerItems[i];
+        added_ceritem.errorCode = parseCert((const ByteArray*)vbaEncodedCerts[i], &added_ceritem.cerItem);
+    }
+
+    for (auto& it : addedCerItems) {
+        if (it.errorCode != RET_OK) continue;
+
+        CerItem* added_ceritem = addItem(it.cerItem);
+        it.isUnique = (it.cerItem == added_ceritem);
+        if (it.isUnique) {
+            it.cerItem->setTrusted(trusted);
+            it.cerItem->markToRemove(!trusted && !permanent);
+        }
+        else {
+            //  Delete parsed CerItem and set existing CerItem
+            delete it.cerItem;
+            it.cerItem = added_ceritem;
         }
     }
 
-    cer_added = addItem(cer_parsed);
-    isUnique = (cer_added == cer_parsed);
-    cer_parsed = nullptr;
-    if (cerStoreItem) {
-        *cerStoreItem = cer_added;
+    if (permanent && !m_Path.empty()) {
+        for (auto& it : addedCerItems) {
+            if ((it.errorCode == RET_OK) && it.isUnique) {
+                CerItem& cer_item = *it.cerItem;
+                if (cer_item.setFileName(cer_item.generateFileName())) {
+                    const string s_fullpath = m_Path + cer_item.getFileName();
+                    it.errorCode = ba_to_file(cer_item.getEncoded(), s_fullpath.c_str());
+                }
+                else {
+                    it.errorCode = RET_UAPKI_GENERAL_ERROR;
+                }
+            }
+        }
     }
 
-    if (permanent) {
-        saveToFile(cer_added);
-    }
+    return RET_OK;
+}
 
-cleanup:
-    delete cer_parsed;
-    return ret;
+vector<CerItem*> CerStore::getCerItems (void)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    return m_Items;
 }
 
 int CerStore::getCertByCertId (
         const ByteArray* baCertId,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
-        if (ba_cmp(baCertId, it->baCertId) == RET_OK) {
-            *cerStoreItem = it;
+        if (ba_cmp(baCertId, it->getCertId()) == RET_OK) {
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getCertByEncoded (
         const ByteArray* baEncoded,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
-        if (ba_cmp(baEncoded, it->baEncoded) == RET_OK) {
-            *cerStoreItem = it;
+        if (ba_cmp(baEncoded, it->getEncoded()) == RET_OK) {
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getCertByIndex (
         const size_t index,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
     if (index < m_Items.size()) {
-        *cerStoreItem = m_Items[index];
+        *cerItem = m_Items[index];
         ret = RET_OK;
     }
+    return ret;
+}
 
-    mtx.unlock();
+int CerStore::getCertByIssuerAndSN (
+        const ByteArray* baIssuerAndSN,
+        CerItem** cerItem
+)
+{
+    //  Note: Use implicit lock_guard, see: getCertByIssuerAndSN()
+    SmartBA sba_issuer, sba_serialnumber;
+    int ret = parseIssuerAndSN(baIssuerAndSN, &sba_issuer, &sba_serialnumber);
+    if (ret == RET_OK) {
+        ret = getCertByIssuerAndSN(sba_issuer.get(), sba_serialnumber.get(), cerItem);
+    }
     return ret;
 }
 
 int CerStore::getCertByIssuerAndSN (
         const ByteArray* baIssuer,
         const ByteArray* baSerialNumber,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
+    lock_guard<mutex> lock(m_Mutex);
+
     int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
     for (auto& it : m_Items) {
         if (
-            (ba_cmp(baSerialNumber, it->baSerialNumber) == RET_OK) &&
-            (ba_cmp(baIssuer, it->baIssuer) == RET_OK)
+            (ba_cmp(baSerialNumber, it->getSerialNumber()) == RET_OK) &&
+            (ba_cmp(baIssuer, it->getIssuer()) == RET_OK)
         ) {
-            *cerStoreItem = it;
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getCertByKeyId (
         const ByteArray* baKeyId,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
-    for (auto& it : m_Items) {
-        if (ba_cmp(baKeyId, it->baKeyId) == RET_OK) {
-            *cerStoreItem = it;
-            ret = RET_OK;
-            break;
-        }
-    }
-
-    mtx.unlock();
+    const int ret = get_cert_by_keyid_internal(m_Items, baKeyId, cerItem);
     return ret;
 }
 
 int CerStore::getCertBySID (
         const ByteArray* baSID,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_OK;
+    lock_guard<mutex> lock(m_Mutex);
+
     SmartBA sba_issuer, sba_keyid, sba_serialnum;
 
-    ret = parseSid(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
+    int ret = parseSID(baSID, &sba_issuer, &sba_serialnum, &sba_keyid);
     if (ret != RET_OK) return ret;
 
     if (sba_keyid.size() > 0) {
-        ret = getCertByKeyId(sba_keyid.get(), cerStoreItem);
+        ret = get_cert_by_keyid_internal(m_Items, sba_keyid.get(), cerItem);
         return ret;
     }
 
     ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
     for (auto& it : m_Items) {
         if (
-            (ba_cmp(sba_serialnum.get(), it->baSerialNumber) == RET_OK) &&
-            (ba_cmp(sba_issuer.get(), it->baIssuer) == RET_OK)
+            (ba_cmp(sba_serialnum.get(), it->getSerialNumber()) == RET_OK) &&
+            (ba_cmp(sba_issuer.get(), it->getIssuer()) == RET_OK)
         ) {
-            *cerStoreItem = it;
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getCertBySPKI (
         const ByteArray* baSPKI,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
-        if (ba_cmp(baSPKI, it->baSPKI) == RET_OK) {
-            *cerStoreItem = it;
+        if (ba_cmp(baSPKI, it->getSpki()) == RET_OK) {
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getCertBySubject (
         const ByteArray* baSubject,
-        Item** cerStoreItem
+        CerItem** cerItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
-        if (ba_cmp(baSubject, it->baSubject) == RET_OK) {
-            *cerStoreItem = it;
+        if (ba_cmp(baSubject, it->getSubject()) == RET_OK) {
+            *cerItem = it;
             ret = RET_OK;
             break;
         }
     }
-
-    mtx.unlock();
     return ret;
 }
 
 int CerStore::getChainCerts (
-        const Item* cerSubject,
-        vector<Item*>& chainCerts
+        const CerItem* cerSubject,
+        vector<CerItem*>& chainCerts
 )
 {
+    //  Note: Use implicit lock_guard, see: getIssuerCert()
     int ret = RET_OK;
-    Item* cer_subject = (Item*)cerSubject;
-    Item* cer_issuer = nullptr;
+    CerItem* cer_subject = (CerItem*)cerSubject;
+    CerItem* cer_issuer = nullptr;
     bool is_selfsigned = false;
 
     while (true) {
@@ -590,14 +339,15 @@ cleanup:
 }
 
 int CerStore::getChainCerts (
-        const Item* cerSubject,
-        std::vector<Item*>& chainCerts,
+        const CerItem* cerSubject,
+        vector<CerItem*>& chainCerts,
         const ByteArray** baIssuerKeyId
 )
 {
+    //  Note: Use implicit lock_guard, see: getIssuerCert()
     int ret = RET_OK;
-    Item* cer_subject = (Item*)cerSubject;
-    Item* cer_issuer = nullptr;
+    CerItem* cer_subject = (CerItem*)cerSubject;
+    CerItem* cer_issuer = nullptr;
     bool is_selfsigned = false;
 
     while (true) {
@@ -609,7 +359,7 @@ int CerStore::getChainCerts (
         }
         else {
             if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
-                *baIssuerKeyId = cer_subject->baAuthorityKeyId;
+                *baIssuerKeyId = cer_subject->getAuthorityKeyId();
             }
             break;
         }
@@ -622,499 +372,110 @@ int CerStore::getCount (
         size_t& count
 )
 {
-    mutex mtx;
-    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
-    int ret = RET_OK;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
     count = m_Items.size();
-
-    mtx.unlock();
-    return ret;
+    return RET_OK;
 }
 
-int CerStore::getCountTrusted (
-        size_t& count
+int CerStore::getCount (
+        size_t& count,
+        size_t& countTrusted
 )
 {
-    mutex mtx;
-    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
-    int ret = RET_OK;
-    count = 0;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    count = m_Items.size();
+    countTrusted = 0;
     for (auto& it : m_Items) {
-        count += (it->trusted) ? 1 : 0;
+        countTrusted += (it->isTrusted()) ? 1 : 0;
     }
-
-    mtx.unlock();
-    return ret;
+    return RET_OK;
 }
 
 int CerStore::getIssuerCert (
-        const Item* cerSubject,
-        Item** cerIssuer,
+        CerItem* cerSubject,
+        CerItem** cerIssuer,
         bool& isSelfSigned
 )
 {
+    //  Note: Use implicit lock_guard, see: getCertByKeyId()
     if (!cerSubject || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    if (ba_cmp(cerSubject->baKeyId, cerSubject->baAuthorityKeyId) != 0) {
+    if (ba_cmp(cerSubject->getKeyId(), cerSubject->getAuthorityKeyId()) != 0) {
         isSelfSigned = false;
-        ret = getCertByKeyId(cerSubject->baAuthorityKeyId, cerIssuer);
+        ret = getCertByKeyId(cerSubject->getAuthorityKeyId(), cerIssuer);
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
         }
     }
     else {
         isSelfSigned = true;
-        *cerIssuer = (Item*)cerSubject;
+        *cerIssuer = cerSubject;
     }
 
     return ret;
 }
 
-int CerStore::load (
-        const char* path
-)
+int CerStore::load (void)
 {
-    mutex mtx;
-    if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
+    lock_guard<mutex> lock(m_Mutex);
 
-    mtx.lock();
-    m_Path = string(path);
     const int ret = loadDir();
-    mtx.unlock();
     if (ret != RET_OK) {
         reset();
     }
     return ret;
 }
 
-int CerStore::reload (void)
-{
-    mutex mtx;
-    mtx.lock();
-    const int ret = loadDir();
-    mtx.unlock();
-    if (ret != RET_OK) {
-        reset();
-    }
-    return ret;
-}
-
-int CerStore::removeCert (
-        const ByteArray* baCertId,
+int CerStore::removeMarkedCerts (
         const bool permanent
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CERT_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
-    for (auto it = m_Items.begin(); it != m_Items.end(); it++) {
-        if (ba_cmp(baCertId, (*it)->baCertId) == RET_OK) {
-            CerStore::Item* cer_item = *it;
-            m_Items.erase(it);
-            delete cer_item;//tmp solution, need add m_RemovedItems
-            ret = RET_OK;
-            break;
+    vector<CerItem*> new_items, removing_items;
+    new_items.reserve(m_Items.capacity());
+    removing_items.reserve(m_Items.capacity());
+    
+    for (const auto& it : m_Items) {
+        if (!it->isMarkedToRemove()) {
+            new_items.push_back(it);
+        }
+        else {
+            removing_items.push_back(it);
         }
     }
+    m_Items = new_items;
 
-    mtx.unlock();
-    return ret;
-}
-
-void CerStore::reset (void)
-{
-    mutex mtx;
-    mtx.lock();
-    for (auto& it : m_Items) {
-        delete it;
-    }
-    m_Items.clear();
-    mtx.unlock();
-}
-
-bool CerStore::addCertIfUnique (
-        vector<Item*>& cerStoreItems,
-        Item* cerStoreItem
-)
-{
-    if (!cerStoreItem) return false;
-
-    for (const auto& it : cerStoreItems) {
-        if (ba_cmp(cerStoreItem->baCertId, it->baCertId) == 0) return false;
-    }
-    cerStoreItems.push_back(cerStoreItem);
-    return true;
-}
-
-int CerStore::calcKeyId (
-        const HashAlg algoKeyId,
-        const ByteArray* baPubkey,
-        ByteArray** baKeyId
-)
-{
     int ret = RET_OK;
-    const ByteArray* ref_ba = nullptr;
-    ByteArray* ba_encappubkey = nullptr;
-
-    CHECK_PARAM(baPubkey != nullptr);
-    CHECK_PARAM(baKeyId != nullptr);
-
-    if (algoKeyId == HASH_ALG_GOST34311) {
-        DO(Util::encodeOctetString(baPubkey, &ba_encappubkey));
-        ref_ba = ba_encappubkey;
-    }
-    else {
-        ref_ba = baPubkey;
-    }
-
-    DO(::hash(algoKeyId, ref_ba, baKeyId));
-
-cleanup:
-    ba_free(ba_encappubkey);
-    return ret;
-}
-
-int CerStore::encodeIssuerAndSN (
-        const ByteArray* baIssuer,
-        const ByteArray* baSerialNumber,
-        ByteArray** baIssuerAndSN
-)
-{
-    int ret = RET_OK;
-    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
-
-    if (!baIssuer || !baSerialNumber || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
-
-    DO(asn_decode_ba(get_Name_desc(), &issuer_and_sn->issuer, baIssuer));
-    DO(asn_ba2INTEGER(baSerialNumber, &issuer_and_sn->serialNumber));
-
-    DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
-
-cleanup:
-    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
-    return ret;
-}
-
-CerStore::Item* CerStore::findCertByCertId (
-        const std::vector<Item*>& cerStoreItems,
-        const ByteArray* baCertId
-)
-{
-    for (size_t i = 0; i < cerStoreItems.size(); i++) {
-        if (ba_cmp(baCertId, cerStoreItems[i]->baCertId) == 0) {
-            return cerStoreItems[i];
-        }
-    }
-    return nullptr;
-}
-
-int CerStore::generateEssCertId (
-        const Item* cerStoreItem,
-        const UapkiNS::AlgorithmIdentifier& aidDigest,
-        UapkiNS::EssCertId& essCertId
-)
-{
-    int ret = RET_OK;
-    HashAlg hash_alg = HashAlg::HASH_ALG_UNDEFINED;
-
-    if (!cerStoreItem || !aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-
-    hash_alg = hash_from_oid(aidDigest.algorithm.c_str());
-    if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
-
-    DO(::hash(hash_alg, cerStoreItem->baEncoded, &essCertId.baHashValue));
-    if (!essCertId.hashAlgorithm.copy(aidDigest)) return RET_UAPKI_GENERAL_ERROR;
-
-    DO(issuerToGeneralNames(cerStoreItem->baIssuer, &essCertId.issuerSerial.baIssuer));
-    CHECK_NOT_NULL(essCertId.issuerSerial.baSerialNumber = ba_copy_with_alloc(cerStoreItem->baSerialNumber, 0, 0));
-
-cleanup:
-    return ret;
-}
-
-int CerStore::issuerFromGeneralNames (
-        const ByteArray* baEncoded,
-        ByteArray** baIssuer
-)
-{
-    int ret = RET_OK;
-    GeneralNames_t* general_names = nullptr;
-    bool is_found = false;
-
-    if (!baEncoded || !baIssuer) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(general_names = (GeneralNames_t*)asn_decode_ba_with_alloc(get_GeneralNames_desc(), baEncoded));
-
-    for (int i = 0; i < general_names->list.count; i++) {
-        GeneralName_t& general_name = *general_names->list.array[i];
-        if (general_name.present == GeneralName_PR_directoryName) {
-            DO(asn_encode_ba(get_Name_desc(), &general_name.choice.directoryName, baIssuer));
-            is_found = true;
-            break;
-        }
-    }
-
-    if (!is_found) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-cleanup:
-    asn_free(get_GeneralNames_desc(), general_names);
-    return ret;
-}
-
-int CerStore::issuerToGeneralNames (
-        const ByteArray* baIssuer,
-        ByteArray** baEncoded
-)
-{
-    int ret = RET_OK;
-    GeneralName_t* general_name = nullptr;
-    GeneralNames_t* general_names = nullptr;
-
-    if (!baIssuer || !baEncoded) return RET_UAPKI_INVALID_PARAMETER;
-
-    ASN_ALLOC_TYPE(general_name, GeneralName_t);
-    general_name->present = GeneralName_PR_directoryName;
-    DO(asn_decode_ba(get_Name_desc(), &general_name->choice.directoryName, baIssuer));
-
-    ASN_ALLOC_TYPE(general_names, GeneralNames_t);
-    DO(ASN_SET_ADD(&general_names->list, (void*)general_name));
-    general_name = nullptr;
-
-    DO(asn_encode_ba(get_GeneralNames_desc(), general_names, baEncoded));
-
-cleanup:
-    asn_free(get_GeneralName_desc(), general_name);
-    asn_free(get_GeneralNames_desc(), general_names);
-    return ret;
-}
-
-int CerStore::keyIdFromSid (
-        const ByteArray* baSidEncoded,
-        ByteArray** baKeyId
-)
-{
-    int ret = RET_OK;
-    SignerIdentifier_t* sid = nullptr;
-
-    if ((ba_get_len(baSidEncoded) < 3) || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(sid = (SignerIdentifier_t*)asn_decode_ba_with_alloc(get_SignerIdentifier_desc(), baSidEncoded));
-    if (sid->present == SignerIdentifier_PR_subjectKeyIdentifier) {
-        DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
-    }
-    else {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-cleanup:
-    asn_free(get_SignerIdentifier_desc(), sid);
-    return ret;
-}
-
-int CerStore::keyIdToSid (
-        const ByteArray* baKeyId,
-        ByteArray** baSidEncoded
-)
-{
-    int ret = RET_OK;
-    SignerIdentifier_t* sid = nullptr;
-
-    if ((ba_get_len(baKeyId) == 0) || !baSidEncoded) return RET_UAPKI_INVALID_PARAMETER;
-
-    ASN_ALLOC_TYPE(sid, SignerIdentifier_t);
-    sid->present = SignerIdentifier_PR_subjectKeyIdentifier;
-    DO(asn_ba2OCTSTRING(baKeyId, &sid->choice.subjectKeyIdentifier));
-
-    DO(asn_encode_ba(get_SignerIdentifier_desc(), sid, baSidEncoded));
-
-cleanup:
-    asn_free(get_SignerIdentifier_desc(), sid);
-    return ret;
-}
-
-int CerStore::parseCert (
-        const ByteArray* baEncoded,
-        Item** item
-)
-{
-    int ret = RET_OK;
-    Certificate_t* cert = nullptr;
-    SmartBA sba_authkeyid;
-    SmartBA sba_certid;
-    SmartBA sba_issuer;
-    SmartBA sba_keyid;
-    SmartBA sba_pubkey;
-    SmartBA sba_serialnum;
-    SmartBA sba_spki;
-    SmartBA sba_subject;
-    Item* cer_item = nullptr;
-    HashAlg algo_keyid = HASH_ALG_SHA1;
-    uint64_t not_after = 0, not_before = 0;
-    uint32_t key_usage = 0;
-    char* s_keyalgo = nullptr;
-
-    CHECK_PARAM(baEncoded != nullptr);
-    CHECK_PARAM(item != nullptr);
-
-    CHECK_NOT_NULL(cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), baEncoded));
-
-    DO(asn_INTEGER2ba(&cert->tbsCertificate.serialNumber, &sba_serialnum));
-    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.issuer, &sba_issuer));
-    DO(Util::pkixTimeFromAsn1(&cert->tbsCertificate.validity.notBefore, not_before));
-    DO(Util::pkixTimeFromAsn1(&cert->tbsCertificate.validity.notAfter, not_after));
-    DO(asn_encode_ba(get_Name_desc(), &cert->tbsCertificate.subject, &sba_subject));
-    DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &cert->tbsCertificate.subjectPublicKeyInfo, &sba_spki));
-    DO(asn_oid_to_text(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, &s_keyalgo));
-    if (DstuNS::isDstu4145family(s_keyalgo)) {
-        algo_keyid = HASH_ALG_GOST34311;
-        //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
-        DO(Util::bitStringEncapOctetFromAsn1(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
-    }
-    else {
-        DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
-    }
-
-    DO(calcKeyId(algo_keyid, sba_pubkey.get(), &sba_keyid));
-    DO(encode_issuer_and_sn(&cert->tbsCertificate, &sba_certid));
-
-    if (cert->tbsCertificate.extensions) {
-        ret = ExtensionHelper::getKeyUsage(cert->tbsCertificate.extensions, &key_usage);
-        if (ret != RET_OK) {
-            if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
-                key_usage = 0;
-                ret = RET_OK;
+    if (permanent && !m_Path.empty()) {
+        for (auto it = removing_items.begin(); it != removing_items.end(); it++) {
+            CerItem* cer_item = *it;
+            if (!cer_item->getFileName().empty()) {
+                const string fn_cert = m_Path + cer_item->getFileName();
+                if (delete_file(fn_cert.c_str()) != 0) {
+                    ret = RET_UAPKI_FILE_DELETE_ERROR;
+                }
             }
         }
-        //  Required attribute authorityKeyIdentifier
-        DO(ExtensionHelper::getAuthorityKeyId(cert->tbsCertificate.extensions, &sba_authkeyid));
     }
 
-    cer_item = new Item();
-    if (cer_item) {
-        cer_item->baEncoded = baEncoded;
-        cer_item->cert = cert;
-        cer_item->baAuthorityKeyId = sba_authkeyid.pop();
-        cer_item->baCertId = sba_certid.pop();
-        cer_item->keyAlgo = s_keyalgo;
-        cer_item->baSerialNumber = sba_serialnum.pop();
-        cer_item->baKeyId = sba_keyid.pop();
-        cer_item->baIssuer = sba_issuer.pop();
-        cer_item->baSubject = sba_subject.pop();
-        cer_item->baSPKI = sba_spki.pop();
-        cer_item->algoKeyId = algo_keyid;
-        cer_item->notBefore = not_before;
-        cer_item->notAfter = not_after;
-        cer_item->keyUsage = key_usage;
-
-        cert = nullptr;
-        s_keyalgo = nullptr;
-
-        *item = cer_item;
-#ifdef DEBUG_CERSTOREITEM_INFO
-        debug_cerstoreitem_info(*cer_item);
-#endif
-        cer_item = nullptr;
-    }
-    else {
-        ret = RET_UAPKI_GENERAL_ERROR;
+    for (auto it = removing_items.begin(); it != removing_items.end(); it++) {
+        CerItem* cer_item = *it;
+        delete cer_item;
     }
 
-cleanup:
-    asn_free(get_Certificate_desc(), cert);
-    ::free(s_keyalgo);
-    delete cer_item;
     return ret;
 }
 
-int CerStore::parseSid (
-        const ByteArray* baSidEncoded,
-        ByteArray** baIssuer,
-        ByteArray** baSerialNumber,
-        ByteArray** baKeyId
-)
-{
-    int ret = RET_OK;
-    SignerIdentifier_t* sid = nullptr;
-    ByteArray* ba_issuer = nullptr;
-    ByteArray* ba_serialnum = nullptr;
-
-    if ((ba_get_len(baSidEncoded) < 3) || !baIssuer || !baSerialNumber || !baKeyId) return RET_UAPKI_INVALID_PARAMETER;
-
-    CHECK_NOT_NULL(sid = (SignerIdentifier_t*)asn_decode_ba_with_alloc(get_SignerIdentifier_desc(), baSidEncoded));
-    switch (sid->present) {
-    case SignerIdentifier_PR_issuerAndSerialNumber:
-        DO(asn_encode_ba(get_Name_desc(), &sid->choice.issuerAndSerialNumber.issuer, &ba_issuer));
-        DO(asn_INTEGER2ba(&sid->choice.issuerAndSerialNumber.serialNumber, &ba_serialnum));
-        *baIssuer = ba_issuer;
-        *baSerialNumber = ba_serialnum;
-        ba_issuer = nullptr;
-        ba_serialnum = nullptr;
-        break;
-    case SignerIdentifier_PR_subjectKeyIdentifier:
-        DO(asn_OCTSTRING2ba(&sid->choice.subjectKeyIdentifier, baKeyId));
-        break;
-    default:
-        break;
-    }
-
-cleanup:
-    asn_free(get_SignerIdentifier_desc(), sid);
-    ba_free(ba_issuer);
-    ba_free(ba_serialnum);
-    return ret;
-}
-
-CerStore::ValidationType CerStore::validationTypeFromStr (
-        const string& validationType
-)
-{
-    ValidationType rv_type = ValidationType::UNDEFINED;
-    if (validationType.empty() || (validationType == string("NONE"))) {
-        rv_type = ValidationType::NONE;
-    }
-    else if (validationType == string("CHAIN")) {
-        rv_type = ValidationType::CHAIN;
-    }
-    else if (validationType == string("CRL")) {
-        rv_type = ValidationType::CRL;
-    }
-    else if (validationType == string("OCSP")) {
-        rv_type = ValidationType::OCSP;
-    }
-    return rv_type;
-}
-
-const char* CerStore::verifyStatusToStr (
-        const VerifyStatus status
-)
-{
-    static const char* VERIFY_STATUS_STRINGS[6] = {
-        "UNDEFINED",
-        "INDETERMINATE",
-        "FAILED",
-        "INVALID",
-        "VALID WITHOUT KEYUSAGE",
-        "VALID"
-    };
-    return VERIFY_STATUS_STRINGS[((uint32_t)status < 6) ? (uint32_t)status : 0];
-}
-
-CerStore::Item* CerStore::addItem (
-        Item* item
+CerItem* CerStore::addItem (
+        CerItem* item
 )
 {
     for (auto& it : m_Items) {
-        const int ret = ba_cmp(item->baKeyId, it->baKeyId);
+        const int ret = ba_cmp(item->getKeyId(), it->getKeyId());
         if (ret == RET_OK) {
             DEBUG_OUTCON(printf("CerStore::addItem(), cert is found. keyId: "); ba_print(stdout, it->baKeyId));
             return it;
@@ -1141,46 +502,54 @@ int CerStore::loadDir (void)
             continue;
         }
 
-        //  Check ext of file
+        //  Check file-extension
         const string s_name = string(in_file->d_name);
-        size_t pos = s_name.rfind(CER_EXT);
-        if (pos != s_name.length() - 4) {
+        const size_t pos = s_name.rfind(CER_EXT);
+        if (pos != s_name.length() - CER_EXT_LEN) {
             continue;
         }
 
-        const string cer_path = m_Path + s_name;
-        if (!is_dir(cer_path.c_str())) {
-            ByteArray* ba_encoded = nullptr;
-            int ret = ba_alloc_from_file(cer_path.c_str(), &ba_encoded);
+        const string s_fullpath = m_Path + s_name;
+        if (!is_dir(s_fullpath.c_str())) {
+            SmartBA sba_encoded;
+            int ret = ba_alloc_from_file(s_fullpath.c_str(), &sba_encoded);
             if (ret != RET_OK) continue;
 
-            Item* cer_item = nullptr;
-            ret = parseCert(ba_encoded, &cer_item);
+            CerItem* parsed_item = nullptr;
+            ret = parseCert(sba_encoded.get(), &parsed_item);
             if (ret == RET_OK) {
-                addItem(cer_item);
-            }
-            else {
-                ba_free(ba_encoded);
+                (void)parsed_item->setFileName(s_name);
+                CerItem* added_item = addItem(parsed_item);
+                if (added_item != parsed_item) {
+                    (void)delete_file(s_fullpath.c_str());
+                    delete parsed_item;
+                }
             }
         }
     }
 
     closedir(dir);
+
+    for (auto& it : m_Items) {
+        const string s_genname = it->generateFileName();
+        if (s_genname != it->getFileName()) {
+            const string s_oldpath = m_Path + it->getFileName();
+            const string s_newpath = m_Path + s_genname;
+            if (rename(s_oldpath.c_str(), s_newpath.c_str()) == 0) {
+                (void)it->setFileName(s_genname);
+            }
+        }
+    }
+
     return RET_OK;
 }
 
-int CerStore::saveToFile (
-        const Item* cerStoreItem
-)
+void CerStore::reset (void)
 {
-    if (m_Path.empty()) return RET_OK;
-
-    string s_hex = Util::baToHex(cerStoreItem->baKeyId);
-    if (s_hex.empty()) return RET_OK;
-
-    const string s_path = m_Path + s_hex + string(CER_EXT);
-    const int ret = ba_to_file(cerStoreItem->baEncoded, s_path.c_str());
-    return ret;
+    for (auto& it : m_Items) {
+        delete it;
+    }
+    m_Items.clear();
 }
 
 void CerStore::saveStatToLog (
@@ -1199,12 +568,13 @@ void CerStore::saveStatToLog (
 
     size_t idx = 0;
     for (const auto& it : m_Items) {
+        CertStatusInfo& certstatus_byocsp = it->getCertStatusByOcsp();
         s_line = string("CER[") + to_string(idx++) + string("]\n");
-        s_line += string("KeyId: ") + Util::baToHex(it->baKeyId) + string("\n");
-        s_line += string("SerialNumber: ") + Util::baToHex(it->baSerialNumber) + string("\n");
-        s_line += string("OCSP, status: ") + CrlStore::certStatusToStr(it->certStatusByOcsp.status) + string("\n");
-        s_line += string("OCSP, validTime: ") + string(it->certStatusByOcsp.isExpired(ms) ? "IS EXPIRED " : "IS VALID   ");
-        s_line += TimeUtil::mtimeToFtime(it->certStatusByOcsp.validTime) + string("\n");
+        s_line += string("KeyId: ") + Util::baToHex(it->getKeyId()) + string("\n");
+        s_line += string("SerialNumber: ") + Util::baToHex(it->getSerialNumber()) + string("\n");
+        s_line += string("OCSP, status: ") + Crl::certStatusToStr(certstatus_byocsp.status) + string("\n");
+        s_line += string("OCSP, validTime: ") + string(certstatus_byocsp.isExpired(ms) ? "IS EXPIRED " : "IS VALID   ");
+        s_line += TimeUtil::mtimeToFtime(certstatus_byocsp.validTime) + string("\n");
         s_line += string("\n");
         fputs(s_line.c_str(), f);
     }
@@ -1214,3 +584,8 @@ void CerStore::saveStatToLog (
 
     fclose(f);
 }
+
+
+}   //  end namespace Cert
+
+}   //  end namespace UapkiNS

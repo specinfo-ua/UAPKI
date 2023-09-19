@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/add-crl.cpp"
+
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "parson-helper.h"
@@ -32,32 +34,30 @@
 #include "uapki-ns.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/add-crl.cpp"
+using namespace UapkiNS;
 
 
 int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    CrlStore* crl_store = nullptr;
-    UapkiNS::SmartBA sba_encoded;
-    const CrlStore::Item* crl_item = nullptr;
-    bool is_unique = false, permanent = false;
+    LibraryConfig* lib_config = get_config();
+    Crl::CrlStore* crl_store = get_crlstore();
+    Crl::CrlItem* crl_item = nullptr;
+    const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
+    SmartBA sba_encoded;
+    bool is_unique = false;
 
-    crl_store = get_crlstore();
-    if (!crl_store) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
+    if (!lib_config || !crl_store) return RET_UAPKI_GENERAL_ERROR;
+    if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     if (!sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
-    permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
 
     DO(crl_store->addCrl(sba_encoded.get(), permanent, is_unique, &crl_item));
     sba_encoded.set(nullptr);
 
-    DO(json_object_set_base64(joResult, "crlId", crl_item->baCrlId));
+    DO(json_object_set_base64(joResult, "crlId", crl_item->getCrlId()));
     DO(ParsonHelper::jsonObjectSetBoolean(joResult, "isUnique", is_unique));
 
 cleanup:

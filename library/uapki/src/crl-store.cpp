@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,7 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mutex>
+#define FILE_MARKER "uapki/crl-store.cpp"
+
+#include <map>
 #include <string.h>
 #include "crl-store.h"
 #include "ba-utils.h"
@@ -33,13 +35,9 @@
 #include "extension-helper.h"
 #include "macros-internal.h"
 #include "oids.h"
+#include "time-util.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-#include "uapki-ns-verify.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "src/crl-store.cpp"
 
 
 #define DEBUG_OUTCON(expression)
@@ -49,279 +47,59 @@
 
 
 using namespace std;
-using namespace UapkiNS;
+
+namespace UapkiNS {
+
+namespace Crl {
 
 
-static const char* CRL_EXT = ".crl";
-
-
-static const char* CERT_STATUS_STRINGS[4] = {
-    "UNDEFINED", "GOOD", "REVOKED", "UNKNOWN"
-};
-
-static const char* CRL_REASON_STRINGS[12] = {
-    "UNDEFINED", "UNSPECIFIED", "KEY_COMPROMISE", "CA_COMPROMISE", "AFFILIATION_CHANGED",
-    "SUPERSEDED", "CESSATION_OF_OPERATION", "CERTIFICATE_HOLD", "", "REMOVE_FROM_CRL",
-    "PRIVILEGE_WITHDRAWN", "AA_COMPROMISE"
-};
-
-
-static int encode_crlid (
-        const TBSCertList_t* tbs,
-        const ByteArray* baCrlNumber,
-        ByteArray** baIssuerAndSN
+static bool check_uris_delta (
+        const Type crlType,
+        const vector<string>& urisDeltaFromCrl,
+        const vector<string>& urisDeltaFromCert
 )
 {
-    int ret = RET_OK;
-    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
+    if (
+        urisDeltaFromCrl.empty() ||
+        urisDeltaFromCert.empty()
+    ) return false;
 
-    CHECK_PARAM(tbs != nullptr);
-    CHECK_PARAM(baCrlNumber != nullptr);
-    CHECK_PARAM(baIssuerAndSN != nullptr);
+    //  Simple case - check first values
+    return (urisDeltaFromCrl[0] == urisDeltaFromCert[0]);
+}   //  check_uris_delta
 
-    CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
-
-    DO(asn_copy(get_Name_desc(), &tbs->issuer, &issuer_and_sn->issuer));
-    DO(asn_ba2INTEGER(baCrlNumber, &issuer_and_sn->serialNumber));
-
-    DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
-
-cleanup:
-    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
-    return ret;
-}   //  encode_crlid
-
-static int encode_crlidentifier (
-        const TBSCertList_t* tbs,
-        const ByteArray* baCrlNumber,
-        ByteArray** baCrlIdentifier
+static CrlItem* find_last_available (
+        const vector<CrlItem*>& crlItems
 )
 {
-    int ret = RET_OK;
-    CrlIdentifier_t* crl_identifier = nullptr;
-    ByteArray* ba_crlissuedtime = nullptr;
-
-    CHECK_PARAM(tbs != nullptr);
-    CHECK_PARAM(baCrlIdentifier != nullptr);
-
-    CHECK_NOT_NULL(crl_identifier = (CrlIdentifier_t*)calloc(1, sizeof(CrlIdentifier_t)));
-
-    DO(asn_copy(get_Name_desc(), &tbs->issuer, &crl_identifier->crlissuer));
-    switch (tbs->thisUpdate.present) {
-    case PKIXTime_PR_utcTime:
-        DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.utcTime, &ba_crlissuedtime));
-        DO(asn_ba2OCTSTRING(ba_crlissuedtime, &crl_identifier->crlIssuedTime));
-        break;
-    case PKIXTime_PR_generalTime:
-        DO(asn_OCTSTRING2ba(&tbs->thisUpdate.choice.generalTime, &ba_crlissuedtime));
-        DO(asn_bytes2OCTSTRING(&crl_identifier->crlIssuedTime, ba_get_buf_const(ba_crlissuedtime) + 2, ba_get_len(ba_crlissuedtime) - 2));
-        break;
-    default:
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-    if (baCrlNumber) {
-        CHECK_NOT_NULL(crl_identifier->crlNumber = (INTEGER_t*)calloc(1, sizeof(INTEGER_t)));
-        DO(asn_ba2INTEGER(baCrlNumber, crl_identifier->crlNumber));
-    }
-
-    DO(asn_encode_ba(get_CrlIdentifier_desc(), crl_identifier, baCrlIdentifier));
-
-cleanup:
-    asn_free(get_CrlIdentifier_desc(), crl_identifier);
-    ba_free(ba_crlissuedtime);
-    return ret;
-}   //  encode_crlidentifier
-
-
-CrlStore::Item::Item (const CrlType iType)
-    : actuality(Actuality::UNDEFINED)
-    , type(iType)
-    , baEncoded(nullptr)
-    , crl(nullptr)
-    , baCrlId(nullptr)
-    , baIssuer(nullptr)
-    , thisUpdate(0)
-    , nextUpdate(0)
-    , baAuthorityKeyId(nullptr)
-    , baCrlNumber(nullptr)
-    , baDeltaCrl(nullptr)
-    , statusSign(CerStore::VerifyStatus::UNDEFINED)
-    , baCrlIdentifier(nullptr)
-{}
-
-CrlStore::Item::~Item (void)
-{
-    type = CrlType::UNDEFINED;
-    ba_free((ByteArray*)baEncoded);
-    asn_free(get_CertificateList_desc(), (CertificateList_t*)crl);
-    ba_free((ByteArray*)baCrlId);
-    ba_free((ByteArray*)baIssuer);
-    thisUpdate = 0;
-    nextUpdate = 0;
-    ba_free((ByteArray*)baAuthorityKeyId);
-    ba_free((ByteArray*)baCrlNumber);
-    ba_free((ByteArray*)baDeltaCrl);
-    statusSign = CerStore::VerifyStatus::UNDEFINED;
-    ba_free((ByteArray*)baCrlIdentifier);
-}
-
-size_t CrlStore::Item::countRevokedCerts (void) const
-{
-    size_t rv_cnt = 0;
-    if (crl && crl->tbsCertList.revokedCertificates) {
-        rv_cnt = (size_t)crl->tbsCertList.revokedCertificates->list.count;
-    }
-    return rv_cnt;
-}
-
-int CrlStore::Item::getHash (
-        const UapkiNS::AlgorithmIdentifier& aidDigest
-)
-{
-    int ret = RET_OK;
-
-    if (!aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
-
-    if (!crlHash.baHashValue || (crlHash.hashAlgorithm.algorithm != aidDigest.algorithm)) {
-        const HashAlg hash_alg = hash_from_oid(aidDigest.algorithm.c_str());
-        if (hash_alg == HashAlg::HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
-
-        ba_free(crlHash.baHashValue);
-        crlHash.baHashValue = nullptr;
-        crlHash.hashAlgorithm.clear();
-
-        DO(::hash(hash_alg, baEncoded, &crlHash.baHashValue));
-        crlHash.hashAlgorithm.algorithm = aidDigest.algorithm;
-    }
-
-cleanup:
-    return ret;
-}
-
-int CrlStore::Item::revokedCerts (
-        const CerStore::Item* cerSubject,
-        vector<const RevokedCertItem*>& revokedItems
-)
-{
-    int ret = RET_OK;
-    const RevokedCertificates_t* revoked_certs = nullptr;
-    ASN__PRIMITIVE_TYPE_t user_sn;
-
-    CHECK_PARAM(cerSubject != nullptr);
-
-    DEBUG_OUTCON(printf("CrlStore::Item::revokedCerts() cerSubject->baSerialNumber, hex: "); ba_print(stdout, cerSubject->baSerialNumber));
-    revoked_certs = crl->tbsCertList.revokedCertificates;
-    if (revoked_certs) {
-        DEBUG_OUTCON(printf("CrlStore::Item::revokedCerts() count: %d\n", revoked_certs->list.count));
-        user_sn.buf = (uint8_t*)ba_get_buf_const(cerSubject->baSerialNumber);
-        user_sn.size = (int)ba_get_len(cerSubject->baSerialNumber);
-        for (int i = 0; i < revoked_certs->list.count; i++) {
-            const RevokedCertificate_t* revoked_cert = revoked_certs->list.array[i];
-            if (Util::equalValuePrimitiveType(revoked_cert->userCertificate, user_sn)) {
-                DEBUG_OUTCON(printf("equal SerialNumber, index: %d\n", i));
-                const RevokedCertItem* revcert_item = nullptr;
-                uint64_t invalidity_date = 0, revocation_date = 0;
-                UapkiNS::CrlReason crl_reason = UapkiNS::CrlReason::UNDEFINED;
-
-                DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, revocation_date));
-                if (revoked_cert->crlEntryExtensions) {
-                    uint32_t u32_crlreason = 0;
-                    ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, &u32_crlreason);
-                    if (ret == RET_OK) {
-                        crl_reason = (UapkiNS::CrlReason)u32_crlreason;
-                    }
-                    ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, &invalidity_date);
-                }
-
-                revcert_item = new RevokedCertItem(revocation_date, crl_reason, invalidity_date);
-                if (revcert_item) {
-                    revokedItems.push_back(revcert_item);
+    CrlItem* rv_item = nullptr;
+    if (!crlItems.empty()) {
+        rv_item = crlItems[0];
+        if (crlItems.size() > 1) {
+            const ByteArray* ba_maxnumber = rv_item->getCrlNumber();
+            DEBUG_OUTCON(
+                printf("find_last_available() [0]  ba_maxnumber: ");
+                ba_print(stdout, ba_maxnumber);
+            )
+            for (size_t i = 1; i < crlItems.size(); i++) {
+                const int res = ba_cmp(ba_maxnumber, crlItems[i]->getCrlNumber());
+                if (res < 0) {
+                    rv_item = crlItems[i];
+                    ba_maxnumber = rv_item->getCrlNumber();
+                    DEBUG_OUTCON(
+                        printf("find_last_available() [%d]  ba_maxnumber: ", (int)i);
+                        ba_print(stdout, ba_maxnumber);
+                    )
                 }
             }
         }
     }
-
-cleanup:
-    return ret;
-}
-
-int CrlStore::Item::verify (
-        const CerStore::Item* cerIssuer
-)
-{
-    int ret = RET_OK;
-    X509Tbs_t* x509_tbs = nullptr;
-    ByteArray* ba_signature = nullptr;
-    ByteArray* ba_tbs = nullptr;
-    char* s_signalgo = nullptr;
-
-    CHECK_PARAM(cerIssuer != nullptr);
-
-    if (statusSign == CerStore::VerifyStatus::UNDEFINED) {
-        CHECK_NOT_NULL(x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded));
-        CHECK_NOT_NULL(ba_tbs = ba_alloc_from_uint8(x509_tbs->tbsData.buf, x509_tbs->tbsData.size));
-
-        DO(asn_oid_to_text(&crl->signatureAlgorithm.algorithm, &s_signalgo));
-        if (
-            oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo) ||
-            oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)
-        ) {
-            DO(Util::bitStringEncapOctetFromAsn1(&crl->signatureValue, &ba_signature));
-        }
-        else {
-            DO(asn_BITSTRING2ba(&crl->signatureValue, &ba_signature));
-        }
-
-        ret = Verify::verifySignature(s_signalgo, ba_tbs, false, cerIssuer->baSPKI, ba_signature);
-        switch (ret) {
-        case RET_OK:
-            statusSign = CerStore::VerifyStatus::VALID;
-            break;
-        case RET_VERIFY_FAILED:
-            statusSign = CerStore::VerifyStatus::INVALID;
-            break;
-        default:
-            statusSign = CerStore::VerifyStatus::FAILED;
-        }
-    }
-    else {
-        //  Nothing
-    }
-
-cleanup:
-    asn_free(get_X509Tbs_desc(), x509_tbs);
-    ba_free(ba_signature);
-    ba_free(ba_tbs);
-    ::free(s_signalgo);
-    return ret;
-}
-
-
-static CrlStore::Item* crlstore_find_last_available (vector<CrlStore::Item*> crlItems)
-{
-    CrlStore::Item* rv_item = nullptr;
-    const ByteArray* ba_maxnumber = nullptr;
-
-    rv_item = crlItems[0];
-    if (crlItems.size() > 1) {
-        int res = 0;
-        ba_maxnumber = rv_item->baCrlNumber;
-        DEBUG_OUTCON(printf("find_last_available() [0]  ba_maxnumber: "); ba_print(stdout, ba_maxnumber));
-        for (size_t i = 1; i < crlItems.size(); i++) {
-            res = ba_cmp(ba_maxnumber, crlItems[i]->baCrlNumber);
-            if (res < 0) {
-                rv_item = crlItems[i];
-                ba_maxnumber = rv_item->baCrlNumber;
-                DEBUG_OUTCON(printf("find_last_available() [%d]  ba_maxnumber: ", (int)i); ba_print(stdout, ba_maxnumber));
-            }
-        }
-    }
-
     return rv_item;
-}
+}   //  find_last_available
 
 
 CrlStore::CrlStore (void)
+    : m_UseDeltaCrl(true)
 {
 }
 
@@ -330,32 +108,50 @@ CrlStore::~CrlStore (void)
     reset();
 }
 
+void CrlStore::setParams (
+        const string& path,
+        bool useDeltaCrl
+)
+{
+    m_Path = path;
+    m_UseDeltaCrl = useDeltaCrl;
+}
+
 int CrlStore::addCrl (
         const ByteArray* baEncoded,
         const bool permanent,
         bool& isUnique,
-        const Item** crlStoreItem
+        CrlItem** crlItem
 )
 {
+    lock_guard<mutex> lock(m_Mutex);
+
     int ret = RET_OK;
-    Item* crl_parsed = nullptr;
-    const Item* crl_added = nullptr;
+    CrlItem* parsed_item = nullptr;
+    CrlItem* added_item = nullptr;
 
-    DO(parseCrl(baEncoded, &crl_parsed));
+    DO(parseCrl(baEncoded, &parsed_item));
 
-    crl_added = addItem(crl_parsed);
-    isUnique = true;//TODO: see CerStore::addCert()
-    crl_parsed = nullptr;
-    if (crlStoreItem) {
-        *crlStoreItem = crl_added;
+    added_item = addItem(parsed_item);
+    isUnique = (added_item == parsed_item);
+    if (isUnique) {
+        parsed_item = nullptr;
+    }
+    if (crlItem) {
+        *crlItem = added_item;
     }
 
-    if (permanent) {
-        saveToFile(crl_added);
+    if (isUnique && permanent && !m_Path.empty()) {
+        if (added_item->setFileName(added_item->generateFileName())) {
+            ret = added_item->saveToFile(m_Path);
+        }
+        else {
+            ret = RET_UAPKI_GENERAL_ERROR;
+        }
     }
 
 cleanup:
-    delete crl_parsed;
+    delete parsed_item;
     return ret;
 }
 
@@ -363,326 +159,191 @@ int CrlStore::getCount (
         size_t& count
 )
 {
-    mutex mtx;
-    //  Note: getCount() may (by type provider) return RET_UAPKI_NOT_SUPPORTED
-    int ret = RET_OK;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
+
     count = m_Items.size();
-    mtx.unlock();
-    return ret;
+    return RET_OK;
 }
 
-CrlStore::Item* CrlStore::getCrl (
+CrlItem* CrlStore::getCrl (
         const ByteArray* baAuthorityKeyId,
-        const CrlType type
+        const Type crlType,
+        const vector<string>& urisDeltaFromCert
 )
 {
-    mutex mtx;
-    mtx.lock();
-    vector<Item*> crl_items;
+    lock_guard<mutex> lock(m_Mutex);
+
+    DEBUG_OUTCON(
+        printf("\nCrlStore::getCrl(authKeyId=");
+        ba_print(stdout, baAuthorityKeyId);
+        printf("  crlType=%d,\n  urisDeltaFromCert.size=%zu)\n", (int)crlType, urisDeltaFromCert.size());
+        if (!urisDeltaFromCert.empty()) printf("   urisDeltaFromCert[0]='%s'\n", urisDeltaFromCert[0].c_str());
+    );
+
+    vector<CrlItem*> crl_items;
     for (auto& it : m_Items) {
-        if ((ba_cmp(it->baAuthorityKeyId, baAuthorityKeyId) == 0) && (it->actuality != Actuality::OBSOLETE) && (it->type == type)) {
-            DEBUG_OUTCON(printf("CrlStore::getCrl(): thisUpdate %lld, nextUpdate %lld\n", it->thisUpdate, it->nextUpdate));
+        DEBUG_OUTCON(
+            printf(" CrlItem:\n   authKeyId=");
+            ba_print(stdout, it->getAuthorityKeyId());
+            printf("   crlNumber=");
+            ba_print(stdout, it->getCrlNumber());
+            printf("   actuality=%d, crlType=%d, count deltaCrl=%zu\n", (int)it->getActuality(), (int)it->getType(), it->getUris().deltaCrl.size());
+            if (!it->getUris().deltaCrl.empty()) printf("   deltaCrl[0]='%s'\n", it->getUris().deltaCrl[0].c_str());
+        );
+        if (
+            (ba_cmp(it->getAuthorityKeyId(), baAuthorityKeyId) == 0) &&
+            (it->getActuality() != CrlItem::Actuality::OBSOLETE) &&
+            (it->getType() == crlType) &&
+            check_uris_delta(crlType, it->getUris().deltaCrl, urisDeltaFromCert)
+        ) {
+            DEBUG_OUTCON(printf("   *** FOUND CrlItem: ThisUpdate %lld, NextUpdate %lld\n", it->getThisUpdate(), it->getNextUpdate()));
             crl_items.push_back(it);
         }
     }
 
-    Item* rv_item = nullptr;
-    if (!crl_items.empty()) {
-        rv_item = crlstore_find_last_available(crl_items);
-        if (rv_item) {
-            for (auto& it : crl_items) {
-                it->actuality = Actuality::OBSOLETE;
-            }
-            rv_item->actuality = Actuality::LAST_AVAILABLE;
+    CrlItem* rv_item = find_last_available(crl_items);
+    if (rv_item) {
+        DEBUG_OUTCON(printf(" Last AVAILABLE CrlItem: ThisUpdate %lld, NextUpdate %lld\n", rv_item->getThisUpdate(), rv_item->getNextUpdate()));
+        for (auto& it : crl_items) {
+            it->setActuality((it == rv_item) ? CrlItem::Actuality::LAST_AVAILABLE : CrlItem::Actuality::OBSOLETE);
         }
     }
+    else {
+        DEBUG_OUTCON(printf(" Last AVAILABLE CrlItem: NOT FOUND\n"));
+    }
 
-    mtx.unlock();
     return rv_item;
 }
 
 int CrlStore::getCrlByCrlId (
         const ByteArray* baCrlId,
-        const Item** crlStoreItem
+        CrlItem** crlItem
 )
 {
-    mutex mtx;
-    int ret = RET_UAPKI_CRL_NOT_FOUND;
-    mtx.lock();
+    lock_guard<mutex> lock(m_Mutex);
 
+    int ret = RET_UAPKI_CRL_NOT_FOUND;
     for (auto& it : m_Items) {
-        if (ba_cmp(baCrlId, it->baCrlId) == RET_OK) {
-            *crlStoreItem = it;
+        if (ba_cmp(baCrlId, it->getCrlId()) == RET_OK) {
+            *crlItem = it;
             ret = RET_OK;
             break;
         }
     }
 
-    mtx.unlock();
     return ret;
 }
 
-int CrlStore::load (
-        const char* path
+int CrlStore::getCrlByIndex (
+        const size_t index,
+        CrlItem** crlItem
 )
 {
-    mutex mtx;
-    if (path == nullptr) return RET_UAPKI_INVALID_PARAMETER;
+    lock_guard<mutex> lock(m_Mutex);
 
-    mtx.lock();
-    m_Path = string(path);
+    int ret = RET_UAPKI_CRL_NOT_FOUND;
+    if (index < m_Items.size()) {
+        *crlItem = m_Items[index];
+        ret = RET_OK;
+    }
+
+    return ret;
+}
+
+vector<CrlItem*> CrlStore::getCrlItems (void)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    return m_Items;
+}
+
+int CrlStore::load (void)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
     const int ret = loadDir();
-    mtx.unlock();
     if (ret != RET_OK) {
         reset();
     }
     return ret;
 }
 
-int CrlStore::reload (void)
-{
-    mutex mtx;
-    mtx.lock();
-    const int ret = loadDir();
-    mtx.unlock();
-    if (ret != RET_OK) {
-        reset();
-    }
-    return ret;
-}
-
-void CrlStore::reset (void)
-{
-    mutex mtx;
-    mtx.lock();
-    for (auto& it : m_Items) {
-        delete it;
-    }
-    m_Items.clear();
-    mtx.unlock();
-}
-
-const char* CrlStore::certStatusToStr (
-        const UapkiNS::CertStatus status
+int CrlStore::removeCrl (
+        const ByteArray* baCrlId,
+        const bool permanent
 )
 {
-    int32_t idx = (int32_t)status + 1;
-    return CERT_STATUS_STRINGS[(idx < 4) ? idx : 0];
-}
+    lock_guard<mutex> lock(m_Mutex);
 
-const char* CrlStore::crlReasonToStr (
-        const UapkiNS::CrlReason reason
-)
-{
-    int32_t idx = (int32_t)reason + 1;
-    return CRL_REASON_STRINGS[(idx < 12) ? idx : 0];
-}
-
-int CrlStore::decodeCrlIdentifier (
-        const ByteArray* baEncoded,
-        ByteArray** baIssuer,
-        uint64_t& msIssuedTime,
-        ByteArray** baCrlNumber
-)
-{
     int ret = RET_OK;
-    CrlIdentifier_t* crl_identifier = nullptr;
-
-    CHECK_NOT_NULL(crl_identifier = (CrlIdentifier_t*)asn_decode_ba_with_alloc(get_CrlIdentifier_desc(), baEncoded));
-
-    //  =crlIssuer=
-    DO(asn_encode_ba(get_Name_desc(), &crl_identifier->crlissuer, baIssuer));
-    //  =crlIssuedTime=
-    DO(Util::utcTimeFromAsn1(&crl_identifier->crlIssuedTime, msIssuedTime));
-    //  =crlNumber= (optional)
-    if (crl_identifier->crlNumber) {
-        DO(asn_INTEGER2ba(crl_identifier->crlNumber, baCrlNumber));
-    }
-
-cleanup:
-    asn_free(get_CrlIdentifier_desc(), crl_identifier);
-    return ret;
-}
-
-const CrlStore::RevokedCertItem* CrlStore::findNearBefore (
-        const vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validateTime
-)
-{
-    const RevokedCertItem* rv_item = nullptr;
-    if (!revokedItems.empty()) {
-        //  Search first near
-        for (auto& it : revokedItems) {
-            if (validateTime > it->getDate()) {
-                rv_item = it;
-                break;
+    vector<CrlItem*> deleting_items, items, items2;
+    
+    if (baCrlId) {
+        for (auto& it : m_Items) {
+            if (ba_cmp(baCrlId, it->getCrlId()) == RET_OK) {
+                deleting_items.push_back(it);
+            }
+            else {
+                items.push_back(it);
             }
         }
-
-        //  Search nearest
-        if (rv_item) {
-            uint64_t near_date = rv_item->getDate();
-            for (auto& it : revokedItems) {
-                if (it != rv_item) {
-                    const uint64_t cur_date = it->getDate();
-                    if ((validateTime > cur_date) && (cur_date > near_date)) {
-                        near_date = rv_item->getDate();
-                        rv_item = it;
-                    }
-                }
-            }
+        if (deleting_items.empty()) {
+            return RET_UAPKI_CRL_NOT_FOUND;
         }
-    }
-    return rv_item;
-}
-
-bool CrlStore::findRevokedCert (
-        const vector<const RevokedCertItem*>& revokedItems,
-        const uint64_t validateTime,
-        UapkiNS::CertStatus& status,
-        RevokedCertItem& revokedCertItem
-)
-{
-    bool rv_isfound = false;
-    if (revokedItems.empty()) {
-        status = UapkiNS::CertStatus::GOOD;
     }
     else {
-        const CrlStore::RevokedCertItem* revcert_before = CrlStore::findNearBefore(revokedItems, validateTime);
-        if (revcert_before) {
-            DEBUG_OUTCON(printf("revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n",
-                revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));
-            switch (revcert_before->crlReason) {
-            case UapkiNS::CrlReason::REMOVE_FROM_CRL:
-                status = UapkiNS::CertStatus::GOOD;
-                break;
-            case UapkiNS::CrlReason::UNDEFINED:
-                status = UapkiNS::CertStatus::UNDEFINED;
-                break;
-            case UapkiNS::CrlReason::UNSPECIFIED:
-                status = UapkiNS::CertStatus::UNKNOWN;
-                break;
-            default:
-                status = UapkiNS::CertStatus::REVOKED;
-                break;
-            }
-            rv_isfound = true;
+        items = m_Items;
+    }
+
+    for (auto& it : items) {
+        if (it->getActuality() == CrlItem::Actuality::OBSOLETE) {
+            deleting_items.push_back(it);
         }
         else {
-            status = UapkiNS::CertStatus::GOOD;
+            items2.push_back(it);
         }
     }
-    return rv_isfound;
-}
 
-int CrlStore::parseCrl (
-        const ByteArray* baEncoded,
-        Item** item
-)
-{
-    int ret = RET_OK;
-    CertificateList_t* crl = nullptr;
-    TBSCertList_t* tbs = nullptr;
-    ByteArray* ba_authoritykeyid = nullptr;
-    ByteArray* ba_crlid = nullptr;
-    ByteArray* ba_crlident = nullptr;
-    ByteArray* ba_crlnumber = nullptr;
-    ByteArray* ba_deltacrl = nullptr;
-    ByteArray* ba_issuer = nullptr;
-    Item* crl_item = nullptr;
-    CrlType crl_type = CrlType::UNDEFINED;
-    uint64_t this_update = 0, next_update = 0;
-    unsigned long version = 0;
-
-    CHECK_PARAM(baEncoded != nullptr);
-    CHECK_PARAM(item != nullptr);
-
-    CHECK_NOT_NULL(crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), baEncoded));
-    tbs = &crl->tbsCertList;
-
-    if (tbs->version) {
-        DO(asn_INTEGER2ulong(tbs->version, &version));
-    }
-    if (!Util::equalValuePrimitiveType(tbs->signature.algorithm, crl->signatureAlgorithm.algorithm)) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-    DO(asn_encode_ba(get_Name_desc(), &tbs->issuer, &ba_issuer));
-    DO(Util::pkixTimeFromAsn1(&tbs->thisUpdate, this_update));
-    DO(Util::pkixTimeFromAsn1(&tbs->nextUpdate, next_update));
-
-    if (tbs->crlExtensions) {
-        DO(ExtensionHelper::getAuthorityKeyId(tbs->crlExtensions, &ba_authoritykeyid));
-        DO(ExtensionHelper::getCrlNumber(tbs->crlExtensions, &ba_crlnumber));
-        ret = ExtensionHelper::getDeltaCrlIndicator(tbs->crlExtensions, &ba_deltacrl);
-        switch (ret) {
-        case RET_OK:
-            crl_type = CrlType::DELTA;
-            break;
-        case RET_UAPKI_EXTENSION_NOT_PRESENT:
-            crl_type = CrlType::FULL;
-            break;
-        default:
-            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    m_Items = items2;
+    for (auto& it : deleting_items) {
+        if (permanent) {
+            const string s_fullpath = m_Path + it->getFileName();
+            (void)delete_file(s_fullpath.c_str());
         }
-        DO(encode_crlid(tbs, ba_crlnumber, &ba_crlid));
-        DO(encode_crlidentifier(tbs, ba_crlnumber, &ba_crlident));
-    }
-    else {
-        crl_type = CrlType::V1;
+        delete it;
     }
 
-    crl_item = new Item(crl_type);
-    if (crl_item) {
-        crl_item->baEncoded = baEncoded;
-        crl_item->crl = crl;
-        crl_item->baCrlId = ba_crlid;
-        crl_item->baIssuer = ba_issuer;
-        crl_item->thisUpdate = this_update;
-        crl_item->nextUpdate = next_update;
-        crl_item->baAuthorityKeyId = ba_authoritykeyid;
-        crl_item->baCrlNumber = ba_crlnumber;
-        crl_item->baDeltaCrl = ba_deltacrl;
-        crl_item->baCrlIdentifier = ba_crlident;
-
-        crl = nullptr;
-        ba_authoritykeyid = nullptr;
-        ba_crlid = nullptr;
-        ba_crlident = nullptr;
-        ba_crlnumber = nullptr;
-        ba_deltacrl = nullptr;
-        ba_issuer = nullptr;
-        *item = crl_item;
-        crl_item = nullptr;
-    }
-
-cleanup:
-    asn_free(get_CertificateList_desc(), crl);
-    ba_free(ba_authoritykeyid);
-    ba_free(ba_crlid);
-    ba_free(ba_crlident);
-    ba_free(ba_crlnumber);
-    ba_free(ba_deltacrl);
-    ba_free(ba_issuer);
-    delete crl_item;
     return ret;
 }
 
-CrlStore::Item* CrlStore::addItem (
-        Item* item
+CrlItem* CrlStore::addItem (
+        CrlItem* item
 )
 {
-    mutex mtx;
-    mtx.lock();
+    for (auto& it : m_Items) {
+        const bool authoritykeyid_is_equal = (ba_cmp(item->getAuthorityKeyId(), it->getAuthorityKeyId()) == 0);
+        const bool crlnumber_is_equal = (ba_cmp(item->getCrlNumber(), it->getCrlNumber()) == 0);
+        if (authoritykeyid_is_equal && crlnumber_is_equal) {
+            DEBUG_OUTCON(
+                printf("CrlStore::addItem(), CRL is found. AuthorityKeyId and CrlNumber: ");
+                ba_print(stdout, it->getAuthorityKeyId());
+                ba_print(stdout, it->getCrlNumber());
+            )
+            return it;
+        }
+    }
 
-    DEBUG_OUTCON(printf("CRL info:\n  crlType: %d\n  thisUpdate: %llu\n  nextUpdate: %llu\n", (int)item->type, item->thisUpdate, item->nextUpdate));
-    DEBUG_OUTCON(if (item->crl->tbsCertList.revokedCertificates) { printf("  count revoked certs: %d\n", item->crl->tbsCertList.revokedCertificates->list.count); });
-    DEBUG_OUTCON(printf("  AuthorityKeyId,    hex: ");  ba_print(stdout, item->baAuthorityKeyId));
-    DEBUG_OUTCON(printf("  CrlNumber,         hex: ");  ba_print(stdout, item->baCrlNumber));
-    DEBUG_OUTCON(if (item->type == CrlType::DELTA) { printf("  DeltaCrlIndicator, hex: ");  ba_print(stdout, item->baDeltaCrl); });
+    DEBUG_OUTCON(printf("CRL info:\n  crlType: %d\n  m_ThisUpdate: %llu\n  m_nextUpdate: %llu\n", (int)item->getType(), item->getThisUpdate(), item->getNextUpdate()));
+    DEBUG_OUTCON(if (item->getCrl()->tbsCertList.revokedCertificates) { printf("  count revoked certs: %d\n", item->getCrl()->tbsCertList.revokedCertificates->list.count); });
+    DEBUG_OUTCON(printf("  AuthorityKeyId,    hex: ");  ba_print(stdout, item->getAuthorityKeyId()));
+    DEBUG_OUTCON(printf("  CrlNumber,         hex: ");  ba_print(stdout, item->getCrlNumber()));
+    DEBUG_OUTCON(if (item->getType() == Type::DELTA) { printf("  DeltaCrlIndicator, hex: ");  ba_print(stdout, item->getDeltaCrl()); });
     m_Items.push_back(item);
-
-    mtx.unlock();
+    DEBUG_OUTCON(
+        printf("CrlStore::addItem(), CRL is unique - add it. AuthorityKeyId and CrlNumber: ");
+        ba_print(stdout, item->getAuthorityKeyId());
+        ba_print(stdout, item->getCrlNumber());
+    )
     return item;
 }
 
@@ -701,48 +362,120 @@ int CrlStore::loadDir (void)
             continue;
         }
 
-        //  Check ext of file
+        //  Check file-extension
         const string s_name = string(in_file->d_name);
-        size_t pos = s_name.rfind(CRL_EXT);
-        if (pos != s_name.length() - 4) {
+        const size_t pos = s_name.rfind(CRL_EXT);
+        if (pos != s_name.length() - CRL_EXT_LEN) {
             continue;
         }
 
-        const string crl_path = m_Path + s_name;
-        if (!is_dir(crl_path.c_str())) {
-            ByteArray* ba_encoded = nullptr;
-            int ret = ba_alloc_from_file(crl_path.c_str(), &ba_encoded);
+        const string s_fullpath = m_Path + s_name;
+        if (!is_dir(s_fullpath.c_str())) {
+            SmartBA sba_encoded;
+            int ret = ba_alloc_from_file(s_fullpath.c_str(), &sba_encoded);
             if (ret != RET_OK) continue;
 
-            Item* crl_item = nullptr;
-            ret = parseCrl(ba_encoded, &crl_item);
+            CrlItem* parsed_item = nullptr;
+            ret = parseCrl(sba_encoded.get(), &parsed_item);
             if (ret == RET_OK) {
-                addItem(crl_item);
-            }
-            else {
-                ba_free(ba_encoded);
+                (void)sba_encoded.set(nullptr);
+                (void)parsed_item->setFileName(s_name);
+                CrlItem* added_item = addItem(parsed_item);
+                if (added_item != parsed_item) {
+                    (void)delete_file(s_fullpath.c_str());
+                    delete parsed_item;
+                }
             }
         }
     }
 
     closedir(dir);
+
+    for (auto& it : m_Items) {
+        const string s_genname = it->generateFileName();
+        if (s_genname != it->getFileName()) {
+            const string s_oldpath = m_Path + it->getFileName();
+            const string s_newpath = m_Path + s_genname;
+            if (rename(s_oldpath.c_str(), s_newpath.c_str()) == 0) {
+                (void)it->setFileName(s_genname);
+            }
+        }
+    }
+
+    return removeObsolete();
+}
+
+int CrlStore::removeObsolete (void)
+{
+    //  Build maps and list
+    map<string, CrlItem*> map_fullcrls, map_deltacrls;
+    vector<CrlItem*> deleting_items;
+    for (const auto& it : m_Items) {
+        string s_id = Util::baToHex(it->getAuthorityKeyId());
+        if (s_id.empty()) continue;
+
+        if (it->getType() == Type::FULL) {
+            if (!it->getUris().deltaCrl.empty()) {
+                s_id += "-" + it->getUris().deltaCrl[0];
+            }
+
+            auto it_value = map_fullcrls.find(s_id);
+            if (it_value == map_fullcrls.end()) {
+                map_fullcrls.insert(pair<string, CrlItem*>(s_id, it));
+            }
+            else {
+                if (it->getThisUpdate() > it_value->second->getThisUpdate()) {
+                    deleting_items.push_back(it_value->second);
+                    it_value->second = it;
+                }
+            }
+        }
+        else {
+            const string s_deltacrl = Util::baToHex(it->getDeltaCrl());
+            if (s_deltacrl.empty()) continue;
+
+            s_id += "-" + s_deltacrl;
+            auto it_value = map_deltacrls.find(s_id);
+            if (it_value == map_deltacrls.end()) {
+                map_deltacrls.insert(pair<string, CrlItem*>(s_id, it));
+            }
+            else {
+                if (it->getThisUpdate() > it_value->second->getThisUpdate()) {
+                    deleting_items.push_back(it_value->second);
+                    it_value->second = it;
+                }
+            }
+        }
+    }
+
+    //  Delete CRL from FS and release CrlStore::CrlItem
+    for (auto& it : deleting_items) {
+        const string s_fullpath = m_Path + it->getFileName();
+        (void)delete_file(s_fullpath.c_str());
+        delete it;
+    }
+
+    //  Create new list CrlStore::CrlItem
+    m_Items.clear();
+    for (const auto& it : map_fullcrls) {
+        m_Items.push_back(it.second);
+    }
+    for (const auto& it : map_deltacrls) {
+        m_Items.push_back(it.second);
+    }
+
     return RET_OK;
 }
 
-int CrlStore::saveToFile (
-        const Item* crlStoreItem
-)
+void CrlStore::reset (void)
 {
-    if (m_Path.empty() || ((crlStoreItem->type != CrlType::FULL) && (crlStoreItem->type != CrlType::DELTA))) return RET_OK;
-
-    string s_hex = Util::baToHex(crlStoreItem->baAuthorityKeyId);
-    if (s_hex.empty()) return RET_OK;
-
-    string s_path = m_Path + s_hex + ((crlStoreItem->type == CrlType::FULL) ? "-full-" : "-delta-");
-    s_hex = Util::baToHex(crlStoreItem->baCrlNumber);
-    s_path += s_hex + string(CRL_EXT);
-
-    const int ret = ba_to_file(crlStoreItem->baEncoded, s_path.c_str());
-    return ret;
+    for (auto& it : m_Items) {
+        delete it;
+    }
+    m_Items.clear();
 }
 
+
+}   //  end namespace Crl
+
+}   //  end namespace UapkiNS

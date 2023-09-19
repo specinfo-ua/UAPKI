@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -106,11 +106,17 @@ namespace Ocsp {
 
         int init (void);
         int addCert (
-            const CerStore::Item* csiIssuer,
-            const CerStore::Item* csiSubject
+            const Cert::CerItem* cerIssuer,
+            const Cert::CerItem* cerSubject
         );
-        int addSN (
-            const CerStore::Item* csiIssuer,
+        int addCertId (
+            const UapkiNS::AlgorithmIdentifier& hashAlgorithm,
+            const ByteArray* baIssuerNameHash,
+            const ByteArray* baIssuerKeyHash,
+            const ByteArray* baSerialNumber
+        );
+        int addIssuerAndSN (
+            const Cert::CerItem* cerIssuer,
             const ByteArray* baSerialNumber
         );
         int genNonce (
@@ -161,7 +167,7 @@ namespace Ocsp {
         );
         int scanSingleResponses (void);
         int verifyTbsResponseData (
-            const CerStore::Item* csiResponder,
+            const Cert::CerItem* cerResponder,
             SignatureVerifyStatus& statusSign
         );
 
@@ -187,7 +193,9 @@ namespace Ocsp {
 
     public:
         int addNonceToExtension (void);
-        int parseOcspResponse (const ByteArray* baEncoded);
+        int parseOcspResponse (
+            const ByteArray* baEncoded
+        );
 
     };  //  end class OcspHelper
 
@@ -202,15 +210,15 @@ namespace Ocsp {
                     singleResponseInfo;
         SignatureVerifyStatus
                     statusSignature;
-        CerStore::Item*
-                    csiResponder;
+        Cert::CerItem*
+                    cerResponder;
 
         ResponseInfo (void)
         : responseStatus(ResponseStatus::UNDEFINED)
         , responderIdType(ResponderIdType::UNDEFINED)
         , msProducedAt(0)
         , statusSignature(SignatureVerifyStatus::UNDEFINED)
-        , csiResponder(nullptr)
+        , cerResponder(nullptr)
         {}
 
     };  //  end struct ResponseInfo

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,6 +24,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define FILE_MARKER "common/pkix/uapki-ns-verify.cpp"
 
 #include "uapki-ns-verify.h"
 #include "dstu4145-params.h"
@@ -64,7 +66,7 @@ cleanup:
 static int parse_ecdsa_pubkey (const ByteArray* baPubkey, ByteArray** baQx, ByteArray** baQy)
 {
     int ret = RET_OK;
-    SmartBA sba_qx, sba_qy;
+    SmartBA sba_Qx, sba_Qy;
     const uint8_t* buf = nullptr;
     size_t len = 0;
 
@@ -80,14 +82,14 @@ static int parse_ecdsa_pubkey (const ByteArray* baPubkey, ByteArray** baQx, Byte
     len = (len - 1) / 2;
 
     if (
-        !sba_qx.set(ba_alloc_from_uint8(&buf[1], len)) ||
-        !sba_qy.set(ba_alloc_from_uint8(&buf[len + 1], len))
+        !sba_Qx.set(ba_alloc_from_uint8(&buf[1], len)) ||
+        !sba_Qy.set(ba_alloc_from_uint8(&buf[len + 1], len))
     ) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    *baQx = sba_qx.pop();
-    *baQy = sba_qy.pop();
+    *baQx = sba_Qx.pop();
+    *baQy = sba_Qy.pop();
 
 cleanup:
     return ret;
@@ -121,7 +123,7 @@ int Verify::verifyEcSign (
 {
     int ret = RET_OK;
     EcCtx* ec_ctx = nullptr;
-    SmartBA sba_qx, sba_qy, sba_r, sba_s;
+    SmartBA sba_Qx, sba_Qy, sba_r, sba_s;
 
     CHECK_NOT_NULL(baPubkey);
     CHECK_NOT_NULL(baHash);
@@ -131,17 +133,17 @@ int Verify::verifyEcSign (
     switch (signAlgo)
     {
     case SIGN_DSTU4145:
-        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &sba_qx, &sba_qy));
-        DO(ba_swap(sba_qx.get()));
-        DO(ba_swap(sba_qy.get()));
+        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &sba_Qx, &sba_Qy));
+        DO(ba_swap(sba_Qx.get()));
+        DO(ba_swap(sba_Qy.get()));
         DO(parse_dstu_signvalue(baSignValue, &sba_r, &sba_s));
-        DO(ec_init_verify(ec_ctx, sba_qx.get(), sba_qy.get()));
+        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
         DO(dstu4145_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
         break;
     case SIGN_ECDSA:
-        DO(parse_ecdsa_pubkey(baPubkey, &sba_qx, &sba_qy));
+        DO(parse_ecdsa_pubkey(baPubkey, &sba_Qx, &sba_Qy));
         DO(parse_ecdsa_signvalue(baSignValue, &sba_r, &sba_s));
-        DO(ec_init_verify(ec_ctx, sba_qx.get(), sba_qy.get()));
+        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
         DO(ecdsa_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
         break;
     default:

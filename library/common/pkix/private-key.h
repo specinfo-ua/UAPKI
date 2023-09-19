@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-03-01
-
-#ifndef CM_PRIVATE_KEY_H
-#define CM_PRIVATE_KEY_H
+#ifndef UAPKI_PRIVATE_KEY_H
+#define UAPKI_PRIVATE_KEY_H
 
 #include "uapkic.h"
 #include "cm-export.h"

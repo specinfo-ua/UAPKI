@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,14 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
+#define CURL_STATICLIB
+#include "curl/curl.h"
 #include "ba-utils.h"
 #include "http-helper.h"
 #include "uapkic.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
-#define CURL_STATICLIB
-#include "curl/curl.h"
+#include <string.h>
+#include <map>
+#include <mutex>
 
 
 #define DEBUG_OUTCON(expression)
@@ -49,19 +51,38 @@ const char* HttpHelper::CONTENT_TYPE_OCSP_REQUEST   = "Content-Type:application/
 const char* HttpHelper::CONTENT_TYPE_TSP_REQUEST    = "Content-Type:application/timestamp-query";
 
 
-typedef struct HTTP_HELPER_ST {
-    bool isInitialized;
-    bool offlineMode;
+struct HTTP_HELPER {
+    bool    isInitialized;
+    bool    offlineMode;
+    string  proxyUrl;
+    string  proxyCredentials;
+    mutex   mtx;
+    map<string, mutex>
+            mtxByUrl;
 
-    HTTP_HELPER_ST (void)
-        : isInitialized(false), offlineMode(false)
+    HTTP_HELPER (void)
+        : isInitialized(false)
+        , offlineMode(false)
     {}
-} HTTP_HELPER;
+
+    void reset (void)
+    {
+        isInitialized = false;
+        offlineMode = false;
+        proxyUrl.clear();
+        proxyCredentials.clear();
+    }
+};  //  end struct HTTP_HELPER
 
 static HTTP_HELPER http_helper;
 
 
-static size_t cb_curlwrite (void* dataIn, size_t size, size_t nmemb, void* userp)
+static size_t cb_curlwrite (
+        void* dataIn,
+        size_t size,
+        size_t nmemb,
+        void* userp
+)
 {
     size_t realsize = size * nmemb;
     ByteArray* data = (ByteArray*)userp;
@@ -73,11 +94,34 @@ static size_t cb_curlwrite (void* dataIn, size_t size, size_t nmemb, void* userp
     memcpy(&(buf[old_len]), dataIn, realsize);
 
     return realsize;
-}
+}   //  cb_curlwrite
+
+static bool curl_set_url_and_proxy (
+        CURL* curl,
+        const string& uri
+)
+{
+    CURLcode rv_ccode = curl_easy_setopt(curl, CURLOPT_URL, uri.c_str());
+    if (rv_ccode != CURLE_OK) return false;
+
+    if (!http_helper.proxyUrl.empty()) {
+        rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, http_helper.proxyUrl.c_str());
+        if (rv_ccode != CURLE_OK) return false;
+
+        if (!http_helper.proxyCredentials.empty()) {
+            rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, http_helper.proxyCredentials.c_str());
+            if (rv_ccode != CURLE_OK) return false;
+        }
+    }
+
+    return true;
+}   //  curl_set_url_and_proxy
 
 
 int HttpHelper::init (
-        const bool offlineMode
+        const bool offlineMode,
+        const char* proxyUrl,
+        const char* proxyCredentials
 )
 {
     int ret = RET_OK;
@@ -85,6 +129,12 @@ int HttpHelper::init (
     if (!http_helper.isInitialized) {
         const CURLcode curl_code = curl_global_init(CURL_GLOBAL_ALL);
         http_helper.isInitialized = (curl_code == CURLE_OK);
+        if (proxyUrl && http_helper.isInitialized) {
+            http_helper.proxyUrl = string(proxyUrl);
+            if (proxyCredentials && !http_helper.proxyUrl.empty()) {
+                http_helper.proxyCredentials = string(proxyCredentials);
+            }
+        }
         ret = (http_helper.isInitialized) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
     }
     return ret;
@@ -93,7 +143,7 @@ int HttpHelper::init (
 void HttpHelper::deinit (void)
 {
     if (http_helper.isInitialized) {
-        http_helper.isInitialized = false;
+        http_helper.reset();
         curl_global_cleanup();
     }
 }
@@ -103,12 +153,17 @@ bool HttpHelper::isOfflineMode (void)
     return http_helper.offlineMode;
 }
 
+const string& HttpHelper::getProxyUrl (void)
+{
+    return http_helper.proxyUrl;
+}
+
 int HttpHelper::get (
-        const char* url,
+        const string& uri,
         ByteArray** baResponse
 )
 {
-    DEBUG_OUTCON(printf("HttpHelper::get(url='%s')\n", url));
+    DEBUG_OUTCON(printf("HttpHelper::get(uri='%s')\n", uri.c_str()));
     CURL* curl;
     CURLcode curl_code;
     int ret;
@@ -124,7 +179,9 @@ int HttpHelper::get (
 
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the data.
-    curl_easy_setopt(curl, CURLOPT_URL, url);
+    if (!curl_set_url_and_proxy(curl, uri)) {
+        return RET_UAPKI_CONNECTION_ERROR;
+    }
 
     // send all data to this function
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb_curlwrite);
@@ -151,13 +208,16 @@ int HttpHelper::get (
 }
 
 int HttpHelper::post (
-        const char* url,
+        const string& uri,
         const char* contentType,
         const ByteArray* baRequest,
         ByteArray** baResponse
 )
 {
-    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', contentType='%s'), Request:\n", url, contentType); ba_print(stdout, baRequest));
+    DEBUG_OUTCON(
+        printf("HttpHelper::post(uri='%s', contentType='%s'), Request:\n", uri.c_str(), contentType);
+        ba_print(stdout, baRequest);
+    )
     CURL* curl;
     CURLcode curl_code;
     int ret;
@@ -181,7 +241,9 @@ int HttpHelper::post (
 
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the data.
-    curl_easy_setopt(curl, CURLOPT_URL, url);
+    if (!curl_set_url_and_proxy(curl, uri)) {
+        return RET_UAPKI_CONNECTION_ERROR;
+    }
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
 
     // Now specify the POST data
@@ -215,16 +277,18 @@ int HttpHelper::post (
 }
 
 int HttpHelper::post (
-        const char* url,
+        const string& uri,
         const char* contentType,
         const char* userPwd,
-        const char* authorizationBearer,
-        const char* request,
+        const string& authorizationBearer,
+        const string& request,
         ByteArray** baResponse
 )
 {
-    DEBUG_OUTCON(printf("HttpHelper::post(url='%s', contentType='%s', userPwd='%s', authorizationBearer='%s', request='%s')\n",
-            url, contentType, userPwd, authorizationBearer, request));
+    DEBUG_OUTCON(
+        printf("HttpHelper::post(uri='%s', contentType='%s', userPwd='%s', authorizationBearer='%s', request='%s')\n",
+                uri.c_str(), contentType, userPwd, authorizationBearer.c_str(), request.c_str());
+    )
     CURL* curl;
     CURLcode curl_code;
     int ret;
@@ -250,8 +314,8 @@ int HttpHelper::post (
 
     // Add a custom header 
     chunk = curl_slist_append(chunk, contentType);
-    if (authorizationBearer) {
-        chunk = curl_slist_append(chunk, authorizationBearer);
+    if (!authorizationBearer.empty()) {
+        chunk = curl_slist_append(chunk, authorizationBearer.c_str());
     }
 
     // set our custom set of headers
@@ -260,16 +324,18 @@ int HttpHelper::post (
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the
     // data.
-    curl_easy_setopt(curl, CURLOPT_URL, url);
+    if (!curl_set_url_and_proxy(curl, uri)) {
+        return RET_UAPKI_CONNECTION_ERROR;
+    }
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
 
     // Now specify the POST data
     // binary data
-    if (request) {
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request);
+    if (!request.empty()) {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.c_str());
     }
     // size of the POST data
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (request) ? (long)strlen(request) : 0);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)request.length());
 
     // send all data to this function
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb_curlwrite);
@@ -293,6 +359,15 @@ int HttpHelper::post (
     curl_easy_cleanup(curl);
 
     return ret;
+}
+
+mutex& HttpHelper::lockUri (
+        const string& uri
+)
+{
+    lock_guard<mutex> lock(http_helper.mtx);
+
+    return http_helper.mtxByUrl[uri];
 }
 
 vector<string> HttpHelper::randomURIs (

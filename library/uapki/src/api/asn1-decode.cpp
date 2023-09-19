@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/asn1-decode.cpp"
+
 #include "api-json-internal.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
@@ -32,50 +34,49 @@
 #include "uapki-ns-util.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/asn1-decode.cpp"
-
-
 using namespace std;
+using namespace UapkiNS;
 
 
 static const char* ASN1_TAG_NAMES[31] = {
-    NULL,   //  [0x00] EOC
+    nullptr,    //  [0x00] EOC
     "BOOLEAN",
     "INTEGER",
     "BIT_STRING",
     "OCTET_STRING",
     "NULL",
     "OID",
-    NULL,   //  [0x07] OBJECT_DESCRIPTOR
-    NULL,   //  [0x08] EXTERNAL
-    NULL,   //  [0x09] REAL
+    nullptr,    //  [0x07] OBJECT_DESCRIPTOR
+    nullptr,    //  [0x08] EXTERNAL
+    nullptr,    //  [0x09] REAL
     "ENUMERATED",
-    NULL,   //  [0x0B]
+    nullptr,    //  [0x0B]
     "UTF8_STRING",
-    NULL,   //  [0x0D] RELATIVE_OID
-    NULL,   //  [0x0E]
-    NULL,   //  [0x0F]
-    NULL,   //  [0x10] SEQUENCE
-    NULL,   //  [0x11] SET
-    NULL,   //  [0x12] NUMERIC_STRING
+    nullptr,    //  [0x0D] RELATIVE_OID
+    nullptr,    //  [0x0E]
+    nullptr,    //  [0x0F]
+    nullptr,    //  [0x10] SEQUENCE
+    nullptr,    //  [0x11] SET
+    nullptr,    //  [0x12] NUMERIC_STRING
     "PRINTABLE_STRING",
-    NULL,   //  [0x14] T61_STRING
-    NULL,   //  [0x15] VIDEOTEXT_STRING
+    nullptr,    //  [0x14] T61_STRING
+    nullptr,    //  [0x15] VIDEOTEXT_STRING
     "IA5_STRING",
     "UTC_TIME",
     "GENERALIZED_TIME",
-    NULL,   //  [0x19] GRAPHIC_STRING
-    NULL,   //  [0x1A] VISIBLE_STRING
-    NULL,   //  [0x1B] GENERAL_STRING
-    NULL,   //  [0x1C] UNIVERSAL_STRING
-    NULL,   //  [0x1D]
+    nullptr,    //  [0x19] GRAPHIC_STRING
+    nullptr,    //  [0x1A] VISIBLE_STRING
+    nullptr,    //  [0x1B] GENERAL_STRING
+    nullptr,    //  [0x1C] UNIVERSAL_STRING
+    nullptr,    //  [0x1D]
     "BMP_STRING"
 };
 
-static const char* asn1_tag_to_name (const uint8_t tag)
+static const char* asn1_tag_to_name (
+        const uint8_t tag
+)
 {
-    const char* rv_s = NULL;
+    const char* rv_s = nullptr;
     if (tag < 31) rv_s = ASN1_TAG_NAMES[tag];
     else if (tag == 0x30) rv_s = "SEQUENCE";
     else if (tag == 0x31) rv_s = "SET";
@@ -84,70 +85,80 @@ static const char* asn1_tag_to_name (const uint8_t tag)
     return rv_s;
 }
 
-static int asn1_decode_bit_string (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_bit_string (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    BIT_STRING_t* prim_bitstr = NULL;
-    ByteArray* ba_data = NULL;
+    BIT_STRING_t* prim_bitstr = nullptr;
+    SmartBA sba_data;
     uint32_t bits = 0;
 
     CHECK_NOT_NULL(prim_bitstr = (BIT_STRING_t*)asn_decode_ba_with_alloc(get_BIT_STRING_desc(), baEncoded));
-    DO(asn_BITSTRING2ba(prim_bitstr, &ba_data));
-    DO_JSON(json_object_set_base64(joResult, "value", ba_data));
-    if ((ba_get_len(ba_data) > 0) && (ba_get_len(ba_data) < 4)) {
-        DO(UapkiNS::Util::bitStringFromAsn1(prim_bitstr, &bits));
+    DO(asn_BITSTRING2ba(prim_bitstr, &sba_data));
+    DO_JSON(json_object_set_base64(joResult, "value", sba_data.get()));
+    if ((sba_data.size() > 0) && (sba_data.size() < 4)) {
+        DO(Util::bitStringFromAsn1(prim_bitstr, &bits));
         DO_JSON(json_object_set_number(joResult, "integer", (double)bits));
     }
 
 cleanup:
     asn_free(get_BIT_STRING_desc(), prim_bitstr);
-    ba_free(ba_data);
     return ret;
 }
 
-static int asn1_decode_bmp_string (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_bmp_string (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    BMPString_t* bmp_str = NULL;
-    ByteArray* ba_value = NULL;
-    char* s_value = NULL;
+    BMPString_t* bmp_str = nullptr;
+    SmartBA sba_value;
+    string s_value;
 
     CHECK_NOT_NULL(bmp_str = (BMPString_t*)asn_decode_ba_with_alloc(get_BMPString_desc(), baEncoded));
-    DO(UapkiNS::Util::bmpStringFromAsn1(bmp_str, &s_value));
-    DO_JSON(json_object_set_string(joResult, "value", s_value));
-    if ((bmp_str->buf != NULL) && (bmp_str->size > 0)) {
-        CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(bmp_str->buf, bmp_str->size));
-        DO_JSON(json_object_set_base64(joResult, "bytes", ba_value));
+    DO(Util::bmpStringFromAsn1(bmp_str, s_value));
+    DO_JSON(json_object_set_string(joResult, "value", s_value.c_str()));
+    if (bmp_str->buf && (bmp_str->size > 0)) {
+        if (!sba_value.set(ba_alloc_from_uint8(bmp_str->buf, bmp_str->size))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+        DO_JSON(json_object_set_base64(joResult, "bytes", sba_value.get()));
     }
 
 cleanup:
     asn_free(get_BMPString_desc(), bmp_str);
-    ba_free(ba_value);
-    ::free(s_value);
     return ret;
 }
 
-static int asn1_decode_boolean (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_boolean (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    BOOLEAN_t* prim_boolean = NULL;
+    bool value = false;
 
-    CHECK_NOT_NULL(prim_boolean = (BOOLEAN_t*)asn_decode_ba_with_alloc(get_BOOLEAN_desc(), baEncoded));
-    DO_JSON(json_object_set_boolean(joResult, "value", *prim_boolean));
+    DO(Util::decodeBoolean(baEncoded, value));
+    DO_JSON(json_object_set_boolean(joResult, "value", value));
 
 cleanup:
-    asn_free(get_BOOLEAN_desc(), prim_boolean);
     return ret;
 }
 
-static int asn1_decode_enumerated (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_enumerated (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    ENUMERATED_t* prim_enum = NULL;
+    ENUMERATED_t* prim_enum = nullptr;
     uint32_t value = 0;
 
     CHECK_NOT_NULL(prim_enum = (ENUMERATED_t*)asn_decode_ba_with_alloc(get_ENUMERATED_desc(), baEncoded));
-    DO(UapkiNS::Util::enumeratedFromAsn1(prim_enum, &value));
+    DO(Util::enumeratedFromAsn1(prim_enum, &value));
     DO_JSON(json_object_set_number(joResult, "value", (double)value));
 
 cleanup:
@@ -155,7 +166,10 @@ cleanup:
     return ret;
 }
 
-static int asn1_decode_gentime (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_gentime (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     GeneralizedTime_t* gen_time = nullptr;
@@ -177,31 +191,36 @@ cleanup:
     return ret;
 }
 
-static int asn1_decode_integer (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_integer (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    INTEGER_t* prim_integer = NULL;
-    ByteArray* ba_data = NULL;
+    INTEGER_t* prim_integer = nullptr;
+    SmartBA sba_data;
     long value = 0;
 
     CHECK_NOT_NULL(prim_integer = (INTEGER_t*)asn_decode_ba_with_alloc(get_INTEGER_desc(), baEncoded));
-    DO(asn_INTEGER2ba(prim_integer, &ba_data));
-    DO_JSON(json_object_set_base64(joResult, "value", ba_data));
-    if ((ba_get_len(ba_data) > 0) && (ba_get_len(ba_data) < 4)) {
+    DO(asn_INTEGER2ba(prim_integer, &sba_data));
+    DO_JSON(json_object_set_base64(joResult, "value", sba_data.get()));
+    if ((sba_data.size() > 0) && (sba_data.size() < 4)) {
         DO(asn_INTEGER2long(prim_integer, &value));
         DO_JSON(json_object_set_number(joResult, "integer", (double)value));
     }
 
 cleanup:
     asn_free(get_INTEGER_desc(), prim_integer);
-    ba_free(ba_data);
     return ret;
 }
 
-static int asn1_decode_null (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_null (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    NULL_t* prim_null = NULL;
+    NULL_t* prim_null = nullptr;
 
     CHECK_NOT_NULL(prim_null = (NULL_t*)asn_decode_ba_with_alloc(get_NULL_desc(), baEncoded));
 
@@ -210,66 +229,70 @@ cleanup:
     return ret;
 }
 
-static int asn1_decode_octet_string (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_octet_string (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    OCTET_STRING_t* prim_octetstr = NULL;
-    ByteArray* ba_data = NULL;
+    SmartBA sba_data;
 
-    CHECK_NOT_NULL(prim_octetstr = (OCTET_STRING_t*)asn_decode_ba_with_alloc(get_OCTET_STRING_desc(), baEncoded));
-    DO(asn_OCTSTRING2ba(prim_octetstr, &ba_data));
-    DO_JSON(json_object_set_base64(joResult, "value", ba_data));
+    DO(Util::decodeOctetString(baEncoded, &sba_data));
+    DO_JSON(json_object_set_base64(joResult, "value", sba_data.get()));
 
 cleanup:
-    asn_free(get_OCTET_STRING_desc(), prim_octetstr);
-    ba_free(ba_data);
     return ret;
 }
 
-static int asn1_decode_oid (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_oid (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    OBJECT_IDENTIFIER_t* prim_oid = NULL;
-    char* s_oid = NULL;
+    string s_oid;
 
-    CHECK_NOT_NULL(prim_oid = (OBJECT_IDENTIFIER_t*)asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), baEncoded));
-    DO(asn_oid_to_text(prim_oid, &s_oid));
-    DO_JSON(json_object_set_string(joResult, "value", s_oid));
+    DO(Util::decodeOid(baEncoded, s_oid));
+    DO_JSON(json_object_set_string(joResult, "value", s_oid.c_str()));
 
 cleanup:
-    asn_free(get_OBJECT_IDENTIFIER_desc(), prim_oid);
-    ::free(s_oid);
     return ret;
 }
 
-static int asn1_decode_string (asn_TYPE_descriptor_t* desc, const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_string (
+        asn_TYPE_descriptor_t* desc,
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     OCTET_STRING_t* octet_str = nullptr;
-    ByteArray* ba_value = nullptr;
-    char* s_value = nullptr;
+    SmartBA sba_value;
+    string s_value;
 
     CHECK_NOT_NULL(octet_str = (OCTET_STRING_t*)asn_decode_ba_with_alloc(desc, baEncoded));
-    DO(UapkiNS::Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, &s_value));
-    DO_JSON(json_object_set_string(joResult, "value", s_value));
+    DO(Util::pbufToStr(octet_str->buf, (size_t)octet_str->size, s_value));
+    DO_JSON(json_object_set_string(joResult, "value", s_value.c_str()));
 
-    if ((octet_str->buf != NULL) && (octet_str->size > 0)) {
-        CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(octet_str->buf, octet_str->size));
-        DO_JSON(json_object_set_base64(joResult, "bytes", ba_value));
+    if (octet_str->buf && (octet_str->size > 0)) {
+        if (!sba_value.set(ba_alloc_from_uint8(octet_str->buf, octet_str->size))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+        DO_JSON(json_object_set_base64(joResult, "bytes", sba_value.get()));
     }
 
 cleanup:
     asn_free(desc, octet_str);
-    ba_free(ba_value);
-    ::free(s_value);
     return ret;
 }
 
-static int asn1_decode_utctime (const ByteArray* baEncoded, JSON_Object* joResult)
+static int asn1_decode_utctime (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     UTCTime_t* utc_time = nullptr;
-    char* s_value = nullptr;
     uint64_t ms_time;
     string stime;
     ::tm tm_data;
@@ -285,7 +308,6 @@ static int asn1_decode_utctime (const ByteArray* baEncoded, JSON_Object* joResul
 
 cleanup:
     asn_free(get_UTCTime_desc(), utc_time);
-    ::free(s_value);
     return ret;
 }
 
@@ -293,17 +315,11 @@ cleanup:
 int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    JSON_Array* ja_items = NULL;
-    JSON_Array* ja_results = NULL;
-    JSON_Object* jo_result = NULL;
-    ByteArray* ba_encoded = NULL;
-    const char* s_id = NULL;
-    const char* s_tag = NULL;
-    uint8_t tag = 0;
-    size_t cnt_items = 0;
+    JSON_Array* ja_items = json_object_get_array(joParams, "items");
+    JSON_Array* ja_results = nullptr;
+    JSON_Object* jo_result = nullptr;
+    const size_t cnt_items = json_array_get_count(ja_items);
 
-    ja_items = json_object_get_array(joParams, "items");
-    cnt_items = json_array_get_count(ja_items);
     if (cnt_items == 0) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
@@ -312,86 +328,82 @@ int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult)
     ja_results = json_object_get_array(joResult, "decoded");
 
     for (size_t i = 0; i < cnt_items; i++) {
-        JSON_Object* jo_item = NULL;
+        JSON_Object* jo_item = nullptr;
+        SmartBA sba_encoded;
+        string s_id;
 
         DO_JSON(json_array_append_value(ja_results, json_value_init_object()));
         jo_result = json_array_get_object(ja_results, i);
 
         jo_item = json_array_get_object(ja_items, i);
-        ba_encoded = json_object_get_base64(jo_item, "bytes");
-        ret = (ba_get_len(ba_encoded) > 0) ? RET_OK : RET_INVALID_PARAM;
-        s_id = json_object_get_string(jo_item, "id");
-        if (s_id) {
-            DO_JSON(json_object_set_string(jo_result, "id", s_id));
+        (void)sba_encoded.set(json_object_get_base64(jo_item, "bytes"));
+        ret = (sba_encoded.size() >= 2) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
+        s_id = ParsonHelper::jsonObjectGetString(jo_item, "id");
+        if (!s_id.empty()) {
+            DO_JSON(json_object_set_string(jo_result, "id", s_id.c_str()));
         }
-        //a need processing optional param "implicit"
-        //a need processing constructed sequence and set
 
-        tag = 0;
-        s_tag = NULL;
         if (ret == RET_OK) {
-            ba_get_byte(ba_encoded, 0, &tag);
-            s_tag = asn1_tag_to_name(tag);
-            if (s_tag != NULL) {
+            uint8_t tag = 0;
+            ba_get_byte(sba_encoded.get(), 0, &tag);
+
+            const char* s_tag = asn1_tag_to_name(tag);
+            if (s_tag) {
                 DO_JSON(json_object_set_string(jo_result, "tag", s_tag));
             }
             else {
-                DO_JSON(json_object_set_number(jo_result, "tag", (double)tag));
+                DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_result, "tag", (uint32_t)tag));
             }
 
             switch (tag) {
             case 0x01:
-                ret = asn1_decode_boolean(ba_encoded, jo_result);
+                ret = asn1_decode_boolean(sba_encoded.get(), jo_result);
                 break;
             case 0x02:
-                ret = asn1_decode_integer(ba_encoded, jo_result);
+                ret = asn1_decode_integer(sba_encoded.get(), jo_result);
                 break;
             case 0x03:
-                ret = asn1_decode_bit_string(ba_encoded, jo_result);
+                ret = asn1_decode_bit_string(sba_encoded.get(), jo_result);
                 break;
             case 0x04:
-                ret = asn1_decode_octet_string(ba_encoded, jo_result);
+                ret = asn1_decode_octet_string(sba_encoded.get(), jo_result);
                 break;
             case 0x05:
-                ret = asn1_decode_null(ba_encoded, jo_result);
+                ret = asn1_decode_null(sba_encoded.get(), jo_result);
                 break;
             case 0x06:
-                ret = asn1_decode_oid(ba_encoded, jo_result);
+                ret = asn1_decode_oid(sba_encoded.get(), jo_result);
                 break;
             case 0x0A:
-                ret = asn1_decode_enumerated(ba_encoded, jo_result);
+                ret = asn1_decode_enumerated(sba_encoded.get(), jo_result);
                 break;
             case 0x0C:
-                ret = asn1_decode_string(get_UTF8String_desc(), ba_encoded, jo_result);
+                ret = asn1_decode_string(get_UTF8String_desc(), sba_encoded.get(), jo_result);
                 break;
             case 0x13:
-                ret = asn1_decode_string(get_PrintableString_desc(), ba_encoded, jo_result);
+                ret = asn1_decode_string(get_PrintableString_desc(), sba_encoded.get(), jo_result);
                 break;
             case 0x16:
-                ret = asn1_decode_string(get_IA5String_desc(), ba_encoded, jo_result);
+                ret = asn1_decode_string(get_IA5String_desc(), sba_encoded.get(), jo_result);
                 break;
             case 0x17:
-                ret = asn1_decode_utctime(ba_encoded, jo_result);
+                ret = asn1_decode_utctime(sba_encoded.get(), jo_result);
                 break;
             case 0x18:
-                ret = asn1_decode_gentime(ba_encoded, jo_result);
+                ret = asn1_decode_gentime(sba_encoded.get(), jo_result);
                 break;
             case 0x1E:
-                ret = asn1_decode_bmp_string(ba_encoded, jo_result);
+                ret = asn1_decode_bmp_string(sba_encoded.get(), jo_result);
                 break;
             }
         }
 
         if (ret != RET_OK) {
-            json_object_set_boolean(jo_result, "error", 1);
+            ParsonHelper::jsonObjectSetBoolean(jo_result, "error", true);
             ret = RET_OK;
         }
-
-        ba_free(ba_encoded);
-        ba_encoded = NULL;
     }
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/archive-timestamp-helper.cpp"
+
 #include "archive-timestamp-helper.h"
 #include "ba-utils.h"
 #include "byte-array.h"
@@ -33,10 +35,6 @@
 #include "uapkif.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "common/pkix/archive-timestamp-helper.cpp"
 
 
 #define DEBUG_OUTCON(expression)

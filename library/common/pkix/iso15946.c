@@ -1,29 +1,31 @@
 /*
  * Copyright (c) 2021, The UAPKI Project Authors.
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define FILE_MARKER "common/pkix/iso15946.c"
 
 #include "iso15946.h"
 #include "aid.h"
@@ -44,13 +46,11 @@
 
 
 /**
-* Преобразовывает 32 битное целое в массив байт. При формировании используется
-* правило "младший байт из целого помещается по старшему
-* индексу" (big-endian).
+* Перетворює 32 бітнє целе в масив байт.
+* Застосовується правило "молодший байт із цілого розміщається по старшому індексу" (big-endian).
 *
-* @param src    целое
-* @param dst    массив байт
-* @param dstOff смещение в массиве байт
+* @param src    ціле
+* @param dst    масив байт
 */
 static void iso15946_int2be(int src, void *dst)
 {
@@ -62,15 +62,12 @@ static void iso15946_int2be(int src, void *dst)
 }
 
 
-/**
-* Повертає енкодований SharedInfo. (rfc3278, $8.2)
-*
-* @param oid идентификатор алгоритма
-* @param baEntityInfo 64-байтный массив случайных числ
-* @param keySize
-* @param baEncoded
-*/
-static int iso15946_shared_info(const char* oid, const ByteArray* baEntityInfo, const int keySize, ByteArray** baEncoded)
+int iso15946_encode_sharedinfo (
+        const char* oid,
+        const ByteArray* baEntityInfo,
+        const int keySize,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     ByteArray* ba_suppPubInfo = NULL;
@@ -125,8 +122,13 @@ static ByteArray *iso15946_get_not_zero(const ByteArray *zx)
     return NULL;
 }
 
-int iso15946_generate_secretc (const HashAlg hashAlgo, const char* oidWrapAlgo,
-        const ByteArray* baEntityInfo, const ByteArray* baZx, ByteArray** baSecret)
+int iso15946_generate_secretc (
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const ByteArray* baEntityInfo,
+        const ByteArray* baZx,
+        ByteArray** baSecret
+)
 {
     int ret = RET_OK;
     HashCtx* ctx = NULL;
@@ -137,7 +139,7 @@ int iso15946_generate_secretc (const HashAlg hashAlgo, const char* oidWrapAlgo,
     //DEBUG_OUTCON( printf("iso15946_generate_secretc(), baZx: ");ba_print(stdout, baZx); )
     //DEBUG_OUTCON( printf("iso15946_generate_secretc(), baEntityInfo: ");ba_print(stdout, baEntityInfo); )
 
-    DO(iso15946_shared_info(oidWrapAlgo, baEntityInfo, KEY_LENGTH, &ba_sharedinfo));
+    DO(iso15946_encode_sharedinfo(oidWrapAlgo, baEntityInfo, KEY_LENGTH, &ba_sharedinfo));
     DEBUG_OUTCON( printf("iso15946_generate_secretc(), ba_sharedinfo: ");ba_print(stdout, ba_sharedinfo); )
 
     CHECK_NOT_NULL(ba_hashdata = iso15946_get_not_zero(baZx));

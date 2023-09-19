@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,23 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/storage-open.cpp"
+
 #include "api-json-internal.h"
 #include "cm-providers.h"
 #include "global-objects.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/storage-open.cpp"
 
-// "method": "OPEN"
-// "parameters": {"provider":"PKCS12", "storage":"test.p12", "password":"testpassword", "mode":"RO/RW/CREATE"}
-// out: {"mechanisms":[{"id":"ECDSA", "description":"ECDSA", "parameters":[{"id":"P256", "description":"NIST P256 curve"},{...}],{...}]}, "user_presense":false}
+#define DEBUG_OUTCON(expression)
+#ifndef DEBUG_OUTCON
+#define DEBUG_OUTCON(expression) expression
+#endif
 
 using namespace std;
+using namespace UapkiNS;
 
 
-static int session_info (CmStorageProxy& storage, JSON_Object* joResult)
+static int session_info (
+        CmStorageProxy& storage,
+        JSON_Object* joResult
+)
 {
     string s_sesinfo;
     int ret = storage.sessionInfo(s_sesinfo);
@@ -83,25 +88,33 @@ static int session_info (CmStorageProxy& storage, JSON_Object* joResult)
 
 cleanup:
     return ret;
-}
+}   //  session_info
 
-static int add_certs_from_storage_to_cache (CmStorageProxy& storage, CerStore& cerStore)
+static int add_certs_from_storage_to_cache (
+        CmStorageProxy& storage,
+        Cert::CerStore& cerStore
+)
 {
-    UapkiNS::VectorBA vba_certs;
-    int ret = storage.sessionGetCertificates(vba_certs);
+    VectorBA vba_encodedcerts;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
+    int ret = storage.sessionGetCertificates(vba_encodedcerts);
     if (ret != RET_OK) {
         return (ret == RET_UAPKI_NOT_SUPPORTED) ? RET_OK : ret;
     }
 
-    for (size_t i = 0; i < vba_certs.size(); i++) {
-        bool is_unique;
-        DO(cerStore.addCert(vba_certs[i], false, false, false, is_unique, nullptr));
-        vba_certs[i] = nullptr;
+    DEBUG_OUTCON(printf("Get certs from session: %zu\n", vba_encodedcerts.size()));
+    if (!vba_encodedcerts.empty()) {
+        DO(cerStore.addCerts(
+            Cert::NOT_TRUSTED,
+            Cert::NOT_PERMANENT,
+            vba_encodedcerts,
+            added_ceritems
+        ));
     }
 
 cleanup:
     return ret;
-}
+}   //  add_certs_from_storage_to_cache
 
 
 int uapki_storage_open (JSON_Object* joParams, JSON_Object* joResult)
@@ -114,7 +127,7 @@ int uapki_storage_open (JSON_Object* joParams, JSON_Object* joResult)
     if (ret != RET_OK) return ret;
 
     CmStorageProxy* storage = CmProviders::openedStorage();
-    CerStore* cer_store = get_cerstore();
+    Cert::CerStore* cer_store = get_cerstore();
     if (!storage || !cer_store) return RET_UAPKI_GENERAL_ERROR;
 
     ret = session_info(*storage, joResult);

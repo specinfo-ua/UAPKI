@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,8 +24,6 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-//  Last update: 2023-03-21
 
 #ifndef UAPKI_NS_SIGNEDDATA_HELPER_H
 #define UAPKI_NS_SIGNEDDATA_HELPER_H
@@ -333,6 +331,9 @@ namespace Pkcs7 {
             return m_Certs;
         }
         const VectorBA& getCrls (void) const {
+            return m_Crls;
+        }
+        VectorBA& getCrls (void) {
             return m_Crls;
         }
         const size_t getCountSignerInfos (void) const {

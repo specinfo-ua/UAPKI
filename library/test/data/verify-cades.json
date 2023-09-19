@@ -1,9 +1,6 @@
 {
-  "comment": "Verify PKCS7/CAdES-signature, generated 2023-01-30",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "comment": "Verify PKCS7/CAdES-signature",
+  "commentUsage": "uapki verify-cades.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -17,7 +14,7 @@
           "trustedCerts": []
         },
         "crlCache": {
-          "path": "certs/crls/"
+          "path": "crls/"
         },
         "offline": false
       }

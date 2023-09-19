@@ -1,9 +1,6 @@
 {
-  "comment": "Test create key-storage (OPENSSL compatible) and ECDSA-keys",
-  "comment1a": "Для коректного відображення utf8 тексту под ОС Windows",
-  "comment1b": "треба перед запуском теста в терміналі ввести 'chcp 65001'",
-  "comment1c": "або ввімкнути підтримку utf8 в терміналі для всієї ОС Windows 10",
-  "comment2": "Локаль за замовчуванням: 'locale'='', мінімальна C-локаль: 'locale'='C'",
+  "comment": "Test create DSTU key-storage",
+  "commentUsage": "uapki create-dstu-key.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -32,14 +29,16 @@
     },
     {
       "comment": "Отримання переліку провайдерів підпису (типів носіів ключів: файли, токени, смарт-картки, хмарні криптомодулі та ін.)",
-      "method": "PROVIDERS"
+      "method": "PROVIDERS",
+      "skip": false
     },
     {
       "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
       "method": "STORAGES",
       "parameters": {
         "provider": "PKCS12" // Обов'язкове (ідентифікатор провайдера зі списку що повертає метод PROVIDERS)
-      }
+      },
+      "skip": false
     },
     {
       "comment": "Отримання переліку носіїв ключів для заданого провайдера та їх властивостей",
@@ -47,7 +46,8 @@
       "parameters": {
         "provider": "PKCS12", // Опціональне, по замовчанню PKCS12
         "storage": "storage-id" // Для PKCS12-provider обов'язкове, шлях до контейнера PKCS#8,PKCS#12,JKS,IIT
-      }
+      },
+      "skip": false
     },
     {
       "comment": "Створення нового сховища ключів",
@@ -58,35 +58,38 @@
         "password": "testpassword",
         "openParams": {
           "createPfx": { // specific cm-provider parameters
-            "bagCipher": "1.2.804.2.1.1.1.1.1.1.3",
-            "bagKdf": "1.2.804.2.1.1.1.1.1.2",
-            "macAlgo": "1.2.804.2.1.1.1.1.2.1",
+            "bagCipher": "1.2.804.2.1.1.1.1.1.1.3", // GOST28147_CFB
+            "bagKdf": "1.2.804.2.1.1.1.1.1.2", // HMAC_GOST34311
+            "macAlgo": "1.2.804.2.1.1.1.1.2.1", // OID_GOST34311
             "iterations": 10000
-            //"bagCipher": "2.16.840.1.101.3.4.1.22", // aes192-CBC
-            //"bagKdf": "1.2.840.113549.2.10", // hmacWithSHA384
-            //"iterations": 5555,
-            //"macAlgo": "2.16.840.1.101.3.4.2.2" // sha-384
-            //"bagCipher": "2.16.840.1.101.3.4.1.2", // aes128-CBC
-            //"bagKdf": "1.2.840.113549.2.9", // hmacWithSHA256
-            //"iterations": 777,
-            //"macAlgo": "2.16.840.1.101.3.4.2.1" // sha-256
-            //"bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
-            //"bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
-            //"iterations": 1234,
-            //"macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
           }
         },
         "mode": "CREATE"
       }
     },
     {
-      "comment": "Створення нового ключа за алгоритмом DSTU-4145 with GOST34311 з параметом M257_PB",
+      "comment": "Створення нового ключа за алгоритмом DSTU-4145 with GOST34311 (OID='1.2.804.2.1.1.1.1.3.1.1') з параметром M257_PB (OID='1.2.804.2.1.1.1.1.3.1.1.2.6')",
       "method": "CREATE_KEY",
       "parameters": {
-        "comment": "createKey DSTU, (default: M257_PB)",
-        "mechanismId": "1.2.804.2.1.1.1.1.3.1",
+        "mechanismId": "1.2.804.2.1.1.1.1.3.1.1",
         "parameterId": "1.2.804.2.1.1.1.1.3.1.1.2.6",
-        "label": "DSTU4145 key, M257_PB"
+        "label": "Key-1 DSTU-4145 M257_PB"
+      }
+    },
+    {
+      "comment": "Отримання запиту на сертифікат для поточного ключа",
+      "method": "GET_CSR",
+      "parameters": {
+        "signAlgo": "1.2.804.2.1.1.1.1.3.1.1"
+      }
+    },
+    {
+      "comment": "Створення нового ключа за алгоритмом DSTU-4145 with GOST34311 (OID='1.2.804.2.1.1.1.1.3.1.1') з параметром M431_PB (OID='1.2.804.2.1.1.1.1.3.1.1.2.9')",
+      "method": "CREATE_KEY",
+      "parameters": {
+        "mechanismId": "1.2.804.2.1.1.1.1.3.1.1",
+        "parameterId": "1.2.804.2.1.1.1.1.3.1.1.2.9",
+        "label": "Key-2 DSTU-4145 M431_PB"
       }
     },
     {
@@ -101,7 +104,6 @@
       "method": "KEYS"
     },
     {
-      "comment": "Для перевірки новостворенного сховища ключів можно використувати OPENSSL",
       "method": "CLOSE"
     },
     {

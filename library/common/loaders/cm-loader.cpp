@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -37,6 +37,9 @@
 #endif
 
 
+using namespace std;
+
+
 CmLoader::CmLoader (void)
 {
     DEBUG_OUTCON(puts("CmLoader::CmLoader"));
@@ -49,12 +52,17 @@ CmLoader::~CmLoader (void)
     unload();
 }
 
-string CmLoader::getLibName (const string& libName)
+string CmLoader::getLibName (
+        const string& libName
+)
 {
     return string(LIBNAME_PREFIX) + libName + "." + string(LIBNAME_EXT);
 }
 
-bool CmLoader::load (const string& libName, const string& dir)
+bool CmLoader::load (
+        const string& libName,
+        const string& dir
+)
 {
     unload();
 
@@ -65,7 +73,7 @@ bool CmLoader::load (const string& libName, const string& dir)
     m_Api.hlib = DL_LOAD_LIBRARY(lib_name.c_str());
     DEBUG_OUTCON(printf("CmLoader.load(), m_Api.hlib: %p\n", m_Api.hlib));
 
-    if (m_Api.hlib) {
+    if (isLoaded()) {
         m_Api.info              = (cm_provider_info_f)          DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_info");          //  required API
         m_Api.init              = (cm_provider_init_f)          DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_init");          //  required API
         m_Api.deinit            = (cm_provider_deinit_f)        DL_GET_PROC_ADDRESS((HANDLE_DLIB)m_Api.hlib, "provider_deinit");        //  required API
@@ -91,18 +99,22 @@ bool CmLoader::load (const string& libName, const string& dir)
 
 void CmLoader::unload (void)
 {
-    if (m_Api.hlib) {
+    if (isLoaded()) {
         DL_FREE_LIBRARY(m_Api.hlib);
         memset(&m_Api, 0, sizeof(CM_PROVIDER_API));
     }
 }
 
-int CmLoader::info (CM_JSON_PCHAR* providerInfo)
+int CmLoader::info (
+        CM_JSON_PCHAR* providerInfo
+)
 {
     return (m_Api.info) ? (int)m_Api.info(providerInfo) : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
 
-int CmLoader::init (const CM_JSON_PCHAR providerParams)
+int CmLoader::init (
+        const CM_JSON_PCHAR providerParams
+)
 {
     return (m_Api.init) ? (int)m_Api.init(providerParams) : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
@@ -112,40 +124,59 @@ int CmLoader::deinit (void)
     return (m_Api.deinit) ? (int)m_Api.deinit() : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
 
-int CmLoader::listStorages (CM_JSON_PCHAR* listUris)
+int CmLoader::listStorages (
+        CM_JSON_PCHAR* listUris
+)
 {
-    return (m_Api.list_storages) ? (int)m_Api.list_storages(listUris) : ((m_Api.hlib) ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
+    return (m_Api.list_storages) ? (int)m_Api.list_storages(listUris) : (isLoaded() ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
 }
 
-int CmLoader::storageInfo (const char* uri, CM_JSON_PCHAR* storageInfo)
+int CmLoader::storageInfo (
+        const char* uri,
+        CM_JSON_PCHAR* storageInfo
+)
 {
-    return (m_Api.storage_info) ? (int)m_Api.storage_info(uri, storageInfo) : ((m_Api.hlib) ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
+    return (m_Api.storage_info) ? (int)m_Api.storage_info(uri, storageInfo) : (isLoaded() ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
 }
 
-int CmLoader::open (const char* uri, uint32_t mode,
-        const CM_JSON_PCHAR createParams, CM_SESSION_API** session)
+int CmLoader::open (
+        const char* uri,
+        uint32_t mode,
+        const CM_JSON_PCHAR openParams,
+        CM_SESSION_API** session
+)
 {
-    return (m_Api.open) ? (int)m_Api.open(uri, mode, createParams, session) : RET_UAPKI_PROVIDER_NOT_LOADED;
+    return (m_Api.open) ? (int)m_Api.open(uri, mode, openParams, session) : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
 
-int CmLoader::close (CM_SESSION_API* session)
+int CmLoader::close (
+        CM_SESSION_API* session
+)
 {
     return (m_Api.close) ? (int)m_Api.close(session) : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
 
-int CmLoader::format (const char* uri, const char* soPassword, const char* userPassword)
+int CmLoader::format (
+        const char* uri,
+        const char* soPassword,
+        const char* userPassword
+)
 {
-    return (m_Api.format) ? (int)m_Api.format(uri, soPassword, userPassword) : ((m_Api.hlib) ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
+    return (m_Api.format) ? (int)m_Api.format(uri, soPassword, userPassword) : (isLoaded() ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
 }
 
-void CmLoader::blockFree (void* ptr)
+void CmLoader::blockFree (
+        void* ptr
+)
 {
     if (m_Api.block_free) {
         m_Api.block_free(ptr);
     }
 }
 
-void CmLoader::baFree (CM_BYTEARRAY* ba)
+void CmLoader::baFree (
+        CM_BYTEARRAY* ba
+)
 {
     if (m_Api.bytearray_free) {
         m_Api.bytearray_free(ba);

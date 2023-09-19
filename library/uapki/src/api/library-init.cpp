@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/library-init.cpp"
+
 #include "api-json-internal.h"
 #include "global-objects.h"
 #include "http-helper.h"
@@ -34,11 +36,8 @@
 #include "uapki-ns-util.h"
 
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/library-init.cpp"
-
-
 using namespace std;
+using namespace UapkiNS;
 
 
 static int load_config (ParsonHelper& json, const string& configFile)
@@ -89,46 +88,57 @@ static int setup_cm_providers (JSON_Object* joParams)
 static int setup_cert_cache (JSON_Object* joParams)
 {
     int ret = RET_OK;
-    CerStore* cer_store = get_cerstore();
-    ByteArray* ba_encoded = nullptr;
-    JSON_Array* ja_trustedcerts = json_object_get_array(joParams, "trustedCerts");
-    const char* s_path = nullptr;
+    Cert::CerStore& cer_store = *get_cerstore();
 
-    if (ja_trustedcerts) {
-        const size_t cnt_certs = json_array_get_count(ja_trustedcerts);
+    cer_store.setParams(ParsonHelper::jsonObjectGetString(joParams, "path"));
+
+    JSON_Array* ja_trustedcerts = json_object_get_array(joParams, "trustedCerts");
+    const size_t cnt_certs = json_array_get_count(ja_trustedcerts);
+    if (cnt_certs > 0) {
+        VectorBA vba_encodedcerts;
+        vector<Cert::CerStore::AddedCerItem> added_ceritems;
+
+        vba_encodedcerts.resize(cnt_certs);
         for (size_t i = 0; i < cnt_certs; i++) {
-            bool is_unique;
             const char* s_b64 = json_array_get_string(ja_trustedcerts, i);
             if (s_b64) {
-                ba_encoded = ba_alloc_from_base64(s_b64);
+                vba_encodedcerts[i] = ba_alloc_from_base64(s_b64);
             }
-            if (!ba_encoded) {
+            if (!vba_encodedcerts[i]) {
                 SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
             }
-            DO(cer_store->addCert(ba_encoded, false, false, true, is_unique, NULL));
-            ba_encoded = nullptr;
+        }
+
+        DO(cer_store.addCerts(
+            Cert::TRUSTED,
+            Cert::NOT_PERMANENT,
+            vba_encodedcerts,
+            added_ceritems
+        ));
+
+        for (const auto& it : added_ceritems) {
+            if (it.errorCode != RET_OK) {
+                SET_ERROR(it.errorCode);
+            }
         }
     }
 
-    s_path = json_object_get_string(joParams, "path");
-    if (s_path) {
-        DO(cer_store->load(s_path));
-    }
+    DO(cer_store.load());
 
 cleanup:
-    ba_free(ba_encoded);
     return ret;
 }   //  setup_cert_cache
 
 static int setup_crl_cache (JSON_Object* joParams)
 {
     int ret = RET_OK;
-    CrlStore* crl_store = get_crlstore();
-    const char* s_path = json_object_get_string(joParams, "path");
+    Crl::CrlStore& crl_store = *get_crlstore();
 
-    if (s_path) {
-        DO(crl_store->load(s_path));
-    }
+    crl_store.setParams(
+        ParsonHelper::jsonObjectGetString(joParams, "path"),
+        ParsonHelper::jsonObjectGetBoolean(joParams, "useDeltaCrl", true)
+    );
+    DO(crl_store.load());
 
 cleanup:
     return ret;
@@ -196,36 +206,24 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     ParsonHelper json;
-    LibraryConfig* lib_config = nullptr;
-    CerStore* lib_cerstore = nullptr;
-    CrlStore* lib_crlstore = nullptr;
+    LibraryConfig* lib_config = get_config();
+    Cert::CerStore* lib_cerstore = get_cerstore();
+    Crl::CrlStore* lib_crlstore = get_crlstore();
+    const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
     JSON_Object* jo_refparams = joParams;
     JSON_Object* jo_category = nullptr;
-    size_t cnt;
+    size_t cnt_certs, cnt_crls, cnt_trustedcerts;
     bool offline;
 
-    lib_config = get_config();
-    if (lib_config) {
-        if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
-
-        const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
-        if (!fn_config.empty()) {
-            DO(load_config(json, fn_config));
-            jo_refparams = json.rootObject();
-        }
-    }
-    else {
+    if (!lib_config || !lib_cerstore || !lib_crlstore) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    lib_cerstore = get_cerstore();
-    if (!lib_cerstore) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-    }
+    if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
 
-    lib_crlstore = get_crlstore();
-    if (!lib_crlstore) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    if (!fn_config.empty()) {
+        DO(load_config(json, fn_config));
+        jo_refparams = json.rootObject();
     }
 
     //  Setup subsystems
@@ -242,25 +240,31 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
     DO(setup_tsp(*lib_config, json_object_get_object(jo_refparams, "tsp")));
 
-    HttpHelper::init(offline);
+    {   //  Setup CURL
+        JSON_Object* jo_proxy = json_object_get_object(jo_refparams, "proxy");
+        HttpHelper::init(
+            offline,
+            json_object_get_string(jo_proxy, "url"),
+            json_object_get_string(jo_proxy, "credentials")
+        );
+    }
 
     lib_config->setInitialized(true);
 
     //  Out info subsystems
     DO_JSON(json_object_set_value(joResult, "certCache", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "certCache");
-    if (lib_cerstore->getCount(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt));
-    }
-    if (lib_cerstore->getCountTrusted(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt));
+    if (lib_cerstore->getCount(cnt_certs, cnt_trustedcerts) == RET_OK) {
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt_certs));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt_trustedcerts));
     }
 
     DO_JSON(json_object_set_value(joResult, "crlCache", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "crlCache");
-    if (lib_crlstore->getCount(cnt) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt));
+    if (lib_crlstore->getCount(cnt_crls) == RET_OK) {
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt_crls));
     }
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "useDeltaCrl", lib_crlstore->useDeltaCrl()));
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)CmProviders::count()));
 
@@ -273,18 +277,17 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
         DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "nonceLen", (uint32_t)ocsp_params.nonceLen));
     }
 
+    DO_JSON(json_object_set_value(joResult, "proxy", json_value_init_object()));
+    jo_category = json_object_get_object(joResult, "proxy");
+    if (jo_category) {
+        DO_JSON(json_object_set_string(jo_category, "url", HttpHelper::getProxyUrl().c_str()));
+    }
+
     DO_JSON(json_object_set_value(joResult, "tsp", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "tsp");
     if (jo_category) {
         const LibraryConfig::TspParams& tsp_params = lib_config->getTsp();
-        string s_url;
-
-        for (auto& it : tsp_params.uris) {
-            s_url += it + ";";
-        }
-        if (!s_url.empty()) {
-            s_url.pop_back();
-        }
+        const string s_url = UapkiNS::Util::joinStrings(tsp_params.uris);
 
         DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "certReq", tsp_params.certReq));
         DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "forced", tsp_params.forced));

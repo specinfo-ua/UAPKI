@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,8 +24,6 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-//  Last update: 2023-05-03
 
 #ifndef UAPKI_NS_ENVELOPEDDATA_HELPER_H
 #define UAPKI_NS_ENVELOPEDDATA_HELPER_H
@@ -220,15 +218,19 @@ namespace Pkcs7 {
             );
             int toIssuerAndSN (
                 ByteArray** baIssuerAndSN
-            );
+            ) const;
+            int toIssuerAndSN (
+                ByteArray** baIssuer,
+                ByteArray** baSerialNumber
+            ) const;
             int toRecipientKeyId (
                 ByteArray** baSubjectKeyId
-            );
+            ) const;
             int toRecipientKeyId (
                 ByteArray** baSubjectKeyId,
                 uint64_t& date,
                 ByteArray** baOtherKeyAttribute
-            );
+            ) const;
 
         };  //  end class KeyAgreeRecipientIdentifier
 
@@ -294,7 +296,13 @@ namespace Pkcs7 {
         const VectorBA& getOriginatorCerts (void) const {
             return m_OriginatorInfo.certs;
         }
+        VectorBA& getOriginatorCerts (void) {
+            return m_OriginatorInfo.certs;
+        }
         const VectorBA& getOriginatorCrls (void) const {
+            return m_OriginatorInfo.crls;
+        }
+        VectorBA& getOriginatorCrls (void) {
             return m_OriginatorInfo.crls;
         }
         const std::vector<RecipientInfo_PR>& getRecipientInfoTypes (void) const {

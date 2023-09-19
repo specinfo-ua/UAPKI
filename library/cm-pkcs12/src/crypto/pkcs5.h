@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2021-03-20
-
 #ifndef CM_PKCS5_H
 #define CM_PKCS5_H
 

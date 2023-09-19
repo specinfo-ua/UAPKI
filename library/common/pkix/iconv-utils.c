@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "common/pkix/iconv-utils.c"
+
 #include "iconv-utils.h"
 #include "uapkif.h"
 #include "macros-internal.h"

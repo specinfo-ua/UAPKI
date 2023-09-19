@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,6 +24,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define FILE_MARKER "common/pkix/extension-helper-json.cpp"
 
 #include "extension-helper-json.h"
 #include "extension-helper.h"
@@ -55,86 +57,32 @@ static const char* KEY_USAGE_NAMES[9] = {   //  KeyUsage ::= BIT STRING -- rfc52
 };
 
 
-int ExtensionHelper::DecodeToJsonObject::accessDescriptions (const ByteArray* baEncoded, JSON_Object* joResult)
+
+static int decode_other_name_to_json (
+        const OtherName_t* otherName,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
-    SubjectInfoAccess_t* subject_infoaccess = nullptr;
-    ByteArray* ba_accesslocation = nullptr;
-    JSON_Array* ja_accessdescrs = nullptr;
-    char* s_accessmethod = nullptr;
-    char* s_uri = nullptr;
+    string s_typeid;
+    SmartBA sba_value;
 
-    CHECK_NOT_NULL(subject_infoaccess = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), baEncoded));
+    DO(Util::oidFromAsn1(&otherName->type_id, s_typeid));
+    DO_JSON(json_object_set_string(joResult, "typeId", s_typeid.c_str()));
 
-    DO_JSON(json_object_set_value(joResult, "accessDescriptions", json_value_init_array()));
-    ja_accessdescrs = json_object_get_array(joResult, "accessDescriptions");
-
-    for (int i = 0; i < subject_infoaccess->list.count; i++) {
-        DO_JSON(json_array_append_value(ja_accessdescrs, json_value_init_object()));
-        JSON_Object* jo_accessdescr = json_array_get_object(ja_accessdescrs, i);
-        const AccessDescription_t* access_descr = subject_infoaccess->list.array[i];
-
-        DO(asn_oid_to_text(&access_descr->accessMethod, &s_accessmethod));
-
-        if (oid_is_equal(s_accessmethod, OID_PKIX_OCSP)
-            && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
-            DO(UapkiNS::Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                    access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "ocsp", s_uri));
-        }
-        else if (oid_is_equal(s_accessmethod, OID_PKIX_CaIssuers)
-            && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
-            DO(UapkiNS::Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "caIssuers", s_uri));
-        }
-        else if (oid_is_equal(s_accessmethod, OID_PKIX_TimeStamping)
-            && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
-            DO(UapkiNS::Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "timeStamping", s_uri));
-        }
-        else {
-            DO(asn_encode_ba(get_GeneralName_desc(), &access_descr->accessLocation, &ba_accesslocation));
-            DO_JSON(json_object_set_string(jo_accessdescr, "accessMethod", s_accessmethod));
-            DO(json_object_set_base64(jo_accessdescr, "accessLocation", ba_accesslocation));
-        }
-
-        ::free(s_accessmethod);
-        s_accessmethod = nullptr;
-        ::free(s_uri);
-        s_uri = nullptr;
-        ba_free(ba_accesslocation);
-        ba_accesslocation = nullptr;
+    if (!sba_value.set(ba_alloc_from_uint8(otherName->value.buf, otherName->value.size))) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
+    DO(json_object_set_base64(joResult, "value", sba_value.get()));
 
 cleanup:
-    asn_free(get_SubjectInfoAccess_desc(), subject_infoaccess);
-    ba_free(ba_accesslocation);
-    ::free(s_accessmethod);
-    ::free(s_uri);
     return ret;
-}
+}   //  decode_other_name_to_json
 
-static int decode_other_name_to_json (const OtherName_t* otherName, JSON_Object* joResult)
-{
-    int ret = RET_OK;
-    ByteArray* ba_value = nullptr;
-    char* s_typeid = nullptr;
-
-    DO(asn_oid_to_text(&otherName->type_id, &s_typeid));
-    DO_JSON(json_object_set_string(joResult, "typeId", s_typeid));
-
-    CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(otherName->value.buf, otherName->value.size));
-    DO(json_object_set_base64(joResult, "value", ba_value));
-
-cleanup:
-    ba_free(ba_value);
-    ::free(s_typeid);
-    return ret;
-}
-
-static int decode_general_name_to_json (const GeneralName_t* generalName, JSON_Object* joResult)
+static int decode_general_name_to_json (
+        const GeneralName_t* generalName,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     ByteArray* ba_value = nullptr;
@@ -147,15 +95,15 @@ static int decode_general_name_to_json (const GeneralName_t* generalName, JSON_O
         DO(decode_other_name_to_json(&generalName->choice.otherName, json_object_get_object(joResult, "otherName")));
         break;
     case GeneralName_PR_rfc822Name:
-        DO(UapkiNS::Util::pbufToStr(generalName->choice.rfc822Name.buf, generalName->choice.rfc822Name.size, &s_value));
+        DO(Util::pbufToStr(generalName->choice.rfc822Name.buf, generalName->choice.rfc822Name.size, &s_value));
         DO_JSON(json_object_set_string(joResult, "email", s_value));
         break;
     case GeneralName_PR_dNSName:
-        DO(UapkiNS::Util::pbufToStr(generalName->choice.dNSName.buf, generalName->choice.dNSName.size, &s_value));
+        DO(Util::pbufToStr(generalName->choice.dNSName.buf, generalName->choice.dNSName.size, &s_value));
         DO_JSON(json_object_set_string(joResult, "dns", s_value));
         break;
     case GeneralName_PR_uniformResourceIdentifier:
-        DO(UapkiNS::Util::pbufToStr(generalName->choice.uniformResourceIdentifier.buf, generalName->choice.uniformResourceIdentifier.size, &s_value));
+        DO(Util::pbufToStr(generalName->choice.uniformResourceIdentifier.buf, generalName->choice.uniformResourceIdentifier.size, &s_value));
         DO_JSON(json_object_set_string(joResult, "uri", s_value));
         break;
     default:
@@ -170,9 +118,106 @@ cleanup:
     ba_free(ba_value);
     ::free(s_value);
     return ret;
+}   //  decode_general_name_to_json
+
+static const char* friendlyname_from_oid (
+        const string& type
+)
+{
+    const char* rv_s = nullptr;
+    if (type == string(OID_PDS_UKRAINE_DRFO)) {
+        rv_s = "PDS_UKRAINE_DRFO";
+    }
+    else if (type == string(OID_PDS_UKRAINE_EDRPOU)) {
+        rv_s = "PDS_UKRAINE_EDRPOU";
+    }
+    else if (type == string(OID_PDS_UKRAINE_NBU)) {
+        rv_s = "PDS_UKRAINE_NBU";
+    }
+    else if (type == string(OID_PDS_UKRAINE_SPMF)) {
+        rv_s = "PDS_UKRAINE_SPMF";
+    }
+    else if (type == string(OID_PDS_UKRAINE_ORG)) {
+        rv_s = "PDS_UKRAINE_ORG";
+    }
+    else if (type == string(OID_PDS_UKRAINE_UNIT)) {
+        rv_s = "PDS_UKRAINE_UNIT";
+    }
+    else if (type == string(OID_PDS_UKRAINE_USER)) {
+        rv_s = "PDS_UKRAINE_USER";
+    }
+    else if (type == string(OID_PDS_UKRAINE_EDDR)) {
+        rv_s = "PDS_UKRAINE_EDDR";
+    }
+    return rv_s;
+}   //  friendlyname_from_oid
+
+
+
+int ExtensionHelper::DecodeToJsonObject::accessDescriptions (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
+{
+    int ret = RET_OK;
+    SubjectInfoAccess_t* subject_infoaccess = nullptr;
+    JSON_Array* ja_accessdescrs = nullptr;
+    char* s_uri = nullptr;
+
+    CHECK_NOT_NULL(subject_infoaccess = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), baEncoded));
+
+    DO_JSON(json_object_set_value(joResult, "accessDescriptions", json_value_init_array()));
+    ja_accessdescrs = json_object_get_array(joResult, "accessDescriptions");
+
+    for (int i = 0; i < subject_infoaccess->list.count; i++) {
+        DO_JSON(json_array_append_value(ja_accessdescrs, json_value_init_object()));
+        JSON_Object* jo_accessdescr = json_array_get_object(ja_accessdescrs, i);
+        const AccessDescription_t* access_descr = subject_infoaccess->list.array[i];
+        string s_accessmethod;
+
+        DO(Util::oidFromAsn1(&access_descr->accessMethod, s_accessmethod));
+
+        if (
+            oid_is_equal(s_accessmethod.c_str(), OID_PKIX_OCSP) &&
+            (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)
+        ) {
+            DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
+                    access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
+            DO(json_object_set_string(jo_accessdescr, "ocsp", s_uri));
+        }
+        else if (oid_is_equal(s_accessmethod.c_str(), OID_PKIX_CaIssuers)
+            && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
+            DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
+            DO(json_object_set_string(jo_accessdescr, "caIssuers", s_uri));
+        }
+        else if (oid_is_equal(s_accessmethod.c_str(), OID_PKIX_TimeStamping)
+            && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
+            DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
+            DO(json_object_set_string(jo_accessdescr, "timeStamping", s_uri));
+        }
+        else {
+            SmartBA sba_accesslocation;
+            DO(asn_encode_ba(get_GeneralName_desc(), &access_descr->accessLocation, &sba_accesslocation));
+            DO_JSON(json_object_set_string(jo_accessdescr, "accessMethod", s_accessmethod.c_str()));
+            DO(json_object_set_base64(jo_accessdescr, "accessLocation", sba_accesslocation.get()));
+        }
+
+        ::free(s_uri);
+        s_uri = nullptr;
+    }
+
+cleanup:
+    asn_free(get_SubjectInfoAccess_desc(), subject_infoaccess);
+    ::free(s_uri);
+    return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::alternativeName (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::alternativeName (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     //  typedef GeneralNames_t IssuerAltName_t;
@@ -195,11 +240,15 @@ cleanup:
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::authorityKeyId (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId)
+int ExtensionHelper::DecodeToJsonObject::authorityKeyId (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult,
+        ByteArray** baKeyId
+)
 {
     int ret = RET_OK;
     AuthorityKeyIdentifier_t* authority_keyid = nullptr;
-    ByteArray* ba_authoritycertsn = nullptr;
+    SmartBA sba_authoritycertsn;
 
     CHECK_PARAM(baKeyId != nullptr);
 
@@ -212,17 +261,19 @@ int ExtensionHelper::DecodeToJsonObject::authorityKeyId (const ByteArray* baEnco
     //TODO: need impl 'authorityCertIssuer'(OPTIONAL)
 
     if (authority_keyid->authorityCertSerialNumber) {//TODO: need check
-        DO(asn_INTEGER2ba(authority_keyid->authorityCertSerialNumber, &ba_authoritycertsn));
-        DO(json_object_set_hex(joResult, "authorityCertSerialNumber", ba_authoritycertsn));
+        DO(asn_INTEGER2ba(authority_keyid->authorityCertSerialNumber, &sba_authoritycertsn));
+        DO(json_object_set_hex(joResult, "authorityCertSerialNumber", sba_authoritycertsn.get()));
     }
 
 cleanup:
     asn_free(get_AuthorityKeyIdentifier_desc(), authority_keyid);
-    ba_free(ba_authoritycertsn);
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::basicConstraints (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::basicConstraints (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     BasicConstraints_t* basic_constraints = nullptr;
@@ -230,8 +281,8 @@ int ExtensionHelper::DecodeToJsonObject::basicConstraints (const ByteArray* baEn
     CHECK_NOT_NULL(basic_constraints = (BasicConstraints_t*)asn_decode_ba_with_alloc(get_BasicConstraints_desc(), baEncoded));
 
     if (basic_constraints->cA) {
-        const bool cA = (basic_constraints->cA != 0);
-        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "cA", cA));
+        const bool is_ca = (basic_constraints->cA != 0);
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "cA", is_ca));
     }
 
     if (basic_constraints->pathLenConstraint) {
@@ -245,16 +296,15 @@ cleanup:
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::certificatePolicies (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::certificatePolicies (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     CertificatePolicies_t* cert_policies = nullptr;
-    ByteArray* ba_encodedqualifier = nullptr;
     JSON_Array* ja_policyinfos = nullptr;
     JSON_Array* ja_policyquals = nullptr;
-    char* s_policyid = nullptr;
-    char* s_policyqualid = nullptr;
-    char* s_qualifier = nullptr;
 
     CHECK_NOT_NULL(cert_policies = (CertificatePolicies_t*)asn_decode_ba_with_alloc(get_CertificatePolicies_desc(), baEncoded));
 
@@ -265,11 +315,11 @@ int ExtensionHelper::DecodeToJsonObject::certificatePolicies (const ByteArray* b
         DO_JSON(json_array_append_value(ja_policyinfos, json_value_init_object()));
         JSON_Object* jo_policyinfo = json_array_get_object(ja_policyinfos, i);
         const PolicyInformation_t* policy_info = cert_policies->list.array[i];
+        string s_policyid, s_policyqualid, s_qualifier;
+        SmartBA sba_encodedqualifier;
 
-        DO(asn_oid_to_text(&policy_info->policyIdentifier, &s_policyid));
-        DO_JSON(json_object_set_string(jo_policyinfo, "policyIdentifier", s_policyid));
-        ::free(s_policyid);
-        s_policyid = nullptr;
+        DO(Util::oidFromAsn1(&policy_info->policyIdentifier, s_policyid));
+        DO_JSON(json_object_set_string(jo_policyinfo, "policyIdentifier", s_policyid.c_str()));
 
         if (policy_info->policyQualifiers) {
             DO_JSON(json_object_set_value(jo_policyinfo, "policyQualifiers", json_value_init_array()));
@@ -280,39 +330,34 @@ int ExtensionHelper::DecodeToJsonObject::certificatePolicies (const ByteArray* b
                 JSON_Object* jo_pqinfo = json_array_get_object(ja_policyquals, j);
                 const PolicyQualifierInfo_t* pq_info = policy_info->policyQualifiers->list.array[j];
 
-                DO(asn_oid_to_text(&pq_info->policyQualifierId, &s_policyqualid));
-                DO_JSON(json_object_set_string(jo_pqinfo, "policyQualifierId", s_policyqualid));
+                DO(Util::oidFromAsn1(&pq_info->policyQualifierId, s_policyqualid));
+                DO_JSON(json_object_set_string(jo_pqinfo, "policyQualifierId", s_policyqualid.c_str()));
 
-                CHECK_NOT_NULL(ba_encodedqualifier = ba_alloc_from_uint8(pq_info->qualifier.buf, pq_info->qualifier.size));
-                DO(json_object_set_base64(jo_pqinfo, "qualifier", ba_encodedqualifier));
-                if (oid_is_equal(s_policyqualid, OID_PKIX_PqiCps)) {
-                    DO(UapkiNS::Util::decodeAnyString(ba_encodedqualifier, &s_qualifier));
-                    DO_JSON(json_object_set_string(jo_pqinfo, "cps", s_qualifier));
+                if (!sba_encodedqualifier.set(ba_alloc_from_uint8(pq_info->qualifier.buf, pq_info->qualifier.size))) {
+                    SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+                }
+
+                DO(json_object_set_base64(jo_pqinfo, "qualifier", sba_encodedqualifier.get()));
+                if (oid_is_equal(s_policyqualid.c_str(), OID_PKIX_PqiCps)) {
+                    DO(Util::decodeAnyString(sba_encodedqualifier.get(), s_qualifier));
+                    DO_JSON(json_object_set_string(jo_pqinfo, "cps", s_qualifier.c_str()));
                 }
                 else {
-                    //TODO: OID_PKIX_PqiUnotice("1.3.6.1.5.5.7.2.2"), OID_PKIX_PqiTextNotice("1.3.6.1.5.5.7.2.3"), and ?
+                    //TODO: OID_PKIX_PqiUnotice("1.3.6.1.5.5.7.2.2"), OID_PKIX_PqiTextNotice("1.3.6.1.5.5.7.2.3")
                 }
-
-                ::free(s_policyqualid);
-                s_policyqualid = nullptr;
-                ba_free(ba_encodedqualifier);
-                ba_encodedqualifier = nullptr;
-                ::free(s_qualifier);
-                s_qualifier = nullptr;
             }
         }
     }
 
 cleanup:
     asn_free(get_CertificatePolicies_desc(), cert_policies);
-    ba_free(ba_encodedqualifier);
-    ::free(s_policyid);
-    ::free(s_policyqualid);
-    ::free(s_qualifier);
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::distributionPoints (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::distributionPoints (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     vector<string> uris;
@@ -331,12 +376,14 @@ cleanup:
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::extendedKeyUsage (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::extendedKeyUsage (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     ExtendedKeyUsage_t* ext_keyusage = nullptr;
     JSON_Array* ja_keypurposeids = nullptr;
-    char* s_keypurposeid = nullptr;
 
     CHECK_NOT_NULL(ext_keyusage = (ExtendedKeyUsage_t*)asn_decode_ba_with_alloc(get_ExtendedKeyUsage_desc(), baEncoded));
 
@@ -345,19 +392,21 @@ int ExtensionHelper::DecodeToJsonObject::extendedKeyUsage (const ByteArray* baEn
 
     for (int i = 0; i < ext_keyusage->list.count; i++) {
         const KeyPurposeId_t* key_purposeid = ext_keyusage->list.array[i];
-        DO(asn_oid_to_text(key_purposeid, &s_keypurposeid));
-        DO_JSON(json_array_append_string(ja_keypurposeids, s_keypurposeid));
-        ::free(s_keypurposeid);
-        s_keypurposeid = nullptr;
+        string s_keypurposeid;
+
+        DO(Util::oidFromAsn1(key_purposeid, s_keypurposeid));
+        DO_JSON(json_array_append_string(ja_keypurposeids, s_keypurposeid.c_str()));
     }
 
 cleanup:
     asn_free(get_ExtendedKeyUsage_desc(), ext_keyusage);
-    ::free(s_keypurposeid);
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::keyUsage (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::keyUsage (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     KeyUsage_t* key_usage = nullptr;
@@ -379,13 +428,14 @@ cleanup:
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::qcStatements (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::qcStatements (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     QCStatements_t* qc_statements = nullptr;
-    ByteArray* ba_statementinfo = nullptr;
     JSON_Array* ja_qcstatements = nullptr;
-    char* s_statementid = nullptr;
 
     CHECK_NOT_NULL(qc_statements = (QCStatements_t*)asn_decode_ba_with_alloc(get_QCStatements_desc(), baEncoded));
 
@@ -396,81 +446,98 @@ int ExtensionHelper::DecodeToJsonObject::qcStatements (const ByteArray* baEncode
         DO_JSON(json_array_append_value(ja_qcstatements, json_value_init_object()));
         JSON_Object* jo_qcstatement = json_array_get_object(ja_qcstatements, i);
         const QCStatement_t* qc_statement = qc_statements->list.array[i];
+        string s_statementid;
+        SmartBA sba_statementinfo;
 
-        DO(asn_oid_to_text(&qc_statement->statementId, &s_statementid));
-        DO_JSON(json_object_set_string(jo_qcstatement, "statementId", s_statementid));
+        DO(Util::oidFromAsn1(&qc_statement->statementId, s_statementid));
+        DO_JSON(json_object_set_string(jo_qcstatement, "statementId", s_statementid.c_str()));
         if (qc_statement->statementInfo) {
-            CHECK_NOT_NULL(ba_statementinfo = ba_alloc_from_uint8(qc_statement->statementInfo->buf, qc_statement->statementInfo->size));
-            DO(json_object_set_base64(jo_qcstatement, "statementInfo", ba_statementinfo));
+            if (!sba_statementinfo.set(ba_alloc_from_uint8(qc_statement->statementInfo->buf, qc_statement->statementInfo->size))) {
+                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+            }
+            DO(json_object_set_base64(jo_qcstatement, "statementInfo", sba_statementinfo.get()));
         }
-
-        ::free(s_statementid);
-        s_statementid = nullptr;
-        ba_free(ba_statementinfo);
-        ba_statementinfo = nullptr;
     }
 
 cleanup:
     asn_free(get_QCStatements_desc(), qc_statements);
-    ba_free(ba_statementinfo);
-    ::free(s_statementid);
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::subjectDirectoryAttributes (const ByteArray* baEncoded, JSON_Object* joResult)
+int ExtensionHelper::DecodeToJsonObject::subjectDirectoryAttributes (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     SubjectDirectoryAttributes_t* subject_dirattrs = nullptr;
-    ByteArray* ba_encoded = nullptr;
-    char* str = nullptr;
+    JSON_Array* ja_attrs = nullptr;
 
     CHECK_NOT_NULL(subject_dirattrs = (SubjectDirectoryAttributes_t*)asn_decode_ba_with_alloc(get_SubjectDirectoryAttributes_desc(), baEncoded));
 
-    ret = UapkiNS::Util::attrValueFromAttributes((const Attributes_t*)subject_dirattrs, OID_PDS_UKRAINE_DRFO, &ba_encoded);
-    if (ret == RET_OK) {
-        DO(UapkiNS::Util::decodeAnyString(ba_encoded, &str));
-        ba_free(ba_encoded);
-        ba_encoded = nullptr;
-        if (str != nullptr) {
-            DO_JSON(json_object_dotset_string(joResult, "DRFO", str));
-            ::free(str);
-            str = nullptr;
+    DO_JSON(json_object_set_value(joResult, "attributes", json_value_init_array()));
+    ja_attrs = json_object_get_array(joResult, "attributes");
+
+    for (int i = 0; i < subject_dirattrs->list.count; i++) {
+        const Attribute_t* attr = subject_dirattrs->list.array[i];
+        string s_type, s_value;
+        SmartBA sba_encoded;
+        const char* s_friendlyname = nullptr;
+
+        DO_JSON(json_array_append_value(ja_attrs, json_value_init_object()));
+        JSON_Object* jo_attr = json_array_get_object(ja_attrs, i);
+
+        DO(Util::oidFromAsn1(&attr->type, s_type));
+        DO_JSON(json_object_set_string(jo_attr, "type", s_type.c_str()));
+        if (attr->value.list.count > 0) {
+            const AttributeValue_t* attr_value = attr->value.list.array[0];
+            if (!sba_encoded.set(ba_alloc_from_uint8(attr_value->buf, attr_value->size))) {
+                SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+            }
+            DO(json_object_set_base64(jo_attr, "bytes", sba_encoded.get()));
+        }
+        s_friendlyname = friendlyname_from_oid(s_type);
+        if (s_friendlyname) {
+            DO_JSON(json_object_set_string(jo_attr, "friendlyName", s_friendlyname));
+        }
+
+        if (s_type == string(OID_PDS_UKRAINE_DRFO)) {
+            DO(Util::decodeAnyString(sba_encoded.get(), s_value));
+            DO_JSON(json_object_set_string(jo_attr, "value", s_value.c_str()));
+            DO_JSON(json_object_set_string(joResult, "DRFO", s_value.c_str()));
+        }
+        else if (s_type == string(OID_PDS_UKRAINE_EDRPOU)) {
+            DO(Util::decodeAnyString(sba_encoded.get(), s_value));
+            DO_JSON(json_object_set_string(jo_attr, "value", s_value.c_str()));
+            DO_JSON(json_object_set_string(joResult, "EDRPOU", s_value.c_str()));
+        }
+        else if (s_type == string(OID_PDS_UKRAINE_EDDR)) {
+            DO(Util::decodeAnyString(sba_encoded.get(), s_value));
+            DO_JSON(json_object_set_string(jo_attr, "value", s_value.c_str()));
+            DO_JSON(json_object_set_string(joResult, "EDDR", s_value.c_str()));
+        }
+        else if (
+            (s_type == string(OID_PDS_UKRAINE_NBU)) ||
+            (s_type == string(OID_PDS_UKRAINE_SPMF)) ||
+            (s_type == string(OID_PDS_UKRAINE_ORG)) ||
+            (s_type == string(OID_PDS_UKRAINE_UNIT)) ||
+            (s_type == string(OID_PDS_UKRAINE_USER))
+        ) {
+            DO(Util::decodeAnyString(sba_encoded.get(), s_value));
+            DO_JSON(json_object_set_string(jo_attr, "value", s_value.c_str()));
         }
     }
-
-    ret = UapkiNS::Util::attrValueFromAttributes((const Attributes_t*)subject_dirattrs, OID_PDS_UKRAINE_EDRPOU, &ba_encoded);
-    if (ret == RET_OK) {
-        DO(UapkiNS::Util::decodeAnyString(ba_encoded, &str));
-        ba_free(ba_encoded);
-        ba_encoded = nullptr;
-        if (str != nullptr) {
-            DO_JSON(json_object_dotset_string(joResult, "EDRPOU", str));
-            ::free(str);
-            str = nullptr;
-        }
-    }
-
-    ret = UapkiNS::Util::attrValueFromAttributes((const Attributes_t*)subject_dirattrs, OID_PDS_UKRAINE_EDDR, &ba_encoded);
-    if (ret == RET_OK) {
-        DO(UapkiNS::Util::decodeAnyString(ba_encoded, &str));
-        ba_free(ba_encoded);
-        ba_encoded = nullptr;
-        if (str != nullptr) {
-            DO_JSON(json_object_dotset_string(joResult, "EDDR", str));
-            ::free(str);
-            str = nullptr;
-        }
-    }
-
-    ret = RET_OK;
 
 cleanup:
     asn_free(get_SubjectDirectoryAttributes_desc(), subject_dirattrs);
-    ba_free(ba_encoded);
     return ret;
 }
 
-int ExtensionHelper::DecodeToJsonObject::subjectKeyId (const ByteArray* baEncoded, JSON_Object* joResult, ByteArray** baKeyId)
+int ExtensionHelper::DecodeToJsonObject::subjectKeyId (
+        const ByteArray* baEncoded,
+        JSON_Object* joResult,
+        ByteArray** baKeyId
+)
 {
     int ret = RET_OK;
     SubjectKeyIdentifier_t* subject_keyid = nullptr;

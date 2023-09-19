@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//  Last update: 2023-05-01
-
+#define FILE_MARKER "common/pkix/attribute-helper.cpp"
 
 #include "attribute-helper.h"
 #include "ba-utils.h"
@@ -35,10 +34,6 @@
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
 #include "uapkif.h"
-
-
-#undef FILE_MARKER
-#define FILE_MARKER "common/pkix/attribute-helper.cpp"
 
 
 #define DEBUG_OUTCON(expression)
@@ -127,13 +122,10 @@ int decodeContentType (
 )
 {
     int ret = RET_OK;
-    char* s_contenttype = nullptr;
 
-    DO(UapkiNS::Util::decodeOid(baEncoded, &s_contenttype));
-    contentType = string(s_contenttype);
+    DO(Util::decodeOid(baEncoded, contentType));
 
 cleanup:
-    ::free(s_contenttype);
     return ret;
 }
 
@@ -142,7 +134,7 @@ int decodeMessageDigest (
         ByteArray** baMessageDigest
 )
 {
-    return UapkiNS::Util::decodeOctetString(baEncoded, baMessageDigest);
+    return Util::decodeOctetString(baEncoded, baMessageDigest);
 }
 
 int decodeOtherHash (
@@ -736,7 +728,7 @@ int RevocationRefsBuilder::CrlOcspRef::addCrlValidatedId (
     //  =crlHash=
     if (crlHash.hashAlgorithm.algorithm != string(OID_SHA1)) {
         crl_validatedid->crlHash.present = OtherHash_PR_otherHash;
-        DO(UapkiNS::Util::algorithmIdentifierToAsn1(crl_validatedid->crlHash.choice.otherHash.hashAlgorithm, crlHash.hashAlgorithm));
+        DO(Util::algorithmIdentifierToAsn1(crl_validatedid->crlHash.choice.otherHash.hashAlgorithm, crlHash.hashAlgorithm));
         DO(asn_ba2OCTSTRING(crlHash.baHashValue, &crl_validatedid->crlHash.choice.otherHash.hashValue));
     }
     else {

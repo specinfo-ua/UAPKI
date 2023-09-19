@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -24,8 +24,6 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-//  Last update: 2023-02-01
 
 #ifndef UAPKI_OIDS_H
 #define UAPKI_OIDS_H
@@ -378,6 +376,9 @@ DEFINE_OID(OID_PKIX_PolicyQualifierIds,         "1.3.6.1.5.5.7.2");
 DEFINE_OID(OID_PKIX_PqiCps,                     "1.3.6.1.5.5.7.2.1");
 DEFINE_OID(OID_PKIX_PqiUnotice,                 "1.3.6.1.5.5.7.2.2");
 DEFINE_OID(OID_PKIX_PqiTextNotice,              "1.3.6.1.5.5.7.2.3");
+DEFINE_OID(OID_PKIX_ExtendedKeyPurposes,        "1.3.6.1.5.5.7.3");
+DEFINE_OID(OID_PKIX_KpTspSigning,               "1.3.6.1.5.5.7.3.8");
+DEFINE_OID(OID_PKIX_KpOcspSigning,              "1.3.6.1.5.5.7.3.9");
 DEFINE_OID(OID_PKIX_OCSP,                       "1.3.6.1.5.5.7.48.1");
 DEFINE_OID(OID_PKIX_OcspBasic,                  "1.3.6.1.5.5.7.48.1.1");
 DEFINE_OID(OID_PKIX_OcspNonce,                  "1.3.6.1.5.5.7.48.1.2");
@@ -398,14 +399,15 @@ DEFINE_OID(OID_MEDOC_DIGEST,            "1.32.113549.1.7.1.524545");  // OID а�
 
 //-----------------------------------------------------------------------------------------
 //IIT
-DEFINE_OID(OID_IIT_KEYSTORE,                     "1.3.6.1.4.1.19398.1.1.1.2"); // OID хранилища закрытого ключа IIT Key-6.dat
-DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.1.5"); // RSA ключ ("почти" RSAPrivateKey из RFC 8017)
+DEFINE_OID(OID_IIT_KEYSTORE,                     "1.3.6.1.4.1.19398.1.1.1.2"); // OID сховища закритого ключа IIT Key-6.dat
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.1.5"); // RSA ключ ("майже" RSAPrivateKey із RFC 8017)
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_SIGN_KEYID,     "1.3.6.1.4.1.19398.1.1.2.1"); // Subject Key Identifier
-DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_SPKI,       "1.3.6.1.4.1.19398.1.1.2.2"); // Параметры KEP ключа
+DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_SPKI,       "1.3.6.1.4.1.19398.1.1.2.2"); // Параметри KEP ключа
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.2.3"); // KEP ключ
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_KEYID,      "1.3.6.1.4.1.19398.1.1.2.5"); // KEP Subject Key Identifier
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_HMAC_GOST34311, "1.3.6.1.4.1.19398.1.1.2.6"); // sbox (64 byte), key (8 byte), hash (32 byte)
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_KEYID,      "1.3.6.1.4.1.19398.1.1.2.7"); // RSA Subject Key Identifier
+DEFINE_OID(OID_IIT_KEYPURPOSE_CMP_SIGNING,       "1.3.6.1.4.1.19398.1.1.8.1"); // Extended Key Purpose - signing CMP-responses
 
 //-----------------------------------------------------------------------------------------
 //PKCS7
@@ -474,6 +476,11 @@ DEFINE_OID(OID_JKS_KEY_PROTECTOR,           "1.3.6.1.4.1.42.2.17.1.1");
 //Personal data of the signer (Ukraine)
 DEFINE_OID(OID_PDS_UKRAINE_DRFO,            "1.2.804.2.1.1.1.11.1.4.1.1");
 DEFINE_OID(OID_PDS_UKRAINE_EDRPOU,          "1.2.804.2.1.1.1.11.1.4.2.1");
+DEFINE_OID(OID_PDS_UKRAINE_NBU,             "1.2.804.2.1.1.1.11.1.4.3.1");
+DEFINE_OID(OID_PDS_UKRAINE_SPMF,            "1.2.804.2.1.1.1.11.1.4.4.1");
+DEFINE_OID(OID_PDS_UKRAINE_ORG,             "1.2.804.2.1.1.1.11.1.4.5.1");
+DEFINE_OID(OID_PDS_UKRAINE_UNIT,            "1.2.804.2.1.1.1.11.1.4.6.1");
+DEFINE_OID(OID_PDS_UKRAINE_USER,            "1.2.804.2.1.1.1.11.1.4.7.1");
 DEFINE_OID(OID_PDS_UKRAINE_EDDR,            "1.2.804.2.1.1.1.11.1.4.11.1");
 //-----------------------------------------------------------------------------------------
 //ETSI

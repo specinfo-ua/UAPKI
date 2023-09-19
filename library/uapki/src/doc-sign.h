@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -50,18 +50,18 @@ public:
     static const size_t MAX_COUNT_DOCS  = 100;
 
     struct CerDataItem {
-        CerStore::Item*
-                    pcsiSubject;
-        CerStore::Item*
-                    pcsiIssuer;
+        Cert::CerItem*
+                    pCerSubject;
+        Cert::CerItem*
+                    pCerIssuer;
         bool        isSelfSigned;
         SmartBA     basicOcspResponse;
         SmartBA     ocspIdentifier;
         SmartBA     ocspRespHash;
-        CrlStore::Item*
-                    pcsiCrl;
-        CerStore::Item*
-                    pcsiResponder;
+        Crl::CrlItem*
+                    pCrl;
+        Cert::CerItem*
+                    pCerResponder;
 
         CerDataItem (void);
         ~CerDataItem (void);
@@ -102,7 +102,7 @@ public:
         ~SignParams (void);
 
         int addCert (
-            CerStore::Item* cerStoreItem
+            Cert::CerItem* cerItem
         );
         int setSignatureFormat (
             const SignatureFormat signatureFormat
@@ -143,7 +143,7 @@ public:
         const SignParams* iSignParams
     );
     int addCert (
-        CerStore::Item* cerStoreItem
+        Cert::CerItem* cerItem
     );
     int addArchiveAttribute (
         const std::string& type,

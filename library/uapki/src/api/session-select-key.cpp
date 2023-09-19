@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, The UAPKI Project Authors.
+ * Copyright (c) 2021, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,14 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define FILE_MARKER "uapki/api/session-select-key.cpp"
+
 #include "api-json-internal.h"
 #include "cm-providers.h"
 #include "global-objects.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
 
-#undef FILE_MARKER
-#define FILE_MARKER "api/session-select-key.cpp"
 
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON
@@ -40,15 +40,19 @@
 #endif
 
 
+using namespace std;
+using namespace UapkiNS;
+
+
 int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
 {
-    CerStore* cer_store = get_cerstore();
+    Cert::CerStore* cer_store = get_cerstore();
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
     CmStorageProxy* storage = CmProviders::openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
-    UapkiNS::SmartBA sba_keyid;
+    SmartBA sba_keyid;
     if (!sba_keyid.set(json_object_get_hex(joParams, "id"))) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = storage->sessionSelectKey(*sba_keyid);
@@ -61,27 +65,39 @@ int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
     ParsonHelper json;
     if (!json.parse(s_keyinfo.c_str())) return RET_UAPKI_INVALID_JSON_FORMAT;
 
-    UapkiNS::VectorBA vba_certs;
-    CerStore::Item* cer_selectedkey = nullptr;
+    string s_label, s_application;
+    VectorBA vba_encodedcerts;
+    vector<Cert::CerStore::AddedCerItem> added_ceritems;
+    Cert::CerItem* cer_selectedkey = nullptr;
 
+    (void)json.getString("label", s_label);
+    (void)json.getString("application", s_application);
+
+    DO_JSON(json_object_set_string(joResult, "id", json.getString("id")));
+    DO_JSON(json_object_set_string(joResult, "mechanismId", json.getString("mechanismId")));
+    DO_JSON(json_object_set_string(joResult, "parameterId", json.getString("parameterId")));
     DO_JSON(json_object_set_value(joResult, "signAlgo", json_value_init_array()));
     DO_JSON(json_array_copy_all_items(json_object_get_array(joResult, "signAlgo"), json.getArray("signAlgo")));
+    DO_JSON(json_object_set_string(joResult, "label", s_label.c_str()));
+    DO_JSON(json_object_set_string(joResult, "application", s_application.c_str()));
 
     //  Add certs to cert-store (if present)
-    ret = storage->keyGetCertificates(vba_certs);
-    if ((ret == RET_OK) && !vba_certs.empty()) {
-        for (size_t i = 0; i < vba_certs.size(); i++) {
-            DEBUG_OUTCON(printf("cert[%zu]: ", i); ba_print(stdout, vba_certs[i]));
-            bool is_unique;
-            DO(cer_store->addCert(vba_certs[i], true, false, false, is_unique, nullptr));
-        }
+    ret = storage->keyGetCertificates(vba_encodedcerts);
+    DEBUG_OUTCON(printf("Get certs(%zu) from key, ret: %d\n", vba_encodedcerts.size(), ret));
+    if ((ret == RET_OK) && !vba_encodedcerts.empty()) {
+        DO(cer_store->addCerts(
+            Cert::NOT_TRUSTED,
+            Cert::NOT_PERMANENT,
+            vba_encodedcerts,
+            added_ceritems
+        ));
     }
 
     // Get cert from cert-store
     ret = cer_store->getCertByKeyId(*sba_keyid, &cer_selectedkey);
     if (ret == RET_OK) {
-        DO_JSON(json_object_set_base64(joResult, "certId", cer_selectedkey->baCertId));
-        DO_JSON(json_object_set_base64(joResult, "certificate", cer_selectedkey->baEncoded));
+        DO_JSON(json_object_set_base64(joResult, "certId", cer_selectedkey->getCertId()));
+        DO_JSON(json_object_set_base64(joResult, "certificate", cer_selectedkey->getEncoded()));
     }
     else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
         ret = RET_OK;
