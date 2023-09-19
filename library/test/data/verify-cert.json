@@ -47,7 +47,7 @@
       "parameters": {
         "certId": "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAc6V2AA=="
       },
-      "skip": true
+      "skip": false
     },
     {
       "comment": "Verify certificate (validationType - issuerOnly) 'diia-test-sign-7775603.cer' from cer-store",
@@ -77,7 +77,7 @@
         "validationType": "OCSP",
         "reportTime": true
       },
-      "skip": true
+      "skip": false
     },
     {
       "comment": "Verify certificate (validationType - issuerAndCrl) 'diia-test-sign-7775603.cer' from cer-store",
@@ -89,57 +89,6 @@
         "reportTime": true
       },
       "skip": false
-    },
-    {
-      "comment": "Verify certificate(Serpen Augusto, SN: 122555289206669935155620253106797026752923172864, 0x157791B9508857ED04000000350000005C000000) from cer-store",
-      "comment1": "Validity: from 2020-08-26 20:13:07 to 2022-08-26 20:13:07",
-      "comment2": "Included in CRL 4 times",
-      "comment2a": "cRLReason(6) 2020-08-26 20:28:37",
-      "comment2b": "cRLReason(8) 2020-08-26 20:32:18",
-      "comment2c": "cRLReason(6) 2020-08-31 15:59:59",
-      "comment2d": "cRLReason(8) 2020-08-31 16:01:09",
-      "comment3": "validationType - issuerOnly",
-      "method": "VERIFY_CERT",
-      "parameters": {
-        "certId": "MIH+MIHlMQswCQYDVQQGEwJVQTEZMBcGA1UEBRMQVUEtMzg3NzM4NjktMDAwMTE/MD0GA1UEAww20KbQtdC90YLRgCDRgdC10YDRgtC40YTRltC60LDRhtGW0Zcg0LrQu9GO0YfRltCyICIzREEiMVYwVAYDVQQKDE3QotCe0JIgItCG0L3RgtC10LPRgNC+0LLQsNC90ZYg0ZbQvdGE0L7RgNC80LDRhtGW0LnQvdGWINGC0LXRhdC90L7Qu9C+0LPRltGXIjEPMA0GA1UECwwG0KbQodCaMREwDwYDVQQHDAjQmtC40ZfQsgIUFXeRuVCIV+0EAAAANQAAAFwAAAA=",
-        "reportTime": true
-      },
-      "skip": true
-    },
-    {
-      "comment": "Verify certificate(Serpen Augusto, SN: 122555289206669935155620253106797026752923172864, 0x157791B9508857ED04000000350000005C000000) from cer-data",
-      "comment1": "Validity: from 2020-08-26 20:13:07 to 2022-08-26 20:13:07",
-      "comment2": "Included in CRL 4 times",
-      "comment2a": "cRLReason(6) 2020-08-26 20:28:37",
-      "comment2b": "cRLReason(8) 2020-08-26 20:32:18",
-      "comment2c": "cRLReason(6) 2020-08-31 15:59:59",
-      "comment2d": "cRLReason(8) 2020-08-31 16:01:09",
-      "comment3": "validationType - issuerAndOcsp",
-      "method": "VERIFY_CERT",
-      "parameters": {
-        "bytes": "MIIErjCCBFagAwIBAgIUFXeRuVCIV+0EAAAANQAAAFwAAAAwDQYLKoYkAgEBAQEDAQEwgeUxCzAJBgNVBAYTAlVBMRkwFwYDVQQFExBVQS0zODc3Mzg2OS0wMDAxMT8wPQYDVQQDDDbQptC10L3RgtGAINGB0LXRgNGC0LjRhNGW0LrQsNGG0ZbRlyDQutC70Y7Rh9GW0LIgIjNEQSIxVjBUBgNVBAoMTdCi0J7QkiAi0IbQvdGC0LXQs9GA0L7QstCw0L3RliDRltC90YTQvtGA0LzQsNGG0ZbQudC90ZYg0YLQtdGF0L3QvtC70L7Qs9GW0ZciMQ8wDQYDVQQLDAbQptCh0JoxETAPBgNVBAcMCNCa0LjRl9CyMB4XDTIwMDgyNjIwMTMwN1oXDTIyMDgyNjIwMTMwN1owgYYxCzAJBgNVBAYTAlVBMQswCQYDVQQFEwI1MzEXMBUGA1UEAwwOU2VycGVuIEF1Z3VzdG8xEzARBgNVBAcMCk1hcnNvcG9saXMxDTALBgNVBAgMBE1hcnMxCjAIBgNVBAkMASwxDzANBgNVBAQMBlNlcnBlbjEQMA4GA1UEKgwHQXVndXN0bzCBiDBgBgsqhiQCAQEBAQMBATBRBg0qhiQCAQEBAQMBAQIGBECp1utF8TxwgoDElnsjH16t9ljrpMA3KR042WvwJcpOF/jpcg3GFbQ6KJdfC8Heo2Q4tWTqLBef0BI+bbj6xXkEAyQABCEF+FEAFdm1K6VBKMwvtkjIoD+mOaTWwvoxlM67pkQ4NgGjggIMMIICCDArBgNVHSMEJDAigCDQBpqgqN99cHrXCy9UDLH7GR8iHQw45x/hP5u2nqKMxzAZBgNVHSABAf8EDzANMAsGCSqGJAIBAQECAjAeBggrBgEFBQcBAwEB/wQPMA0wCwYJKoYkAgEBAQIBMAwGA1UdEwEB/wQCMAAwQAYDVR0fBDkwNzA1oDOgMYYvaHR0cDovL2NhLmlpdC51YS9kb3dubG9hZC9jcmxzL0QwMDY5QUEtZnVsbC5jcmwwQQYDVR0uBDowODA2oDSgMoYwaHR0cDovL2NhLmlpdC51YS9kb3dubG9hZC9jcmxzL0QwMDY5QUEtZGVsdGEuY3JsMD8GCCsGAQUFBwEBBDMwMTAvBggrBgEFBQcwAYYjaHR0cDovL2NhLmlpdC51YS9zZXJ2aWNlcy9vY3NwL2RzdHUwPgYIKwYBBQUHAQsEMjAwMC4GCCsGAQUFBzADhiJodHRwOi8vY2EuaWl0LnVhL3NlcnZpY2VzL3RzcC9kc3R1MA4GA1UdDwEB/wQEAwIGwDApBgNVHQ4EIgQgvLO+cnTQdd1SJStn10qigdVouKBbDfjz1cf2nQC8E3AwTwYDVR0JBEgwRjASBgwqhiQCAQEBCwEEAgExAhMAMBwGDCqGJAIBAQELAQQBATEMEwoyMDIwMDgyNjAwMBIGDCqGJAIBAQELAQQLATECEwAwDQYLKoYkAgEBAQEDAQEDQwAEQAuxLQxwHob4lXWKnmt863SSgF76OJU7w4e0HH4pKAga5X9j1oGrvl9zaLw6Y67TiHbNaq/rNcYCFp23iPeya2s=",
-        "validationType": "OCSP",
-        "reportTime": true
-      },
-      "skip": true
-    },
-    {
-      "comment": "Verify certificate(Serpen Augusto, SN: 122555289206669935155620253106797026752923172864, 0x157791B9508857ED04000000350000005C000000) from cer-store",
-      "comment1": "Validity: from 2020-08-26 20:13:07 to 2022-08-26 20:13:07",
-      "comment2": "Included in CRL 4 times",
-      "comment2a": "cRLReason(6) 2020-08-26 20:28:37",
-      "comment2b": "cRLReason(8) 2020-08-26 20:32:18",
-      "comment2c": "cRLReason(6) 2020-08-31 15:59:59",
-      "comment2d": "cRLReason(8) 2020-08-31 16:01:09",
-      "comment3": "validationType - issuerAndCrl",
-      "method": "VERIFY_CERT",
-      "parameters": {
-        "certId": "MIH+MIHlMQswCQYDVQQGEwJVQTEZMBcGA1UEBRMQVUEtMzg3NzM4NjktMDAwMTE/MD0GA1UEAww20KbQtdC90YLRgCDRgdC10YDRgtC40YTRltC60LDRhtGW0Zcg0LrQu9GO0YfRltCyICIzREEiMVYwVAYDVQQKDE3QotCe0JIgItCG0L3RgtC10LPRgNC+0LLQsNC90ZYg0ZbQvdGE0L7RgNC80LDRhtGW0LnQvdGWINGC0LXRhdC90L7Qu9C+0LPRltGXIjEPMA0GA1UECwwG0KbQodCaMREwDwYDVQQHDAjQmtC40ZfQsgIUFXeRuVCIV+0EAAAANQAAAFwAAAA=",
-        "validationType": "CRL",
-        "validateTime": "2020-08-31 16:00:00",
-        "reportTime": true
-      },
-      "skip": true
     },
     {
       "comment": "Звільнити ресурси бібліотеки",

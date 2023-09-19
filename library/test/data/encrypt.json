@@ -58,7 +58,7 @@
     {
       "comment": "Encrypt envelopedData with ephemeral key",
       "comment1": "Use IIT-compatible params (COFACTOR_DH_GOST34311_KDF, GOST28147_WRAP, GOST28147_CFB)",
-      "comment2": "Included 2 certs and 2 unprotected attributes, set other contentType",
+      "comment2": "Included 2 unprotected attributes",
       "method": "ENCRYPT",
       "parameters": {
         "content": {
@@ -73,10 +73,6 @@
             //"keyWrapAlgo": "1.2.804.2.1.1.1.1.1.1.5" // optional, for COFACTOR_DH_GOST34311_KDF/OID_STD_DH_GOST34311_KDF default: GOST28147_WRAP
           }
         ],
-        "originatorCertIds": [
-          "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAc6V2AA==",
-          "MIH6MIHhMRYwFAYDVQQKDA3QlNCfICLQlNCG0K8iMXMwcQYDVQQDDGoi0JTRltGPIi4g0JrQstCw0LvRltGE0ZbQutC+0LLQsNC90LjQuSDQvdCw0LTQsNCy0LDRhyDQtdC70LXQutGC0YDQvtC90L3QuNGFINC00L7QstGW0YDRh9C40YUg0L/QvtGB0LvRg9CzMRkwFwYDVQQFExBVQS00MzM5NTAzMy0xMDAwMQswCQYDVQQGEwJVQTERMA8GA1UEBwwI0JrQuNGX0LIxFzAVBgNVBGEMDk5UUlVBLTQzMzk1MDMzAhQ+1QgxYNvFmwQAAACpHgYAdKV2AA=="
-        ], // optional
         "unprotectedAttrs": [
           {
             "type": "1.2.3.4",
