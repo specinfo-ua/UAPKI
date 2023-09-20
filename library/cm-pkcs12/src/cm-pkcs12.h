@@ -44,6 +44,7 @@ public:
     static const char* CM_SESSION_DESCRIPTION;
     static const char* CM_SESSION_MANUFACTURER;
     static const char* CM_SESSION_MODEL;
+    static const char* FILENAME_ON_MEMORY;
 
     CmPkcs12 (void);
     ~CmPkcs12 (void);

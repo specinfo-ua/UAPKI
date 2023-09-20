@@ -44,9 +44,6 @@
 #endif
 
 
-static const char* FILENAME_ON_MEMORY = "file://memory";
-
-
 static CM_ERROR err_to_cmerror (int err)
 {
     switch (err) {

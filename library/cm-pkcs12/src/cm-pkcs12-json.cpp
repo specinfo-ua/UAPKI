@@ -56,6 +56,7 @@ using namespace std;
 const char* CmPkcs12::CM_SESSION_DESCRIPTION    = "PKCS12-file session";
 const char* CmPkcs12::CM_SESSION_MANUFACTURER   = "2021 SPECINFOSYSTEMS LLC";
 const char* CmPkcs12::CM_SESSION_MODEL          = "PKCS12-FILE";
+const char* CmPkcs12::FILENAME_ON_MEMORY        = "file://memory";
 
 
 static const size_t DSTU_ECNAMES_NUMBER = 7;
@@ -246,11 +247,12 @@ CM_ERROR CmPkcs12::sessionInfoToJson (
     if (!json.create()) return RET_CM_GENERAL_ERROR;
 
     CM_ERROR cm_err = RET_OK;
+    CHECK_JSON(json.setString("id", !filename.empty() ? filename.c_str() : FILENAME_ON_MEMORY));
     CHECK_JSON(json.setString("description", CM_SESSION_DESCRIPTION));
     CHECK_JSON(json.setString("manufacturer", CM_SESSION_MANUFACTURER));
-    CHECK_JSON(json.setString("label", filename));
-    CHECK_JSON(json.setString("model", CM_SESSION_MODEL));
-    CHECK_JSON(json.setString("serial", filename));
+    CHECK_JSON(json.setString("label", ""));
+    CHECK_JSON(json.setString("model", ""));
+    CHECK_JSON(json.setString("serial", ""));
     cm_err = listMechanisms(json.setArray("mechanisms"));
     if (cm_err != RET_OK) return cm_err;
 
@@ -267,29 +269,16 @@ CM_ERROR CmPkcs12::signAlgoByMechanismId (
 {
     size_t cnt = 0;
     const char** sign_algos = nullptr;
-    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, oid) || oid_is_parent(OID_DSTU4145_WITH_GOST3411, oid)) {
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, oid) ||
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, oid)
+    ) {
         cnt = SIGN_ALGO_DSTU_NUMBER;
         sign_algos = SIGN_ALGO_DSTU;
     }
     else if (oid_is_equal(OID_EC_KEY, oid)) {
         cnt = SIGN_ALGO_ECDSA_NUMBER;
         sign_algos = SIGN_ALGOS_ECDSA;
-    }
-    else if (oid_is_equal(OID_ECKCDSA, oid)) {
-        cnt = 0;
-        //TODO: strings =
-    }
-    else if (oid_is_equal(OID_ECGDSA_STD, oid)) {
-        cnt = 0;
-        //TODO: strings =
-    }
-    else if (oid_is_parent("1.2.643.7.1.1.1", oid)) {//TODO add Rusland oids
-        cnt = 0;
-        //TODO: strings =
-    }
-    else if (oid_is_equal(OID_SM2, oid)) {
-        cnt = 0;
-        //TODO: strings =
     }
     else if (oid_is_equal(OID_RSA, oid)) {
         cnt = SIGN_ALGO_RSA_NUMBER;
