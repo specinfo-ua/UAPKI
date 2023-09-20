@@ -75,6 +75,62 @@ static struct LIB_CMPROVIDERS_ST {
 } lib_cmproviders;
 
 
+static JSON_Status json_object_copy_boolean (
+        JSON_Object* joDest,
+        JSON_Object* joSource,
+        const char* key
+)
+{
+    const bool b_value = ParsonHelper::jsonObjectGetBoolean(joSource, key, false);
+    return ParsonHelper::jsonObjectSetBoolean(joDest, key, b_value);
+}   //  json_object_copy_boolean
+
+static JSON_Status json_object_copy_number (
+    JSON_Object* joDest,
+    JSON_Object* joSource,
+    const char* key
+)
+{
+    const int32_t int_value = ParsonHelper::jsonObjectGetInt32(joSource, key, 0);
+    return ParsonHelper::jsonObjectSetInt32(joDest, key, int_value);
+}   //  json_object_copy_number
+
+static JSON_Status json_object_copy_string (
+        JSON_Object* joDest,
+        JSON_Object* joSource,
+        const char* key
+)
+{
+    const string s = ParsonHelper::jsonObjectGetString(joSource, key);
+    return json_object_set_string(joDest, key, s.c_str());
+}   //  json_object_copy_string
+
+static int json_object_copy_storageinfo (
+        JSON_Object* joDestStorageInfo,
+        JSON_Object* joSrcStorageInfo
+)
+{
+    int ret = RET_OK;
+
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "id"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "description"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "manufacturer"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "model"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "serial"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "label"));
+    DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordCountLow"));
+    DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordFinalTry"));
+    DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordLocked"));
+    DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordToBeChanged"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordAttemptsLeft"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordMinLen"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordMaxLen"));
+
+cleanup:
+    return ret;
+}   //  json_object_copy_storageinfo
+
+
 int CmProviders::loadProvider (const string& dir, const string& libName, const string& jsonParams)
 {
     DEBUG_OUTCON(printf("CmProviders::loadProvider(dir: '%s', libName: '%s', params: '%s')\n", dir.c_str(), libName.c_str(), jsonParams.c_str()));
@@ -182,7 +238,19 @@ int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
     JSON_Object* jo_resp = json.parse(s_storlist.c_str());
     if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
 
-    ret = (json_object_copy_all_items(joResult, jo_resp) == JSONSuccess) ? RET_OK : RET_UAPKI_JSON_FAILURE;
+    JSON_Array* ja_dststoreinfos = nullptr;
+    JSON_Array* ja_srcstoreinfos = json.getArray("storages");
+    const size_t cnt_storages = json_array_get_count(ja_srcstoreinfos);
+
+    DO_JSON(json_object_set_value(joResult, "storages", json_value_init_array()));
+    ja_dststoreinfos = json_object_get_array(joResult, "storages");
+    for (size_t i = 0; i < cnt_storages; i++) {
+        DO_JSON(json_array_append_value(ja_dststoreinfos, json_value_init_object()));
+        JSON_Object* jo_dstkeyinfo = json_array_get_object(ja_dststoreinfos, i);
+        JSON_Object* jo_srckeyinfo = json_array_get_object(ja_srcstoreinfos, i);
+        DO(json_object_copy_storageinfo(jo_dstkeyinfo, jo_srckeyinfo));
+    }
+cleanup:
     return ret;
 }
 
@@ -200,7 +268,7 @@ int CmProviders::storageInfo (const string& providerId, const string& storageId,
     JSON_Object* jo_resp = json.parse(s_storinfo.c_str());
     if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
 
-    ret = (json_object_copy_all_items(joResult, jo_resp) == JSONSuccess) ? RET_OK : RET_UAPKI_JSON_FAILURE;
+    ret = json_object_copy_storageinfo(joResult, jo_resp);
     return ret;
 }
 
