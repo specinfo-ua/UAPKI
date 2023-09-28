@@ -43,18 +43,6 @@ set(PATH_COMMON_JSON ${PATH_PRJ}/../common/json)
 set(PATH_COMMON_MACROS ${PATH_PRJ}/../common/macros)
 set(PATH_COMMON_PKIX ${PATH_PRJ}/../common/pkix)
 
-include_directories(
-        ${PATH_UAPKIC}/include
-        ${PATH_UAPKIF}/include
-        ${PATH_COMMON_CMAPI}
-        ${PATH_COMMON_JSON}
-        ${PATH_COMMON_MACROS}
-        ${PATH_COMMON_PKIX}
-        ${PATH_PRJ}/src
-        ${PATH_PRJ}/src/crypto
-        ${PATH_PRJ}/src/storage
-)
-
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../build)
 
 aux_source_directory(${PATH_PRJ}/src CMP12_SRC_SOURCES)
@@ -80,6 +68,16 @@ add_library(cm-pkcs12 ${UAPKI_LIBS_TYPE}
         ${CMP12_STORAGE_SOURCES}
         ${COMMON_SOURCES}
         ${JSON_SOURCES}
+)
+
+target_include_directories(cm-pkcs12 PUBLIC
+        ${PATH_COMMON_CMAPI}
+        ${PATH_COMMON_JSON}
+        ${PATH_COMMON_MACROS}
+        ${PATH_COMMON_PKIX}
+        ${PATH_PRJ}/src
+        ${PATH_PRJ}/src/crypto
+        ${PATH_PRJ}/src/storage
 )
 
 set_target_properties(cm-pkcs12 PROPERTIES LINK_FLAGS_RELEASE -s)

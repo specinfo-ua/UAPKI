@@ -37,14 +37,6 @@ set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 set(PATH_PRJ_SOURCES ${PATH_PRJ}/src)
 set(PATH_UAPKIC ${PATH_PRJ}/../uapkic)
 
-include_directories(
-        ${PATH_PRJ}
-        ${PATH_PRJ}/asn1
-        ${PATH_PRJ}/include
-        ${PATH_PRJ_SOURCES}/asn1
-        ${PATH_UAPKIC}/include
-)
-
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
 
 aux_source_directory(${PATH_PRJ_SOURCES}/asn1 UAPKIF_ASN1_SOURCES)
@@ -53,6 +45,13 @@ aux_source_directory(${PATH_PRJ_SOURCES}/struct UAPKIF_STRUCT_SOURCES)
 add_library(uapkif ${UAPKI_LIBS_TYPE}
         ${UAPKIF_ASN1_SOURCES}
         ${UAPKIF_STRUCT_SOURCES}
+)
+
+target_include_directories(uapkif PUBLIC
+        ${PATH_PRJ}
+        ${PATH_PRJ}/asn1
+        ${PATH_PRJ}/include
+        ${PATH_PRJ_SOURCES}/asn1
 )
 
 set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)

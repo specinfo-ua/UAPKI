@@ -46,20 +46,6 @@ set(PATH_COMMON_LOADERS ${PATH_PRJ}/../common/loaders)
 set(PATH_COMMON_MACROS ${PATH_PRJ}/../common/macros)
 set(PATH_COMMON_PKIX ${PATH_PRJ}/../common/pkix)
 
-include_directories(
-        ${PATH_UAPKIC}/include
-        ${PATH_UAPKIF}/include
-        ${PATH_COMMON_CMAPI}
-        ${PATH_COMMON_JSON}
-        ${PATH_COMMON_LOADERS}
-        ${PATH_COMMON_MACROS}
-        ${PATH_COMMON_PKIX}
-        ${PATH_PRJ}
-        ${PATH_PRJ}/include
-        ${PATH_PRJ}/src
-        ${PATH_PRJ}/src/api
-)
-
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
 
 aux_source_directory(${PATH_PRJ}/src/api UAPKI_API_SOURCES)
@@ -73,6 +59,18 @@ add_library(uapki ${UAPKI_LIBS_TYPE}
         ${COMMON_SOURCES}
         ${PATH_COMMON_LOADERS}/cm-loader.cpp
         ${JSON_SOURCES}
+)
+
+target_include_directories(uapki PUBLIC
+        ${PATH_COMMON_CMAPI}
+        ${PATH_COMMON_JSON}
+        ${PATH_COMMON_LOADERS}
+        ${PATH_COMMON_MACROS}
+        ${PATH_COMMON_PKIX}
+        ${PATH_PRJ}
+        ${PATH_PRJ}/include
+        ${PATH_PRJ}/src
+        ${PATH_PRJ}/src/api
 )
 
 set_target_properties(uapki PROPERTIES LINK_FLAGS_RELEASE -s)

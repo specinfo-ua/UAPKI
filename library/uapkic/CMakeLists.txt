@@ -35,15 +35,15 @@ endif ()
 
 set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 
-include_directories(
-        ${PATH_PRJ}
-        ${PATH_PRJ}/include
-)
-
 aux_source_directory(${PATH_PRJ}/src UAPKIC_SOURCES)
 
 add_library(uapkic ${UAPKI_LIBS_TYPE}
         ${UAPKIC_SOURCES}
+)
+
+target_include_directories(uapkic PUBLIC
+        ${PATH_PRJ}
+        ${PATH_PRJ}/include
 )
 
 set_target_properties(uapkic PROPERTIES LINK_FLAGS_RELEASE -s)
