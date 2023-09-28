@@ -5,6 +5,7 @@ project(uapki LANGUAGES C CXX)
 message(STATUS "Project: uapki")
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
+option(UAPKI_PUBLIC_INTERNAL_INCLUDES "Exposes uapki library internal include files" OFF)
 
 if (DEFINED UAPKI_LIBS_TYPE)
     if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
@@ -12,6 +13,11 @@ if (DEFINED UAPKI_LIBS_TYPE)
     endif ()
 else ()
     set(UAPKI_LIBS_TYPE SHARED)
+endif ()
+
+set(UAPKI_INTERNAL_INCLUDES_MODE PRIVATE)
+if (UAPKI_PUBLIC_INTERNAL_INCLUDES)
+    set(UAPKI_INTERNAL_INCLUDES_MODE PUBLIC)
 endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -61,22 +67,23 @@ add_library(uapki ${UAPKI_LIBS_TYPE}
         ${JSON_SOURCES}
 )
 
-target_include_directories(uapki PUBLIC
+target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
         ${PATH_COMMON_CMAPI}
         ${PATH_COMMON_JSON}
-        ${PATH_COMMON_LOADERS}
         ${PATH_COMMON_MACROS}
         ${PATH_COMMON_PKIX}
         ${PATH_PRJ}
-        ${PATH_PRJ}/include
         ${PATH_PRJ}/src
         ${PATH_PRJ}/src/api
+        PUBLIC
+        ${PATH_COMMON_LOADERS}
+        ${PATH_PRJ}/include
 )
 
 set_target_properties(uapki PROPERTIES LINK_FLAGS_RELEASE -s)
 
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
-target_link_libraries(uapki PUBLIC uapkic uapkif)
+target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 if (${UNIX})
     target_link_libraries(uapki PRIVATE dl curl)
 endif ()
