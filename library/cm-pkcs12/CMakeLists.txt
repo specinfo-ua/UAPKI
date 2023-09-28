@@ -6,6 +6,14 @@ message(STATUS "Project: cm-pkcs12")
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 
+if (DEFINED UAPKI_LIBS_TYPE)
+    if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
+        message(FATAL_ERROR "Bad UAPKI_LIBS_TYPE")
+    endif ()
+else ()
+    set(UAPKI_LIBS_TYPE SHARED)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -66,7 +74,7 @@ set(COMMON_SOURCES
         ${PATH_COMMON_PKIX}/uapki-ns-util.cpp
 )
 
-add_library(cm-pkcs12 SHARED
+add_library(cm-pkcs12 ${UAPKI_LIBS_TYPE}
         ${CMP12_CRYPTO_SOURCES}
         ${CMP12_SRC_SOURCES}
         ${CMP12_STORAGE_SOURCES}

@@ -6,6 +6,14 @@ message(STATUS "Project: uapki")
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 
+if (DEFINED UAPKI_LIBS_TYPE)
+    if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
+        message(FATAL_ERROR "Bad UAPKI_LIBS_TYPE")
+    endif ()
+else ()
+    set(UAPKI_LIBS_TYPE SHARED)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -59,7 +67,7 @@ aux_source_directory(${PATH_PRJ}/src UAPKI_SOURCES)
 aux_source_directory(${PATH_COMMON_PKIX} COMMON_SOURCES)
 aux_source_directory(${PATH_COMMON_JSON} JSON_SOURCES)
 
-add_library(uapki SHARED
+add_library(uapki ${UAPKI_LIBS_TYPE}
         ${UAPKI_API_SOURCES}
         ${UAPKI_SOURCES}
         ${COMMON_SOURCES}

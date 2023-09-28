@@ -6,6 +6,14 @@ message(STATUS "Project: uapkic, version: " ${UAPKIC_VERSION})
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 
+if (DEFINED UAPKI_LIBS_TYPE)
+    if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
+        message(FATAL_ERROR "Bad UAPKI_LIBS_TYPE")
+    endif ()
+else ()
+    set(UAPKI_LIBS_TYPE SHARED)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -34,7 +42,7 @@ include_directories(
 
 aux_source_directory(${PATH_PRJ}/src UAPKIC_SOURCES)
 
-add_library(uapkic SHARED
+add_library(uapkic ${UAPKI_LIBS_TYPE}
         ${UAPKIC_SOURCES}
 )
 

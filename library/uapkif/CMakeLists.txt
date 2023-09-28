@@ -6,6 +6,14 @@ message(STATUS "Project: uapkif, version: " ${UAPKIF_VERSION})
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 
+if (DEFINED UAPKI_LIBS_TYPE)
+    if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
+        message(FATAL_ERROR "Bad UAPKI_LIBS_TYPE")
+    endif ()
+else ()
+    set(UAPKI_LIBS_TYPE SHARED)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -42,7 +50,7 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
 aux_source_directory(${PATH_PRJ_SOURCES}/asn1 UAPKIF_ASN1_SOURCES)
 aux_source_directory(${PATH_PRJ_SOURCES}/struct UAPKIF_STRUCT_SOURCES)
 
-add_library(uapkif SHARED
+add_library(uapkif ${UAPKI_LIBS_TYPE}
         ${UAPKIF_ASN1_SOURCES}
         ${UAPKIF_STRUCT_SOURCES}
 )
