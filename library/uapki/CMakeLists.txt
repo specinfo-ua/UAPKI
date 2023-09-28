@@ -76,7 +76,7 @@ target_include_directories(uapki PUBLIC
 set_target_properties(uapki PROPERTIES LINK_FLAGS_RELEASE -s)
 
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
-target_link_libraries(uapki PRIVATE uapkic uapkif)
+target_link_libraries(uapki PUBLIC uapkic uapkif)
 if (${UNIX})
     target_link_libraries(uapki PRIVATE dl curl)
 endif ()

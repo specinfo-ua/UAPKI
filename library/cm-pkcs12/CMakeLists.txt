@@ -88,7 +88,7 @@ if (${WIN32})
     target_compile_definitions(cm-pkcs12 PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif ()
 
-target_link_libraries(cm-pkcs12 PRIVATE uapkic uapkif)
+target_link_libraries(cm-pkcs12 PUBLIC uapkic uapkif)
 if (${APPLE})
     target_link_libraries(cm-pkcs12 PRIVATE iconv)
 endif ()

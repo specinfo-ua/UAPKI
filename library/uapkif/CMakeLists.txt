@@ -63,7 +63,7 @@ if (${WIN32})
     target_compile_definitions(uapkif PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif ()
 
-target_link_libraries(uapkif PRIVATE uapkic)
+target_link_libraries(uapkif PUBLIC uapkic)
 
 
 if (NOT UAPKI_DISABLE_COPY)
