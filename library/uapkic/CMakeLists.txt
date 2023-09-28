@@ -4,6 +4,8 @@ project(uapkic LANGUAGES C)
 set(UAPKIC_VERSION 2.0.0)
 message(STATUS "Project: uapkic, version: " ${UAPKIC_VERSION})
 
+option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -52,7 +54,9 @@ else ()
 endif ()
 
 
-add_custom_command(TARGET uapkic POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../../${OUT_DIR}/
-)
+if (NOT UAPKI_DISABLE_COPY)
+    add_custom_command(TARGET uapkic POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../../${OUT_DIR}/
+    )
+endif ()

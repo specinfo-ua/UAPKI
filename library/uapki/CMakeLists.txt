@@ -4,6 +4,8 @@ project(uapki LANGUAGES C CXX)
 
 message(STATUS "Project: uapki")
 
+option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -77,7 +79,9 @@ if (${APPLE})
 endif ()
 
 
-add_custom_command(TARGET uapki POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../out/
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../../${OUT_DIR}/
-)
+if (NOT UAPKI_DISABLE_COPY)
+    add_custom_command(TARGET uapki POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../out/
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../../${OUT_DIR}/
+    )
+endif ()

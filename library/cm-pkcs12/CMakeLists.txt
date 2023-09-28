@@ -4,6 +4,8 @@ project(cm-pkcs12 LANGUAGES C CXX)
 
 message(STATUS "Project: cm-pkcs12")
 
+option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
@@ -86,7 +88,9 @@ if (${APPLE})
 endif ()
 
 
-add_custom_command(TARGET cm-pkcs12 POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../out/
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../../${OUT_DIR}/
-)
+if (NOT UAPKI_DISABLE_COPY)
+    add_custom_command(TARGET cm-pkcs12 POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../out/
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../../${OUT_DIR}/
+    )
+endif ()
