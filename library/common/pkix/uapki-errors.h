@@ -85,10 +85,6 @@
 
 #define RET_UAPKI_UNSUPPORTED_CMAPI                                   (UAPKI_ERROR_NAME_CODE | 0x0000001B)
 
-#define RET_UAPKI_MANY_METHODS_ARE_RUNNING                            (UAPKI_ERROR_NAME_CODE | 0x0000001C)
-
-#define RET_UAPKI_SERIAL_METHOD_IS_RUNNING                            (UAPKI_ERROR_NAME_CODE | 0x0000001D)
-
 
 #define RET_UAPKI_FILE_OPEN_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000020)
 #define RET_UAPKI_FILE_READ_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000021)

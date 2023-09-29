@@ -55,16 +55,15 @@ int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
     if (!from_storage) {
         if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
             DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
+            DO(cer_store->removeCert(cer_item, permanent));
         }
         else if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
             DO(cer_store->getCertByEncoded(sba_encoded.get(), &cer_item));
+            DO(cer_store->removeCert(cer_item, permanent));
         }
-
-        if (cer_item) {
-            cer_item->markToRemove(true);
+        else {
+            DO(cer_store->removeMarkedCerts());
         }
-
-        DO(cer_store->removeMarkedCerts(permanent));
     }
     else {
         const bool present_bytes = ParsonHelper::jsonObjectHasValue(joParams, "bytes", JSONString);
