@@ -46,9 +46,9 @@ DEBUG_OUTPUT_FUNC
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS12\","                               //  required
     "\"apiVersion\": \"1.0.0\","                        //  required
-    "\"libVersion\": \"1.0.8\","                        //  required
-    "\"description\": \"PKCS12-provider\","             //  required
-    "\"manufacturer\": \"2021 SPECINFOSYSTEMS LLC\","   //  required
+    "\"libVersion\": \"1.0.9\","                        //  required
+    "\"description\": \"PKCS#12 (PFX) file key storage\"," //  required
+    "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","   //  required
     "\"supportListStorages\": false,"                   //  optional
     "\"flags\": 0"                                      //  optional
 "}";

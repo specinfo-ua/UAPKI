@@ -53,9 +53,9 @@
 using namespace std;
 
 
-const char* CmPkcs12::CM_SESSION_DESCRIPTION    = "PKCS12-file session";
-const char* CmPkcs12::CM_SESSION_MANUFACTURER   = "2021 SPECINFOSYSTEMS LLC";
-const char* CmPkcs12::CM_SESSION_MODEL          = "PKCS12-FILE";
+const char* CmPkcs12::CM_SESSION_DESCRIPTION    = "PKCS#12";
+const char* CmPkcs12::CM_SESSION_MANUFACTURER   = "SPECINFOSYSTEMS LLC";
+const char* CmPkcs12::CM_SESSION_MODEL          = "PKCS#12";
 const char* CmPkcs12::FILENAME_ON_MEMORY        = "file://memory";
 
 
