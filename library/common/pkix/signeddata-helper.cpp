@@ -661,6 +661,7 @@ int SignedDataParser::decodeDigestAlgorithms (
     for (int i = 0; i < digestAlgorithms.list.count; i++) {
         DO(asn_oid_to_text(&digestAlgorithms.list.array[i]->algorithm, &s_dgstalgo));
         decodedDigestAlgos.push_back(string(s_dgstalgo));
+        free(s_dgstalgo);
         s_dgstalgo = nullptr;
     }
 
