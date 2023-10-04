@@ -261,5 +261,7 @@ cleanup:
     ba_free(hash_exp);
     ba_free(hash_act);
 
+    free(s_oid);
+
     return ret;
 }
