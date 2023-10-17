@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.05)
 
 project(cm-pkcs12 LANGUAGES C CXX)
-
-message(STATUS "Project: cm-pkcs12")
+set(CM_PKCS12_VERSION 1.0.9)
+set(CM_PKCS12_SOVERSION 1)
+message(STATUS "Project: cm-pkcs12, version: " ${CM_PKCS12_VERSION})
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -12,10 +13,11 @@ endif(NOT CMAKE_BUILD_TYPE)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 set(CMAKE_SKIP_RPATH ON)
+
+#set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -72,7 +74,10 @@ add_library(cm-pkcs12 SHARED
     ${JSON_SOURCES}
 )
 
+set_target_properties(cm-pkcs12 PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(cm-pkcs12 PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(cm-pkcs12 PROPERTIES LINK_FLAGS_RELEASE -s)
+set_target_properties(cm-pkcs12 PROPERTIES VERSION ${CM_PKCS12_VERSION} SOVERSION ${CM_PKCS12_SOVERSION})
 
 target_compile_definitions(cm-pkcs12 PRIVATE CM_LIBRARY)
 if(${WIN32})

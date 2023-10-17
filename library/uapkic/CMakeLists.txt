@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.05)
 
 project(uapkic LANGUAGES C)
 set(UAPKIC_VERSION 2.0.0)
+set(UAPKIC_SOVERSION 2)
 message(STATUS "Project: uapkic, version: " ${UAPKIC_VERSION})
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -10,7 +11,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 set(CMAKE_SKIP_RPATH ON)
@@ -36,8 +36,10 @@ add_library(uapkic SHARED
     ${UAPKIC_SOURCES}
 )
 
+set_target_properties(uapkic PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(uapkic PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(uapkic PROPERTIES LINK_FLAGS_RELEASE -s)
-set_target_properties(uapkic PROPERTIES VERSION ${UAPKIC_VERSION})
+set_target_properties(uapkic PROPERTIES VERSION ${UAPKIC_VERSION} SOVERSION ${UAPKIC_SOVERSION})
 
 target_compile_definitions(uapkic PRIVATE UAPKIC_LIBRARY)
 target_compile_definitions(uapkic PRIVATE UAPKIC_SELF_TEST)
