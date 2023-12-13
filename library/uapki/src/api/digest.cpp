@@ -96,6 +96,9 @@ static int digest_file (const HashAlg hashAlgo, JSON_Object* joParams, ByteArray
     DO(hash_final(hash_ctx, baHash));
 
 cleanup:
+    if (f) {
+        fclose(f);
+    }
     ba_free(ba_data);
     hash_free(hash_ctx);
     return ret;
