@@ -1,8 +1,9 @@
 ﻿cmake_minimum_required(VERSION 3.17)
 
 project(uapki LANGUAGES C CXX)
-
-message(STATUS "Project: uapki")
+set(UAPKI_VERSION 2.0.11)
+set(UAPKI_SOVERSION 2)
+message(STATUS "Project: uapki, version: " ${UAPKI_VERSION})
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 option(UAPKI_PUBLIC_INTERNAL_INCLUDES "Exposes uapki library internal include files" OFF)
@@ -28,7 +29,6 @@ endif (NOT CMAKE_BUILD_TYPE)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 set(CMAKE_SKIP_RPATH ON)
@@ -80,7 +80,10 @@ target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
         ${PATH_PRJ}/include
 )
 
+set_target_properties(uapki PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(uapki PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(uapki PROPERTIES LINK_FLAGS_RELEASE -s)
+set_target_properties(uapki PROPERTIES VERSION ${UAPKI_VERSION} SOVERSION ${UAPKI_SOVERSION})
 
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
 target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)

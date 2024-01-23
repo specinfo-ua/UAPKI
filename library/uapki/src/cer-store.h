@@ -133,9 +133,11 @@ public:
         bool& isSelfSigned
     );
     int load (void);
-    int removeMarkedCerts (
+    int removeCert (
+        CerItem* cerSubject,
         const bool permanent
     );
+    int removeMarkedCerts (void);
 
 private:
     //  addItem - added unique item, return new-item or exists-item

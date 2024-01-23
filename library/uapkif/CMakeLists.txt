@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.05)
 
 project(uapkif LANGUAGES C)
 set(UAPKIF_VERSION 2.0.0)
+set(UAPKIF_SOVERSION 2)
 message(STATUS "Project: uapkif, version: " ${UAPKIF_VERSION})
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
@@ -20,7 +21,6 @@ if (NOT CMAKE_BUILD_TYPE)
 endif (NOT CMAKE_BUILD_TYPE)
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 set(CMAKE_SKIP_RPATH ON)
@@ -54,8 +54,10 @@ target_include_directories(uapkif PUBLIC
         ${PATH_PRJ_SOURCES}/asn1
 )
 
+set_target_properties(uapkif PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(uapkif PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
-set_target_properties(uapkif PROPERTIES VERSION ${UAPKIF_VERSION})
+set_target_properties(uapkif PROPERTIES VERSION ${UAPKIF_VERSION} SOVERSION ${UAPKIF_SOVERSION})
 
 target_compile_definitions(uapkif PRIVATE UAPKIF_LIBRARY)
 if (${WIN32})

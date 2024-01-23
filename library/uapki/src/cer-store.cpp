@@ -429,16 +429,45 @@ int CerStore::load (void)
     return ret;
 }
 
-int CerStore::removeMarkedCerts (
+int CerStore::removeCert (
+        CerItem* cerSubject,
         const bool permanent
 )
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_UAPKI_CERT_NOT_FOUND;
+    const ByteArray* pba_certid = cerSubject->getCertId();
+    for (auto it = m_Items.begin(); it != m_Items.end(); it++) {
+        if (ba_cmp(pba_certid, (*it)->getCertId()) == RET_OK) {
+            m_Items.erase(it);
+            ret = RET_OK;
+            break;
+        }
+    }
+    if (ret != RET_OK) return ret;
+
+    if (permanent && !m_Path.empty() && !cerSubject->getFileName().empty()) {
+        const string fn_cert = m_Path + cerSubject->getFileName();
+        if (delete_file(fn_cert.c_str()) != 0) {
+            ret = RET_UAPKI_FILE_DELETE_ERROR;
+        }
+    }
+
+    delete cerSubject;
+    return ret;
+}
+
+int CerStore::removeMarkedCerts (void)
 {
     lock_guard<mutex> lock(m_Mutex);
 
     vector<CerItem*> new_items, removing_items;
     new_items.reserve(m_Items.capacity());
     removing_items.reserve(m_Items.capacity());
-    
+
     for (const auto& it : m_Items) {
         if (!it->isMarkedToRemove()) {
             new_items.push_back(it);
@@ -447,27 +476,14 @@ int CerStore::removeMarkedCerts (
             removing_items.push_back(it);
         }
     }
+
     m_Items = new_items;
-
-    int ret = RET_OK;
-    if (permanent && !m_Path.empty()) {
-        for (auto it = removing_items.begin(); it != removing_items.end(); it++) {
-            CerItem* cer_item = *it;
-            if (!cer_item->getFileName().empty()) {
-                const string fn_cert = m_Path + cer_item->getFileName();
-                if (delete_file(fn_cert.c_str()) != 0) {
-                    ret = RET_UAPKI_FILE_DELETE_ERROR;
-                }
-            }
-        }
-    }
-
     for (auto it = removing_items.begin(); it != removing_items.end(); it++) {
         CerItem* cer_item = *it;
         delete cer_item;
     }
 
-    return ret;
+    return RET_OK;
 }
 
 CerItem* CerStore::addItem (
