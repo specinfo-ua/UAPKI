@@ -680,8 +680,6 @@ int SignedDataParser::decodeEncapContentInfo (
 
     DO(asn_oid_to_text(&encapContentInfo.eContentType, &s_contype));
     decodedEncapContentInfo.contentType = string(s_contype);
-    free(s_contype);
-    s_contype = nullptr;
 
     if (encapContentInfo.eContent) {
         DO(asn_OCTSTRING2ba(encapContentInfo.eContent, &decodedEncapContentInfo.baEncapContent));
