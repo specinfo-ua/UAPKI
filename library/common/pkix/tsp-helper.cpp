@@ -326,8 +326,6 @@ int TsTokenParser::parse (
 
     m_PolicyId = string(s_policy);
     m_HashAlgo = string(s_hashalgo);
-    s_policy = nullptr;
-    s_hashalgo = nullptr;
 
 cleanup:
     asn_free(get_TSTInfo_desc(), tst_info);

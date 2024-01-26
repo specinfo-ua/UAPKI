@@ -993,6 +993,7 @@ int Util::oidFromAsn1 (
     if ((ret == RET_OK) && s_oid) {
         sOid = string(s_oid);
     }
+    free(s_oid);
     return ret;
 }
 
