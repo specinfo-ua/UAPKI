@@ -108,10 +108,14 @@ namespace Tsp {
     {
         UapkiNS::Pkcs7::SignedDataParser
                     m_SignedDataParser;
-        ByteArray*  m_BaHashedMessage;
-        uint64_t    m_GenTime;
-        std::string m_HashAlgo;
         std::string m_PolicyId;
+        std::string m_HashAlgo;
+        ByteArray*  m_BaHashedMessage;
+        ByteArray*  m_BaSerialNumber;
+        uint64_t    m_GenTime;
+        bool        m_AccuracyPresent;
+        bool        m_Ordering;
+        ByteArray*  m_BaNonce;
 
     public:
         TsTokenParser (void);
@@ -123,17 +127,29 @@ namespace Tsp {
         ByteArray* getHashedMessage (
             const bool move = false
         );
+        ByteArray* getNonce (
+            const bool move = false
+        );
+        ByteArray* getSerialNumber (
+            const bool move = false
+        );
 
+        bool accuracyIsPresent (void) const {
+            return m_AccuracyPresent;
+        }
         uint64_t getGenTime (void) const {
             return m_GenTime;
         }
         const std::string& getHashAlgo (void) const {
             return m_HashAlgo;
         }
+        bool getOrdering (void) const {
+            return m_Ordering;
+        }
         const std::string& getPolicyId (void) const {
             return m_PolicyId;
         }
-        UapkiNS::Pkcs7::SignedDataParser& getSignedDataParser (void) {
+        Pkcs7::SignedDataParser& getSignedDataParser (void) {
             return m_SignedDataParser;
         }
 

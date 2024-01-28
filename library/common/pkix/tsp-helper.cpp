@@ -89,7 +89,7 @@ int TspHelper::genNonce (
 )
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_nonce;
+    SmartBA sba_nonce;
 
     if (
         !m_TspRequest ||
@@ -133,11 +133,8 @@ int TspHelper::setMessageImprint (
 
     if (!m_TspRequest || !baHashedMessage) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(UapkiNS::Util::algorithmIdentifierToAsn1(m_TspRequest->messageImprint.hashAlgorithm, aidHashAlgo));
+    DO(Util::algorithmIdentifierToAsn1(m_TspRequest->messageImprint.hashAlgorithm, aidHashAlgo));
     DO(asn_ba2OCTSTRING(baHashedMessage, &m_TspRequest->messageImprint.hashedMessage));
-
-    //m_MessageImprint.hashAlgorithm = aidHashAlgo.algorithm;
-    //CHECK_NOT_NULL(m_MessageImprint.baHashedMessage = ba_copy_with_alloc(baHashedMessage, 0, 0));
 
 cleanup:
     return ret;
@@ -225,10 +222,10 @@ int TspHelper::parseResponse (
 
         DO(asn_encode_ba(get_ContentInfo_desc(), tsp_response->timeStampToken, &m_BaTsToken));
 
-        UapkiNS::Pkcs7::SignedDataParser sdata_parser;
+        Pkcs7::SignedDataParser sdata_parser;
         DO(sdata_parser.parse(m_BaTsToken));
 
-        const UapkiNS::Pkcs7::EncapsulatedContentInfo& encap_cinfo = sdata_parser.getEncapContentInfo();
+        const Pkcs7::EncapsulatedContentInfo& encap_cinfo = sdata_parser.getEncapContentInfo();
         if ((encap_cinfo.contentType != string(OID_PKCS9_TST_INFO)) || !encap_cinfo.baEncapContent) {
             SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
         }
@@ -290,13 +287,19 @@ cleanup:
 
 TsTokenParser::TsTokenParser (void)
     : m_BaHashedMessage(nullptr)
+    , m_BaSerialNumber(nullptr)
     , m_GenTime(0)
+    , m_AccuracyPresent(false)
+    , m_Ordering(false)
+    , m_BaNonce(nullptr)
 {
 }
 
 TsTokenParser::~TsTokenParser (void)
 {
     ba_free(m_BaHashedMessage);
+    ba_free(m_BaSerialNumber);
+    ba_free(m_BaNonce);
 }
 
 int TsTokenParser::parse (
@@ -309,28 +312,25 @@ int TsTokenParser::parse (
     if (ret != RET_OK) return ret;
 
     TSTInfo_t* tst_info = nullptr;
-    char* s_hashalgo = nullptr;
-    char* s_policy = nullptr;
-
-    const UapkiNS::Pkcs7::EncapsulatedContentInfo& encap_cinfo = m_SignedDataParser.getEncapContentInfo();
+    const Pkcs7::EncapsulatedContentInfo& encap_cinfo = m_SignedDataParser.getEncapContentInfo();
     if ((encap_cinfo.contentType != string(OID_PKCS9_TST_INFO)) || !encap_cinfo.baEncapContent) {
         SET_ERROR(RET_UAPKI_INVALID_CONTENT_INFO);
     }
 
     CHECK_NOT_NULL(tst_info = (TSTInfo_t*)asn_decode_ba_with_alloc(get_TSTInfo_desc(), encap_cinfo.baEncapContent));
 
-    DO(asn_oid_to_text(&tst_info->policy, &s_policy));
-    DO(asn_oid_to_text(&tst_info->messageImprint.hashAlgorithm.algorithm, &s_hashalgo));
+    DO(Util::oidFromAsn1(&tst_info->policy, m_PolicyId));
+    DO(Util::oidFromAsn1(&tst_info->messageImprint.hashAlgorithm.algorithm, m_HashAlgo));
     DO(asn_OCTSTRING2ba(&tst_info->messageImprint.hashedMessage, &m_BaHashedMessage));
-    DO(UapkiNS::Util::genTimeFromAsn1(&tst_info->genTime, m_GenTime));
-
-    m_PolicyId = string(s_policy);
-    m_HashAlgo = string(s_hashalgo);
+    DO(asn_INTEGER2ba(&tst_info->serialNumber, &m_BaSerialNumber));
+    DO(Util::genTimeFromAsn1(&tst_info->genTime, m_GenTime));
+    m_AccuracyPresent = (tst_info->accuracy);
+    if (tst_info->nonce) {
+        DO(asn_INTEGER2ba(tst_info->nonce, &m_BaNonce));
+    }
 
 cleanup:
     asn_free(get_TSTInfo_desc(), tst_info);
-    ::free(s_hashalgo);
-    ::free(s_policy);
     return ret;
 }
 
@@ -341,6 +341,28 @@ ByteArray* TsTokenParser::getHashedMessage (
     ByteArray* rv_ba = m_BaHashedMessage;
     if (move) {
         m_BaHashedMessage = nullptr;
+    }
+    return rv_ba;
+}
+
+ByteArray* TsTokenParser::getNonce (
+        const bool move
+)
+{
+    ByteArray* rv_ba = m_BaNonce;
+    if (move) {
+        m_BaNonce = nullptr;
+    }
+    return rv_ba;
+}
+
+ByteArray* TsTokenParser::getSerialNumber (
+    const bool move
+)
+{
+    ByteArray* rv_ba = m_BaSerialNumber;
+    if (move) {
+        m_BaSerialNumber = nullptr;
     }
     return rv_ba;
 }

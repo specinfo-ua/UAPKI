@@ -28,9 +28,10 @@
 #define FILE_MARKER "common/pkix/signeddata-helper.cpp"
 
 #include "signeddata-helper.h"
-#include "api-json-internal.h"
 #include "attribute-helper.h"
+#include "macros-internal.h"
 #include "oid-utils.h"
+#include "uapki-errors.h"
 #include "uapki-ns-util.h"
 #include <stdio.h>
 
@@ -656,17 +657,14 @@ int SignedDataParser::decodeDigestAlgorithms (
 )
 {
     int ret = RET_OK;
-    char* s_dgstalgo = nullptr;
 
     for (int i = 0; i < digestAlgorithms.list.count; i++) {
-        DO(asn_oid_to_text(&digestAlgorithms.list.array[i]->algorithm, &s_dgstalgo));
-        decodedDigestAlgos.push_back(string(s_dgstalgo));
-        ::free(s_dgstalgo);
-        s_dgstalgo = nullptr;
+        string s_dgstalgo;
+        DO(Util::oidFromAsn1(&digestAlgorithms.list.array[i]->algorithm, s_dgstalgo));
+        decodedDigestAlgos.push_back(s_dgstalgo);
     }
 
 cleanup:
-    ::free(s_dgstalgo);
     return ret;
 }
 
@@ -676,17 +674,13 @@ int SignedDataParser::decodeEncapContentInfo (
 )
 {
     int ret = RET_OK;
-    char* s_contype = nullptr;
 
-    DO(asn_oid_to_text(&encapContentInfo.eContentType, &s_contype));
-    decodedEncapContentInfo.contentType = string(s_contype);
-
+    DO(Util::oidFromAsn1(&encapContentInfo.eContentType, decodedEncapContentInfo.contentType));
     if (encapContentInfo.eContent) {
         DO(asn_OCTSTRING2ba(encapContentInfo.eContent, &decodedEncapContentInfo.baEncapContent));
     }
 
 cleanup:
-    ::free(s_contype);
     return ret;
 }
 
