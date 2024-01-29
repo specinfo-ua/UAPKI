@@ -80,8 +80,5 @@
     <None Include="data\encrypt.json">
       <Filter>data</Filter>
     </None>
-    <None Include="data\verify-cades.json">
-      <Filter>data</Filter>
-    </None>
   </ItemGroup>
 </Project>

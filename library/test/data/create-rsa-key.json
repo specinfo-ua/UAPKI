@@ -1,7 +1,7 @@
 {
   "comment": "Test create key-storage (OPENSSL compatible) and RSA-keys",
   "commentOPENSSL": "openssl pkcs12 -in new-rsa.p12 -info -passin pass:testpassword -nodes",
-  "commentUsage": "uapki create-ecdsa-key.json",
+  "commentUsage": "uapki create-rsa-key.json",
   "tasks": [
     {
       "method": "VERSION"
@@ -61,8 +61,8 @@
           "createPfx": { // specific cm-provider parameters
             "bagCipher": "2.16.840.1.101.3.4.1.2", // aes128-CBC
             "bagKdf": "1.2.840.113549.2.9", // hmacWithSHA256
-            "macAlgo": "2.16.840.1.101.3.4.2.1", // sha-256
-            "iterations": 10000
+            "iterations": 10000,
+            "macAlgo": "2.16.840.1.101.3.4.2.1" // sha-256
           }
         },
         "mode": "CREATE"
@@ -78,8 +78,13 @@
       }
     },
     {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS"
+    },
+    {
       "method": "GET_CSR",
-      "parameters": {}
+      "parameters": {},
+      "skip": false
     },
     {
       "comment": "Створення нового ключа за алгоритмом RSA з параметром 2048 bits",
@@ -88,15 +93,18 @@
         "mechanismId": "1.2.840.113549.1.1.1",
         "parameterId": "2048",
         "label": "Key-2 RSA 2048 bits"
-      }
-    },
-    {
-      "method": "GET_CSR",
-      "parameters": {}
+      },
+      "skip": false
     },
     {
       "comment": "Отримання переліку ключів на відкритому носії",
-      "method": "KEYS"
+      "method": "KEYS",
+      "skip": false
+    },
+    {
+      "method": "GET_CSR",
+      "parameters": {},
+      "skip": false
     },
     {
       "method": "CLOSE"

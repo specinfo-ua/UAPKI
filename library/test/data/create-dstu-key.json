@@ -16,10 +16,10 @@
               "lib": "cm-pkcs12",
               "config": { // optional parameters
                 "createPfx": { // specific cm-provider parameters
-                  "bagCipher": "2.16.840.1.101.3.4.1.42", // aes256-CBC
-                  "bagKdf": "1.2.840.113549.2.11", // hmacWithSHA512
+                  "bagCipher": "1.2.804.2.1.1.1.1.1.1.3", // gost28147-CFB
+                  "bagKdf": "1.2.804.2.1.1.1.1.1.2", // hmacGost34311
                   "iterations": 10000,
-                  "macAlgo": "2.16.840.1.101.3.4.2.3" // sha-512
+                  "macAlgo": "1.2.804.2.1.1.1.1.2.1" // gost34311
                 }
               }
             }
@@ -58,10 +58,10 @@
         "password": "testpassword",
         "openParams": {
           "createPfx": { // specific cm-provider parameters
-            "bagCipher": "1.2.804.2.1.1.1.1.1.1.3", // GOST28147_CFB
-            "bagKdf": "1.2.804.2.1.1.1.1.1.2", // HMAC_GOST34311
-            "macAlgo": "1.2.804.2.1.1.1.1.2.1", // OID_GOST34311
-            "iterations": 10000
+            "bagCipher": "1.2.804.2.1.1.1.1.1.1.3", // gost28147-CFB
+            "bagKdf": "1.2.804.2.1.1.1.1.1.2", // hmacGost34311
+            "iterations": 10000,
+            "macAlgo": "1.2.804.2.1.1.1.1.2.1" // gost34311
           }
         },
         "mode": "CREATE"
@@ -77,11 +77,16 @@
       }
     },
     {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS"
+    },
+    {
       "comment": "Отримання запиту на сертифікат для поточного ключа",
       "method": "GET_CSR",
       "parameters": {
         "signAlgo": "1.2.804.2.1.1.1.1.3.1.1"
-      }
+      },
+      "skip": false
     },
     {
       "comment": "Створення нового ключа за алгоритмом DSTU-4145 with GOST34311 (OID='1.2.804.2.1.1.1.1.3.1.1') з параметром M431_PB (OID='1.2.804.2.1.1.1.1.3.1.1.2.9')",
@@ -90,18 +95,21 @@
         "mechanismId": "1.2.804.2.1.1.1.1.3.1.1",
         "parameterId": "1.2.804.2.1.1.1.1.3.1.1.2.9",
         "label": "Key-2 DSTU-4145 M431_PB"
-      }
+      },
+      "skip": false
+    },
+    {
+      "comment": "Отримання переліку ключів на відкритому носії",
+      "method": "KEYS",
+      "skip": false
     },
     {
       "comment": "Отримання запиту на сертифікат для поточного ключа",
       "method": "GET_CSR",
       "parameters": {
         "signAlgo": "1.2.804.2.1.1.1.1.3.1.1"
-      }
-    },
-    {
-      "comment": "Отримання переліку ключів на відкритому носії",
-      "method": "KEYS"
+      },
+      "skip": false
     },
     {
       "method": "CLOSE"
