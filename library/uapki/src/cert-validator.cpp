@@ -905,7 +905,7 @@ int getCrl (
         JSON_Object* joResult
 )
 {
-    int ret = RET_OK;
+    int ret = RET_OK, err_crl = RET_OK;
     const bool is_full = (*baCrlNumber == nullptr);
     Crl::CrlItem* crl_item = nullptr;
     const Cert::CerItem::Uris& uris = cerSubject->getUris();
@@ -932,9 +932,13 @@ int getCrl (
 
         if (crl_item) {
             if (crl_item->getNextUpdate() < validateTime) {
-                DEBUG_OUTCON(puts("CertValidator::getCrl(), Need get newest CRL"));
+                DEBUG_OUTCON(puts("CertValidator::getCrl(), need get newest CRL"));
+                err_crl = RET_UAPKI_CRL_EXPIRED;
                 crl_item = nullptr;
             }
+        }
+        else {
+            err_crl = RET_UAPKI_CRL_NOT_FOUND;
         }
 
 #ifdef TEST_SIM_BREAKDOWN_CRL
@@ -942,7 +946,7 @@ int getCrl (
 #endif
         if (!crl_item) {
             if (HttpHelper::isOfflineMode()) {
-                SET_ERROR(RET_UAPKI_OFFLINE_MODE);
+                SET_ERROR(err_crl);
             }
             if (uris_crl.empty()) {
                 SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
@@ -975,7 +979,7 @@ int getCrl (
             }
 
             if (crl_item->getNextUpdate() < validateTime) {
-                DEBUG_OUTCON(puts("CertValidator::getCrl(), Need get newest CRL. Again... stop it!"));
+                DEBUG_OUTCON(puts("CertValidator::getCrl(), need get newest CRL. Again... stop it!"));
                 SET_ERROR(RET_UAPKI_CRL_EXPIRED);
             }
         }
