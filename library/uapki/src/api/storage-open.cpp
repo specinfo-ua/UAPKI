@@ -103,6 +103,10 @@ static int add_certs_from_storage_to_cache (
     }
 
     DEBUG_OUTCON(printf("Get certs from session: %zu\n", vba_encodedcerts.size()));
+    DEBUG_OUTCON(for (size_t i = 0; i < vba_encodedcerts.size(); i++) {
+        printf("  cert[%zu] = ", i);
+        ba_print(stdout, vba_encodedcerts[i]);
+    })
     if (!vba_encodedcerts.empty()) {
         DO(cerStore.addCerts(
             Cert::NOT_TRUSTED,

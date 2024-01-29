@@ -59,8 +59,11 @@ int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
     if (ret != RET_OK) return ret;
 
     ParsonHelper json;
-    JSON_Object* jo_resp = json.parse(s_infokeys.c_str());
-    if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
+    JSON_Object* jo_resp = nullptr;
+    if (!s_infokeys.empty()) {
+        jo_resp = json.parse(s_infokeys.c_str());
+        if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
+    }
 
     JSON_Array* ja_dstkeyinfos = nullptr;
     JSON_Array* ja_srckeyinfos = json.getArray("keys");
