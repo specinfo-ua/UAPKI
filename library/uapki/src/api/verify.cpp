@@ -30,6 +30,7 @@
 #include "api-json-internal.h"
 #include "archive-timestamp-helper.h"
 #include "attribute-helper.h"
+#include "content-hasher.h"
 #include "doc-verify.h"
 #include "global-objects.h"
 #include "http-helper.h"
@@ -72,6 +73,10 @@ static int parse_verify_options (
         );
         if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
         verifyOptions.onlyCrl = ParsonHelper::jsonObjectGetBoolean(joParams, "onlyCrl", false);
+        verifyOptions.verifySignerInfoIndex = ParsonHelper::jsonObjectGetInt32(joParams, "verifySignerInfoIndex", -1);
+        if (verifyOptions.verifySignerInfoIndex < 0) {
+            verifyOptions.verifySignerInfoIndex = -1;
+        }
     }
 
     return RET_OK;
@@ -87,15 +92,15 @@ static int result_attr_timestamp_to_json (
 
     if (attrTS.isPresent()) {
         json_object_set_value(joResult, attrName, json_value_init_object());
-        JSON_Object* jo_attrts = json_object_get_object(joResult, attrName);
-        DO_JSON(json_object_set_string(jo_attrts, "genTime", TimeUtil::mtimeToFtime(attrTS.msGenTime).c_str()));
-        DO_JSON(json_object_set_string(jo_attrts, "policyId", attrTS.policy.c_str()));
-        DO_JSON(json_object_set_string(jo_attrts, "hashAlgo", attrTS.hashAlgo.c_str()));
-        DO(json_object_set_base64(jo_attrts, "hashedMessage", attrTS.hashedMessage.get()));
-        DO_JSON(json_object_set_string(jo_attrts, "statusDigest", verifyStatusToStr(attrTS.statusDigest)));
-        DO_JSON(json_object_set_string(jo_attrts, "statusSignature", verifyStatusToStr(attrTS.statusSignature)));
+        JSON_Object* jo_attr = json_object_get_object(joResult, attrName);
+        DO_JSON(json_object_set_string(jo_attr, "genTime", TimeUtil::mtimeToFtime(attrTS.msGenTime).c_str()));
+        DO_JSON(json_object_set_string(jo_attr, "policyId", attrTS.policy.c_str()));
+        DO_JSON(json_object_set_string(jo_attr, "hashAlgo", attrTS.hashAlgo.c_str()));
+        DO(json_object_set_base64(jo_attr, "hashedMessage", attrTS.hashedMessage.get()));
+        DO_JSON(json_object_set_string(jo_attr, "statusDigest", verifyStatusToStr(attrTS.statusDigest)));
+        DO_JSON(json_object_set_string(jo_attr, "statusSignature", verifyStatusToStr(attrTS.statusSignature)));
         if (attrTS.cerSigner) {
-            DO(json_object_set_base64(jo_attrts, "signerCertId", attrTS.cerSigner->getCertId()));
+            DO(json_object_set_base64(jo_attr, "signerCertId", attrTS.cerSigner->getCertId()));
         }
     }
 
@@ -416,7 +421,9 @@ static int result_verifyinfo_to_json (
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validSignatures", verifyInfo.isValidSignatures()));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joSignInfo, "validDigests", verifyInfo.isValidDigests()));
     DO_JSON(json_object_set_string(joSignInfo, "bestSignatureTime", TimeUtil::mtimeToFtime(verifyInfo.getBestSignatureTime()).c_str()));
+    DO_JSON(json_object_set_string(joSignInfo, "signAlgo", verifyInfo.getSignerInfo().getSignatureAlgorithm().algorithm.c_str()));
     DO_JSON(json_object_set_string(joSignInfo, "statusSignature", verifyStatusToStr(verifyInfo.getStatusSignature())));
+    DO_JSON(json_object_set_string(joSignInfo, "digestAlgo", verifyInfo.getSignerInfo().getDigestAlgorithm().algorithm.c_str()));
     DO_JSON(json_object_set_string(joSignInfo, "statusMessageDigest", verifyStatusToStr(verifyInfo.getStatusMessageDigest())));
     if (verifyInfo.getSigningTime() > 0) {
         DO_JSON(json_object_set_string(joSignInfo, "signingTime", TimeUtil::mtimeToFtime(verifyInfo.getSigningTime()).c_str()));
@@ -608,7 +615,7 @@ cleanup:
 
 static int verify_p7s (
         const ByteArray* baSignature,
-        const ByteArray* baContent,
+        ContentHasher& contentHasher,
         const bool isDigest,
         const Doc::Verify::VerifyOptions& verifyOptions,
         JSON_Object* joResult
@@ -627,7 +634,7 @@ static int verify_p7s (
     }
 
     DO(verify_sdoc.parse(baSignature));
-    verify_sdoc.getContent(baContent);
+    DO(verify_sdoc.getContent(contentHasher));
     DO(verify_sdoc.addCertsToStore());
 
     //  For each signer_info
@@ -647,23 +654,28 @@ static int verify_p7s (
         }
 
         DO(verified_sinfo.parseAttributes());
-        DO(verified_sinfo.verifySignedAttribute());
-        DO(verified_sinfo.verifyMessageDigest(verify_sdoc.refContent));
-        DO(verified_sinfo.verifySigningCertificateV2());
+        if (
+            (verifyOptions.verifySignerInfoIndex < 0) ||
+            (verifyOptions.verifySignerInfoIndex == idx)
+        ) {
+            DO(verified_sinfo.verifySignedAttribute());
+            DO(verified_sinfo.verifyMessageDigest(*verify_sdoc.refContentHasher));
+            DO(verified_sinfo.verifySigningCertificateV2());
 
-        verified_sinfo.determineSignFormat();
-        DO(verified_sinfo.certValuesToStore());
-        DO(verified_sinfo.verifyContentTimeStamp(verify_sdoc.refContent));
-        DO(verified_sinfo.verifySignatureTimeStamp());
-        DO(verified_sinfo.verifyCertificateRefs());
-        DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
+            verified_sinfo.determineSignFormat();
+            DO(verified_sinfo.certValuesToStore());
+            DO(verified_sinfo.verifyContentTimeStamp(*verify_sdoc.refContentHasher));
+            DO(verified_sinfo.verifySignatureTimeStamp());
+            DO(verified_sinfo.verifyCertificateRefs());
+            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
 
-        verified_sinfo.validateSignFormat(verify_sdoc.validateTime);
-        if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
-            DO(verified_sinfo.buildCertChain());
+            verified_sinfo.validateSignFormat(verify_sdoc.validateTime, verify_sdoc.refContentHasher->isPresent());
+            if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+                DO(verified_sinfo.buildCertChain());
+            }
+            DO(validate_certs(verify_sdoc, verified_sinfo));
+            verified_sinfo.validateStatusCerts();
         }
-        DO(validate_certs(verify_sdoc, verified_sinfo));
-        verified_sinfo.validateStatusCerts();
     }
 
     verify_sdoc.detectCertSources();
@@ -677,7 +689,7 @@ cleanup:
 
 static int verify_raw (
         const ByteArray* baSignature,
-        const ByteArray* baContent,
+        ContentHasher& contentHasher,
         const bool isDigest,
         JSON_Object* joSignParams,
         JSON_Object* joSignerPubkey,
@@ -714,8 +726,13 @@ static int verify_raw (
         }
     }
 
-    ret = Verify::verifySignature(s_signalgo.c_str(), baContent, isDigest,
-        (cer_item) ? cer_item->getSpki() : sba_pubdata.get(), baSignature);
+    ret = Verify::verifySignature(
+        s_signalgo.c_str(),
+        contentHasher.getContentBytes(),
+        isDigest,
+        (cer_item) ? cer_item->getSpki() : sba_pubdata.get(),
+        baSignature
+    );
     switch (ret) {
     case RET_OK:
         status_sign = UapkiNS::SignatureVerifyStatus::VALID;
@@ -742,7 +759,8 @@ int uapki_verify_signature (
 )
 {
     int ret = RET_OK;
-    SmartBA sba_content, sba_signature;
+    SmartBA sba_signature;
+    ContentHasher content_hasher;
     JSON_Object* jo_signature = nullptr;
     JSON_Object* jo_signparams = nullptr;
     JSON_Object* jo_signerpubkey = nullptr;
@@ -750,10 +768,29 @@ int uapki_verify_signature (
     jo_signature = json_object_get_object(joParams, "signature");
     jo_signparams = json_object_get_object(joParams, "signParams");
     jo_signerpubkey = json_object_get_object(joParams, "signerPubkey");
-    (void)sba_content.set(json_object_get_base64(jo_signature, "content"));
     const bool is_digest = ParsonHelper::jsonObjectGetBoolean(jo_signature, "isDigest", false);
     if (!sba_signature.set(json_object_get_base64(jo_signature, "bytes"))) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
+
+    if (ParsonHelper::jsonObjectHasValue(jo_signature, "content", JSONString)) {
+        DO(content_hasher.setContent(json_object_get_base64(jo_signature, "content"), true));
+    }
+    else if (ParsonHelper::jsonObjectHasValue(jo_signature, "file", JSONString)) {
+        DO(content_hasher.setContent(json_object_get_string(jo_signature, "file")));
+    }
+    else if (
+        ParsonHelper::jsonObjectHasValue(jo_signature, "ptr", JSONString) &&
+        ParsonHelper::jsonObjectHasValue(jo_signature, "size", JSONNumber)
+    ) {
+        SmartBA sba_ptr;
+        (void)sba_ptr.set(json_object_get_hex(jo_signature, "ptr"));
+        const uint8_t* ptr = ContentHasher::baToPtr(sba_ptr.get());
+        size_t size = 0;
+        if (!ptr || !ContentHasher::numberToSize(json_object_get_number(jo_signature, "size"), size)) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(content_hasher.setContent(ptr, size));
     }
 
     if (!jo_signparams && !jo_signerpubkey) {
@@ -762,7 +799,7 @@ int uapki_verify_signature (
         DO(parse_verify_options(json_object_get_object(joParams, "options"), verify_options));
         DO(verify_p7s(
             sba_signature.get(),
-            sba_content.get(),
+            content_hasher,
             is_digest,
             verify_options,
             joResult
@@ -770,12 +807,12 @@ int uapki_verify_signature (
     }
     else if (jo_signparams && jo_signerpubkey) {
         //  Is RAW-signature
-        if (sba_content.empty() || (jo_signparams == nullptr) || (jo_signerpubkey == nullptr)) {
+        if (!content_hasher.getContentBytes() || !jo_signparams || !jo_signerpubkey) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
         DO(verify_raw(
             sba_signature.get(),
-            sba_content.get(),
+            content_hasher,
             is_digest,
             jo_signparams,
             jo_signerpubkey,

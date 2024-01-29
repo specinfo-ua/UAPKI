@@ -86,6 +86,7 @@
     <ClCompile Include="src\cer-item.cpp" />
     <ClCompile Include="src\cert-validator.cpp" />
     <ClCompile Include="src\cm-storage-proxy.cpp" />
+    <ClCompile Include="src\content-hasher.cpp" />
     <ClCompile Include="src\crl-item.cpp" />
     <ClCompile Include="src\doc-verify.cpp" />
     <ClCompile Include="src\global-objects.cpp" />
@@ -139,6 +140,7 @@
     <ClInclude Include="src\cer-item.h" />
     <ClInclude Include="src\cert-validator.h" />
     <ClInclude Include="src\cm-storage-proxy.h" />
+    <ClInclude Include="src\content-hasher.h" />
     <ClInclude Include="src\crl-item.h" />
     <ClInclude Include="src\doc-verify.h" />
     <ClInclude Include="src\library-config.h" />

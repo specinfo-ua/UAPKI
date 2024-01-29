@@ -31,6 +31,7 @@
 #include "archive-timestamp-helper.h"
 #include "attribute-helper.h"
 #include "cer-store.h"
+#include "content-hasher.h"
 #include "crl-store.h"
 #include "library-config.h"
 #include "signature-format.h"
@@ -119,7 +120,8 @@ public:
     std::string id;
     std::string contentType;
     bool        isDigest;
-    SmartBA     data;
+    ContentHasher
+                contentHasher;
     SmartBA     messageDigest;
     SmartBA     hashSignedAttrs;
     SmartBA     signature;

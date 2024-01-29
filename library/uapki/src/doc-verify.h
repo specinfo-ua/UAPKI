@@ -32,6 +32,7 @@
 #include "archive-timestamp-helper.h"
 #include "cer-store.h"
 #include "cert-validator.h"
+#include "content-hasher.h"
 #include "crl-store.h"
 #include "ocsp-helper.h"
 #include "signature-format.h"
@@ -86,7 +87,7 @@ struct AttrTimeStamp {
         const ByteArray* baEncoded
     );
     int verifyDigest (
-        const ByteArray* baData,
+        ContentHasher& contentHasher,
         const bool isDigest = false
     );
 
@@ -149,10 +150,12 @@ struct VerifyOptions {
     ValidationType
                 validationType;
     bool        onlyCrl;
+    int         verifySignerInfoIndex;
 
     VerifyOptions (void)
         : validationType(ValidationType::UNDEFINED)
         , onlyCrl(false)
+        , verifySignerInfoIndex(-1)
     {}
 
 };  //  end struct VerifyOptions
@@ -241,7 +244,8 @@ public:
         const uint64_t validateTime
     );
     void validateSignFormat (
-        const uint64_t validateTime
+        const uint64_t validateTime,
+        const bool contentIsPresent
     );
     void validateStatusCerts (void);
     void validateValidityTimeCerts (
@@ -253,10 +257,10 @@ public:
     );
     int verifyCertificateRefs (void);
     int verifyContentTimeStamp (
-        const ByteArray* baContent
+        ContentHasher& contentHasher
     );
     int verifyMessageDigest (
-        const ByteArray* baContent
+        ContentHasher& contentHasher
     );
     int verifyOcspResponse (
         Ocsp::OcspHelper& ocspClient,
@@ -355,8 +359,8 @@ struct VerifySignedDoc {
                 verifyOptions;
     Pkcs7::SignedDataParser
                 sdataParser;
-    const ByteArray*
-                refContent;
+    ContentHasher*
+                refContentHasher;
     std::vector<Cert::CerItem*>
                 addedCerts;
     std::vector<Crl::CrlItem*>
@@ -379,8 +383,8 @@ struct VerifySignedDoc {
     int parse (
         const ByteArray* baSignature
     );
-    void getContent (
-        const ByteArray* baContent
+    int getContent (
+        ContentHasher& contentHasher
     );
     int addCertsToStore (void);
     void detectCertSources (void);

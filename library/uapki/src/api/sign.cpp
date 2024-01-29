@@ -378,11 +378,32 @@ static int parse_doc_from_json (
 {
     if (!joDoc) return RET_UAPKI_INVALID_PARAMETER;
 
+    int ret = RET_OK;
+    ContentHasher& content_hasher = sdoc.contentHasher;
+
     sdoc.id = ParsonHelper::jsonObjectGetString(joDoc, "id");
     sdoc.isDigest = ParsonHelper::jsonObjectGetBoolean(joDoc, "isDigest", false);
-    if (sdoc.id.empty() || !sdoc.data.set(json_object_get_base64(joDoc, "bytes"))) return RET_UAPKI_INVALID_PARAMETER;
 
-    int ret = RET_OK;
+    if (ParsonHelper::jsonObjectHasValue(joDoc, "bytes", JSONString)) {
+        DO(content_hasher.setContent(json_object_get_base64(joDoc, "bytes"), true));
+    }
+    else if (ParsonHelper::jsonObjectHasValue(joDoc, "file", JSONString)) {
+        DO(content_hasher.setContent(json_object_get_string(joDoc, "file")));
+    }
+    else if (
+        ParsonHelper::jsonObjectHasValue(joDoc, "ptr", JSONString) &&
+        ParsonHelper::jsonObjectHasValue(joDoc, "size", JSONNumber)
+    ) {
+        SmartBA sba_ptr;
+        (void)sba_ptr.set(json_object_get_hex(joDoc, "ptr"));
+        const uint8_t* ptr = ContentHasher::baToPtr(sba_ptr.get());
+        size_t size = 0;
+        if (!ptr || !ContentHasher::numberToSize(json_object_get_number(joDoc, "size"), size)) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(content_hasher.setContent(ptr, size));
+    }
+
     if (sdoc.signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
         sdoc.contentType = ParsonHelper::jsonObjectGetString(joDoc, "type", string(OID_PKCS7_DATA));
         if (!oid_is_valid(sdoc.contentType.c_str())) return RET_UAPKI_INVALID_PARAMETER;
@@ -428,7 +449,6 @@ static int get_cert_status_by_ocsp (
 )
 {
     int ret = RET_OK;
-    //const LibraryConfig::OcspParams& ocsp_params = signParams.ocsp;//a?
     const bool need_ocspresp = (signParams.signatureFormat > SignatureFormat::CADES_T);
     CertValidator::ResultValidationByOcsp result_valbyocsp(need_ocspresp);
 

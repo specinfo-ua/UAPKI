@@ -28,6 +28,7 @@
 #define FILE_MARKER "uapki/api/digest.cpp"
 
 #include "api-json-internal.h"
+#include "content-hasher.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 
@@ -37,109 +38,18 @@
 #define DEBUG_OUTCON(expression) expression
 #endif
 
-#define FILE_BLOCK_SIZE (10 * 1024 * 1024)
 
-using namespace  std;
-
-//  See: byte-array-internal.h
-struct ByteArray_st {
-    const uint8_t* buf;
-    size_t len;
-};
-
-static int digest_bytes (const HashAlg hashAlgo, JSON_Object* joParams, ByteArray** baHash)
-{
-    int ret = RET_OK;
-    UapkiNS::SmartBA sba_data;
-
-    if (!sba_data.set(json_object_get_base64(joParams, "bytes"))) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    DO(::hash(hashAlgo, sba_data.get(), baHash));
-
-cleanup:
-    return ret;
-}
-
-static int digest_file (const HashAlg hashAlgo, JSON_Object* joParams, ByteArray** baHash)
-{
-    int ret = RET_OK;
-    HashCtx* hash_ctx = nullptr;
-    ByteArray* ba_data = nullptr;
-    const char* filename = nullptr;
-    FILE* f = nullptr;
-
-    filename = json_object_get_string(joParams, "file");
-    if (!filename) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    f = fopen_utf8(filename, 0);
-    if (!f) {
-        SET_ERROR(RET_UAPKI_FILE_OPEN_ERROR);
-    }
-
-    CHECK_NOT_NULL(hash_ctx = hash_alloc(hashAlgo));
-
-    CHECK_NOT_NULL(ba_data = ba_alloc_by_len(FILE_BLOCK_SIZE));
-
-    do {
-        ba_data->len = fread(ba_get_buf(ba_data), 1, FILE_BLOCK_SIZE, f);
-        DO(hash_update(hash_ctx, ba_data));
-    } while (ba_data->len == FILE_BLOCK_SIZE);
-
-    if (ferror(f)) {
-        SET_ERROR(RET_UAPKI_FILE_READ_ERROR);
-    }
-
-    DO(hash_final(hash_ctx, baHash));
-
-cleanup:
-    if (f) {
-        fclose(f);
-    }
-    ba_free(ba_data);
-    hash_free(hash_ctx);
-    return ret;
-}
-
-static int digest_memory (const HashAlg hashAlgo, JSON_Object* joParams, ByteArray** baHash)
-{
-    int ret = RET_OK;
-    UapkiNS::SmartBA sba_ptr;
-    ByteArray ba_local = { nullptr, 0 };
-    double f_len = 0;
-
-    sba_ptr.set(json_object_get_hex(joParams, "ptr"));
-    f_len = json_object_get_number(joParams, "size");
-    ba_local.len = (size_t)f_len;
-    if ((sba_ptr.size() != sizeof(void*)) || (f_len < 0) || ((double)ba_local.len != f_len)) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    DO(ba_swap(sba_ptr.get()));
-    memcpy(&ba_local.buf, sba_ptr.buf(), sba_ptr.size());
-
-    DEBUG_OUTCON(printf("ptr=%p\n", ba_local.buf));
-    if (ba_local.buf == 0) {
-        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
-    }
-
-    DO(::hash(hashAlgo, &ba_local, baHash));
-
-cleanup:
-    return ret;
-}
+using namespace std;
+using namespace UapkiNS;
 
 
 int uapki_digest (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_hash;
     const char* s_hashalgo = nullptr;
     const char* s_signalgo = nullptr;
     HashAlg hash_algo = HashAlg::HASH_ALG_UNDEFINED;
+    ContentHasher content_hasher;
 
     s_hashalgo = json_object_get_string(joParams, "hashAlgo");
     if (!s_hashalgo) {
@@ -156,20 +66,31 @@ int uapki_digest (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(json_object_set_string(joResult, "hashAlgo", (s_hashalgo) ? s_hashalgo : hash_to_oid(hash_algo)));
 
     if (ParsonHelper::jsonObjectHasValue(joParams, "bytes", JSONString)) {
-        DO(digest_bytes(hash_algo, joParams, &sba_hash));
+        DO(content_hasher.setContent(json_object_get_base64(joParams, "bytes"), true));
     }
     else if (ParsonHelper::jsonObjectHasValue(joParams, "file", JSONString)) {
-        DO(digest_file(hash_algo, joParams, &sba_hash));
+        DO(content_hasher.setContent(json_object_get_string(joParams, "file")));
     }
-    else if (ParsonHelper::jsonObjectHasValue(joParams, "ptr", JSONString)
-          && ParsonHelper::jsonObjectHasValue(joParams, "size", JSONNumber)) {
-        DO(digest_memory(hash_algo, joParams, &sba_hash));
+    else if (
+        ParsonHelper::jsonObjectHasValue(joParams, "ptr", JSONString) &&
+        ParsonHelper::jsonObjectHasValue(joParams, "size", JSONNumber)
+    ) {
+        SmartBA sba_ptr;
+        (void)sba_ptr.set(json_object_get_hex(joParams, "ptr"));
+        const uint8_t* ptr = ContentHasher::baToPtr(sba_ptr.get());
+        size_t size = 0;
+        if (!ptr || !ContentHasher::numberToSize(json_object_get_number(joParams, "size"), size)) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(content_hasher.setContent(ptr, size));
     }
     else {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO_JSON(json_object_set_base64(joResult, "bytes", sba_hash.get()));
+    DO(content_hasher.digest(hash_algo));
+
+    DO_JSON(json_object_set_base64(joResult, "bytes", content_hasher.getHashValue()));
 
 cleanup:
     return ret;

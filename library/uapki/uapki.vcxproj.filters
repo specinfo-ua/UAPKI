@@ -264,6 +264,9 @@
     <ClCompile Include="src\api\remove-crl.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
+    <ClCompile Include="src\content-hasher.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -420,6 +423,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\cer-item.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\content-hasher.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

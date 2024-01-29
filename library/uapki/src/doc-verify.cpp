@@ -73,7 +73,7 @@ struct CollectVerifyStatus {
             !values[(uint32_t)VerifyStatus::FAILED] &&
             !values[(uint32_t)VerifyStatus::INVALID] &&
             values[(uint32_t)VerifyStatus::INDETERMINATE]
-            );
+        );
     }
 
     bool isValid (void) {
@@ -84,11 +84,12 @@ struct CollectVerifyStatus {
             !values[(uint32_t)VerifyStatus::FAILED] &&
             !values[(uint32_t)VerifyStatus::INVALID] &&
             values[(uint32_t)VerifyStatus::VALID]
-            );
+        );
     }
 
-    void set (const VerifyStatus status) {
+    bool set (const VerifyStatus status) {
         values[(uint32_t)status] = true;
+        return (status == VerifyStatus::VALID);
     }
 };  //  end class CollectVerifyStatus
 
@@ -211,12 +212,12 @@ int AttrTimeStamp::parse (
 }
 
 int AttrTimeStamp::verifyDigest (
-        const ByteArray* baData,
+        ContentHasher& contentHasher,
         const bool isDigest
 )
 {
     int ret = RET_OK;
-    SmartBA sba_hashdata, sba_hashtstinfo;
+    SmartBA sba_hashtstinfo;
     HashAlg hash_alg = hash_from_oid(signerInfo.getDigestAlgorithm().algorithm.c_str());
 
     if (hash_alg == HASH_ALG_UNDEFINED) {
@@ -235,7 +236,7 @@ int AttrTimeStamp::verifyDigest (
         return RET_UAPKI_INVALID_DIGEST;
     }
 
-    if (!baData) {
+    if (!contentHasher.isPresent()) {
         statusDigest = DigestVerifyStatus::INDETERMINATE;
         return RET_OK;
     }
@@ -247,17 +248,17 @@ int AttrTimeStamp::verifyDigest (
             return RET_UAPKI_UNSUPPORTED_ALG;
         }
 
-        ret = ::hash(hash_alg, baData, &sba_hashdata);
+        ret = contentHasher.digest(hash_alg);
         if (ret != RET_OK) {
             statusDigest = DigestVerifyStatus::FAILED;
             return ret;
         }
 
-        statusDigest = (ba_cmp(hashedMessage.get(), sba_hashdata.get()) == 0)
+        statusDigest = (ba_cmp(hashedMessage.get(), contentHasher.getHashValue()) == 0)
             ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
     else {
-        statusDigest = (ba_cmp(hashedMessage.get(), baData) == 0)
+        statusDigest = (ba_cmp(hashedMessage.get(), contentHasher.getContentBytes()) == 0)
             ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
 
@@ -704,16 +705,19 @@ cleanup:
 }
 
 void VerifiedSignerInfo::validateSignFormat (
-        const uint64_t validateTime
+        const uint64_t validateTime,
+        const bool contentIsPresent
 )
 {
     CollectVerifyStatus collect_digests, collect_signatures;
 
     //  Check mandatory elements
-    collect_signatures.set(getStatusSignature());
-    collect_digests.set(getStatusMessageDigest());
-    if (collect_signatures.isValid() && collect_digests.isValid()) {
-        m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
+    bool sign_is_valid = collect_signatures.set(getStatusSignature());
+    bool digest_is_valid = collect_digests.set(getStatusMessageDigest());
+    if (sign_is_valid) {
+        if ((contentIsPresent && digest_is_valid) || !contentIsPresent) {
+            m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
+        }
     }
 
     //  Check attribute EssCert
@@ -723,18 +727,20 @@ void VerifiedSignerInfo::validateSignFormat (
 
     //  Check Content-Timestamp
     if (m_ContentTS.isPresent()) {
-        collect_signatures.set(m_ContentTS.statusSignature);
-        collect_digests.set(m_ContentTS.statusDigest);
-        if (collect_signatures.isValid() && collect_digests.isValid()) {
-            m_BestSignatureTime = m_ContentTS.msGenTime;
+        sign_is_valid = collect_signatures.set(m_ContentTS.statusSignature);
+        digest_is_valid = collect_digests.set(m_ContentTS.statusDigest);
+        if (sign_is_valid) {
+            if ((contentIsPresent && digest_is_valid) || !contentIsPresent) {
+                m_BestSignatureTime = m_ContentTS.msGenTime;
+            }
         }
     }
 
     //  Check Signature-Timestamp
     if (m_SignatureTS.isPresent()) {
-        collect_signatures.set(m_SignatureTS.statusSignature);
-        collect_digests.set(m_SignatureTS.statusDigest);
-        if (collect_signatures.isValid() && collect_digests.isValid()) {
+        sign_is_valid = collect_signatures.set(m_SignatureTS.statusSignature);
+        digest_is_valid = collect_digests.set(m_SignatureTS.statusDigest);
+        if (sign_is_valid && digest_is_valid) {
             m_BestSignatureTime = m_SignatureTS.msGenTime;
         }
     }
@@ -882,12 +888,12 @@ int VerifiedSignerInfo::verifyCertificateRefs (void)
 }
 
 int VerifiedSignerInfo::verifyContentTimeStamp (
-        const ByteArray* baContent
+        ContentHasher& contentHasher
 )
 {
     int ret = RET_OK;
     if (m_ContentTS.isPresent()) {
-        ret = m_ContentTS.verifyDigest(baContent, m_IsDigest);
+        ret = m_ContentTS.verifyDigest(contentHasher, m_IsDigest);
         if (ret != RET_OK) {
             m_LastError = ret;
         }
@@ -904,11 +910,13 @@ int VerifiedSignerInfo::verifyContentTimeStamp (
 }
 
 int VerifiedSignerInfo::verifyMessageDigest (
-        const ByteArray* baContent
+        ContentHasher& contentHasher
 )
 {
-    if (!baContent) {
-        return RET_UAPKI_CONTENT_NOT_PRESENT;
+    if (!contentHasher.isPresent()) {
+        m_LastError = RET_UAPKI_CONTENT_NOT_PRESENT;
+        m_StatusMessageDigest = DigestVerifyStatus::INDETERMINATE;
+        return RET_OK;
     }
 
     if (!m_IsDigest) {
@@ -919,18 +927,17 @@ int VerifiedSignerInfo::verifyMessageDigest (
             return RET_OK;
         }
 
-        SmartBA sba_hash;
-        const int ret = ::hash(hash_alg, baContent, &sba_hash);
+        const int ret = contentHasher.digest(hash_alg);
         if (ret != RET_OK) {
             m_StatusMessageDigest = DigestVerifyStatus::FAILED;
             return ret;
         }
 
-        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), sba_hash.get()) == 0)
+        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), contentHasher.getHashValue()) == 0)
             ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
     else {
-        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), baContent) == 0)
+        m_StatusMessageDigest = (ba_cmp(m_SignerInfo.getMessageDigest(), contentHasher.getContentBytes()) == 0)
             ? DigestVerifyStatus::VALID : DigestVerifyStatus::INVALID;
     }
 
@@ -992,7 +999,9 @@ int VerifiedSignerInfo::verifySignatureTimeStamp (void)
 {
     int ret = RET_OK;
     if (m_SignatureTS.isPresent()) {
-        ret = m_SignatureTS.verifyDigest(m_SignerInfo.getSignature());
+        ContentHasher content_hasher;
+        (void)content_hasher.setContent(m_SignerInfo.getSignature(), false);
+        ret = m_SignatureTS.verifyDigest(content_hasher);
         if (ret != RET_OK) {
             m_LastError = ret;
         }
@@ -1213,7 +1222,7 @@ VerifySignedDoc::VerifySignedDoc (
     , crlStore(iCrlStore)
     , validateTime(TimeUtil::mtimeNow())
     , verifyOptions(iVerifyOptions)
-    , refContent(nullptr)
+    , refContentHasher(nullptr)
 {
 }
 
@@ -1230,12 +1239,17 @@ int VerifySignedDoc::parse (
     return (sdataParser.getCountSignerInfos() > 0) ? RET_OK : RET_UAPKI_INVALID_STRUCT;
 }
 
-void VerifySignedDoc::getContent (
-        const ByteArray* baContent
+int VerifySignedDoc::getContent (
+        ContentHasher& contentHasher
 )
 {
-    refContent = (sdataParser.getEncapContentInfo().baEncapContent)
-        ? sdataParser.getEncapContentInfo().baEncapContent : baContent;
+    int ret = RET_OK;
+    refContentHasher = &contentHasher;
+    if (sdataParser.getEncapContentInfo().baEncapContent) {
+        contentHasher.reset();
+        ret = contentHasher.setContent(sdataParser.getEncapContentInfo().baEncapContent, false);
+    }
+    return ret;
 }
 
 int VerifySignedDoc::addCertsToStore (void)

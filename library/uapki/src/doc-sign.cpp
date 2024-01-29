@@ -310,7 +310,7 @@ int SigningDoc::buildSignedData (void)
     int ret = RET_OK;
 
     DO(builder.setVersion(signerInfo->getSidType() == Pkcs7::SignerIdentifierType::ISSUER_AND_SN ? 1u : 3u));
-    DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : data.get()));
+    DO(builder.setEncapContentInfo(contentType, (signParams->detachedData) ? nullptr : contentHasher.getContentBytes()));
     DO(signerInfo->encodeUnsignedAttrs());
 
     DO(builder.encode());
@@ -376,13 +376,17 @@ int SigningDoc::digestMessage (void)
     int ret = RET_OK;
 
     if (!isDigest) {
-        DO(::hash(signParams->hashDigest, data.get(), &messageDigest));
+        DO(contentHasher.digest(signParams->hashDigest));
+        if (!messageDigest.set(ba_copy_with_alloc(contentHasher.getHashValue(), 0, 0))) {
+            ret = RET_UAPKI_GENERAL_ERROR;
+        }
     }
     else {
         const size_t hashsize_expected = hash_get_size(signParams->hashDigest);
-        if (hashsize_expected == data.size()) {
-            messageDigest = data;
-            (void)data.set(nullptr);
+        if (hashsize_expected == ba_get_len(contentHasher.getContentBytes())) {
+            if (!messageDigest.set(ba_copy_with_alloc(contentHasher.getContentBytes(), 0, 0))) {
+                ret = RET_UAPKI_GENERAL_ERROR;
+            }
         }
         else {
             ret = RET_UAPKI_INVALID_PARAMETER;
