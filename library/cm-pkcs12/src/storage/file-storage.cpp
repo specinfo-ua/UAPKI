@@ -329,6 +329,7 @@ int FileStorage::decodeJks (
     StoreBag* store_bag = nullptr;
     JksBufferCtx* jks_buffer = nullptr;
     JksEntry* jks_entry = nullptr;
+    ByteArray* ba_privkeys[2] = { nullptr, nullptr };
     ByteArray* ba_data = nullptr;
     SmartBA sba_hashact, sba_hashexp;
     uint32_t jks_version = 0, cnt_entries = 0;
@@ -343,16 +344,30 @@ int FileStorage::decodeJks (
         DO(jks_entry_read(jks_buffer, jks_version, &jks_entry));
 
         if (jks_entry->entry_type == PRIVATE_KEY_ENTRY) {
+            // Private key for signing
             CHECK_NOT_NULL(store_bag = new StoreBag());
-            DO(jks_decrypt_key(jks_entry->entry.key, password, &ba_data));
-            store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_data);
-            ba_data = nullptr;
+            DO(jks_decrypt_key(jks_entry->entry.key, password, &ba_privkeys[0]));
+            store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkeys[0]);
             if (jks_entry->alias) {
                 store_bag->setFriendlyName(jks_entry->alias);
                 store_bag->scanStdAttrs();
             }
             addBag(store_bag);
             store_bag = nullptr;
+            // Private key for decryption
+            if (pkcs12_iit_read_kep_key(ba_privkeys[0], &ba_privkeys[1]) == RET_OK) {
+                ba_privkeys[0] = nullptr;
+                CHECK_NOT_NULL(store_bag = new StoreBag());
+                store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkeys[1]);
+                if (jks_entry->alias) {
+                    store_bag->setFriendlyName(jks_entry->alias);
+                    store_bag->scanStdAttrs();
+                }
+                addBag(store_bag);
+                store_bag = nullptr;
+            }
+            ba_privkeys[0] = nullptr;
+            ba_privkeys[1] = nullptr;
 
             //  Add cert-bags
             if (jks_entry->entry_exts) {
@@ -387,6 +402,8 @@ cleanup:
     jks_buffer_free(jks_buffer);
     jks_entry_free(jks_entry);
     ba_free(ba_data);
+    ba_free(ba_privkeys[0]);
+    ba_free(ba_privkeys[1]);
     return ret;
 }
 int FileStorage::decodePkcs12 (
