@@ -32,6 +32,7 @@
 #include "macros-internal.h"
 #include "uapkic-errors.h"
 #include "uapki-errors.h"
+#include <cstring>
 
 
 #define FILE_BLOCK_SIZE (10 * 1024 * 1024)
