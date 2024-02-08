@@ -44,7 +44,7 @@ public:
         BYTEARRAY   = 1,
         FILE        = 2,
         MEMORY      = 3
-    };  //  end enum ResponderIdType
+    };  //  end enum SourceType
 
 private:
     SourceType  m_SourceType;
