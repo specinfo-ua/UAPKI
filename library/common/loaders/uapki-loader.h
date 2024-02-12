@@ -49,11 +49,20 @@ public:
     UapkiLoader (void);
     ~UapkiLoader (void);
 
-    static std::string getLibName (const std::string& libName);
+    static std::string getLibName (
+        const std::string& libName
+    );
 
-    HANDLE_DLIB getHandle (void) const { return m_HandleDLib; }
-    bool isLoaded (void) const { return (m_HandleDLib != nullptr); }
-    bool load (const std::string& libName = std::string("uapki"));
+    HANDLE_DLIB getHandle (void) const {
+        return m_HandleDLib;
+    }
+    bool isLoaded (void) const {
+        return (m_HandleDLib != nullptr);
+    }
+    bool load (
+        const std::string& libName = std::string("uapki"),
+        const bool isAbsolutePath = false
+    );
     void unload (void);
 
     char* process (const char* jsonRequest);

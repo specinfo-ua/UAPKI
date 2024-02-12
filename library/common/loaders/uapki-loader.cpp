@@ -50,17 +50,22 @@ UapkiLoader::~UapkiLoader (void)
     unload();
 }
 
-string UapkiLoader::getLibName (const string& libName)
+string UapkiLoader::getLibName (
+        const string& libName
+)
 {
     return string(LIBNAME_PREFIX) + libName + "." + string(LIBNAME_EXT);
 }
 
-bool UapkiLoader::load (const string& libName)
+bool UapkiLoader::load (
+        const string& libName,
+        const bool isAbsolutePath
+)
 {
     unload();
 
     bool ok = false;
-    const string lib_name = getLibName(libName);
+    const string lib_name = !isAbsolutePath ? getLibName(libName) : libName;
     DEBUG_OUTCON(printf("UapkiLoader.load('%s'), lib_name: '%s'\n", libName.c_str(), lib_name.c_str()));
 
     m_HandleDLib = DL_LOAD_LIBRARY(lib_name.c_str());
@@ -91,12 +96,16 @@ void UapkiLoader::unload (void)
     }
 }
 
-char* UapkiLoader::process (const char* jsonRequest)
+char* UapkiLoader::process (
+        const char* jsonRequest
+)
 {
     return (m_Process) ? m_Process(jsonRequest) : nullptr;
 }
 
-void UapkiLoader::jsonFree (char* jsonResponse)
+void UapkiLoader::jsonFree (
+        char* jsonResponse
+)
 {
     if (m_JsonFree) {
         m_JsonFree(jsonResponse);
