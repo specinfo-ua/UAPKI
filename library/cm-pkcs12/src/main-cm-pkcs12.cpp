@@ -44,13 +44,13 @@ DEBUG_OUTPUT_FUNC
 
 
 static const char* JSON_PROVIDER_INFO = "{"
-    "\"id\": \"PKCS12\","                               //  required
-    "\"apiVersion\": \"1.0.0\","                        //  required
-    "\"libVersion\": \"1.0.9\","                        //  required
-    "\"description\": \"PKCS#12 (PFX) file key storage\"," //  required
-    "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","   //  required
-    "\"supportListStorages\": false,"                   //  optional
-    "\"flags\": 0"                                      //  optional
+    "\"id\": \"PKCS12\","                                   //  required
+    "\"apiVersion\": \"1.0.0\","                            //  required
+    "\"libVersion\": \"1.0.10\","                           //  required
+    "\"description\": \"PKCS#12 (PFX) file key storage\","  //  required
+    "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","            //  required
+    "\"supportListStorages\": false,"                       //  optional
+    "\"flags\": 0"                                          //  optional
 "}";
 
 
