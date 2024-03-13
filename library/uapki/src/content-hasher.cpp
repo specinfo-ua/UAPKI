@@ -53,6 +53,7 @@ namespace UapkiNS {
 ContentHasher::ContentHasher (void)
     : m_SourceType(SourceType::UNDEFINED)
     , m_HashAlgo(HASH_ALG_UNDEFINED)
+    , m_Bytes(nullptr)
     , m_AutoReleaseBytes(false)
     , m_MemoryPtr(nullptr)
     , m_MemorySize(0)

@@ -1,7 +1,7 @@
 ﻿cmake_minimum_required(VERSION 3.17)
 
 project(uapki LANGUAGES C CXX)
-set(UAPKI_VERSION 2.0.11)
+set(UAPKI_VERSION 2.0.12)
 set(UAPKI_SOVERSION 2)
 message(STATUS "Project: uapki, version: " ${UAPKI_VERSION})
 

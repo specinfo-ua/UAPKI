@@ -73,7 +73,8 @@
         "options": {
           "ignoreCertStatus": false
         }
-      }
+      },
+      "skip": false
     },
     {
       "comment": "формування підпису. Параметри наступні: CAdES-BES, detached data",
@@ -92,12 +93,17 @@
           {
             "id": "doc-0", // Обов'язковий, ідентифікатор даних
             "bytes": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==" // обов'язковий, дані для підпису у кодировці base64
+          },
+          {
+            "id": "doc-1-file", // Обов'язковий, ідентифікатор даних
+            "file": "test-fox.txt" // обов'язковий, дані для підпису у кодировці base64
           }
         ],
         "options": {
           "ignoreCertStatus": false
         }
-      }
+      },
+      "skip": false
     },
     {
       "comment": "формування підпису. Параметри наступні: CAdES-T, attached data",
@@ -121,7 +127,8 @@
         "options": {
           "ignoreCertStatus": false
         }
-      }
+      },
+      "skip": false
     },
     {
       "method": "CLOSE"
