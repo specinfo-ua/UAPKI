@@ -47,7 +47,10 @@ int json_object_set_hex (JSON_Object* jsonObject, const char* name, const ByteAr
 ByteArray* json_object_get_hex (const JSON_Object* jsonObject, const char* name)
 {
     const char* str = json_object_get_string(jsonObject, name);
-    if (!str || (strlen(str) == 0)) return NULL;
+    if (!str) return NULL;
+    if (strlen(str) == 0) {
+        return ba_alloc_by_len(0);
+    }
     return ba_alloc_from_hex(str);
 }
 
@@ -65,7 +68,10 @@ int json_object_set_base64 (JSON_Object* jsonObject, const char* name, const Byt
 ByteArray* json_object_get_base64 (const JSON_Object* jsonObject, const char* name)
 {
     const char* str = json_object_get_string(jsonObject, name);
-    if (!str || (strlen(str) == 0)) return NULL;
+    if (!str) return NULL;
+    if (strlen(str) == 0) {
+        return ba_alloc_by_len(0);
+    }
     return ba_alloc_from_base64(str);
 }
 
@@ -83,6 +89,9 @@ int json_array_append_base64 (JSON_Array* jsonArray, const ByteArray* baData)
 ByteArray* json_array_get_base64 (const JSON_Array* jsonArray, size_t index)
 {
     const char* str = json_array_get_string(jsonArray, index);
-    if (!str || (strlen(str) == 0)) return NULL;
+    if (!str) return NULL;
+    if (strlen(str) == 0) {
+        return ba_alloc_by_len(0);
+    }
     return ba_alloc_from_base64(str);
 }
