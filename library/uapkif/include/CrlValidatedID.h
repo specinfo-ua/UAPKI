@@ -33,6 +33,7 @@
 #include "asn_application.h"
 
 /* Including external dependencies */
+#include "CrlIdentifier.h"
 #include "OtherHash.h"
 #include "constr_SEQUENCE.h"
 
@@ -40,13 +41,10 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
-struct CrlIdentifier;
-
 /* CrlValidatedID */
 typedef struct CrlValidatedID {
-    OtherHash_t     crlHash;
-    struct CrlIdentifier    *crlIdentifier    /* OPTIONAL */;
+    OtherHash_t         crlHash;
+    CrlIdentifier_t*    crlIdentifier    /* OPTIONAL */;
 
     /* Context for parsing across buffer boundaries */
     asn_struct_ctx_t _asn_ctx;

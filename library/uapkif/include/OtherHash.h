@@ -33,6 +33,7 @@
 #include "asn_application.h"
 
 /* Including external dependencies */
+#include "OtherHashValue.h"
 #include "OtherHashAlgAndValue.h"
 #include "constr_CHOICE.h"
 

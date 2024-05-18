@@ -60,6 +60,7 @@ static const ber_tlv_tag_t OcspResponsesID_desc_tags_1[] = {
     (ASN_TAG_CLASS_UNIVERSAL | (16 << 2))
 };
 static const asn_TYPE_tag2member_t asn_MAP_OcspResponsesID_tag2el_1[] = {
+    { (ASN_TAG_CLASS_UNIVERSAL | (4 << 2)), 1, 0, 0 }, /* sha1Hash */
     { (ASN_TAG_CLASS_UNIVERSAL | (16 << 2)), 0, 0, 1 }, /* ocspIdentifier */
     { (ASN_TAG_CLASS_UNIVERSAL | (16 << 2)), 1, -1, 0 } /* otherHash */
 };
@@ -67,7 +68,7 @@ static asn_SEQUENCE_specifics_t asn_SPC_OcspResponsesID_specs_1 = {
     sizeof(struct OcspResponsesID),
     offsetof(struct OcspResponsesID, _asn_ctx),
     asn_MAP_OcspResponsesID_tag2el_1,
-    2,    /* Count of tags in the map */
+    3,    /* Count of tags in the map */
     0, 0, 0,    /* Optional elements (not needed) */
     -1,    /* Start extensions */
     -1    /* Stop extensions */

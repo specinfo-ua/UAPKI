@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.05)
 
 project(uapkif LANGUAGES C)
-set(UAPKIF_VERSION 2.0.0)
+set(UAPKIF_VERSION 2.0.1)
 set(UAPKIF_SOVERSION 2)
 message(STATUS "Project: uapkif, version: " ${UAPKIF_VERSION})
 

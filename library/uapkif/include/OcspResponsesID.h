@@ -33,6 +33,7 @@
 #include "asn_application.h"
 
 /* Including external dependencies */
+#include "OtherHash.h"
 #include "OcspIdentifier.h"
 #include "constr_SEQUENCE.h"
 
@@ -40,13 +41,10 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
-struct OtherHash;
-
 /* OcspResponsesID */
 typedef struct OcspResponsesID {
-    OcspIdentifier_t     ocspIdentifier;
-    struct OtherHash    *ocspRepHash    /* OPTIONAL */;
+    OcspIdentifier_t    ocspIdentifier;
+    OtherHash_t*        ocspRepHash    /* OPTIONAL */;
 
     /* Context for parsing across buffer boundaries */
     asn_struct_ctx_t _asn_ctx;
