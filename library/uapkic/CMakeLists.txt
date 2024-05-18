@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.05)
 
 project(uapkic LANGUAGES C)
-set(UAPKIC_VERSION 2.0.0)
+set(UAPKIC_VERSION 2.0.1)
 set(UAPKIC_SOVERSION 2)
 message(STATUS "Project: uapkic, version: " ${UAPKIC_VERSION})
 

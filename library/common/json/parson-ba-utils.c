@@ -48,9 +48,6 @@ ByteArray* json_object_get_hex (const JSON_Object* jsonObject, const char* name)
 {
     const char* str = json_object_get_string(jsonObject, name);
     if (!str) return NULL;
-    if (strlen(str) == 0) {
-        return ba_alloc_by_len(0);
-    }
     return ba_alloc_from_hex(str);
 }
 
@@ -69,9 +66,6 @@ ByteArray* json_object_get_base64 (const JSON_Object* jsonObject, const char* na
 {
     const char* str = json_object_get_string(jsonObject, name);
     if (!str) return NULL;
-    if (strlen(str) == 0) {
-        return ba_alloc_by_len(0);
-    }
     return ba_alloc_from_base64(str);
 }
 
@@ -90,8 +84,5 @@ ByteArray* json_array_get_base64 (const JSON_Array* jsonArray, size_t index)
 {
     const char* str = json_array_get_string(jsonArray, index);
     if (!str) return NULL;
-    if (strlen(str) == 0) {
-        return ba_alloc_by_len(0);
-    }
     return ba_alloc_from_base64(str);
 }

@@ -540,7 +540,9 @@ ByteArray* ba_alloc_from_base64(const char* str)
 
     CHECK_NOT_NULL(ba = ba_alloc_by_len(len));
     DO(base64_decode((const uint8_t*)str, strlen(str), ba->buf, &len));
-    DO(ba_change_len(ba, len));
+    if (len > 0) {
+        DO(ba_change_len(ba, len));
+    }
 
 cleanup:
     if (ret != RET_OK) {
@@ -650,7 +652,7 @@ ByteArray* ba_alloc_from_hex(const char* hex)
     size_t len;
 
     len = strlen(hex);
-    if ((len == 0) || ((len & 1) != 0)) {
+    if ((len & 1) != 0) {
         SET_ERROR(RET_INVALID_HEX_STRING);
     }
 
@@ -674,7 +676,7 @@ int ba_from_hex(const char* hex, ByteArray* ba)
     CHECK_PARAM(ba != NULL);
 
     len = strlen(hex);
-    if ((len == 0) || ((len & 1) != 0)) {
+    if ((len & 1) != 0) {
         SET_ERROR(RET_INVALID_HEX_STRING);
     }
 
