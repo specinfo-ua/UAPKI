@@ -568,7 +568,7 @@ int CertValidator::validateByOcsp (
                 &m_OcspResponse
             );
             if (ret == RET_OK) {
-                DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), sba_resp.size()));
+                DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), m_OcspResponse.size()));
                 break;
             }
         }
@@ -953,7 +953,7 @@ int getCrl (
             }
 
             const vector<string> shuffled_uris = HttpHelper::randomURIs(uris_crl);
-            DEBUG_OUTCON(printf("CertValidator::getCrl(Type: %d), download CRL", crl_type));
+            DEBUG_OUTCON(printf("CertValidator::getCrl(is full=%d), download CRL", is_full));
             for (auto& it : shuffled_uris) {
                 DEBUG_OUTCON(printf("CertValidator::getCrl(), HttpHelper::get('%s')\n", it.c_str()));
                 ret = HttpHelper::get(it, &sba_crl);
@@ -991,8 +991,11 @@ int getCrl (
     }
     if (is_full) {
         *baCrlNumber = crl_item->getCrlNumber();
+        DEBUG_OUTCON(printf("CertValidator::getCrl(), is full, *baCrlNumber: "); ba_print(stdout, *baCrlNumber));
     }
     else {
+        DEBUG_OUTCON(printf("CertValidator::getCrl(), is delta, *baCrlNumber: "); ba_print(stdout, *baCrlNumber));
+        DEBUG_OUTCON(printf("CertValidator::getCrl(), is delta, crl_item->getDeltaCrl(): "); ba_print(stdout, crl_item->getDeltaCrl()));
         if (ba_cmp(*baCrlNumber, crl_item->getDeltaCrl()) != RET_OK) {
             SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
         }

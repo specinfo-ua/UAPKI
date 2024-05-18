@@ -59,13 +59,15 @@ static bool check_uris_delta (
         const vector<string>& urisDeltaFromCert
 )
 {
-    if (
-        urisDeltaFromCrl.empty() ||
-        urisDeltaFromCert.empty()
-    ) return false;
+    if (crlType == Type::FULL) {
+        if (!urisDeltaFromCrl.empty() && !urisDeltaFromCert.empty()) {
+            return (urisDeltaFromCrl[0] == urisDeltaFromCert[0]);
+        }
+        //else: No checking - always return TRUE
+    }
+    //else: No checking - always return TRUE
 
-    //  Simple case - check first values
-    return (urisDeltaFromCrl[0] == urisDeltaFromCert[0]);
+    return true;
 }   //  check_uris_delta
 
 static CrlItem* find_last_available (
@@ -415,6 +417,7 @@ int CrlStore::removeObsolete (void)
         if (s_id.empty()) continue;
 
         if (it->getType() == Type::FULL) {
+            //  Check unique CRL-files
             if (!it->getUris().deltaCrl.empty()) {
                 s_id += "-" + it->getUris().deltaCrl[0];
             }
@@ -424,6 +427,7 @@ int CrlStore::removeObsolete (void)
                 map_fullcrls.insert(pair<string, CrlItem*>(s_id, it));
             }
             else {
+                //  Check freshest full-CRL
                 if (it->getThisUpdate() > it_value->second->getThisUpdate()) {
                     deleting_items.push_back(it_value->second);
                     it_value->second = it;
@@ -431,6 +435,7 @@ int CrlStore::removeObsolete (void)
             }
         }
         else {
+            //  Check unique CRL-files
             const string s_deltacrl = Util::baToHex(it->getDeltaCrl());
             if (s_deltacrl.empty()) continue;
 
@@ -440,11 +445,25 @@ int CrlStore::removeObsolete (void)
                 map_deltacrls.insert(pair<string, CrlItem*>(s_id, it));
             }
             else {
+                //  Check freshest delta-CRL
                 if (it->getThisUpdate() > it_value->second->getThisUpdate()) {
                     deleting_items.push_back(it_value->second);
                     it_value->second = it;
                 }
             }
+        }
+    }
+
+    //  Check delta with present her full
+    for (auto& it_delta : map_deltacrls) {
+        bool is_found = false;
+        for (const auto& it_full : map_fullcrls) {
+            is_found = (ba_cmp(it_delta.second->getDeltaCrl(), it_full.second->getCrlNumber()) == 0);
+            if (is_found) break;
+        }
+        if (!is_found) {
+            deleting_items.push_back(it_delta.second);
+            it_delta.second = nullptr;
         }
     }
 
@@ -461,7 +480,9 @@ int CrlStore::removeObsolete (void)
         m_Items.push_back(it.second);
     }
     for (const auto& it : map_deltacrls) {
-        m_Items.push_back(it.second);
+        if (it.second) {
+            m_Items.push_back(it.second);
+        }
     }
 
     return RET_OK;
