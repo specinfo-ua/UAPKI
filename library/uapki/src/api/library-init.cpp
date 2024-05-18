@@ -249,26 +249,26 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
         );
     }
 
+    lib_config->setValidationByCrl(ParsonHelper::jsonObjectGetBoolean(jo_refparams, "validationByCrl", false));
+
     lib_config->setInitialized(true);
 
     //  Out info subsystems
     DO_JSON(json_object_set_value(joResult, "certCache", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "certCache");
-    if (lib_cerstore->getCount(cnt_certs, cnt_trustedcerts) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt_certs));
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt_trustedcerts));
-    }
+    (void)lib_cerstore->getCount(cnt_certs, cnt_trustedcerts);
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt_certs));
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt_trustedcerts));
 
     DO_JSON(json_object_set_value(joResult, "crlCache", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "crlCache");
-    if (lib_crlstore->getCount(cnt_crls) == RET_OK) {
-        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt_crls));
-    }
+    (void)lib_crlstore->getCount(cnt_crls);
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt_crls));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "useDeltaCrl", lib_crlstore->useDeltaCrl()));
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)CmProviders::count()));
 
-    ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline);
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline));
 
     DO_JSON(json_object_set_value(joResult, "ocsp", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "ocsp");
@@ -295,6 +295,8 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
         DO_JSON(json_object_set_string(jo_category, "policyId", tsp_params.policyId.c_str()));
         DO_JSON(json_object_set_string(jo_category, "url", s_url.c_str()));
     }
+
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "validationByCrl", lib_config->getValidationByCrl()));
 
 cleanup:
     if (ret != RET_OK) {

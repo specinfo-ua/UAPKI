@@ -796,6 +796,7 @@ int uapki_verify_signature (
     if (!jo_signparams && !jo_signerpubkey) {
         //  Is P7S-signature(CMS/CAdES)
         Doc::Verify::VerifyOptions verify_options;
+        verify_options.onlyCrl = get_config()->getValidationByCrl();
         DO(parse_verify_options(json_object_get_object(joParams, "options"), verify_options));
         DO(verify_p7s(
             sba_signature.get(),

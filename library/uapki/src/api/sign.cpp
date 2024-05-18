@@ -403,6 +403,9 @@ static int parse_doc_from_json (
         }
         DO(content_hasher.setContent(ptr, size));
     }
+    else {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
 
     if (sdoc.signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
         sdoc.contentType = ParsonHelper::jsonObjectGetString(joDoc, "type", string(OID_PKCS7_DATA));
@@ -617,6 +620,12 @@ int uapki_sign (
         Doc::Sign::SigningDoc& sdoc = signing_docs[i];
         DO(sdoc.init(&sign_params));
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
+        if (
+            (sdoc.contentHasher.getSourceType() != ContentHasher::SourceType::BYTEARRAY) &&
+            (sign_params.detachedData == false)
+        ) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
     }
 
     if (sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) {

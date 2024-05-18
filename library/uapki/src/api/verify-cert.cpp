@@ -80,7 +80,10 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     bool is_expired = false, is_selfsigned = false, need_updatecert = false;
     uint64_t validate_time = 0;
 
-    if (validation_type == Cert::ValidationType::UNDEFINED) {
+    if (
+        (validation_type == Cert::ValidationType::UNDEFINED) ||
+        (validation_type == Cert::ValidationType::CHAIN)
+    ) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 

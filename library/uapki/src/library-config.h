@@ -77,10 +77,11 @@ private:
     bool    m_Offline;
     TspParams
             m_TspParams;
+    bool    m_ValidationByCrl;
 
 public:
     LibraryConfig (void)
-        : m_IsInitialized(false), m_Offline(false)
+        : m_IsInitialized(false), m_Offline(false), m_ValidationByCrl(false)
     {
     }
 
@@ -96,6 +97,9 @@ public:
     }
     const TspParams& getTsp (void) const {
         return m_TspParams;
+    }
+    bool getValidationByCrl (void) const {
+        return m_ValidationByCrl;
     }
     bool isInitialized (void) const {
         return m_IsInitialized;
@@ -116,6 +120,9 @@ public:
         m_TspParams.nonceLen = tspParams.nonceLen;
         m_TspParams.policyId = tspParams.policyId;
         m_TspParams.uris = tspParams.uris;
+    }
+    void setValidationByCrl (bool validationByCrl) {
+        m_ValidationByCrl = validationByCrl;
     }
 
 };  //  end class LibraryConfig
