@@ -196,11 +196,12 @@ CM_ERROR CmPkcs12::listMechanisms (
 )
 {
     CM_ERROR cm_err = RET_OK;
-    DO_JSON(json_array_append_string(jaMechanisms, OID_EC_KEY));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU4145_WITH_GOST3411));
     DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU4145_WITH_DSTU7564));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_EC_KEY));
     DO_JSON(json_array_append_string(jaMechanisms, OID_RSA));
-    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU7624_WRAP));
     DO_JSON(json_array_append_string(jaMechanisms, OID_GOST28147_WRAP));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU7624_WRAP));
 
 cleanup:
     return cm_err;
@@ -219,13 +220,19 @@ CM_ERROR CmPkcs12::mechanismParamsToJson (
     if (mechanism_oid == OID_EC_KEY) {
         cm_err = build_ecdsa_parameters(json);
     }
-    else if (mechanism_oid == OID_DSTU4145_WITH_DSTU7564) {
+    else if (
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, mechanismId) ||
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, mechanismId)
+    ) {
         cm_err = build_dstu_parameters(json);
     }
     else if (mechanism_oid == OID_RSA) {
         cm_err = build_rsa_parameters(json);
     }
-    else if ((mechanism_oid == OID_DSTU7624_WRAP) || (mechanism_oid == OID_GOST28147_WRAP)) {
+    else if (
+        (mechanism_oid == OID_GOST28147_WRAP) ||
+        (mechanism_oid == OID_DSTU7624_WRAP)
+    ) {
         cm_err = build_dstu_keywrap_parameters(mechanism_oid, json);
     }
     if (cm_err != RET_OK) return cm_err;
