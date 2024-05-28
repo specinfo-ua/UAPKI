@@ -30,6 +30,7 @@
 #include "doc-verify.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
+#include "cert-validator.h"
 #include "global-objects.h"
 #include "hash.h"
 #include "oid-utils.h"
@@ -646,9 +647,12 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
         }
     }
 
-    if (m_SignatureFormat <= SignatureFormat::CADES_C) {
+    if (m_SignatureFormat >= SignatureFormat::CADES_C) {
         for (const auto& it : m_CertChainItems) {
-            if (it->getValidationType() == Cert::ValidationType::OCSP) {
+            if (
+                (it->getValidationType() == Cert::ValidationType::OCSP) &&
+                (it->getDataSource() != DataSource::SIGNATURE)
+            ) {
                 rv_warns.push_back("THE STATUS OF CERTIFICATE IS FROM OCSP");
                 break;
             }

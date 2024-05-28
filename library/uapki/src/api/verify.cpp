@@ -170,7 +170,7 @@ static int result_certchainitem_valbycrl_to_json (
         crl_item &&
         (crl_item->getStatusSign() == Cert::VerifyStatus::VALID) &&
         (resultValByCrl.certStatus == UapkiNS::CertStatus::GOOD)
-    ) ? UapkiNS::SignatureVerifyStatus::VALID : UapkiNS::SignatureVerifyStatus::INVALID);
+    ) ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID);
 
 cleanup:
     return ret;
@@ -205,9 +205,9 @@ static int result_certchainitem_valbyocsp_to_json (
     }
 
     statusValidation = verifyStatusToStr((
-        (resultValByOcsp.statusSignature == UapkiNS::SignatureVerifyStatus::VALID) &&
+        (resultValByOcsp.statusSignature == SignatureVerifyStatus::VALID) &&
         (singleresp_info.certStatus == UapkiNS::CertStatus::GOOD)
-    ) ? UapkiNS::SignatureVerifyStatus::VALID : UapkiNS::SignatureVerifyStatus::INVALID);
+    ) ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID);
 
 cleanup:
     return ret;
@@ -560,11 +560,31 @@ static int validate_by_ocsp (
         Doc::Verify::CertChainItem& certChainItem
 )
 {
-    return verifiedSignerInfo.validateByOcsp(
+    int ret = RET_OK;
+    Ocsp::OcspHelper ocsp_helper;
+    SmartBA sba_sn;
+
+    DO(verifiedSignerInfo.validateByOcsp(
         certChainItem.getSubject(),
         certChainItem.getIssuer(),
         certChainItem.getResultValidationByOcsp()
-    );
+    ));
+
+    DO(ocsp_helper.parseBasicOcspResponse(certChainItem.getResultValidationByOcsp().basicOcspResponse.get()));
+    DO(ocsp_helper.scanSingleResponses());
+    DO(ocsp_helper.getSerialNumberFromCertId(0, &sba_sn));  //  Work with one OCSP request that has one certificate
+    if (ba_cmp(sba_sn.get(), certChainItem.getSubject()->getSerialNumber()) == 0) {
+        CertValidator::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
+        result_valbyocsp.dataSource = CertValidator::DataSource::STORE;
+        result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
+        result_valbyocsp.statusSignature = SignatureVerifyStatus::VALID; // Previous check is passed
+        result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
+        result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
+    }
+    certChainItem.setValidationType(Cert::ValidationType::OCSP);
+
+cleanup:
+    return ret;
 }   //  validate_by_ocsp
 
 static int validate_certs (
@@ -576,15 +596,38 @@ static int validate_certs (
     const Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
     const uint64_t bestsign_time = verifiedSignerInfo.getBestSignatureTime();
 
-    switch (verify_options.validationType) {
-    case Doc::Verify::VerifyOptions::ValidationType::CHAIN:
+    if (verify_options.validationType == Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
         verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
         for (auto& it : verifiedSignerInfo.getCertChainItems()) {
             it->setValidationType(Cert::ValidationType::NONE);
         }
-        break;
-    case Doc::Verify::VerifyOptions::ValidationType::FULL:
-        if (verifiedSignerInfo.getSignatureFormat() < UapkiNS::SignatureFormat::CADES_XL) {
+    }
+    else if (verify_options.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL) {
+        switch (verifiedSignerInfo.getSignatureFormat()) {
+        case SignatureFormat::CMS_SID_KEYID:
+        case SignatureFormat::CADES_BES:
+        case SignatureFormat::CADES_T:
+            verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
+            for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+                if (!it->isExpired()) {
+                    if (it->getValidationType() == Cert::ValidationType::UNDEFINED) {
+                        if (!verify_options.onlyCrl) {
+                            ret = validate_by_ocsp(verifiedSignerInfo, *it);
+                            if (ret != RET_OK) {
+                                it->setValidationType(Cert::ValidationType::UNDEFINED);
+                                (void)validate_by_crl(verifiedSignerInfo, *it);
+                            }
+                        }
+                        else {
+                            ret = validate_by_crl(verifiedSignerInfo, *it);
+                        }
+                    }
+                }
+            }
+            DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
+            DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            break;
+        case SignatureFormat::CADES_C:
             verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
             for (auto& it : verifiedSignerInfo.getCertChainItems()) {
                 if (!it->isExpired()) {
@@ -599,14 +642,25 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
-        }
-        else {
+            break;
+        case SignatureFormat::CADES_XL:
+        case SignatureFormat::CADES_A:
             DO(verifiedSignerInfo.setRevocationValuesForChain(bestsign_time));
+            //  Loop for validation for case if OCSP-response missed
+            for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+                if (!it->isExpired()) {
+                    if (it->getValidationType() == Cert::ValidationType::UNDEFINED) {
+                        ret = validate_by_crl(verifiedSignerInfo, *it);
+                        if ((ret != RET_OK) && !verify_options.onlyCrl) {
+                            it->setValidationType(Cert::ValidationType::UNDEFINED);
+                            (void)validate_by_ocsp(verifiedSignerInfo, *it);
+                        }
+                    }
+                }
+            }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
+            break;
         }
-        break;
-    default:
-        break;
     }
 
 cleanup:
@@ -700,7 +754,7 @@ static int verify_raw (
     Cert::CerItem* cer_item = nullptr;
     Cert::CerItem* cer_parsed = nullptr;
     SmartBA sba_pubdata;
-    UapkiNS::SignatureVerifyStatus status_sign = UapkiNS::SignatureVerifyStatus::UNDEFINED;
+    SignatureVerifyStatus status_sign = SignatureVerifyStatus::UNDEFINED;
     bool is_digitalsign = true;
 
     const string s_signalgo = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
@@ -735,13 +789,13 @@ static int verify_raw (
     );
     switch (ret) {
     case RET_OK:
-        status_sign = UapkiNS::SignatureVerifyStatus::VALID;
+        status_sign = SignatureVerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        status_sign = UapkiNS::SignatureVerifyStatus::INVALID;
+        status_sign = SignatureVerifyStatus::INVALID;
         break;
     default:
-        status_sign = UapkiNS::SignatureVerifyStatus::FAILED;
+        status_sign = SignatureVerifyStatus::FAILED;
     }
     DO_JSON(json_object_set_string(joResult, "statusSignature", verifyStatusToStr(status_sign)));
 
