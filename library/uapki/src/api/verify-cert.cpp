@@ -130,29 +130,27 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
         DO(json_object_set_base64(joResult, "issuerCertId", cer_issuer->getCertId()));
     }
  
-    if (!is_expired) {
-        if (validation_type == Cert::ValidationType::CRL) {
-            CertValidator::ResultValidationByCrl result_valbycrl;
-            DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
-            DO(cert_validator.validateByCrl(
-                cer_subject,
-                cer_issuer,
-                validate_time,
-                need_updatecert,
-                result_valbycrl,
-                json_object_get_object(joResult, "validateByCRL")
-            ));
-        }
-        else if (validation_type == Cert::ValidationType::OCSP) {
-            CertValidator::ResultValidationByOcsp result_valbyocsp;
-            DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
-            DO(cert_validator.validateByOcsp(
-                cer_subject,
-                cer_issuer,
-                result_valbyocsp,
-                json_object_get_object(joResult, "validateByOCSP")
-            ));
-        }
+    if (validation_type == Cert::ValidationType::CRL) {
+        CertValidator::ResultValidationByCrl result_valbycrl;
+        DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
+        DO(cert_validator.validateByCrl(
+            cer_subject,
+            cer_issuer,
+            validate_time,
+            need_updatecert,
+            result_valbycrl,
+            json_object_get_object(joResult, "validateByCRL")
+        ));
+    }
+    else if (validation_type == Cert::ValidationType::OCSP) {
+        CertValidator::ResultValidationByOcsp result_valbyocsp;
+        DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
+        DO(cert_validator.validateByOcsp(
+            cer_subject,
+            cer_issuer,
+            result_valbyocsp,
+            json_object_get_object(joResult, "validateByOCSP")
+        ));
     }
 
 cleanup:
