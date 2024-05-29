@@ -456,6 +456,9 @@ bool findRevokedCert (
                 break;
             default:
                 status = UapkiNS::CertStatus::REVOKED;
+                revokedCertItem.revocationDate = revcert_before->revocationDate;
+                revokedCertItem.crlReason = revcert_before->crlReason;
+                revokedCertItem.invalidityDate = revcert_before->invalidityDate;
                 break;
             }
             rv_isfound = true;
