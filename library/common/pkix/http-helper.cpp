@@ -108,6 +108,8 @@ static bool curl_set_url_and_proxy (
         rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, http_helper.proxyUrl.c_str());
         if (rv_ccode != CURLE_OK) return false;
 
+        curl_easy_setopt(curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+
         if (!http_helper.proxyCredentials.empty()) {
             rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, http_helper.proxyCredentials.c_str());
             if (rv_ccode != CURLE_OK) return false;
