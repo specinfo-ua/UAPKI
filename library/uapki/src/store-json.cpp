@@ -39,6 +39,7 @@
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
 #include "uapki-ns-verify.h"
+#include <map>
 
 
 #define DEBUG_OUTCON(expression)
@@ -173,6 +174,7 @@ int nameToJson (
     if (name.present != Name_PR_rdnSequence) return RET_UAPKI_INVALID_STRUCT;
 
     int ret = RET_OK;
+    map<string, string> map_name;
     for (int i = 0; i < name.choice.rdnSequence.list.count; i++) {
         const RelativeDistinguishedName_t* rdname_src = name.choice.rdnSequence.list.array[i];
         for (int j = 0; j < rdname_src->list.count; j++) {
@@ -181,8 +183,19 @@ int nameToJson (
 
             DO(Util::oidFromAsn1((OBJECT_IDENTIFIER_t*)&attr->type, s_oid));
             DO(Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, s_value));
-            DO_JSON(json_object_set_string(joResult, oid_to_rdname(s_oid.c_str()), s_value.c_str()));
+            s_oid = string(oid_to_rdname(s_oid.c_str()));
+            auto it = map_name.find(s_oid);
+            if (it == map_name.end()) {
+                map_name.insert(pair<string, string>(s_oid, s_value));
+            }
+            else {
+                it->second += string(";") + s_value;
+            }
         }
+    }
+
+    for (const auto& it : map_name) {
+        DO_JSON(json_object_set_string(joResult, it.first.c_str(), it.second.c_str()));
     }
 
 cleanup:

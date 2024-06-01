@@ -679,11 +679,11 @@ int Util::decodeAnyString (
     if (!buf) return RET_UAPKI_INVALID_PARAMETER;
     if (len < 2) return RET_UAPKI_INVALID_STRUCT;
 
-    switch (buf[0])
-    {
-    case 0x0C: desc = get_UTF8String_desc(); break;
+    switch (buf[0]) {
+    case 0x0C: desc = get_UTF8String_desc();      break;
     case 0x13: desc = get_PrintableString_desc(); break;
-    case 0x16: desc = get_IA5String_desc(); break;
+    case 0x14: desc = get_TeletexString_desc();   break;
+    case 0x16: desc = get_IA5String_desc();       break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
