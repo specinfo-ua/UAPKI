@@ -438,6 +438,7 @@ int CertValidator::validateByCrl (
     JSON_Object* joDelta = nullptr;
     JSON_Object* joFull = nullptr;
     const ByteArray* ba_crlnumber = nullptr;
+    bool is_found;
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
@@ -457,7 +458,10 @@ int CertValidator::validateByCrl (
     DO(crl_item->revokedCerts(cerSubject, revoked_items));
     resultValidation.crlItem = crl_item;
 
-    if (m_CrlStore->useDeltaCrl()) {
+    if (
+        m_CrlStore->useDeltaCrl() &&
+        !cerSubject->getUris().deltaCrl.empty()
+    ) {
         if (joResult) {
             DO_JSON(json_object_set_value(joResult, "delta", json_value_init_object()));
             joDelta = json_object_get_object(joResult, "delta");
@@ -478,19 +482,25 @@ int CertValidator::validateByCrl (
     DEBUG_OUTCON(for (auto& it : revoked_items) {
         printf("revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->revocationDate, it->crlReason, it->invalidityDate);
     });
-    (void)Crl::findRevokedCert(
+    is_found = Crl::findRevokedCert(
         revoked_items,
         validateTime,
         resultValidation.certStatus,
         resultValidation.revokedCertItem
     );
+    if (is_found && (resultValidation.crlItem->getVersion() == 1)) {
+        resultValidation.certStatus = CertStatus::REVOKED;
+        resultValidation.revokedCertItem.crlReason = UapkiNS::CrlReason::UNSPECIFIED;
+    }
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
         if (resultValidation.certStatus == CertStatus::REVOKED) {
             DO_JSON(json_object_set_string(joResult, "revocationReason", Crl::crlReasonToStr(resultValidation.revokedCertItem.crlReason)));
-            const string s_time = TimeUtil::mtimeToFtime(resultValidation.revokedCertItem.revocationDate);
-            DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
+            if (resultValidation.revokedCertItem.revocationDate > 0) {
+                const string s_time = TimeUtil::mtimeToFtime(resultValidation.revokedCertItem.revocationDate);
+                DO_JSON(json_object_set_string(joResult, "revocationTime", s_time.c_str()));
+            }
         }
     }
 

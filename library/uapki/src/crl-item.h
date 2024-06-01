@@ -92,6 +92,7 @@ public:
 private:
     std::mutex  m_Mutex;
     std::string m_FileName;
+    uint32_t    m_Version;
     const Type  m_Type;
     const ByteArray*
                 m_Encoded;
@@ -128,11 +129,11 @@ public:
     Actuality getActuality (void) const {
         return m_Actuality;
     }
-    const CertificateList_t* const getCrl (void) const {
-        return m_Crl;
-    }
     const ByteArray* getAuthorityKeyId (void) const {
         return m_AuthorityKeyId;
+    }
+    const CertificateList_t* const getCrl(void) const {
+        return m_Crl;
     }
     const ByteArray* getCrlId (void) const {
         return m_CrlId;
@@ -172,6 +173,9 @@ public:
     }
     const Uris& getUris (void) const {
         return m_Uris;
+    }
+    uint32_t getVersion (void) const {
+        return m_Version;
     }
 
 public:

@@ -127,7 +127,8 @@ cleanup:
 CrlItem::CrlItem (
         const Type iType
 )
-    : m_Type(iType)
+    : m_Version(0)
+    , m_Type(iType)
     , m_Encoded(nullptr)
     , m_Crl(nullptr)
     , m_CrlId(nullptr)
@@ -483,6 +484,7 @@ int parseCrl (
     int ret = RET_OK;
     TBSCertList_t& tbs = crl->tbsCertList;
     Extensions_t* extns = tbs.crlExtensions;
+    unsigned long version = 0;
     SmartBA sba_authoritykeyid;
     SmartBA sba_crlid;
     SmartBA sba_crlident;
@@ -495,11 +497,10 @@ int parseCrl (
     CrlItem::Uris uris;
 
     if (tbs.version) {
-        unsigned long version = 0;
         DO(asn_INTEGER2ulong(tbs.version, &version));
-        if (version < 1) {
-            SET_ERROR(RET_UAPKI_INVALID_STRUCT_VERSION);
-        }
+    }
+    if (version < 1) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT_VERSION);
     }
     if (!Util::equalValuePrimitiveType(tbs.signature.algorithm, crl->signatureAlgorithm.algorithm)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
@@ -536,6 +537,7 @@ int parseCrl (
     crl_item = new CrlItem(crl_type);
     if (crl_item) {
         crl_item->m_Encoded = baEncoded;
+        crl_item->m_Version = (uint32_t)version;
         crl_item->m_Crl = crl;
         crl_item->m_CrlId = sba_crlid.pop();
         crl_item->m_Issuer = sba_issuer.pop();
