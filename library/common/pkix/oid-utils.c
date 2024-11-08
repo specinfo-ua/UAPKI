@@ -217,16 +217,13 @@ const char* hash_to_oid (HashAlg hash)
 HashAlg hash_from_oid (const char* oid)
 {
     if (oid_is_equal(OID_DSTU7564_256, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_256_PB, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_256, oid))
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564_256, oid))
         return HASH_ALG_DSTU7564_256;
     if (oid_is_equal(OID_DSTU7564_384, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_384_PB, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_384, oid))
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564_384, oid))
         return HASH_ALG_DSTU7564_384;
     if (oid_is_equal(OID_DSTU7564_512, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_512_PB, oid) ||
-        oid_is_equal(OID_DSTU4145_WITH_DSTU7564_512, oid)) 
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564_512, oid))
         return HASH_ALG_DSTU7564_512;
     if (oid_is_equal(OID_GOST34311, oid) ||
         oid_is_equal(OID_HMAC_GOST34311, oid) ||
