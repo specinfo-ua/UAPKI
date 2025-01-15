@@ -412,6 +412,17 @@ static CM_ERROR cm_session_add_certificate (
     int ret = keyid_by_cert((ByteArray*)baCertEncoded, &sba_keyid);
     if (ret != RET_OK) return RET_CM_INVALID_CERTIFICATE;
 
+    vector<StoreBag*> list_certs = storage.listBags(StoreBag::BAG_TYPE::CERT);
+    DEBUG_OUTPUT(std::string("cm_session_add_certificate(), count certs: ") + std::to_string(list_certs.size()));
+
+    for (size_t i = 0; i < list_certs.size(); i++) {
+        SmartBA sba_keyid2;
+        int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid2);
+        if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), sba_keyid2.get()) == 0)) {
+            return RET_OK;
+        }
+    }
+
     //  Make copy for store
     SmartBA sba_cert;
     if (!sba_cert.set(ba_copy_with_alloc((const ByteArray*)baCertEncoded, 0, 0))) {

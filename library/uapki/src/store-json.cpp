@@ -512,7 +512,7 @@ int infoToJson (
     if (!joResult || !crlItem) return RET_UAPKI_GENERAL_ERROR;
 
     DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
-    DO(nameToJson(json_object_get_object(joResult, "issuer"), crlItem->getCrl()->tbsCertList.issuer));
+    DO(nameToJson(json_object_get_object(joResult, "issuer"), crlItem->getTbsCrl()->issuer));
 
     s_time = TimeUtil::mtimeToFtime(crlItem->getThisUpdate());
     DO_JSON(json_object_set_string(joResult, "thisUpdate", s_time.c_str()));
@@ -520,7 +520,7 @@ int infoToJson (
     s_time = TimeUtil::mtimeToFtime(crlItem->getNextUpdate());
     DO_JSON(json_object_set_string(joResult, "nextUpdate", s_time.c_str()));
 
-    DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countRevokedCerts", (uint32_t)crlItem->countRevokedCerts()));
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countRevokedCerts", (uint32_t)crlItem->getCountRevokedCerts()));
 
     if (crlItem->getAuthorityKeyId()) {
         DO(json_object_set_hex(joResult, "authorityKeyId", crlItem->getAuthorityKeyId()));
@@ -557,43 +557,41 @@ int revokedCertsToJson (
         const CrlItem* crlItem
 )
 {
-    int ret = RET_OK;
-    const RevokedCertificates_t* revoked_certs = nullptr;
-
     if (!jaResult || !crlItem) return RET_UAPKI_GENERAL_ERROR;
 
-    revoked_certs = crlItem->getCrl()->tbsCertList.revokedCertificates;
-    if (!revoked_certs) return ret;
+    const size_t cnt_revokedcerts = crlItem->getCountRevokedCerts();
+    if (cnt_revokedcerts == 0) return RET_OK;
 
-    DEBUG_OUTCON(printf("CrlStoreUtil::revokedCertsToJson() count: %d\n", revoked_certs->list.count));
-    for (int i = 0; i < revoked_certs->list.count; i++) {
+    int ret = RET_OK;
+    DEBUG_OUTCON(printf("CrlStoreUtil::revokedCertsToJson() count: %zu\n", cnt_revokedcerts));
+    for (size_t i = 0; i < cnt_revokedcerts; i++) {
         JSON_Object* jo_result = nullptr;
-        const RevokedCertificate_t* revoked_cert = revoked_certs->list.array[i];
         SmartBA sba_certsn;
-        uint64_t ms_time = 0;
+        uint64_t revocation_date, invalidity_date;
+        UapkiNS::CrlReason crl_reason;
         string s_time;
+
+        DO(crlItem->parsedRevokedCert(
+            i,
+            &sba_certsn,
+            revocation_date,
+            crl_reason,
+            invalidity_date
+        ));
 
         DO_JSON(json_array_append_value(jaResult, json_value_init_object()));
         jo_result = json_array_get_object(jaResult, i);
 
-        DO(asn_INTEGER2ba(&revoked_cert->userCertificate, &sba_certsn));
         DO(json_object_set_hex(jo_result, "userCertificate", sba_certsn.get()));
 
-        DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, ms_time));
-        s_time = TimeUtil::mtimeToFtime(ms_time);
+        s_time = TimeUtil::mtimeToFtime(revocation_date);
         DO_JSON(json_object_set_string(jo_result, "revocationDate", s_time.c_str()));
-
-        if (revoked_cert->crlEntryExtensions) {
-            uint32_t u32_crlreason = 0;
-            ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, u32_crlreason);
-            if (ret == RET_OK) {
-                DO_JSON(json_object_set_string(jo_result, "crlReason", crlReasonToStr((CrlReason)u32_crlreason)));
-            }
-            ret = ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, ms_time);
-            if (ret == RET_OK) {
-                s_time = TimeUtil::mtimeToFtime(ms_time);
-                DO_JSON(json_object_set_string(jo_result, "invalidityDate", s_time.c_str()));
-            }
+        if (crl_reason > UapkiNS::CrlReason::UNDEFINED) {
+            DO_JSON(json_object_set_string(jo_result, "crlReason", crlReasonToStr(crl_reason)));
+        }
+        if (invalidity_date > 0) {
+            s_time = TimeUtil::mtimeToFtime(invalidity_date);
+            DO_JSON(json_object_set_string(jo_result, "invalidityDate", s_time.c_str()));
         }
     }
 

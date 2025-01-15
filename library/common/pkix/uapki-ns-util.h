@@ -158,6 +158,20 @@ namespace Util {
         uint32_t* enumValue
     );
 
+    int decodeAsn1Header (
+        const ByteArray* baEncoded,
+        uint32_t& tag,
+        size_t& hlen,
+        size_t& vlen
+    );
+    int decodeAsn1Header (
+        const uint8_t* bufEncoded,
+        const size_t lenEncoded,
+        uint32_t& tag,
+        size_t& hlen,
+        size_t& vlen
+    );
+
     int decodeAnyString (
         const uint8_t* buf,
         const size_t len,

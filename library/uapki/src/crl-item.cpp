@@ -65,8 +65,53 @@ static const char* CRL_REASON_STRINGS[12] = {
 };
 
 
+static int add_revokedcert (
+        const uint8_t* bufEncoded,
+        size_t lenEncoded,
+        size_t offset,
+        vector<const RevokedCertItem*>& revokedItems
+)
+{
+    if (offset >= lenEncoded) return RET_UAPKI_INVALID_STRUCT;
+
+    bufEncoded += offset;
+    lenEncoded -= offset;
+
+    uint32_t tag;
+    size_t hlen, vlen;
+    bool ok = Util::decodeAsn1Header(bufEncoded, lenEncoded, tag, hlen, vlen);
+    if (!ok || (tag != 0x30) || (hlen + vlen > lenEncoded)) return RET_UAPKI_INVALID_STRUCT;
+
+    RevokedCertificate_t* revoked_cert = (RevokedCertificate_t*)asn_decode_with_alloc(get_RevokedCertificate_desc(), bufEncoded, hlen + vlen);
+    if (!revoked_cert) return RET_UAPKI_INVALID_STRUCT;
+
+    int ret = RET_OK;
+    uint64_t invalidity_date = 0, revocation_date = 0;
+    UapkiNS::CrlReason crl_reason = UapkiNS::CrlReason::UNDEFINED;
+    const RevokedCertItem* revcert_item = nullptr;
+
+    DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, revocation_date));
+    if (revoked_cert->crlEntryExtensions) {
+        uint32_t u32_crlreason = 0;
+        ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, u32_crlreason);
+        if (ret == RET_OK) {
+            crl_reason = (UapkiNS::CrlReason)u32_crlreason;
+        }
+        ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, invalidity_date);
+    }
+
+    revcert_item = new RevokedCertItem(revocation_date, crl_reason, invalidity_date);
+    if (revcert_item) {
+        revokedItems.push_back(revcert_item);
+    }
+
+cleanup:
+    asn_free(get_RevokedCertificate_desc(), revoked_cert);
+    return ret;
+}   //  add_revokedcert
+
 static int encode_crlid (
-        const TBSCertList_t& tbs,
+        const TBSCertListAlt_t& tbs,
         const ByteArray* baCrlNumber,
         ByteArray** baIssuerAndSN
 )
@@ -86,7 +131,7 @@ cleanup:
 }   //  encode_crlid
 
 static int encode_crlidentifier (
-        const TBSCertList_t& tbs,
+        const TBSCertListAlt_t& tbs,
         const ByteArray* baCrlNumber,
         ByteArray** baCrlIdentifier
 )
@@ -123,6 +168,58 @@ cleanup:
     return ret;
 }   //  encode_crlidentifier
 
+static size_t search_offset (
+        const vector<RevokedCertOffset>& revokedCertOffsets,
+        const size_t offsetSn
+)
+{
+    //  Note: 0 (and 1) - impossible offset value
+    if (revokedCertOffsets.empty()) return 0;
+
+    size_t left = 0, right = revokedCertOffsets.size() - 1;
+    while (left <= right) {
+        size_t mid = left + (right - left) / 2;
+        const RevokedCertOffset& item = revokedCertOffsets[mid];
+        if (item.offsetSn < offsetSn) {
+            left = mid + 1;
+        }
+        else if (item.offsetSn > offsetSn) {
+            right = mid - 1;
+        }
+        else {
+            return item.offset;
+        }
+    }
+
+    return 0;
+}   //  search_offset
+
+static vector<size_t> find_equal_sn (
+        const uint8_t* bufEncoded,
+        size_t lenEncoded,
+        const uint8_t* bufSerialNumber,
+        size_t lenSerialNumber,
+        const vector<RevokedCertOffset>& revokedCertOffsets
+)
+{
+    vector<size_t> sn_offsets, rv_offsets;
+    lenEncoded -= lenSerialNumber;
+    for (size_t i = 0; i < lenEncoded; i++, bufEncoded++) {
+        if (memcmp(bufEncoded, bufSerialNumber, lenSerialNumber) == 0) {
+            sn_offsets.push_back(i);
+        }
+    }
+
+    for (const auto& it_sn : sn_offsets) {
+        const size_t offset = search_offset(revokedCertOffsets, it_sn);
+        if (offset > 0) {
+            rv_offsets.push_back(offset);
+        }
+    }
+
+    return rv_offsets;
+}   //  find_equal_sn
+
 
 CrlItem::CrlItem (
         const Type iType
@@ -130,7 +227,7 @@ CrlItem::CrlItem (
     : m_Version(0)
     , m_Type(iType)
     , m_Encoded(nullptr)
-    , m_Crl(nullptr)
+    , m_TbsCrl(nullptr)
     , m_CrlId(nullptr)
     , m_Issuer(nullptr)
     , m_ThisUpdate(0)
@@ -146,7 +243,7 @@ CrlItem::CrlItem (
 CrlItem::~CrlItem (void)
 {
     ba_free((ByteArray*)m_Encoded);
-    asn_free(get_CertificateList_desc(), (CertificateList_t*)m_Crl);
+    asn_free(get_TBSCertListAlt_desc(), (TBSCertListAlt_t*)m_TbsCrl);
     ba_free((ByteArray*)m_CrlId);
     ba_free((ByteArray*)m_Issuer);
     m_ThisUpdate = 0;
@@ -251,15 +348,15 @@ int CrlItem::verify (
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    DO(Util::oidFromAsn1(&m_Crl->signatureAlgorithm.algorithm, s_signalgo));
+    DO(Util::oidFromAsn1(&x509_tbs->signAlgo.algorithm, s_signalgo));
     if (
         oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo.c_str()) ||
         oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo.c_str())
     ) {
-        DO(Util::bitStringEncapOctetFromAsn1(&m_Crl->signatureValue, &sba_signvalue));
+        DO(Util::bitStringEncapOctetFromAsn1(&x509_tbs->signValue, &sba_signvalue));
     }
     else {
-        DO(asn_BITSTRING2ba(&m_Crl->signatureValue, &sba_signvalue));
+        DO(asn_BITSTRING2ba(&x509_tbs->signValue, &sba_signvalue));
     }
 
     ret = Verify::verifySignature(s_signalgo.c_str(), sba_tbs.get(), false, cerIssuer->getSpki(), sba_signvalue.get());
@@ -277,15 +374,6 @@ int CrlItem::verify (
 cleanup:
     asn_free(get_X509Tbs_desc(), x509_tbs);
     return ret;
-}
-
-size_t CrlItem::countRevokedCerts (void) const
-{
-    size_t rv_cnt = 0;
-    if (m_Crl && m_Crl->tbsCertList.revokedCertificates) {
-        rv_cnt = (size_t)m_Crl->tbsCertList.revokedCertificates->list.count;
-    }
-    return rv_cnt;
 }
 
 string CrlItem::generateFileName (void) const
@@ -306,47 +394,79 @@ string CrlItem::generateFileName (void) const
     return rv_s;
 }
 
+int CrlItem::parsedRevokedCert (
+        const size_t index,
+        ByteArray** baSerialNumber,
+        uint64_t& revocationDate,
+        UapkiNS::CrlReason& crlReason,
+        uint64_t& invalidityDate
+) const
+{
+    if (index >= m_RevokedCertOffsets.size()) return RET_UAPKI_INVALID_PARAMETER;
+
+    const uint8_t* buf = m_TbsCrl->revokedCertificates.buf + m_RevokedCertOffsets[index].offset;
+    uint32_t tag;
+    size_t hlen, vlen;
+
+    if (!Util::decodeAsn1Header(buf, 6, tag, hlen, vlen)) return RET_UAPKI_INVALID_STRUCT;
+
+    int ret = RET_OK;
+    RevokedCertificate_t* revoked_cert = (RevokedCertificate_t*)asn_decode_with_alloc(get_RevokedCertificate_desc(), buf, hlen + vlen);
+    if (!revoked_cert) return RET_UAPKI_INVALID_STRUCT;
+
+    revocationDate = invalidityDate = 0;
+    crlReason = UapkiNS::CrlReason::UNDEFINED;
+
+    DO(asn_INTEGER2ba(&revoked_cert->userCertificate, baSerialNumber));
+    DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, revocationDate));
+
+    if (revoked_cert->crlEntryExtensions) {
+        uint32_t u32_crlreason = 0;
+        ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, u32_crlreason);
+        if (ret == RET_OK) {
+            crlReason = (CrlReason)u32_crlreason;
+        }
+        ret = RET_OK;
+        (void)ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, invalidityDate);
+    }
+
+cleanup:
+    asn_free(get_RevokedCertificate_desc(), revoked_cert);
+    return ret;
+}
+
 int CrlItem::revokedCerts (
         const Cert::CerItem* cerSubject,
         vector<const RevokedCertItem*>& revokedItems
 )
 {
+    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
+
     int ret = RET_OK;
-    const RevokedCertificates_t* revoked_certs = nullptr;
-    ASN__PRIMITIVE_TYPE_t user_sn;
+    SmartBA sba_snencoded;
+    vector<size_t> offsets;
 
-    CHECK_PARAM(cerSubject != nullptr);
+    DEBUG_OUTCON(printf("CrlItem::revokedCerts() cerSubject->baSerialNumber, hex: "); ba_print(stdout, cerSubject->getSerialNumber()));
+    DO(Util::encodeInteger(cerSubject->getSerialNumber(), &sba_snencoded));
 
-    DEBUG_OUTCON(printf("CrlItem::revokedCerts() cerSubject->baSerialNumber, hex: "); ba_print(stdout, cerSubject->baSerialNumber));
-    revoked_certs = m_Crl->tbsCertList.revokedCertificates;
-    if (revoked_certs) {
-        DEBUG_OUTCON(printf("CrlItem::revokedCerts() count: %d\n", revoked_certs->list.count));
-        user_sn.buf = (uint8_t*)ba_get_buf_const(cerSubject->getSerialNumber());
-        user_sn.size = (int)ba_get_len(cerSubject->getSerialNumber());
-        for (int i = 0; i < revoked_certs->list.count; i++) {
-            const RevokedCertificate_t* revoked_cert = revoked_certs->list.array[i];
-            if (Util::equalValuePrimitiveType(revoked_cert->userCertificate, user_sn)) {
-                DEBUG_OUTCON(printf("equal SerialNumber, index: %d\n", i));
-                const RevokedCertItem* revcert_item = nullptr;
-                uint64_t invalidity_date = 0, revocation_date = 0;
-                UapkiNS::CrlReason crl_reason = UapkiNS::CrlReason::UNDEFINED;
+    if (m_RevokedCertOffsets.empty()) return RET_OK;
+    if (sba_snencoded.size() > (size_t)m_TbsCrl->revokedCertificates.size) return RET_UAPKI_INVALID_STRUCT;
 
-                DO(Util::pkixTimeFromAsn1(&revoked_cert->revocationDate, revocation_date));
-                if (revoked_cert->crlEntryExtensions) {
-                    uint32_t u32_crlreason = 0;
-                    ret = ExtensionHelper::getCrlReason(revoked_cert->crlEntryExtensions, u32_crlreason);
-                    if (ret == RET_OK) {
-                        crl_reason = (UapkiNS::CrlReason)u32_crlreason;
-                    }
-                    ExtensionHelper::getCrlInvalidityDate(revoked_cert->crlEntryExtensions, invalidity_date);
-                }
+    offsets = find_equal_sn(
+        m_TbsCrl->revokedCertificates.buf,
+        (size_t)m_TbsCrl->revokedCertificates.size,
+        sba_snencoded.buf(),
+        sba_snencoded.size(),
+        m_RevokedCertOffsets
+    );
 
-                revcert_item = new RevokedCertItem(revocation_date, crl_reason, invalidity_date);
-                if (revcert_item) {
-                    revokedItems.push_back(revcert_item);
-                }
-            }
-        }
+    for (const auto& it : offsets) {
+        DO(add_revokedcert(
+            m_TbsCrl->revokedCertificates.buf,
+            (size_t)m_TbsCrl->revokedCertificates.size,
+            it,
+            revokedItems
+        ));
     }
 
 cleanup:
@@ -471,6 +591,54 @@ bool findRevokedCert (
     return rv_isfound;
 }
 
+int parseRevokedCerts (
+        std::vector<RevokedCertOffset>& Offsets,
+        const uint8_t* bufEncoded,
+        const int lenEncoded
+)
+{
+    Offsets.clear();
+    if (!bufEncoded || (lenEncoded == 0)) return RET_OK;
+
+    uint32_t tag;
+    size_t hlen, vlen, offset;
+    bool ok = Util::decodeAsn1Header(bufEncoded, (size_t) lenEncoded, tag, hlen, vlen);
+    if (!ok || (tag != 0x30) || (hlen + vlen > lenEncoded)) return RET_UAPKI_INVALID_STRUCT;
+    if (vlen == 0) return RET_OK;
+
+    bufEncoded += hlen;
+    offset = hlen;
+
+    size_t hlen2, vlen2, size2;
+    ok = Util::decodeAsn1Header(bufEncoded, vlen, tag, hlen2, vlen2);
+    if (!ok || (tag != 0x30) || (vlen2 < 4)) return RET_UAPKI_INVALID_STRUCT;
+
+    size2 = hlen2 + vlen2;
+    RevokedCertificate_t* revoked_cert = (RevokedCertificate_t*)asn_decode_with_alloc(get_RevokedCertificate_desc(), bufEncoded, size2);
+    if (!revoked_cert) return RET_UAPKI_INVALID_STRUCT;
+    asn_free(get_RevokedCertificate_desc(), revoked_cert);
+    revoked_cert = nullptr;
+
+    size_t reserved_size = (lenEncoded / (size2)) + 1;
+    Offsets.reserve(reserved_size);
+    Offsets.push_back(RevokedCertOffset(offset, offset + hlen2));
+    bufEncoded += size2;
+    offset += size2;
+    vlen -= size2;
+
+    while (vlen > 2) {
+        ok = Util::decodeAsn1Header(bufEncoded, vlen, tag, hlen2, vlen2);
+        if (!ok || (tag != 0x30) || (vlen2 < 4)) return RET_UAPKI_INVALID_STRUCT;
+
+        Offsets.push_back(RevokedCertOffset(offset, offset + hlen2));
+        bufEncoded += size2;
+        offset += size2;
+        vlen -= size2;
+    }
+
+    return 0;
+}
+
 int parseCrl (
         const ByteArray* baEncoded,
         CrlItem** crlItem
@@ -478,12 +646,11 @@ int parseCrl (
 {
     if (!baEncoded || !crlItem) return RET_UAPKI_INVALID_PARAMETER;
 
-    CertificateList_t* crl = (CertificateList_t*)asn_decode_ba_with_alloc(get_CertificateList_desc(), baEncoded);
-    if (!crl || !crl->tbsCertList.crlExtensions) return RET_UAPKI_INVALID_STRUCT;
+    X509Tbs_t* x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded);
+    if (!x509_tbs || (x509_tbs->tbsData.size < 12)) return RET_UAPKI_INVALID_STRUCT;
 
     int ret = RET_OK;
-    TBSCertList_t& tbs = crl->tbsCertList;
-    Extensions_t* extns = tbs.crlExtensions;
+    Extensions_t* extns = nullptr;
     unsigned long version = 0;
     SmartBA sba_authoritykeyid;
     SmartBA sba_crlid;
@@ -494,21 +661,30 @@ int parseCrl (
     CrlItem* crl_item = nullptr;
     Type crl_type = Type::UNDEFINED;
     uint64_t this_update = 0, next_update = 0;
+    vector<RevokedCertOffset> revcert_offsets;
     CrlItem::Uris uris;
 
-    if (tbs.version) {
-        DO(asn_INTEGER2ulong(tbs.version, &version));
+    TBSCertListAlt_t* tbs = (TBSCertListAlt_t*)asn_decode_with_alloc(get_TBSCertListAlt_desc(), x509_tbs->tbsData.buf, x509_tbs->tbsData.size);
+    if (!tbs) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+    if (tbs->version) {
+        DO(asn_INTEGER2ulong(tbs->version, &version));
     }
     if (version < 1) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT_VERSION);
     }
-    if (!Util::equalValuePrimitiveType(tbs.signature.algorithm, crl->signatureAlgorithm.algorithm)) {
+    if (!Util::equalValuePrimitiveType(tbs->signature.algorithm, x509_tbs->signAlgo.algorithm)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
-    DO(asn_encode_ba(get_Name_desc(), &tbs.issuer, &sba_issuer));
-    DO(Util::pkixTimeFromAsn1(&tbs.thisUpdate, this_update));
-    DO(Util::pkixTimeFromAsn1(&tbs.nextUpdate, next_update));
+    DO(asn_encode_ba(get_Name_desc(), &tbs->issuer, &sba_issuer));
+    DO(Util::pkixTimeFromAsn1(&tbs->thisUpdate, this_update));
+    DO(Util::pkixTimeFromAsn1(&tbs->nextUpdate, next_update));
 
+    DO(parseRevokedCerts(revcert_offsets, tbs->revokedCertificates.buf, tbs->revokedCertificates.size));
+
+    extns = tbs->crlExtensions;
     DO(ExtensionHelper::getAuthorityKeyId(extns, &sba_authoritykeyid));
     DO(ExtensionHelper::getCrlNumber(extns, &sba_crlnumber));
     ret = ExtensionHelper::getDeltaCrlIndicator(extns, &sba_deltacrl);
@@ -522,8 +698,8 @@ int parseCrl (
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
-    DO(encode_crlid(tbs, sba_crlnumber.get(), &sba_crlid));
-    DO(encode_crlidentifier(tbs, sba_crlnumber.get(), &sba_crlident));
+    DO(encode_crlid(*tbs, sba_crlnumber.get(), &sba_crlid));
+    DO(encode_crlidentifier(*tbs, sba_crlnumber.get(), &sba_crlident));
     ret = ExtensionHelper::getCrlUris(extns, OID_X509v3_CRLDistributionPoints, uris.fullCrl);
     if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
@@ -538,25 +714,27 @@ int parseCrl (
     if (crl_item) {
         crl_item->m_Encoded = baEncoded;
         crl_item->m_Version = (uint32_t)version;
-        crl_item->m_Crl = crl;
+        crl_item->m_TbsCrl = tbs;
         crl_item->m_CrlId = sba_crlid.pop();
         crl_item->m_Issuer = sba_issuer.pop();
         crl_item->m_ThisUpdate = this_update;
         crl_item->m_NextUpdate = next_update;
+        crl_item->m_RevokedCertOffsets = revcert_offsets;
         crl_item->m_AuthorityKeyId = sba_authoritykeyid.pop();
         crl_item->m_CrlNumber = sba_crlnumber.pop();
         crl_item->m_DeltaCrl = sba_deltacrl.pop();
         crl_item->m_CrlIdentifier = sba_crlident.pop();
         crl_item->m_Uris = uris;
 
-        crl = nullptr;
+        tbs = nullptr;
 
         *crlItem = crl_item;
         crl_item = nullptr;
     }
 
 cleanup:
-    asn_free(get_CertificateList_desc(), crl);
+    asn_free(get_TBSCertListAlt_desc(), tbs);
+    asn_free(get_X509Tbs_desc(), x509_tbs);
     delete crl_item;
     return ret;
 }

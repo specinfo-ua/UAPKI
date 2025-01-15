@@ -315,6 +315,7 @@
     <ClInclude Include="include\T61String.h" />
     <ClInclude Include="include\TBSCertificate.h" />
     <ClInclude Include="include\TBSCertList.h" />
+    <ClInclude Include="include\TBSCertListAlt.h" />
     <ClInclude Include="include\TBSRequest.h" />
     <ClInclude Include="include\TeletexString.h" />
     <ClInclude Include="include\TerminalIdentifier.h" />
@@ -647,6 +648,7 @@
     <ClCompile Include="src\struct\SubjectPublicKeyInfo.c" />
     <ClCompile Include="src\struct\TBSCertificate.c" />
     <ClCompile Include="src\struct\TBSCertList.c" />
+    <ClCompile Include="src\struct\TBSCertListAlt.c" />
     <ClCompile Include="src\struct\TBSRequest.c" />
     <ClCompile Include="src\struct\TerminalIdentifier.c" />
     <ClCompile Include="src\struct\TimeStampReq.c" />
@@ -672,7 +674,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{246343b7-4d20-4797-9ca9-471692bb441a}</ProjectGuid>
     <RootNamespace>uapkif</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -776,7 +778,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
       <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -824,7 +826,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>$(OutDir);</AdditionalLibraryDirectories>
       <AdditionalDependencies>uapkic.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>

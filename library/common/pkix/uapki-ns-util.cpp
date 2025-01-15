@@ -666,6 +666,53 @@ cleanup:
     return ret;
 }
 
+int Util::decodeAsn1Header (
+        const ByteArray* baEncoded,
+        uint32_t& tag,
+        size_t& hlen,
+        size_t& vlen
+)
+{
+    return decodeAsn1Header(
+        ba_get_buf_const(baEncoded),
+        ba_get_len(baEncoded),
+        tag,
+        hlen,
+        vlen
+    );
+}
+
+int Util::decodeAsn1Header (
+        const uint8_t* bufEncoded,
+        const size_t lenEncoded,
+        uint32_t& tag,
+        size_t& hlen,
+        size_t& vlen
+)
+{
+    if (lenEncoded < 2) return false;
+
+    tag = bufEncoded[0];
+    hlen = 2;
+    vlen = 0;
+
+    size_t v = bufEncoded[1];
+    if (v < 0x80) {
+        vlen = v;
+    }
+    else {
+        const size_t size = v & 0x07;
+        hlen += size;
+        if (lenEncoded < size + 2) return false;
+        for (size_t i = 2; i < hlen; i++) {
+            vlen <<= 8;
+            v = bufEncoded[i];
+            vlen |= v;
+        }
+    }
+    return true;
+}
+
 int Util::decodeAnyString (
         const uint8_t* buf,
         const size_t len,

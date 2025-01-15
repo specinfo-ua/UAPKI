@@ -325,6 +325,7 @@
 #include "T61String.h"
 #include "TBSCertificate.h"
 #include "TBSCertList.h"
+#include "TBSCertListAlt.h"
 #include "TBSRequest.h"
 #include "TeletexString.h"
 #include "TerminalIdentifier.h"

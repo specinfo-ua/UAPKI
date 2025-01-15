@@ -46,7 +46,7 @@ static int crl_info_to_json (
 )
 {
     int ret = Crl::infoToJson(joResult, crlItem);
-    if ((ret == RET_OK) && showRevokedCerts && (crlItem->countRevokedCerts() > 0)) {
+    if ((ret == RET_OK) && showRevokedCerts && (crlItem->getCountRevokedCerts() > 0)) {
         (void)json_object_set_value(joResult, "revokedCerts", json_value_init_array());
         ret = Crl::revokedCertsToJson(json_object_get_array(joResult, "revokedCerts"), crlItem);
     }

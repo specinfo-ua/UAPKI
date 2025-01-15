@@ -993,6 +993,9 @@
     <ClInclude Include="include\RevRepContent.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\TBSCertListAlt.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\struct\AccessDescription.c">
@@ -1950,6 +1953,9 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\RevRepContent.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\TBSCertListAlt.c">
       <Filter>src\struct</Filter>
     </ClCompile>
   </ItemGroup>

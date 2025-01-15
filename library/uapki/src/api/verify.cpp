@@ -143,7 +143,7 @@ static int result_certchainitem_valbycrl_to_json (
 
     if (crl_item) {
         string s_commonname;
-        DO(rdnameFromName(crl_item->getCrl()->tbsCertList.issuer, OID_X520_CommonName, s_commonname));
+        DO(rdnameFromName(crl_item->getTbsCrl()->issuer, OID_X520_CommonName, s_commonname));
         DO(json_object_set_base64(joResult, "crlId", crl_item->getCrlId()));
         DO_JSON(json_object_set_string(joResult, "CN", s_commonname.c_str()));
         DO_JSON(json_object_set_string(joResult, "thisUpdate", TimeUtil::mtimeToFtime(crl_item->getThisUpdate()).c_str()));

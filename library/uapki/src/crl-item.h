@@ -73,6 +73,19 @@ struct RevokedCertItem {
     }
 };  //  end struct RevokedCertItem
 
+struct RevokedCertOffset {
+    size_t  offset;
+    size_t  offsetSn;
+
+    RevokedCertOffset (
+        const size_t iOffset = 0,
+        const size_t iOffsetSn = 0
+    )
+    : offset(iOffset)
+    , offsetSn(iOffsetSn)
+    {}
+};  //  end struct RevokedCertOffset
+
 
 class CrlItem {
 public:
@@ -96,14 +109,16 @@ private:
     const Type  m_Type;
     const ByteArray*
                 m_Encoded;
-    const CertificateList_t*
-                m_Crl;
+    const TBSCertListAlt_t*
+                m_TbsCrl;
     const ByteArray*
                 m_CrlId;
     const ByteArray*
                 m_Issuer;
     uint64_t    m_ThisUpdate;
     uint64_t    m_NextUpdate;
+    std::vector<RevokedCertOffset>
+                m_RevokedCertOffsets;
     const ByteArray*
                 m_AuthorityKeyId;
     const ByteArray*
@@ -132,8 +147,8 @@ public:
     const ByteArray* getAuthorityKeyId (void) const {
         return m_AuthorityKeyId;
     }
-    const CertificateList_t* const getCrl(void) const {
-        return m_Crl;
+    size_t getCountRevokedCerts (void) const {
+        return m_RevokedCertOffsets.size();
     }
     const ByteArray* getCrlId (void) const {
         return m_CrlId;
@@ -164,6 +179,9 @@ public:
     }
     Cert::VerifyStatus getStatusSign (void) const {
         return m_StatusSign;
+    }
+    const TBSCertListAlt_t* const getTbsCrl (void) const {
+        return m_TbsCrl;
     }
     uint64_t getThisUpdate (void) const {
         return m_ThisUpdate;
@@ -199,8 +217,14 @@ public:
     );
 
 public:
-    size_t countRevokedCerts (void) const;
     std::string generateFileName (void) const;
+    int parsedRevokedCert (
+        const size_t index,
+        ByteArray** baSerialNumber,
+        uint64_t& revocationDate,
+        UapkiNS::CrlReason& crlReason,
+        uint64_t& invalidityDate
+    ) const;
     int revokedCerts (
         const Cert::CerItem* cerSubject,
         std::vector<const RevokedCertItem*>& revokedItems
@@ -236,6 +260,11 @@ bool findRevokedCert (
     const uint64_t validateTime,
     UapkiNS::CertStatus& status,
     RevokedCertItem& revokedCertItem
+);
+int parseRevokedCerts (
+    std::vector<RevokedCertOffset>& Offsets,
+    const uint8_t* bufEncoded,
+    const int lenEncoded
 );
 int parseCrl (
     const ByteArray* baEncoded,
