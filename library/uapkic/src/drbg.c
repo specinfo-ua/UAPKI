@@ -125,7 +125,7 @@ static int drbg_init_internal(const ByteArray *entropy)
 	drbg_reseed_counter = 0;
 
 cleanup:
-	if (ret != 0) {
+	if (ret != RET_OK) {
 		drbg_free_internal();
 	}
 	return ret;
@@ -194,6 +194,7 @@ static int drbg_random_internal(ByteArray* random)
 	uint8_t* bufptr = random->buf;
 	size_t current_len, outlen = random->len;
 	ByteArray* tmp = NULL;
+	ByteArray* entropy = NULL;
 
 	if (outlen > (1 << 19)) {
 		return -1;
@@ -204,7 +205,6 @@ static int drbg_random_internal(ByteArray* random)
 	}
 
 	if ((drbg_reseed_counter > 1024) || drbg_prediction_resistance) {
-		ByteArray* entropy = NULL;
 		DO(entropy_get(&entropy));
 		DO(drbg_reseed_internal(entropy));
 	}
@@ -229,6 +229,7 @@ static int drbg_random_internal(ByteArray* random)
 	DO(drbg_update(NULL));
 
 cleanup:
+	ba_free_private(entropy);
 	return ret;
 }
  
