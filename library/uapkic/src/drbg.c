@@ -38,7 +38,7 @@
 
 static ByteArray *drbg_Key = NULL;
 static ByteArray *drbg_V = NULL;
-static size_t drbg_reseed_counter = 0;
+static int drbg_reseed_counter = 0;
 static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
 static pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -122,10 +122,10 @@ static int drbg_init_internal(const ByteArray *entropy)
 	memset(drbg_V->buf, 0x01, drbg_V->len);
 
 	DO(drbg_update(entropy));
-	drbg_reseed_counter = 1;
+	drbg_reseed_counter = 0;
 
 cleanup:
-	if (ret != 0) {
+	if (ret != RET_OK) {
 		drbg_free_internal();
 	}
 	return ret;
@@ -151,7 +151,7 @@ static int drbg_reseed_internal(const ByteArray* seed_material)
 
 	DO(drbg_update(seed_material));
 
-	drbg_reseed_counter = 1;
+	drbg_reseed_counter = 0;
 
 cleanup:
 	return ret;
@@ -194,6 +194,7 @@ static int drbg_random_internal(ByteArray* random)
 	uint8_t* bufptr = random->buf;
 	size_t current_len, outlen = random->len;
 	ByteArray* tmp = NULL;
+	ByteArray* entropy = NULL;
 
 	if (outlen > (1 << 19)) {
 		return -1;
@@ -203,8 +204,9 @@ static int drbg_random_internal(ByteArray* random)
 		DO(drbg_init());
 	}
 
-	if ((drbg_reseed_counter > 1000000) || drbg_prediction_resistance) {
-		DO(drbg_reseed_internal(NULL));
+	if ((drbg_reseed_counter > 1024) || drbg_prediction_resistance) {
+		DO(entropy_get(&entropy));
+		DO(drbg_reseed_internal(entropy));
 	}
 
 	drbg_reseed_counter++;
@@ -227,6 +229,7 @@ static int drbg_random_internal(ByteArray* random)
 	DO(drbg_update(NULL));
 
 cleanup:
+	ba_free_private(entropy);
 	return ret;
 }
  

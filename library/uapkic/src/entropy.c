@@ -32,8 +32,16 @@
 
 #ifdef _WIN32
 #   include <windows.h>
-#   if !defined(_WIN32_WCE)
-#       include <wincrypt.h>
+#   include <winternl.h>
+#   include <winioctl.h>
+#   pragma comment(lib, "NTDLL.lib")
+#   pragma comment(lib, "BCrypt.lib")
+#   define RTL_CONSTANT_STRING(s) { sizeof(s) - sizeof((s)[0]), sizeof(s), s }
+#   ifndef IOCTL_KSEC_RNG   // ntddksec.h, 0x390004
+#       define IOCTL_KSEC_RNG   CTL_CODE(FILE_DEVICE_KSEC, 1, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#   endif
+#   ifndef IOCTL_KSEC_RNG_REKEY // ntddksec.h, 0x390008
+#       define IOCTL_KSEC_RNG_REKEY CTL_CODE(FILE_DEVICE_KSEC, 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #   endif
 #else
 #   include <sys/time.h>
@@ -52,33 +60,51 @@ static int os_prng(void *rnd, size_t size)
     int ret = RET_OK;
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-    /* Пытаемся использовать CryptGenRandom */
-        HCRYPTPROV hProv;
+    // Try calling SystemPrng in the CNG kernel-mode driver via an IOCTL.
+    HANDLE dev;
+    IO_STATUS_BLOCK iosb;
+    UNICODE_STRING path = RTL_CONSTANT_STRING(L"\\Device\\CNG");
+    OBJECT_ATTRIBUTES oa;
+    NTSTATUS status;
 
-        if (CryptAcquireContextA(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) == 0) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
+    InitializeObjectAttributes(&oa, &path, 0, NULL, NULL);
+    NtOpenFile(&dev, FILE_READ_DATA, &oa, &iosb, FILE_SHARE_READ, 0);
+    status = NtDeviceIoControlFile(dev, NULL, NULL, NULL, &iosb, IOCTL_KSEC_RNG, NULL, 0, rnd, (ULONG)size);
+    NtClose(dev);
 
-        if (CryptGenRandom(hProv, (DWORD)size, rnd) == TRUE) {
-            CryptReleaseContext(hProv, 0);
-        } else {
-            CryptReleaseContext(hProv, 0);
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
+    if (NT_SUCCESS(status)) {
+        return RET_OK;
+    }
+
+    // Try using BCryptGenRandom.
+    BCRYPT_ALG_HANDLE alg;
+    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_RNG_ALGORITHM, NULL, 0);
+    if (!NT_SUCCESS(status)) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
+    status = BCryptGenRandom(alg, rnd, (ULONG)size, 0);
+    BCryptCloseAlgorithmProvider(alg, 0);
+    if (!NT_SUCCESS(status)) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
+
 #else
-    /* Пытаемся использовать /dev/urandom */
-        size_t readed;
-        FILE *fos = fopen("/dev/urandom", "rb");
+#ifdef __linux
+    // TODO: Implement use of getrandom syscall.
+#endif
 
-        if (fos == NULL) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
+    size_t readed;
+    FILE *fos = fopen("/dev/urandom", "rb");
 
-        readed = fread(rnd, 1, size, fos);
-        fclose(fos);
-        if (readed != size) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
+    if (fos == NULL) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
+
+    readed = fread(rnd, 1, size, fos);
+    fclose(fos);
+    if (readed != size) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
 #endif
 
 cleanup:
