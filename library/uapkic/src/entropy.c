@@ -47,6 +47,8 @@
 #   ifdef __linux
 #       include <sys/random.h>
 #   endif
+#   include <fcntl.h>
+#   include <unistd.h>
 #   include <sys/time.h>
 #endif
 
@@ -108,17 +110,20 @@ static int os_prng(void *rnd, size_t size)
         return RET_OK;
     }
 #endif
-
-    size_t readed;
-    FILE *fos = fopen("/dev/urandom", "rb");
-
-    if (fos == NULL) {
+    int f = open("/dev/urandom", O_RDONLY);
+    if (f == -1) {
         SET_ERROR(RET_OS_PRNG_ERROR);
     }
-
-    readed = fread(_b, 1, size, fos);
-    fclose(fos);
-    if (readed != size) {
+    do {
+        ssize_t r = read(f, _b, size);
+        if (r == -1) {
+            break;
+        }
+        _b += r;
+        size -= r;
+    } while (size);
+    close(f);
+    if (size) {
         SET_ERROR(RET_OS_PRNG_ERROR);
     }
 #endif
