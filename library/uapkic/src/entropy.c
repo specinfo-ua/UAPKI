@@ -44,6 +44,9 @@
 #       define IOCTL_KSEC_RNG_REKEY CTL_CODE(FILE_DEVICE_KSEC, 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #   endif
 #else
+#   ifdef __linux
+#       include <sys/random.h>
+#   endif
 #   include <sys/time.h>
 #endif
 
@@ -66,10 +69,11 @@ static int os_prng(void *rnd, size_t size)
     UNICODE_STRING path = RTL_CONSTANT_STRING(L"\\Device\\CNG");
     OBJECT_ATTRIBUTES oa;
     NTSTATUS status;
+    ULONG ioctl = size < 16384 ? IOCTL_KSEC_RNG : IOCTL_KSEC_RNG_REKEY;
 
     InitializeObjectAttributes(&oa, &path, 0, NULL, NULL);
     NtOpenFile(&dev, FILE_READ_DATA, &oa, &iosb, FILE_SHARE_READ, 0);
-    status = NtDeviceIoControlFile(dev, NULL, NULL, NULL, &iosb, IOCTL_KSEC_RNG, NULL, 0, rnd, (ULONG)size);
+    status = NtDeviceIoControlFile(dev, NULL, NULL, NULL, &iosb, ioctl, NULL, (ULONG)size, rnd, (ULONG)size);
     NtClose(dev);
 
     if (NT_SUCCESS(status)) {
@@ -89,8 +93,20 @@ static int os_prng(void *rnd, size_t size)
     }
 
 #else
+    uint8_t* _b = rnd;
 #ifdef __linux
-    // TODO: Implement use of getrandom syscall.
+    // Use a system call.
+    do {
+        ssize_t r = getrandom(_b, size, 0);
+        if (r == -1) {
+            break;
+        }
+        _b += r;
+        size -= r;
+    } while (size);
+    if (!size) {
+        return RET_OK;
+    }
 #endif
 
     size_t readed;
@@ -100,7 +116,7 @@ static int os_prng(void *rnd, size_t size)
         SET_ERROR(RET_OS_PRNG_ERROR);
     }
 
-    readed = fread(rnd, 1, size, fos);
+    readed = fread(_b, 1, size, fos);
     fclose(fos);
     if (readed != size) {
         SET_ERROR(RET_OS_PRNG_ERROR);
