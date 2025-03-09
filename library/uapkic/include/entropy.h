@@ -53,7 +53,6 @@ UAPKIC_EXPORT int entropy_jitter(ByteArray *buf);
 /**
  * Виконує самотестування джерел ентропії.
  *
- * @param buf масив для розміщення випадкових байт
  * @return код помилки
  */
 UAPKIC_EXPORT int entropy_self_test(void);

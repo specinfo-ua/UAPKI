@@ -174,8 +174,7 @@ int drbg_reseed(const ByteArray* additional_input)
 	if (additional_input != NULL) {
 		CHECK_NOT_NULL(seed_material = ba_join(entropy, additional_input));
 		DO(drbg_reseed_internal(seed_material));
-	}
-	else {
+	} else {
 		DO(drbg_reseed_internal(entropy));
 	}
 
@@ -196,22 +195,16 @@ static int drbg_random_internal(ByteArray* random)
 	ByteArray* tmp = NULL;
 	ByteArray* entropy = NULL;
 
-	if (outlen > (1 << 19)) {
-		return -1;
-	}
-	
 	if (drbg_Key == NULL || drbg_V == NULL || drbg_hmac_ctx == NULL) {
 		DO(drbg_init());
 	}
 
-	if ((drbg_reseed_counter > 1024) || drbg_prediction_resistance) {
-		DO(entropy_get(&entropy));
-		DO(drbg_reseed_internal(entropy));
-	}
-
-	drbg_reseed_counter++;
-
 	while (outlen > 0) {
+		if (++drbg_reseed_counter >= 2048 || drbg_prediction_resistance) {
+			DO(entropy_get(&entropy));
+			DO(drbg_reseed_internal(entropy));
+		}
+
 		DO(hmac_init(drbg_hmac_ctx, drbg_Key));
 		DO(hmac_update(drbg_hmac_ctx, drbg_V));
 		DO(hmac_final(drbg_hmac_ctx, &tmp));
@@ -232,7 +225,7 @@ cleanup:
 	ba_free_private(entropy);
 	return ret;
 }
- 
+
 int drbg_random(ByteArray* random)
 {
 	int ret;

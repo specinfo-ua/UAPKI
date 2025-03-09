@@ -75,7 +75,7 @@ UAPKIC_EXPORT ByteArray* ba_alloc_from_str(const char* str);
 UAPKIC_EXPORT ByteArray *ba_copy_with_alloc(const ByteArray *in, size_t off, size_t len);
 
 /**
- * Зберігає дані у існуючий контекст масиву байт.
+ * Зберігає дані в наявний контекст масиву байт.
  *
  * @param buf массив байт
  * @param buf_len розмір масиву байт
@@ -83,6 +83,7 @@ UAPKIC_EXPORT ByteArray *ba_copy_with_alloc(const ByteArray *in, size_t off, siz
  * @return код помилки
  */
 UAPKIC_EXPORT int ba_from_uint8(const uint8_t *buf, size_t buf_len, ByteArray *ba);
+
 UAPKIC_EXPORT int ba_from_hex(const char* str, ByteArray* ba);
 UAPKIC_EXPORT int ba_from_base64(const char* str, ByteArray* ba);
 
@@ -119,41 +120,77 @@ UAPKIC_EXPORT int ba_to_base64(const ByteArray* ba, char* str, size_t* outlen);
 UAPKIC_EXPORT int ba_to_hex(const ByteArray* ba, char* str, size_t* outlen);
 
 /**
- * Повертає розмір даних, які зберігають контекст масиву байт.
+ * Повертає розмір даних, які зберігає контекст масиву байт.
  *
  * @param ba контекст масиву байт
- * @return розмір даних, які зберігають контекст масиву байт.
+ * @return розмір даних, які зберігає контекст масиву байт.
  */
 UAPKIC_EXPORT size_t ba_get_len(const ByteArray* ba);
 
 /**
- * Повертає вказівник на дані, які зберігають контекст масиву байт.
+ * Повертає вказівник на дані, які зберігає контекст масиву байт.
  *
  * @param ba контекст масиву байт
- * @return вказівник на дані, які зберігають контекст масиву байт
+ * @return вказівник на дані, які зберігає контекст масиву байт
  */
 UAPKIC_EXPORT const uint8_t* ba_get_buf_const(const ByteArray* ba);
+
+/**
+ * Повертає вказівник на дані, які зберігає контекст масиву байт.
+ *
+ * @param ba контекст масиву байт
+ * @return вказівник на дані, які зберігає контекст масиву байт
+ */
 UAPKIC_EXPORT uint8_t* ba_get_buf(ByteArray* ba);
 
 UAPKIC_EXPORT int ba_get_byte(const ByteArray* ba, size_t index, uint8_t* value);
+
 UAPKIC_EXPORT int ba_set_byte(ByteArray* ba, size_t index, uint8_t value);
 
 UAPKIC_EXPORT int ba_copy(const ByteArray *in, size_t in_off, size_t len, ByteArray *out, size_t out_off);
 
 UAPKIC_EXPORT int ba_append(const ByteArray *in, size_t in_off, size_t len, ByteArray *out);
 
+/**
+ * Змінює розмір масиву байт.
+ *
+ * @param ba контекст масиву байт
+ * @param len новий розмір масиву байт
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_change_len(ByteArray *ba, size_t len);
 
 UAPKIC_EXPORT int ba_trim_leading_zeros_le(ByteArray* ba);
 
+/**
+ * Розташовує вміст масиву байт у зворотному порядку.
+ *
+ * @param a контекст масиву байт
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_swap(const ByteArray* a);
 
+/**
+ * Додає до першого масиву байт другий за модулем 2.
+ * Перший масив не може бути більшим за другий.
+ *
+ * @param a контекст масиву байт
+ * @param b контекст масиву байт
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_xor(const ByteArray* a, const ByteArray* b);
 
+/**
+ * Заповнює масив байт даним значенням.
+ *
+ * @param a контекст масиву байт
+ * @param value значення, яким треба заповнити масив
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_set(ByteArray* a, uint8_t value);
 
 /**
- * Створює контекст масиву байт за двома іншими.
+ * Створює контекст масиву байт шляхом зчеплення двох інших.
  *
  * @param a контекст масиву байт
  * @param b контекст масиву байт
@@ -161,8 +198,14 @@ UAPKIC_EXPORT int ba_set(ByteArray* a, uint8_t value);
  */
 UAPKIC_EXPORT ByteArray* ba_join(const ByteArray* a, const ByteArray* b);
 
+/**
+ * Порівнює два контексти масивів байт.
+ *
+ * @param a контекст масиву байт
+ * @param b контекст масиву байт
+ * @return 0, якщо дані рівні, інакше -1 або 1.
+ */
 UAPKIC_EXPORT int ba_cmp(const ByteArray* a, const ByteArray* b);
-
 
 /**
  * Звільняє контекст масиву байт.
@@ -171,6 +214,11 @@ UAPKIC_EXPORT int ba_cmp(const ByteArray* a, const ByteArray* b);
  */
 UAPKIC_EXPORT void ba_free(ByteArray *ba);
 
+/**
+ * Стирає дані й звільняє контекст масиву байт.
+ *
+ * @param ba контекст масиву байт
+ */
 UAPKIC_EXPORT void ba_free_private(ByteArray *ba);
 
 

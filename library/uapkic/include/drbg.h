@@ -34,9 +34,27 @@
 extern "C" {
 #endif
 
+/**
+ * Заповнює масив випадковими байтами, використовуючи КСГПВЧ криптографічної бібліотеки.
+ *
+ * @param random масив для розміщення випадкових байт
+ * @return код помилки
+ */
 UAPKIC_EXPORT int drbg_random(ByteArray* random);
+
+/**
+ * Додає ентропію до КСГПВЧ криптографічної бібліотеки.
+ *
+ * @param entropy масив байт, що містить ентропію
+ * @return код помилки
+ */
 UAPKIC_EXPORT int drbg_reseed(const ByteArray* entropy);
 
+/**
+ * Виконує самотестування КСГПВЧ криптографічної бібліотеки.
+ *
+ * @return код помилки
+ */
 UAPKIC_EXPORT int drbg_self_test(void);
 
 #ifdef __cplusplus
