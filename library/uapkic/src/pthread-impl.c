@@ -120,13 +120,11 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
     (void)attr;
 
     if (mutex) {
-        if (mutex->init && !mutex->destroyed) {
+        if (mutex->mutex) {
             return EBUSY;
         }
 
-        mutex->mutex = CreateMutex(NULL, FALSE, NULL);
-        mutex->destroyed = 0;
-        mutex->init = 1;
+        mutex->mutex = CreateMutexW(NULL, FALSE, NULL);
         mutex->lockedOrReferenced = 0;
     }
 
@@ -187,7 +185,8 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex)
         return EBUSY;
     }
 
-    mutex->destroyed = 1;
+    CloseHandle(mutex->mutex);
+    mutex->mutex = NULL;
 
     return 0;
 }
@@ -207,13 +206,9 @@ int pthread_attr_destroy(pthread_attr_t* attr)
 
 unsigned long pthread_id(void)
 {
-    unsigned long ret = 0;
-
 #ifdef _WIN32
-    ret = (unsigned long)GetCurrentThreadId();
+    return GetCurrentThreadId();
 #else
-    ret = (unsigned long)pthread_self();
+    return (unsigned long)pthread_self();
 #endif
-
-    return ret;
 }
