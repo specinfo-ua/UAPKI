@@ -40,7 +40,7 @@ UAPKIC_EXPORT int pbkdf1(const char* pass, const ByteArray* salt, uint8_t id, si
 UAPKIC_EXPORT int pbkdf2(const char* pass, const ByteArray* salt, size_t iterations, size_t key_len, HashAlg hash_alg, ByteArray** key);
 
 /**
- * Виконує самотестування реалізації алгоритму .
+ * Виконує самотестування реалізації алгоритму PBKDF.
  *
  * @return код помилки або RET_OK, якщо самотестування пройдено
  */

@@ -2640,7 +2640,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     CHECK_PARAM(h_out != NULL);
     CHECK_PARAM(ctx->block_len >= Nb + 1);
 
-    /*Начало виробки імітовставки*/
+    // Початок утворення імітовставки.
     tmp = ctx->block_len - Nb - 1;
     block_len = ctx->block_len;
 
@@ -2656,7 +2656,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     CALLOC_CHECKED(p_data_buf, p_data_len + block_len);
     DO(ba_to_uint8(plain_data, p_data_buf, p_data_len));
 
-    //Создание заголовка аутентификации
+    // Створення заголовка автентифікації.
     G1[tmp] = (uint8_t) p_data_len;
 
     if (ba_get_len(plain_data) > 0) {
@@ -2664,7 +2664,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     } else {
         G1[block_len - 1] = 0;
     }
-    //Код довжини імітовставки. Определен у стандарте.
+    // Код довжини імітовставки. Визначений стандартом.
     switch (ctx->mode.ccm.q) {
     case 8:
         G1[block_len - 1] |= 2 << 4;
@@ -2685,7 +2685,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
         break;
     }
     G1[block_len - 1] |= ((Nb - 1));
-    //Конец создания заголовка аутентификации
+    // Кінець створення заголовка автентифікації.
 
     G2[0] = (uint8_t) a_data_len;
 
@@ -2716,7 +2716,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     *h_out = h;
     h = NULL;
 
-    /*Конец виробки імітовставки*/
+    // Кінець утворення імітовставки.
 
 cleanup:
 
@@ -2751,7 +2751,7 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < ctx->block_len && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
@@ -2767,14 +2767,14 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Шифрування блоками по 8 байт. */
+        // Шифрування блоками по 8 байтів.
         for (; data_off + ctx->block_len <= src->len; data_off += ctx->block_len) {
             kalyna_xor(&src->buf[data_off], gamma, ctx->block_len, &out->buf[data_off]);
 
             gamma_gen(feed);
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
             offset++;
@@ -3041,17 +3041,17 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     if (padded_len != block_len) {
-        //Дополняем последний блок шифротекстом предпоследнего
+        // Доповнюємо останній блок шифротекстом передостаннього
         i += plain_size % block_len;
         memcpy(&plain_data[i], &plain_data[i - block_len], padded_len);
         i -= plain_size % block_len;
 
-        //Конвертируем а для бе машин.
+        // Конвертуємо a для Big Endian.
         DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
-        //Меняем n-1 блок и nй местами.
+        // Міняємо n-1 блок і n-й місцями.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3128,7 +3128,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
 
-        //Меняем n-1 блок и nй местами.
+        // Міняємо n-1 блок і n-й місцями.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3195,7 +3195,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3209,7 +3209,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in->len) {
-        /* Шифрування блоками по ctx->block_len байт. */
+        // Шифрування блоками по ctx->block_len байтів.
         for (; data_off + q <= in->len; data_off += q) {
             kalyna_xor(&in->buf[data_off], &gamma[offset], q, &out->buf[data_off]);
 
@@ -3218,7 +3218,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = out->buf[data_off];
@@ -3769,7 +3769,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3792,7 +3792,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = in->buf[data_off];

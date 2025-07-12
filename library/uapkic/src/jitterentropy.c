@@ -422,6 +422,7 @@ static inline void jent_notime_unsettick(JitentCtx *ec)
 {
 	ec->notime_interrupt = 1;
 	pthread_join(ec->notime_thread_id, NULL);
+	pthread_detach(ec->notime_thread_id);
 }
 
 static inline void jent_get_nstime_internal(JitentCtx *ec, uint64_t *out)

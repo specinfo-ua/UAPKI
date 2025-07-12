@@ -303,6 +303,9 @@
     <ClInclude Include="src\word-internal.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\macros-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
