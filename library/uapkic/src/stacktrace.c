@@ -47,7 +47,7 @@ typedef struct ErrorsCtx_st {
     struct ErrorsCtx_st *next;
 } ErrorsCtx;
 
-pthread_mutex_t errors_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t errors_mutex = PTHREAD_MUTEX_INITIALIZER;
 static ErrorsCtx *errors_list = NULL;
 
 static StackTraceCtx *errors_get_stacktrace_by_pid(unsigned long pid)

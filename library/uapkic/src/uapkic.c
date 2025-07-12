@@ -24,22 +24,17 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+ 
 #define FILE_MARKER "uapkic/uapkic.c"
-
-#ifdef _WIN32
-#include <Windows.h>
-#endif
 
 #include "uapkic.h"
 #include "macros-internal.h"
-#include "pthread-internal.h"
 
 uint32_t uapkic_self_test(void)
 {
 	uint32_t test_status = 0;
 
-	// ENTROPY SOURCES
+	// ENTROPY
 	if (entropy_self_test() != RET_OK) test_status |= SELF_TEST_ENTROPY_FAIL;
 
 	// DRBG-HMAC-SHA-512
@@ -60,7 +55,7 @@ uint32_t uapkic_self_test(void)
 	// HMAC
 	if (hmac_self_test() != RET_OK) test_status |= SELF_TEST_HMAC_FAIL;
 
-	// DIGITAL SIGNATURES
+	// SIGNATURES
 	if (dstu4145_self_test() != RET_OK) test_status |= SELF_TEST_DSTU4145_FAIL;
 	if (ecdsa_self_test() != RET_OK) test_status |= SELF_TEST_ECDSA_FAIL;
 	if (ecgdsa_self_test() != RET_OK) test_status |= SELF_TEST_ECGDSA_FAIL;
@@ -69,7 +64,7 @@ uint32_t uapkic_self_test(void)
 	if (sm2dsa_self_test() != RET_OK) test_status |= SELF_TEST_SM2DSA_FAIL;
 	if (rsa_self_test() != RET_OK) test_status |= SELF_TEST_RSA_FAIL;
 
-	// CIPHERS
+	// CIPHER
 	if (dstu7624_self_test() != RET_OK) test_status |= SELF_TEST_DSTU7624_FAIL;
 	if (gost28147_self_test() != RET_OK) test_status |= SELF_TEST_GOST28147_FAIL;
 	if (aes_self_test() != RET_OK) test_status |= SELF_TEST_AES_FAIL;
@@ -82,25 +77,18 @@ uint32_t uapkic_self_test(void)
 	// PBKDF
 	if (pbkdf_self_test() != RET_OK) test_status |= SELF_TEST_PBKDF_FAIL;
 
-	// DH
+	// PBKDF
 	if (ec_dh_self_test() != RET_OK) test_status |= SELF_TEST_ECDH_FAIL;
 
 	return test_status;
 }
 
-int entropy_init(void);
 int drbg_init(void);
-void entropy_free(void);
-void drbg_free(void);
 
-extern pthread_mutex_t drbg_mutex;
-extern pthread_mutex_t ec_cache_mutex;
-extern pthread_mutex_t errors_mutex;
+static int initialized = 0;
 
 int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 {
-	static int init = 0;
-
 	int ret = RET_OK;
 
 	if (version) {
@@ -111,59 +99,15 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 		*self_test_status = uapkic_self_test();
 	}
 
-	if (!init) {
-		DO(entropy_init());
+	if (initialized == 0) {
 		DO(drbg_init());
-		pthread_mutex_init(&ec_cache_mutex, NULL);
-		pthread_mutex_init(&errors_mutex, NULL);
-		init = 1;
+		initialized = 1;
 	}
 
-	if (self_test_status && *self_test_status) {
+	if (self_test_status && (*self_test_status != 0)) {
 		SET_ERROR(RET_SELF_TEST_FAIL);
 	}
 
 cleanup:
 	return ret;
 }
-
-static void uapkic_free(void) {
-	drbg_free();
-	entropy_free();
-	ec_cache_free();
-
-	pthread_mutex_destroy(&drbg_mutex);
-	pthread_mutex_destroy(&ec_cache_mutex);
-
-	stacktrace_finalize();
-	pthread_mutex_destroy(&errors_mutex);
-}
-
-#ifdef _WIN32
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
-{
-	uint32_t self_test_status;
-
-	hinstDLL;
-	lpvReserved;
-
-	switch (fdwReason) {
-	case DLL_PROCESS_ATTACH:
-		if (uapkic_init(NULL, &self_test_status) != RET_OK) {
-			if (IsDebuggerPresent()) {
-				DebugBreak();
-			}
-			return FALSE;
-		}
-		break;
-	case DLL_THREAD_ATTACH:
-		break;
-	case DLL_THREAD_DETACH:
-		break;
-	case DLL_PROCESS_DETACH:
-		uapkic_free();
-		break;
-	}
-	return TRUE;
-}
-#endif

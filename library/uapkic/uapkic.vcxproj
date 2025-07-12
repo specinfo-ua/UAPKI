@@ -112,7 +112,6 @@
     <ClInclude Include="src\ec-internal.h" />
     <ClInclude Include="src\entropy-internal.h" />
     <ClInclude Include="src\jitterentropy-internal.h" />
-    <ClInclude Include="src\macros-internal.h" />
     <ClInclude Include="src\math-ec2m-internal.h" />
     <ClInclude Include="src\math-ecp-internal.h" />
     <ClInclude Include="src\math-ec-point-internal.h" />

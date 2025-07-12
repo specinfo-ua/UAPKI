@@ -229,7 +229,7 @@ struct Sha2Ctx_st {
         SHA512_SCR(6 + i);                                              \
         SHA512_SCR(7 + i)
 
-/* init data from standard */
+/*init data from standart*/
 static const uint32_t sha224_h0[8] = {
     0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939,
     0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4
@@ -254,7 +254,7 @@ static const uint64_t sha512_h0[8] = {
     0x1f83d9abfb41bd6bULL, 0x5be0cd19137e2179ULL
 };
 
-/* Precomputed sha2 column shift and mix operations. */
+/*Precomputed sha2 shift columns and mix columns operations.*/
 static const uint32_t sha256_k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

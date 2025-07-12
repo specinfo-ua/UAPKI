@@ -1134,13 +1134,12 @@ __inline static void block_encrypt(AesCtx *ctx, uint8_t *in, uint8_t *out)
 
 __inline static void aes_xor(void *arg1, void *arg2, void *out)
 {
-    uint8_t *a1 = (uint8_t*)arg1;
-    uint8_t *a2 = (uint8_t*)arg2;
-    uint8_t *o = (uint8_t*)out;
+    uint8_t *a1 = (uint8_t*) arg1;
+    uint8_t*a2 = (uint8_t*) arg2;
+    uint8_t*o = (uint8_t*) out;
 
-    // Побайтно, бо адреси блоків у пам’яті можуть не бути
-    // кратними 4 або 8 байтам для 32- та 64-розрядних систем
-    // відповідно.
+    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
+    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
     o[0] = a1[0] ^ a2[0];
     o[1] = a1[1] ^ a2[1];
     o[2] = a1[2] ^ a2[2];

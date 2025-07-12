@@ -77,6 +77,8 @@ typedef struct {
 
 typedef struct {
     HANDLE mutex;
+    int destroyed;
+    int init;
     int lockedOrReferenced;
 } pthread_mutex_t;
 

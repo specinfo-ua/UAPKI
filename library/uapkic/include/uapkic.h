@@ -56,6 +56,7 @@
 #include "sm3.h"
 #include "gost34311.h"
 #include "dstu7564.h"
+#include "whirlpool.h"
 #include "gostr3411-2012.h"
 #include "hash.h"
 #include "hmac.h"
@@ -106,10 +107,10 @@ extern "C" {
 #endif
 
 /**
- * Ініціалізує криптографічну бібліотеку, проводить самотестування
+ * Ініціалізує ГПВП, проводить самотестування
  *
  * @param version повертає версію бібліотеки
- * @param self_test_status повертає результат самотестування, якщо NULL — самотестування не виконується
+ * @param self_test_status повертає результат самотестування, якщо NULL - самотестування не виконується
  * @return код помилки
  */
 UAPKIC_EXPORT int uapkic_init(uint32_t* version, uint32_t* self_test_status);
