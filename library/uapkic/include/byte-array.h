@@ -1,28 +1,28 @@
 /*
  * Copyright 2021 The UAPKI Project Authors.
  * Copyright 2016 PrivatBank IT <acsk@privatbank.ua>
- * 
- * Redistribution and use in source and binary forms, with or without 
- * modification, are permitted provided that the following conditions are 
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
  * met:
- * 
- * 1. Redistributions of source code must retain the above copyright 
+ *
+ * 1. Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright 
- * notice, this list of conditions and the following disclaimer in the 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED 
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -47,7 +47,7 @@ typedef struct ByteArray_st ByteArray;
  *
  * @return контекст масиву байт
  */
-UAPKIC_EXPORT ByteArray *ba_alloc(void);
+UAPKIC_EXPORT ByteArray* ba_alloc(void);
 
 /**
  * Створює контекст масиву байт.
@@ -55,55 +55,81 @@ UAPKIC_EXPORT ByteArray *ba_alloc(void);
  * @param len розмір масиву байт
  * @return контекст масиву байт
  */
-UAPKIC_EXPORT ByteArray *ba_alloc_by_len(size_t len);
+UAPKIC_EXPORT ByteArray* ba_alloc_by_len(size_t len);
 
 /**
  * Створює контекст масиву байт.
  *
- * @param buf массив байт
+ * @param buf масив байт
  * @param buf_len розмір масиву байт
  * @return контекст масиву байт
  */
-UAPKIC_EXPORT ByteArray *ba_alloc_from_uint8(const uint8_t *buf, size_t buf_len);
-
-UAPKIC_EXPORT ByteArray* ba_alloc_from_hex(const char* str);
-
-UAPKIC_EXPORT ByteArray* ba_alloc_from_base64(const char* str);
-
-UAPKIC_EXPORT ByteArray* ba_alloc_from_str(const char* str);
-
-UAPKIC_EXPORT ByteArray *ba_copy_with_alloc(const ByteArray *in, size_t off, size_t len);
+UAPKIC_EXPORT ByteArray* ba_alloc_from_uint8(const uint8_t* buf, size_t buf_len);
 
 /**
- * Зберігає дані в наявний контекст масиву байт.
+ * Створює контекст масиву байт.
  *
- * @param buf массив байт
+ * @param str дані в шістнадцятковому кодуванні
+ * @return контекст масиву байт
+ */
+UAPKIC_EXPORT ByteArray* ba_alloc_from_hex(const char* str);
+
+/**
+ * Створює контекст масиву байт.
+ *
+ * @param str дані в кодуванні Base64
+ * @return контекст масиву байт
+ */
+UAPKIC_EXPORT ByteArray* ba_alloc_from_base64(const char* str);
+
+/**
+ * Створює контекст масиву байт.
+ *
+ * @param str рядок
+ * @return контекст масиву байт
+ */
+UAPKIC_EXPORT ByteArray* ba_alloc_from_str(const char* str);
+
+UAPKIC_EXPORT ByteArray* ba_copy_with_alloc(const ByteArray* in, size_t off, size_t len);
+
+/**
+ * Записує дані в наявний контекст масиву байт.
+ *
+ * @param buf масив байт
  * @param buf_len розмір масиву байт
  * @param ba контекст масиву байт
  * @return код помилки
  */
-UAPKIC_EXPORT int ba_from_uint8(const uint8_t *buf, size_t buf_len, ByteArray *ba);
+UAPKIC_EXPORT int ba_from_uint8(const uint8_t* buf, size_t buf_len, ByteArray* ba);
 
+/**
+ * Створює контекст масиву байт.
+ *
+ * @param str дані в шістнадцятковому кодуванні
+ * @param ba контекст масиву байт
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_from_hex(const char* str, ByteArray* ba);
+
 UAPKIC_EXPORT int ba_from_base64(const char* str, ByteArray* ba);
 
 /**
- * Повертає дані, які зберігають контекст масиву байт.
+ * Повертає дані, які зберігає контекст масиву байт.
  * Не виділяє пам'ять.
  *
  * @param ba контекст масиву байт
- * @param buf массив байт
+ * @param buf масив байт
  * @param buf_len розмір масиву байт
  * @return код помилки
  */
-UAPKIC_EXPORT int ba_to_uint8(const ByteArray *ba, uint8_t *buf, size_t buf_len);
+UAPKIC_EXPORT int ba_to_uint8(const ByteArray* ba, uint8_t* buf, size_t buf_len);
 
 /**
- * Повертає дані, які зберігають контекст масиву байт.
+ * Повертає дані, які зберігає контекст масиву байт.
  * Виділяє пам'ять.
  *
  * @param ba контекст масиву байт
- * @param buf массив байт
+ * @param buf масив байт
  * @param buf_len розмір масиву байт
  * @return код помилки
  */
@@ -143,13 +169,29 @@ UAPKIC_EXPORT const uint8_t* ba_get_buf_const(const ByteArray* ba);
  */
 UAPKIC_EXPORT uint8_t* ba_get_buf(ByteArray* ba);
 
+/**
+ * Зчитує елемент масиву байт.
+ *
+ * @param ba контекст масиву байт
+ * @param index індекс елемента
+ * @param value значення елемента
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_get_byte(const ByteArray* ba, size_t index, uint8_t* value);
 
+/**
+ * Змінює елемент масиву байт.
+ *
+ * @param ba контекст масиву байт
+ * @param index індекс елемента
+ * @param value нове значення елемента
+ * @return код помилки
+ */
 UAPKIC_EXPORT int ba_set_byte(ByteArray* ba, size_t index, uint8_t value);
 
-UAPKIC_EXPORT int ba_copy(const ByteArray *in, size_t in_off, size_t len, ByteArray *out, size_t out_off);
+UAPKIC_EXPORT int ba_copy(const ByteArray* in, size_t in_off, size_t len, ByteArray* out, size_t out_off);
 
-UAPKIC_EXPORT int ba_append(const ByteArray *in, size_t in_off, size_t len, ByteArray *out);
+UAPKIC_EXPORT int ba_append(const ByteArray* in, size_t in_off, size_t len, ByteArray* out);
 
 /**
  * Змінює розмір масиву байт.
@@ -158,7 +200,7 @@ UAPKIC_EXPORT int ba_append(const ByteArray *in, size_t in_off, size_t len, Byte
  * @param len новий розмір масиву байт
  * @return код помилки
  */
-UAPKIC_EXPORT int ba_change_len(ByteArray *ba, size_t len);
+UAPKIC_EXPORT int ba_change_len(ByteArray* ba, size_t len);
 
 UAPKIC_EXPORT int ba_trim_leading_zeros_le(ByteArray* ba);
 
@@ -181,7 +223,7 @@ UAPKIC_EXPORT int ba_swap(const ByteArray* a);
 UAPKIC_EXPORT int ba_xor(const ByteArray* a, const ByteArray* b);
 
 /**
- * Заповнює масив байт даним значенням.
+ * Заповнює масив байт.
  *
  * @param a контекст масиву байт
  * @param value значення, яким треба заповнити масив
@@ -203,7 +245,7 @@ UAPKIC_EXPORT ByteArray* ba_join(const ByteArray* a, const ByteArray* b);
  *
  * @param a контекст масиву байт
  * @param b контекст масиву байт
- * @return 0, якщо дані рівні, інакше -1 або 1.
+ * @return 0, якщо масиви мають однаковий розмір і містять однакові дані, інакше -1 або 1.
  */
 UAPKIC_EXPORT int ba_cmp(const ByteArray* a, const ByteArray* b);
 
@@ -212,14 +254,14 @@ UAPKIC_EXPORT int ba_cmp(const ByteArray* a, const ByteArray* b);
  *
  * @param ba контекст масиву байт
  */
-UAPKIC_EXPORT void ba_free(ByteArray *ba);
+UAPKIC_EXPORT void ba_free(ByteArray* ba);
 
 /**
  * Стирає дані й звільняє контекст масиву байт.
  *
  * @param ba контекст масиву байт
  */
-UAPKIC_EXPORT void ba_free_private(ByteArray *ba);
+UAPKIC_EXPORT void ba_free_private(ByteArray* ba);
 
 
 #ifdef  __cplusplus

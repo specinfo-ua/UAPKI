@@ -28,6 +28,10 @@
 
 #define FILE_MARKER "uapkic/byte-utils-internal.c"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <stddef.h>
 #include <string.h>
 
@@ -275,8 +279,12 @@ void secure_zero(void *s, size_t n)
         return;
     }
 
+#ifdef _WIN32
+    SecureZeroMemory(s, n);
+#else
     volatile char *p = s;
     while (n--) {
         *p++ = 0;
     }
+#endif
 }

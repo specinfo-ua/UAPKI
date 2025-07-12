@@ -27,10 +27,7 @@
 
 #define FILE_MARKER "uapkic/entropy.c"
 
-#include <time.h>
-#include <string.h>
-
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(_WIN32_WCE)
 #   include <windows.h>
 #   include <winternl.h>
 #   include <winioctl.h>
@@ -49,7 +46,6 @@
 #   endif
 #   include <fcntl.h>
 #   include <unistd.h>
-#   include <sys/time.h>
 #endif
 
 #include "entropy.h"
@@ -60,50 +56,115 @@
 #include "byte-utils-internal.h"
 
 #ifndef __EMSCRIPTEN__
+#if defined(_WIN32) && !defined(_WIN32_WCE)
+static HANDLE rng = NULL;
+static BCRYPT_ALG_HANDLE rng2 = NULL;
+#else
+//static int rng = 0;
+#endif
+#endif
+
+int entropy_init(void) {
+    int ret = RET_OK;
+
+#ifndef __EMSCRIPTEN__
+#if defined(_WIN32) && !defined(_WIN32_WCE)
+    NTSTATUS status;
+
+    if (rng == NULL) {
+        IO_STATUS_BLOCK iosb;
+        UNICODE_STRING path = RTL_CONSTANT_STRING(L"\\Device\\CNG");
+        OBJECT_ATTRIBUTES oa;
+
+        InitializeObjectAttributes(&oa, &path, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        status = NtOpenFile(
+            &rng,
+            FILE_READ_DATA,
+            &oa,
+            &iosb,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            0
+        );
+        if (!NT_SUCCESS(status)) {
+            rng = NULL;
+        }
+    }
+
+    if (rng == NULL && rng2 == NULL) {
+        status = BCryptOpenAlgorithmProvider(&rng2, BCRYPT_RNG_ALGORITHM, NULL, 0);
+        if (!NT_SUCCESS(status)) {
+            SET_ERROR(RET_OS_PRNG_ERROR);
+        }
+    }
+#else
+    //rng = open("/dev/urandom", O_RDONLY);
+    //if (rng == -1) {
+    //    rng = 0;
+    //    SET_ERROR(RET_OS_PRNG_ERROR);
+    //}
+#endif  // _WIN32
+#endif  // __EMSCRIPTEN__
+
+cleanup:
+    return ret;
+}
+
+#ifndef __EMSCRIPTEN__
 static int os_prng(void *rnd, size_t size)
 {
     int ret = RET_OK;
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-    // Try calling SystemPrng in the CNG kernel-mode driver via an IOCTL.
-    HANDLE dev;
-    IO_STATUS_BLOCK iosb;
-    UNICODE_STRING path = RTL_CONSTANT_STRING(L"\\Device\\CNG");
-    OBJECT_ATTRIBUTES oa;
+    const ULONG max_block_size = (ULONG)1 << 31;
+
+    uint8_t* b = rnd;
     NTSTATUS status;
-    ULONG ioctl = size < 16384 ? IOCTL_KSEC_RNG : IOCTL_KSEC_RNG_REKEY;
 
-    InitializeObjectAttributes(&oa, &path, 0, NULL, NULL);
-    NtOpenFile(&dev, FILE_READ_DATA, &oa, &iosb, FILE_SHARE_READ, 0);
-    status = NtDeviceIoControlFile(dev, NULL, NULL, NULL, &iosb, ioctl, NULL, (ULONG)size, rnd, (ULONG)size);
-    NtClose(dev);
-
-    if (NT_SUCCESS(status)) {
+    // Try calling SystemPrng in the CNG kernel-mode driver via an IOCTL.
+    do {
+        IO_STATUS_BLOCK iosb;
+        ULONG block_size = (ULONG)min(size, max_block_size);
+        ULONG ioctl = block_size < 16384 ? IOCTL_KSEC_RNG : IOCTL_KSEC_RNG_REKEY;
+        status = NtDeviceIoControlFile(rng, NULL, NULL, NULL, &iosb, ioctl, NULL, block_size, b, block_size);
+        b += iosb.Information;
+        size -= iosb.Information;
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+    } while (size);
+    if (!size) {
         return RET_OK;
     }
 
     // Try using BCryptGenRandom.
-    BCRYPT_ALG_HANDLE alg;
-    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_RNG_ALGORITHM, NULL, 0);
-    if (!NT_SUCCESS(status)) {
+    if (rng2 == NULL) {
+        status = BCryptOpenAlgorithmProvider(&rng2, BCRYPT_RNG_ALGORITHM, NULL, 0);
+        if (!NT_SUCCESS(status)) {
+            SET_ERROR(RET_OS_PRNG_ERROR);
+        }
+    }
+    do {
+        ULONG block_size = (ULONG)min(size, max_block_size);
+        status = BCryptGenRandom(rng2, rnd, block_size, 0);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+        b += block_size;
+        size -= block_size;
+    } while (size);
+    if (size) {
         SET_ERROR(RET_OS_PRNG_ERROR);
     }
-    status = BCryptGenRandom(alg, rnd, (ULONG)size, 0);
-    BCryptCloseAlgorithmProvider(alg, 0);
-    if (!NT_SUCCESS(status)) {
-        SET_ERROR(RET_OS_PRNG_ERROR);
-    }
-
 #else
-    uint8_t* _b = rnd;
+    uint8_t* b = rnd;
 #ifdef __linux
     // Use a system call.
     do {
-        ssize_t r = getrandom(_b, size, 0);
+        ssize_t r = getrandom(b, size, 0);
         if (r == -1) {
             break;
         }
-        _b += r;
+        b += r;
         size -= r;
     } while (size);
     if (!size) {
@@ -115,11 +176,11 @@ static int os_prng(void *rnd, size_t size)
         SET_ERROR(RET_OS_PRNG_ERROR);
     }
     do {
-        ssize_t r = read(f, _b, size);
+        ssize_t r = read(f, b, size);
         if (r == -1) {
             break;
         }
-        _b += r;
+        b += r;
         size -= r;
     } while (size);
     close(f);
@@ -191,34 +252,16 @@ int os_prng(void* buf, size_t n)
 int entropy_get(ByteArray** entropy)
 {
     int ret = RET_OK;
-#ifndef __EMSCRIPTEN__
-    JitentCtx* jec = NULL;
-#endif
     ByteArray* out = NULL;
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(512));
     
-#ifndef __EMSCRIPTEN__
-    DO(os_prng(out->buf, 256));
-
-    if (jent_entropy_init() != 0) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
-    CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, out->buf + 256, 256) != 0) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
-#else
     DO(os_prng(out->buf, 512));
-#endif
 
     *entropy = out;
     out = NULL;
 
 cleanup:
-#ifndef __EMSCRIPTEN__
-    jent_entropy_collector_free(jec);
-#endif
     ba_free_private(out);
     return ret;
 }
@@ -234,11 +277,11 @@ int entropy_jitter(ByteArray* random)
     int ret = RET_OK;
     JitentCtx* jec = NULL;
 
-    if (jent_entropy_init() != 0) {
+    if (jent_entropy_init() != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, random->buf, random->len) != 0) {
+    if (jent_read_entropy(jec, random->buf, random->len) != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 
@@ -259,14 +302,15 @@ int entropy_self_test(void)
 #endif
     uint8_t buf[256];
 
+    DO(entropy_init());
     DO(os_prng(buf, sizeof(buf)));
 
 #ifndef __EMSCRIPTEN__
-    if (jent_entropy_init() != 0) {
+    if (jent_entropy_init() != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, buf, sizeof(buf)) != 0) {
+    if (jent_read_entropy(jec, buf, sizeof(buf)) != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 #endif
@@ -275,4 +319,22 @@ cleanup:
     jent_entropy_collector_free(jec);
 #endif
     return ret;
+}
+
+void entropy_free(void) {
+#ifndef __EMSCRIPTEN__
+#if defined(_WIN32) && !defined(_WIN32_WCE)
+    if (rng != NULL) {
+        CloseHandle(rng);
+        rng = NULL;
+    }
+    if (rng2 != NULL) {
+        BCryptCloseAlgorithmProvider(rng2, 0);
+        rng2 = NULL;
+    }
+#else
+    //close(rng);
+    //rng = 0;
+#endif
+#endif
 }

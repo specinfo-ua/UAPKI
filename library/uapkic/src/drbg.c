@@ -41,7 +41,9 @@ static ByteArray *drbg_V = NULL;
 static int drbg_reseed_counter = 0;
 static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
-static pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static const int max_number_of_bits_per_request = 1 << 19;
 
 static const uint8_t _separator0 = 0x00;
 static const uint8_t _separator1 = 0x01;
@@ -58,6 +60,10 @@ static void drbg_free_internal(void)
 	ba_free(drbg_V);
 	drbg_V = NULL;
 	drbg_reseed_counter = 0;
+}
+
+void drbg_free(void) {
+	drbg_free_internal();
 }
 
 static int drbg_update(const ByteArray *provided_data)
@@ -137,8 +143,8 @@ int drbg_init(void)
 	ByteArray *entropy = NULL;
 
 	DO(entropy_get(&entropy));
-
 	DO(drbg_init_internal(entropy));
+	pthread_mutex_init(&drbg_mutex, NULL);
 
 cleanup:
 	ba_free_private(entropy);
@@ -178,8 +184,6 @@ int drbg_reseed(const ByteArray* additional_input)
 		DO(drbg_reseed_internal(entropy));
 	}
 
-	DO(drbg_reseed_internal(additional_input));
-
 cleanup:
 	pthread_mutex_unlock(&drbg_mutex);
 	ba_free_private(seed_material);
@@ -187,6 +191,8 @@ cleanup:
 	return ret;
 }
 
+// The DRBG is based on design recommendations from this document:
+// http://dx.doi.org/10.6028/NIST.SP.800-90Ar1
 static int drbg_random_internal(ByteArray* random)
 {
 	int ret = RET_OK;
@@ -199,8 +205,8 @@ static int drbg_random_internal(ByteArray* random)
 		DO(drbg_init());
 	}
 
-	while (outlen > 0) {
-		if (++drbg_reseed_counter >= 2048 || drbg_prediction_resistance) {
+	while (outlen) {
+		if (++drbg_reseed_counter >= 16384 || drbg_prediction_resistance) {
 			DO(entropy_get(&entropy));
 			DO(drbg_reseed_internal(entropy));
 		}
@@ -228,6 +234,10 @@ cleanup:
 
 int drbg_random(ByteArray* random)
 {
+	if (random->len > max_number_of_bits_per_request >> 3) {
+		return entropy_std(random);
+	}
+
 	int ret;
 	pthread_mutex_lock(&drbg_mutex);
 	ret = drbg_random_internal(random);
@@ -242,7 +252,7 @@ int drbg_self_test(void)
 		// EntropyInput
 		0x48, 0xC1, 0x21, 0xB1, 0x87, 0x33, 0xAF, 0x15, 0xC2, 0x7E, 0x1D, 0xD9, 0xBA, 0x66, 0xA9, 0xA8,
 		0x1A, 0x55, 0x79, 0xCD, 0xBA, 0x0F, 0x5B, 0x65, 0x7E, 0xC5, 0x3C, 0x2B, 0x9E, 0x90, 0xBB, 0xF6,
-		// Nonce 
+		// Nonce
 		0xBB, 0xB7, 0xC7, 0x77, 0x42, 0x80, 0x68, 0xFA, 0xD9, 0x97, 0x08, 0x91, 0xF8, 0x79, 0xB1, 0xAF };
 
 	static const uint8_t test_drbg_reseed_entropy[] = {
