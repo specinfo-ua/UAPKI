@@ -194,7 +194,7 @@ int ba_cmp(const ByteArray *a, const ByteArray *b)
 {
     if (a && b) {
         if (a->len != b->len) {
-            return (int)(a->len - b->len);
+            return a->len > b->len ? 1 : -1;
         }
 
         return memcmp(a->buf, b->buf, a->len);

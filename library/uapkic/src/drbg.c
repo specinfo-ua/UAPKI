@@ -43,6 +43,7 @@ static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
 pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Up to 64 KiB as per NIST.
 static const int max_number_of_bits_per_request = 1 << 19;
 
 static const uint8_t _separator0 = 0x00;
@@ -55,9 +56,9 @@ static void drbg_free_internal(void)
 {
 	hmac_free(drbg_hmac_ctx);
 	drbg_hmac_ctx = NULL;
-	ba_free(drbg_Key);
+	ba_free_private(drbg_Key);
 	drbg_Key = NULL;
-	ba_free(drbg_V);
+	ba_free_private(drbg_V);
 	drbg_V = NULL;
 	drbg_reseed_counter = 0;
 }
@@ -70,7 +71,7 @@ static int drbg_update(const ByteArray *provided_data)
 {
 	int ret = RET_OK;
 	ByteArray* tmp = NULL;
-	
+
 	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
 	DO(hmac_update(drbg_hmac_ctx, drbg_V));
 	DO(hmac_update(drbg_hmac_ctx, &separator0));
@@ -191,7 +192,7 @@ cleanup:
 	return ret;
 }
 
-// The DRBG is based on design recommendations from this document:
+// The DRBG is based on design recommendations from NIST SP 800-90A Rev. 1.
 // http://dx.doi.org/10.6028/NIST.SP.800-90Ar1
 static int drbg_random_internal(ByteArray* random)
 {
@@ -234,12 +235,18 @@ cleanup:
 
 int drbg_random(ByteArray* random)
 {
+	int ret;
+
 	if (random->len > max_number_of_bits_per_request >> 3) {
+		// Cheat by accessing the operating system’s CSPRNG instead.
 		return entropy_std(random);
 	}
 
-	int ret;
-	pthread_mutex_lock(&drbg_mutex);
+	if (pthread_mutex_trylock(&drbg_mutex) == EBUSY) {
+		// Don’t bother waiting.
+		return entropy_std(random);
+	}
+
 	ret = drbg_random_internal(random);
 	pthread_mutex_unlock(&drbg_mutex);
 	return ret;

@@ -133,8 +133,6 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
     if (!mutex) {
         return EINVAL;
     }
@@ -147,13 +145,37 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
         return EINVAL;
     }
 
-    ret = WaitForSingleObject(mutex->mutex, INFINITE);
-
-    if (ret != WAIT_FAILED) {
+    if (WaitForSingleObject(mutex->mutex, INFINITE) != WAIT_FAILED) {
         mutex->lockedOrReferenced = 1;
         return 0;
     } else {
         return EINVAL;
+    }
+}
+
+int pthread_mutex_trylock(pthread_mutex_t* mutex)
+{
+    if (!mutex) {
+        return EINVAL;
+    }
+
+    if (!mutex->mutex) {
+        pthread_mutex_init(mutex, NULL);
+    }
+
+    if (!mutex->mutex) {
+        return EINVAL;
+    }
+
+    switch (WaitForSingleObject(mutex->mutex, 0)) {
+    case WAIT_TIMEOUT:
+        return EBUSY;
+    case WAIT_FAILED:
+        return EINVAL;
+    case WAIT_OBJECT_0:
+    default:
+        mutex->lockedOrReferenced = 1;
+        return 0;
     }
 }
 

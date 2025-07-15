@@ -52,7 +52,7 @@
 #define KALINA_512_BLOCK_LEN 64
 #define SBOX_LEN 1024
 
-#define GALUA_MUL(i, j, k, shift) (uint64_t)((uint64_t)multiply_galua(mds[j * ROWS + k], s_blocks[(k % 4) * MAX_NUM_IN_BYTE + i]) << ((uint64_t)shift))
+#define GALOIS_MUL(i, j, k, shift) (uint64_t)((uint64_t)multiply_galois(mds[j * ROWS + k], s_blocks[(k % 4) * MAX_NUM_IN_BYTE + i]) << ((uint64_t)shift))
 
 typedef enum {
     DSTU7624_MODE_ECB,
@@ -290,28 +290,17 @@ struct Dstu7624Ctx_st {
 static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 {
     switch (size) {
-    case 2:
-        out[0] += in[0];
-        out[1] += in[1];
-        break;
-    case 4:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
-        break;
     case 8:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
         out[4] += in[4];
         out[5] += in[5];
         out[6] += in[6];
         out[7] += in[7];
-        break;
-    default:
-        break;
+    case 4:
+        out[2] += in[2];
+        out[3] += in[3];
+    case 2:
+        out[0] += in[0];
+        out[1] += in[1];
     }
 }
 
@@ -319,14 +308,14 @@ static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
 {
     uint8_t *a8, *b8, *o8;
-    size_t i;
 
-    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
-    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
-    a8 = (uint8_t *) arg1;
-    b8 = (uint8_t *) arg2;
-    o8 = (uint8_t *) out;
-    for (i = 0; i < len; i++) {
+    // Побайтно, бо адреси блоків у пам’яті можуть не бути
+    // кратними 4 або 8 байтам для 32- та 64-розрядних систем
+    // відповідно.
+    a8 = (uint8_t*)arg1;
+    b8 = (uint8_t*)arg2;
+    o8 = (uint8_t*)out;
+    for (int i = 0; i < len; i++) {
         o8[i] = a8[i] ^ b8[i];
     }
 }
@@ -1329,7 +1318,7 @@ static const uint8_t inv_s_blocks_default[SBOX_LEN] = {
 };
 
 /*Russian peasant multiplication algorithm*/
-static uint8_t multiply_galua(uint8_t x, uint8_t y)
+static uint8_t multiply_galois(uint8_t x, uint8_t y)
 {
     int i;
     uint8_t r = 0;
@@ -1365,8 +1354,8 @@ static void p_sub_row_col(const uint8_t * s_blocks, uint64_t p_boxrowcol[ROWS][M
 
     for (k = 0; k < ROWS; k++) {
         for (i = 0; i < MAX_NUM_IN_BYTE; i++) {
-            p_boxrowcol[k][i] = GALUA_MUL(i, 0, k, 0) ^ GALUA_MUL(i, 1, k, 8) ^ GALUA_MUL(i, 2, k, 16) ^ GALUA_MUL(i, 3, k, 24) ^
-                    GALUA_MUL(i, 4, k, 32) ^ GALUA_MUL(i, 5, k, 40) ^ GALUA_MUL(i, 6, k, 48) ^ GALUA_MUL(i, 7, k, 56);
+            p_boxrowcol[k][i] = GALOIS_MUL(i, 0, k, 0) ^ GALOIS_MUL(i, 1, k, 8) ^ GALOIS_MUL(i, 2, k, 16) ^ GALOIS_MUL(i, 3, k, 24) ^
+                    GALOIS_MUL(i, 4, k, 32) ^ GALOIS_MUL(i, 5, k, 40) ^ GALOIS_MUL(i, 6, k, 48) ^ GALOIS_MUL(i, 7, k, 56);
         }
     }
 }

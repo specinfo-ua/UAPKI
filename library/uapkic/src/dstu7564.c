@@ -511,9 +511,9 @@ static __inline void Q(Dstu7564Ctx *ctx, uint8_t *state_)
 
 static __inline void dstu7564_xor(void *arg1, void *arg2, void *out, size_t columns)
 {
-    uint64_t *a1 = (uint64_t *) arg1;
-    uint64_t *a2 = (uint64_t *) arg2;
-    uint64_t *o = (uint64_t *) out;
+    uint64_t *a1 = (uint64_t*)arg1;
+    uint64_t *a2 = (uint64_t*)arg2;
+    uint64_t *o = (uint64_t*)out;
 
     o[0] = a1[0] ^ a2[0];
     o[1] = a1[1] ^ a2[1];

@@ -28,11 +28,11 @@
 #define FILE_MARKER "uapkic/entropy.c"
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-#   include <windows.h>
+#   include <Windows.h>
 #   include <winternl.h>
 #   include <winioctl.h>
-#   pragma comment(lib, "NTDLL.lib")
-#   pragma comment(lib, "BCrypt.lib")
+#   pragma comment(lib, "ntdll.lib")
+#   pragma comment(lib, "bcrypt.lib")
 #   define RTL_CONSTANT_STRING(s) { sizeof(s) - sizeof((s)[0]), sizeof(s), s }
 #   ifndef IOCTL_KSEC_RNG   // ntddksec.h, 0x390004
 #       define IOCTL_KSEC_RNG   CTL_CODE(FILE_DEVICE_KSEC, 1, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -54,6 +54,7 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 #include "byte-utils-internal.h"
+#include "cpu-features-internal.h"
 
 #ifndef __EMSCRIPTEN__
 #if defined(_WIN32) && !defined(_WIN32_WCE)
@@ -253,10 +254,12 @@ int entropy_get(ByteArray** entropy)
 {
     int ret = RET_OK;
     ByteArray* out = NULL;
+    size_t hwrng_out;
 
-    CHECK_NOT_NULL(out = ba_alloc_by_len(512));
-    
-    DO(os_prng(out->buf, 512));
+    CHECK_NOT_NULL(out = ba_alloc_by_len(64));
+
+    hwrng_out = hw_rng(out->buf, 32);
+    DO(os_prng(out->buf + hwrng_out, 64 - hwrng_out));
 
     *entropy = out;
     out = NULL;

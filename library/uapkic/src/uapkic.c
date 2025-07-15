@@ -35,7 +35,7 @@
 #include "macros-internal.h"
 #include "pthread-internal.h"
 
-uint32_t uapkic_self_test(void)
+static uint32_t uapkic_self_test(void)
 {
 	uint32_t test_status = 0;
 
@@ -88,6 +88,7 @@ uint32_t uapkic_self_test(void)
 	return test_status;
 }
 
+void cpu_features_init(void);
 int entropy_init(void);
 int drbg_init(void);
 void entropy_free(void);
@@ -99,6 +100,7 @@ extern pthread_mutex_t errors_mutex;
 
 int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 {
+	static int cpu_init = 0;
 	static int init = 0;
 
 	int ret = RET_OK;
@@ -107,12 +109,18 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 		*version = UAPKIC_VERSION;
 	}
 
+	if (!cpu_init) {
+		cpu_features_init();
+		cpu_init = 1;
+	}
+
 	if (self_test_status) {
 		*self_test_status = uapkic_self_test();
 	}
 
 	if (!init) {
 		DO(entropy_init());
+		pthread_mutex_init(&drbg_mutex, NULL);
 		DO(drbg_init());
 		pthread_mutex_init(&ec_cache_mutex, NULL);
 		pthread_mutex_init(&errors_mutex, NULL);
@@ -142,19 +150,11 @@ static void uapkic_free(void) {
 #ifdef _WIN32
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	uint32_t self_test_status;
-
 	hinstDLL;
 	lpvReserved;
 
 	switch (fdwReason) {
 	case DLL_PROCESS_ATTACH:
-		if (uapkic_init(NULL, &self_test_status) != RET_OK) {
-			if (IsDebuggerPresent()) {
-				DebugBreak();
-			}
-			return FALSE;
-		}
 		break;
 	case DLL_THREAD_ATTACH:
 		break;
