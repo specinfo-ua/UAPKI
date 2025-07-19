@@ -44,12 +44,12 @@
 #define MAX_NUM_IN_BYTE 256
 #define MAX_BLOCK_LEN 64
 #define BITS_IN_BYTE 8
-#define KALINA_128_KEY_LEN 16
-#define KALINA_256_KEY_LEN 32
-#define KALINA_512_KEY_LEN 64
-#define KALINA_128_BLOCK_LEN 16
-#define KALINA_256_BLOCK_LEN 32
-#define KALINA_512_BLOCK_LEN 64
+#define KALYNA_128_KEY_LEN 16
+#define KALYNA_256_KEY_LEN 32
+#define KALYNA_512_KEY_LEN 64
+#define KALYNA_128_BLOCK_LEN 16
+#define KALYNA_256_BLOCK_LEN 32
+#define KALYNA_512_BLOCK_LEN 64
 #define SBOX_LEN 1024
 
 #define GALOIS_MUL(i, j, k, shift) (uint64_t)((uint64_t)multiply_galois(mds[j * ROWS + k], s_blocks[(k % 4) * MAX_NUM_IN_BYTE + i]) << ((uint64_t)shift))
@@ -1779,7 +1779,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
 {
     size_t block_len = ctx->block_len;
 
-    if (block_len == KALINA_128_BLOCK_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         out[0] = ((uint64_t) (ctx->inv_s_blocks[0 * 256 + (s0 & 255)]) ^
@@ -1798,8 +1798,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
                 (uint64_t) (ctx->inv_s_blocks[1 * 256 + ((s0 >> 40) & 255)]) << 40 ^
                 (uint64_t) (ctx->inv_s_blocks[2 * 256 + ((s0 >> 48) & 255)]) << 48 ^
                 (uint64_t) (ctx->inv_s_blocks[3 * 256 + ((s0 >> 56) & 255)]) << 56) - rkey[1];
-    }
-    if (block_len == KALINA_256_BLOCK_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         uint64_t s2 = state[2];
@@ -1836,8 +1835,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
                 (uint64_t) (ctx->inv_s_blocks[1 * 256 + ((s1 >> 40) & 255)]) << 40 ^
                 (uint64_t) (ctx->inv_s_blocks[2 * 256 + ((s2 >> 48) & 255)]) << 48 ^
                 (uint64_t) (ctx->inv_s_blocks[3 * 256 + ((s2 >> 56) & 255)]) << 56) - rkey[3];
-    }
-    if (block_len == KALINA_512_BLOCK_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         uint64_t s2 = state[2];
@@ -1918,7 +1916,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
     size_t block_len = ctx->block_len;
     uint8_t *s_blocks = ctx->s_blocks;
 
-    if (block_len == KALINA_128_BLOCK_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -1935,8 +1933,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
                 ctx->p_inv_boxrowcol[5][s_blocks[1 * 256 + ((state[1] >> 40) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[6][s_blocks[2 * 256 + ((state[1] >> 48) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[7][s_blocks[3 * 256 + ((state[1] >> 56) & 0xFF)]];
-    }
-    if (block_len == KALINA_256_BLOCK_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -1969,8 +1966,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
                 ctx->p_inv_boxrowcol[5][s_blocks[1 * 256 + ((state[3] >> 40) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[6][s_blocks[2 * 256 + ((state[3] >> 48) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[7][s_blocks[3 * 256 + ((state[3] >> 56) & 0xFF)]];
-    }
-    if (block_len == KALINA_512_BLOCK_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -2043,7 +2039,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
     size_t block_len = ctx->block_len;
     size_t key_len  = ctx->key_len;
 
-    if (block_len == KALINA_128_BLOCK_LEN && key_len == KALINA_128_KEY_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN && key_len == KALYNA_128_KEY_LEN) {
         invert_state(&rkey[18], ctx);
         invert_state(&rkey[16], ctx);
         invert_state(&rkey[14], ctx);
@@ -2053,8 +2049,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[6], ctx);
         invert_state(&rkey[4], ctx);
         invert_state(&rkey[2], ctx);
-    }
-    if (block_len == KALINA_128_BLOCK_LEN && key_len == KALINA_256_KEY_LEN) {
+    } else if (block_len == KALYNA_128_BLOCK_LEN && key_len == KALYNA_256_KEY_LEN) {
         invert_state(&rkey[26], ctx);
         invert_state(&rkey[24], ctx);
         invert_state(&rkey[22], ctx);
@@ -2068,8 +2063,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[6], ctx);
         invert_state(&rkey[4], ctx);
         invert_state(&rkey[2], ctx);
-    }
-    if (block_len == KALINA_256_BLOCK_LEN && key_len == KALINA_256_KEY_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN && key_len == KALYNA_256_KEY_LEN) {
         invert_state(&rkey[52], ctx);
         invert_state(&rkey[48], ctx);
         invert_state(&rkey[44], ctx);
@@ -2083,8 +2077,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[12], ctx);
         invert_state(&rkey[8], ctx);
         invert_state(&rkey[4], ctx);
-    }
-    if (block_len == KALINA_256_BLOCK_LEN && key_len == KALINA_512_KEY_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN && key_len == KALYNA_512_KEY_LEN) {
         invert_state(&rkey[68], ctx);
         invert_state(&rkey[64], ctx);
         invert_state(&rkey[60], ctx);
@@ -2102,8 +2095,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[12], ctx);
         invert_state(&rkey[8], ctx);
         invert_state(&rkey[4], ctx);
-    }
-    if (block_len == KALINA_512_BLOCK_LEN && key_len == KALINA_512_KEY_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN && key_len == KALYNA_512_KEY_LEN) {
         invert_state(&rkey[136], ctx);
         invert_state(&rkey[128], ctx);
         invert_state(&rkey[120], ctx);
@@ -2439,7 +2431,7 @@ static int p_key_shift(const uint8_t *key, Dstu7624Ctx *ctx, uint64_t **key_shif
                     shift = 60 * i;
                     key_shift[(j + shift) % key_len] = key[j];
                 } else {
-                    if (key_len == KALINA_256_KEY_LEN) {
+                    if (key_len == KALYNA_256_KEY_LEN) {
                         shift = 48 - ((i >> 1) << 3);
                     } else {
                         shift = 96 - ((i >> 1) << 3);
@@ -2473,8 +2465,8 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
-    CHECK_PARAM(block_size == KALINA_128_BLOCK_LEN || block_size == KALINA_256_BLOCK_LEN || 
-        block_size == KALINA_512_BLOCK_LEN);
+    CHECK_PARAM(block_size == KALYNA_128_BLOCK_LEN || block_size == KALYNA_256_BLOCK_LEN || 
+        block_size == KALYNA_512_BLOCK_LEN);
 
     gf2m_free(ctx->mode.gmac.gf2m_ctx);
     ctx->mode.gmac.gf2m_ctx = NULL;
@@ -2482,38 +2474,38 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
     key_buf = key->buf;
     key_buf_len = key->len;
 
-    CHECK_PARAM(key_buf_len == KALINA_128_KEY_LEN || key_buf_len == KALINA_256_KEY_LEN
-            || key_buf_len == KALINA_512_KEY_LEN);
+    CHECK_PARAM(key_buf_len == KALYNA_128_KEY_LEN || key_buf_len == KALYNA_256_KEY_LEN
+            || key_buf_len == KALYNA_512_KEY_LEN);
 
     MALLOC_CHECKED(p_hrkey, key_buf_len);
     memset(p_hrkey, 0, key_buf_len);
 
     /*Ініціалізація початкових даних ДСТУ7624 у відповідності з розміром блока та ключа.*/
-    if (key_buf_len == KALINA_128_KEY_LEN && block_size == KALINA_128_BLOCK_LEN) {
+    if (key_buf_len == KALYNA_128_KEY_LEN && block_size == KALYNA_128_BLOCK_LEN) {
         p_hrkey[0] = 0x05;
         ctx->subrowcol = subrowcol128; // операція швидкого обчислення s_blocks, srow, mcol
         ctx->basic_transform = basic_transform_128; // операція базового перетворення
         ctx->subrowcol_dec = subrowcol128_dec; // операція зворотнього базового перетворення
         ctx->rounds = 10; // кількість раундів для генерування раундового ключа
-    } else if (key_buf_len == KALINA_256_KEY_LEN && block_size == KALINA_128_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_256_KEY_LEN && block_size == KALYNA_128_BLOCK_LEN) {
         p_hrkey[0] = 0x07;
         ctx->subrowcol = subrowcol128;
         ctx->basic_transform = basic_transform_128_256;
         ctx->subrowcol_dec = subrowcol128_256_dec;
         ctx->rounds = 14;
-    } else if (key_buf_len == KALINA_256_KEY_LEN && block_size == KALINA_256_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_256_KEY_LEN && block_size == KALYNA_256_BLOCK_LEN) {
         p_hrkey[0] = 0x09;
         ctx->subrowcol = subrowcol256;
         ctx->basic_transform = basic_transform_256;
         ctx->subrowcol_dec = subrowcol256_dec;
         ctx->rounds = 14;
-    } else if (key_buf_len == KALINA_512_KEY_LEN && block_size == KALINA_256_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_512_KEY_LEN && block_size == KALYNA_256_BLOCK_LEN) {
         p_hrkey[0] = 0x0D;
         ctx->subrowcol = subrowcol256;
         ctx->basic_transform = basic_transform_256_512;
         ctx->subrowcol_dec = subrowcol256_512_dec;
         ctx->rounds = 18;
-    } else if (key_buf_len == KALINA_512_KEY_LEN && block_size == KALINA_512_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_512_KEY_LEN && block_size == KALYNA_512_BLOCK_LEN) {
         p_hrkey[0] = 0x11;
         ctx->subrowcol = subrowcol512;
         ctx->basic_transform = basic_transform_512;

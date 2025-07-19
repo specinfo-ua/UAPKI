@@ -275,16 +275,16 @@ cleanup:
 
 void secure_zero(void *s, size_t n)
 {
-    if (s == NULL) {
+    if (s == NULL || !n) {
         return;
     }
 
 #ifdef _WIN32
     SecureZeroMemory(s, n);
 #else
-    volatile char *p = s;
-    while (n--) {
+    volatile uint8_t *p = s;
+    do {
         *p++ = 0;
-    }
+    } while (--n);
 #endif
 }

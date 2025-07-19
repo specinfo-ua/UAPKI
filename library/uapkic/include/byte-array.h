@@ -115,7 +115,7 @@ UAPKIC_EXPORT int ba_from_base64(const char* str, ByteArray* ba);
 
 /**
  * Повертає дані, які зберігає контекст масиву байтів.
- * Не виділяє пам'ять.
+ * Не виділяє пам’ять.
  *
  * @param ba контекст масиву байтів
  * @param buf масив байтів
@@ -126,7 +126,7 @@ UAPKIC_EXPORT int ba_to_uint8(const ByteArray* ba, uint8_t* buf, size_t buf_len)
 
 /**
  * Повертає дані, які зберігає контекст масиву байтів.
- * Виділяє пам'ять.
+ * Виділяє пам’ять.
  *
  * @param ba контекст масиву байтів
  * @param buf масив байтів

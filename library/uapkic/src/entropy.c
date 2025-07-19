@@ -116,15 +116,13 @@ static int os_prng(void *rnd, size_t size)
     int ret = RET_OK;
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-    const ULONG max_block_size = (ULONG)1 << 31;
-
     uint8_t* b = rnd;
     NTSTATUS status;
 
     // Try calling SystemPrng in the CNG kernel-mode driver via an IOCTL.
     do {
         IO_STATUS_BLOCK iosb;
-        ULONG block_size = (ULONG)min(size, max_block_size);
+        ULONG block_size = (ULONG)min(size, ULONG_MAX);
         ULONG ioctl = block_size < 16384 ? IOCTL_KSEC_RNG : IOCTL_KSEC_RNG_REKEY;
         status = NtDeviceIoControlFile(rng, NULL, NULL, NULL, &iosb, ioctl, NULL, block_size, b, block_size);
         b += iosb.Information;
@@ -145,7 +143,7 @@ static int os_prng(void *rnd, size_t size)
         }
     }
     do {
-        ULONG block_size = (ULONG)min(size, max_block_size);
+        ULONG block_size = (ULONG)min(size, ULONG_MAX);
         status = BCryptGenRandom(rng2, rnd, block_size, 0);
         if (!NT_SUCCESS(status)) {
             break;

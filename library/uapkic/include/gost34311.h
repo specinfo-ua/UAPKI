@@ -45,7 +45,7 @@ typedef struct Gost34311Ctx_st Gost34311Ctx;
  * Створює контекст ГОСТ 34.311 зі стандартним sbox.
  *
  * @param sbox_id ідентифікатор стандартной таблиці замін
- * @param sync синхропосилка (опціональний, якщо NULL синхропосилка 0)
+ * @param sync ініціалізаційний вектор (необов’язково; якщо NULL, то ініціалізаційний вектор становить 0)
  * @return контекст ГОСТ 34.311
  */
 UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteArray *sync);
@@ -54,7 +54,7 @@ UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteA
  * Створює контекст ГОСТ 34.311 з користувацьким sbox.
  *
  * @param sbox користувацький sbox
- * @param sync синхропосилка
+ * @param sync ініціалізаційний вектор
  * @return контекст ГОСТ 34.311
  */
 UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc_user_sbox(const ByteArray *sbox, const ByteArray *sync);

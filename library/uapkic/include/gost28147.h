@@ -123,7 +123,7 @@ UAPKIC_EXPORT int gost28147_init_ecb(Gost28147Ctx *ctx, const ByteArray *key);
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -133,7 +133,7 @@ UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, co
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_cfb(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);

@@ -42,7 +42,7 @@ static uint32_t uapkic_self_test(void)
 	// ENTROPY SOURCES
 	if (entropy_self_test() != RET_OK) test_status |= SELF_TEST_ENTROPY_FAIL;
 
-	// DRBG-HMAC-SHA-512
+	// NIST SP 800-90A SHA-512 HMAC_DRBG
 	if (drbg_self_test() != RET_OK) test_status |= SELF_TEST_DRBG_FAIL;
 
 	// HASHES
@@ -154,14 +154,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	lpvReserved;
 
 	switch (fdwReason) {
-	case DLL_PROCESS_ATTACH:
-		break;
-	case DLL_THREAD_ATTACH:
-		break;
-	case DLL_THREAD_DETACH:
-		break;
 	case DLL_PROCESS_DETACH:
 		uapkic_free();
+		break;
+	case DLL_PROCESS_ATTACH:
+	case DLL_THREAD_ATTACH:
+	case DLL_THREAD_DETACH:
+	default:
 		break;
 	}
 	return TRUE;

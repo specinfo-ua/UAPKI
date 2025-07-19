@@ -92,26 +92,24 @@ static int drbg_update(const ByteArray *provided_data)
 	drbg_V = tmp;
 	tmp = NULL;
 
-	if (provided_data == NULL) {
-		goto cleanup;
+	if (provided_data != NULL) {
+		DO(hmac_init(drbg_hmac_ctx, drbg_Key));
+		DO(hmac_update(drbg_hmac_ctx, drbg_V));
+		DO(hmac_update(drbg_hmac_ctx, &separator1));
+		DO(hmac_update(drbg_hmac_ctx, provided_data));
+
+		DO(hmac_final(drbg_hmac_ctx, &tmp));
+		ba_free_private(drbg_Key);
+		drbg_Key = tmp;
+		tmp = NULL;
+
+		DO(hmac_init(drbg_hmac_ctx, drbg_Key));
+		DO(hmac_update(drbg_hmac_ctx, drbg_V));
+		DO(hmac_final(drbg_hmac_ctx, &tmp));
+		ba_free_private(drbg_V);
+		drbg_V = tmp;
+		tmp = NULL;
 	}
-
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_update(drbg_hmac_ctx, &separator1));
-	DO(hmac_update(drbg_hmac_ctx, provided_data));
-
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_Key);
-	drbg_Key = tmp;
-	tmp = NULL;
-
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_V);
-	drbg_V = tmp;
-	tmp = NULL;
 
 cleanup:
 	return ret;

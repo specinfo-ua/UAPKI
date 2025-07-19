@@ -29,6 +29,14 @@
 
 #include <inttypes.h>
 
+#if !defined(_M_IX86) && defined(__i386__)
+#define _M_IX86
+#endif
+
+#if !defined(_M_AMD64) && defined(__x86_64__)
+#define _M_AMD64
+#endif
+
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
 #include <intrin.h>
 #endif
@@ -75,22 +83,24 @@ void cpu_features_init(void) {
 #endif
 }
 
-#if defined(_MSC_VER) && (defined(_M_AMD64) || defined(_M_IX86))
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
 static bool rdrand(rdrand_out_t* n) {
 	if (rdseed_supported) {
-		for (int i = 0; i < 10; i++) {
+		for (int i = 10; i; i--) {
 			if (RDSEED_FUNC(n)) {
 				return true;
 			}
 		}
+		rdseed_supported = false;
 	}
 
 	if (rdrand_supported) {
-		for (int i = 0; i < 10; i++) {
+		for (int i = 10; i; i--) {
 			if (RDRAND_FUNC(n)) {
 				return true;
 			}
 		}
+		rdrand_supported = false;
 	}
 
 	return false;
@@ -117,7 +127,7 @@ size_t hw_rng(void* buffer, size_t size) {
 			goto cleanup;
 		}
 		int head_len = RDRAND_SIZE - head_align;
-		memcpy((void*)buffer_address, (uint8_t*)rdrand_out.a + head_align, head_len);
+		memcpy((void*)buffer_address, rdrand_out.a + head_align, head_len);
 		buffer_address += head_len;
 		bytes_written += head_len;
 		size -= head_len;
@@ -134,8 +144,6 @@ size_t hw_rng(void* buffer, size_t size) {
 	}
 
 	if (size) {
-		// If the "tail" of the buffer is longer than the "head",
-		// run RDRAND/RDSEED once more.
 		if (head_align < size && !rdrand(&rdrand_out.n)) {
 			goto cleanup;
 		}
@@ -148,6 +156,10 @@ cleanup:
 	return bytes_written;
 #else
 	// Not implemented.
+
+	buffer;
+	size;
+
 	return 0;
 #endif
 }

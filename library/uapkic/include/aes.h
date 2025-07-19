@@ -73,7 +73,7 @@ UAPKIC_EXPORT int aes_init_ecb(AesCtx *ctx, const ByteArray *key);
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_cbc(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -83,7 +83,7 @@ UAPKIC_EXPORT int aes_init_cbc(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_cfb(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -93,7 +93,7 @@ UAPKIC_EXPORT int aes_init_cfb(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_ofb(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -103,7 +103,7 @@ UAPKIC_EXPORT int aes_init_ofb(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_ctr(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -113,7 +113,7 @@ UAPKIC_EXPORT int aes_init_ctr(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @param tag_len розмір контрольної суми
  * @return код помилки
  */
@@ -124,7 +124,7 @@ UAPKIC_EXPORT int aes_init_gcm(AesCtx* ctx, const ByteArray* key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @param tag_len розмір контрольної суми
  * @return код помилки
  */
@@ -135,7 +135,7 @@ UAPKIC_EXPORT int aes_init_ccm(AesCtx* ctx, const ByteArray* key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_wrap(AesCtx* ctx, const ByteArray* key, const ByteArray* iv);
