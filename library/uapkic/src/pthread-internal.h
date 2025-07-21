@@ -77,7 +77,6 @@ typedef struct {
 
 typedef struct {
     HANDLE mutex;
-    int lockedOrReferenced;
 } pthread_mutex_t;
 
 typedef struct {

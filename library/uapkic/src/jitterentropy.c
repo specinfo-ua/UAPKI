@@ -759,7 +759,7 @@ static void jent_random_data(struct rand_data *ec)
  */
 int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 {
-	unsigned char *p = data;
+	uint8_t *p = data;
 	int ret = 0;
 
 	if (NULL == ec)
@@ -782,10 +782,7 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 			goto err;
 		}
 
-		if ((DATA_SIZE_BITS / 8) < len)
-			tocopy = (DATA_SIZE_BITS / 8);
-		else
-			tocopy = len;
+		tocopy = min(DATA_SIZE_BITS >> 3, len);
 		memcpy(p, ba_get_buf_const(ec->data), tocopy);
 
 		len -= tocopy;

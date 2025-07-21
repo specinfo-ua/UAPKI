@@ -38,13 +38,13 @@
 
 static ByteArray *drbg_Key = NULL;
 static ByteArray *drbg_V = NULL;
-static int drbg_reseed_counter = 0;
+static int drbg_reseed_counter;
 static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
 pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Up to 64 KiB as per NIST.
-static const int max_number_of_bits_per_request = 1 << 19;
+static const int drbg_max_number_of_bits_per_request = 1 << 19;
 
 static const uint8_t _separator0 = 0x00;
 static const uint8_t _separator1 = 0x01;
@@ -60,7 +60,6 @@ static void drbg_free_internal(void)
 	drbg_Key = NULL;
 	ba_free_private(drbg_V);
 	drbg_V = NULL;
-	drbg_reseed_counter = 0;
 }
 
 void drbg_free(void) {
@@ -127,7 +126,7 @@ static int drbg_init_internal(const ByteArray *entropy)
 	memset(drbg_V->buf, 0x01, drbg_V->len);
 
 	DO(drbg_update(entropy));
-	drbg_reseed_counter = 0;
+	drbg_reseed_counter = 1;
 
 cleanup:
 	if (ret != RET_OK) {
@@ -156,7 +155,7 @@ static int drbg_reseed_internal(const ByteArray* seed_material)
 
 	DO(drbg_update(seed_material));
 
-	drbg_reseed_counter = 0;
+	drbg_reseed_counter = 1;
 
 cleanup:
 	return ret;
@@ -204,12 +203,12 @@ static int drbg_random_internal(ByteArray* random)
 		DO(drbg_init());
 	}
 
-	while (outlen) {
-		if (++drbg_reseed_counter >= 16384 || drbg_prediction_resistance) {
-			DO(entropy_get(&entropy));
-			DO(drbg_reseed_internal(entropy));
-		}
+	if (drbg_reseed_counter > 128 || drbg_prediction_resistance) {
+		DO(entropy_get(&entropy));
+		DO(drbg_reseed_internal(entropy));
+	}
 
+	while (outlen) {
 		DO(hmac_init(drbg_hmac_ctx, drbg_Key));
 		DO(hmac_update(drbg_hmac_ctx, drbg_V));
 		DO(hmac_final(drbg_hmac_ctx, &tmp));
@@ -225,6 +224,7 @@ static int drbg_random_internal(ByteArray* random)
 	}
 
 	DO(drbg_update(NULL));
+	drbg_reseed_counter++;
 
 cleanup:
 	ba_free_private(entropy);
@@ -235,7 +235,7 @@ int drbg_random(ByteArray* random)
 {
 	int ret;
 
-	if (random->len > max_number_of_bits_per_request >> 3) {
+	if (random->len > drbg_max_number_of_bits_per_request >> 3) {
 		// Cheat by accessing the operating system’s CSPRNG instead.
 		return entropy_std(random);
 	}

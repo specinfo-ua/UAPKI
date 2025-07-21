@@ -41,9 +41,7 @@
 #       define IOCTL_KSEC_RNG_REKEY CTL_CODE(FILE_DEVICE_KSEC, 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #   endif
 #else
-#   ifdef __linux
-#       include <sys/random.h>
-#   endif
+#   include <sys/random.h>
 #   include <fcntl.h>
 #   include <unistd.h>
 #endif
@@ -87,13 +85,27 @@ int entropy_init(void) {
             0
         );
         if (!NT_SUCCESS(status)) {
-            rng = NULL;
+            UNICODE_STRING path2 = RTL_CONSTANT_STRING(L"\\Device\\KSecDD");
+
+            InitializeObjectAttributes(&oa, &path2, OBJ_CASE_INSENSITIVE, NULL, NULL);
+            status = NtOpenFile(
+                &rng,
+                FILE_READ_DATA,
+                &oa,
+                &iosb,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                0
+            );
+            if (!NT_SUCCESS(status)) {
+                rng = NULL;
+            }
         }
     }
 
     if (rng == NULL && rng2 == NULL) {
         status = BCryptOpenAlgorithmProvider(&rng2, BCRYPT_RNG_ALGORITHM, NULL, 0);
         if (!NT_SUCCESS(status)) {
+            rng2 = NULL;
             SET_ERROR(RET_OS_PRNG_ERROR);
         }
     }
@@ -104,6 +116,9 @@ int entropy_init(void) {
     //    SET_ERROR(RET_OS_PRNG_ERROR);
     //}
 #endif  // _WIN32
+    if (jent_entropy_init()) {
+        SET_ERROR(RET_JITTER_RNG_ERROR);
+    }
 #endif  // __EMSCRIPTEN__
 
 cleanup:
@@ -118,6 +133,7 @@ static int os_prng(void *rnd, size_t size)
 #if defined(_WIN32) && !defined(_WIN32_WCE)
     uint8_t* b = rnd;
     NTSTATUS status;
+    BCRYPT_ALG_HANDLE alg;
 
     // Try calling SystemPrng in the CNG kernel-mode driver via an IOCTL.
     do {
@@ -136,15 +152,22 @@ static int os_prng(void *rnd, size_t size)
     }
 
     // Try using BCryptGenRandom.
-    if (rng2 == NULL) {
-        status = BCryptOpenAlgorithmProvider(&rng2, BCRYPT_RNG_ALGORITHM, NULL, 0);
+    alg = InterlockedCompareExchangePointer(&rng2, NULL, NULL);
+    if (alg == NULL) {
+        BCRYPT_ALG_HANDLE alg2;
+        status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_RNG_ALGORITHM, NULL, 0);
         if (!NT_SUCCESS(status)) {
             SET_ERROR(RET_OS_PRNG_ERROR);
+        }
+        alg2 = InterlockedCompareExchangePointer(&rng2, alg, NULL);
+        if (alg2 != NULL) {
+            BCryptCloseAlgorithmProvider(alg, 0);
+            alg = alg2;
         }
     }
     do {
         ULONG block_size = (ULONG)min(size, ULONG_MAX);
-        status = BCryptGenRandom(rng2, rnd, block_size, 0);
+        status = BCryptGenRandom(alg, b, block_size, 0);
         if (!NT_SUCCESS(status)) {
             break;
         }
@@ -156,7 +179,7 @@ static int os_prng(void *rnd, size_t size)
     }
 #else
     uint8_t* b = rnd;
-#ifdef __linux
+
     // Use a system call.
     do {
         ssize_t r = getrandom(b, size, 0);
@@ -169,7 +192,8 @@ static int os_prng(void *rnd, size_t size)
     if (!size) {
         return RET_OK;
     }
-#endif
+
+    // If the system call fails, fall back to reading /dev/urandom.
     int f = open("/dev/urandom", O_RDONLY);
     if (f == -1) {
         SET_ERROR(RET_OS_PRNG_ERROR);
@@ -251,18 +275,32 @@ int os_prng(void* buf, size_t n)
 int entropy_get(ByteArray** entropy)
 {
     int ret = RET_OK;
+#ifndef __EMSCRIPTEN__
+    JitentCtx* jec = NULL;
+#endif
     ByteArray* out = NULL;
     size_t hwrng_out;
 
-    CHECK_NOT_NULL(out = ba_alloc_by_len(64));
+    CHECK_NOT_NULL(out = ba_alloc_by_len(512));
 
-    hwrng_out = hw_rng(out->buf, 32);
-    DO(os_prng(out->buf + hwrng_out, 64 - hwrng_out));
+    hwrng_out = hw_rng(out->buf, 448);
+#ifndef __EMSCRIPTEN__
+    DO(os_prng(out->buf + hwrng_out, 480 - hwrng_out));
+    CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
+    if (jent_read_entropy(jec, out->buf + 480, 32)) {
+        SET_ERROR(RET_JITTER_RNG_ERROR);
+    }
+#else
+    DO(os_prng(out->buf + hwrng_out, 512 - hwrng_out));
+#endif
 
     *entropy = out;
     out = NULL;
 
 cleanup:
+#ifndef __EMSCRIPTEN__
+    jent_entropy_collector_free(jec);
+#endif
     ba_free_private(out);
     return ret;
 }
@@ -278,9 +316,6 @@ int entropy_jitter(ByteArray* random)
     int ret = RET_OK;
     JitentCtx* jec = NULL;
 
-    if (jent_entropy_init() != RET_OK) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
     if (jent_read_entropy(jec, random->buf, random->len) != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
@@ -307,9 +342,6 @@ int entropy_self_test(void)
     DO(os_prng(buf, sizeof(buf)));
 
 #ifndef __EMSCRIPTEN__
-    if (jent_entropy_init() != RET_OK) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
     if (jent_read_entropy(jec, buf, sizeof(buf)) != RET_OK) {
         SET_ERROR(RET_JITTER_RNG_ERROR);

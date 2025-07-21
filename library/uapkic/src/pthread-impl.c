@@ -125,7 +125,9 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
         }
 
         mutex->mutex = CreateMutexW(NULL, FALSE, NULL);
-        mutex->lockedOrReferenced = 0;
+        if (!mutex->mutex) {
+            return ENOMEM;
+        }
     }
 
     return 0;
@@ -146,7 +148,6 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
     }
 
     if (WaitForSingleObject(mutex->mutex, INFINITE) != WAIT_FAILED) {
-        mutex->lockedOrReferenced = 1;
         return 0;
     } else {
         return EINVAL;
@@ -174,37 +175,23 @@ int pthread_mutex_trylock(pthread_mutex_t* mutex)
         return EINVAL;
     case WAIT_OBJECT_0:
     default:
-        mutex->lockedOrReferenced = 1;
         return 0;
     }
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
-    if (!mutex) {
+    if (!mutex || !mutex->mutex) {
         return EINVAL;
     }
 
-    ret = ReleaseMutex(mutex->mutex);
-
-    if (ret != 0) {
-        mutex->lockedOrReferenced = 0;
-        return 0;
-    } else {
-        return EPERM;
-    }
+    return ReleaseMutex(mutex->mutex) ? 0 : EPERM;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-    if (!mutex) {
+    if (!mutex || !mutex->mutex) {
         return EINVAL;
-    }
-
-    if (mutex->lockedOrReferenced) {
-        return EBUSY;
     }
 
     CloseHandle(mutex->mutex);

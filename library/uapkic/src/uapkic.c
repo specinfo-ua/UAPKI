@@ -47,7 +47,7 @@ static uint32_t uapkic_self_test(void)
 
 	// HASHES
 	if (dstu7564_self_test() != RET_OK) test_status |= SELF_TEST_DSTU7564_FAIL;
-	if (gost34311_self_test() != RET_OK) test_status |= SELF_TEST_DSTU7564_FAIL;
+	if (gost34311_self_test() != RET_OK) test_status |= SELF_TEST_GOST34311_FAIL;
 	if (sha1_self_test() != RET_OK) test_status |= SELF_TEST_SHA1_FAIL;
 	if (sha2_self_test() != RET_OK) test_status |= SELF_TEST_SHA2_FAIL;
 	if (sha3_self_test() != RET_OK) test_status |= SELF_TEST_SHA3_FAIL;
@@ -98,7 +98,7 @@ extern pthread_mutex_t drbg_mutex;
 extern pthread_mutex_t ec_cache_mutex;
 extern pthread_mutex_t errors_mutex;
 
-int uapkic_init(uint32_t *version, uint32_t* self_test_status)
+int uapkic_init(uint32_t *version, uint32_t *self_test_status)
 {
 	static int cpu_init = 0;
 	static int init = 0;
@@ -114,16 +114,16 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 		cpu_init = 1;
 	}
 
+	pthread_mutex_init(&errors_mutex, NULL);
+	pthread_mutex_init(&ec_cache_mutex, NULL);
+
 	if (self_test_status) {
 		*self_test_status = uapkic_self_test();
 	}
 
 	if (!init) {
 		DO(entropy_init());
-		pthread_mutex_init(&drbg_mutex, NULL);
 		DO(drbg_init());
-		pthread_mutex_init(&ec_cache_mutex, NULL);
-		pthread_mutex_init(&errors_mutex, NULL);
 		init = 1;
 	}
 
