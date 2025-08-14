@@ -30,16 +30,37 @@
 
 #include <inttypes.h>
 
+#if !defined(_M_IX86) && defined(__i386__)
+#define _M_IX86
+#endif
+
+#if !defined(_M_AMD64) && defined(__x86_64__)
+#define _M_AMD64
+#endif
+
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#include <intrin.h>
+#endif
+
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
 /**
- * Заповнює буфер випадковими байтами з апаратного ГВЧ, якщо такий є.
+ * Перевіряє наявність розширення AES-NI на процесорі архітектури x86 або AMD64.
+ *
+ * @return true, якщо розширення доступне, інакше false.
+ * @return на архітектурах, відмінних від x86 або AMD64, — завжди false.
+ */
+bool cpu_aes_available(void);
+
+/**
+ * Заповнює буфер випадковими байтами з ГВЧ, якщо такий є.
  *
  * @param buffer указівник на буфер
  * @param size розмір буферу
- * @return кількість записаних у буфер випадкових байтів; може бути меншою за size у разі помилки
+ * @return кількість записаних у буфер випадкових байтів; може бути меншою за size у разі помилки.
  */
 size_t hw_rng(void* buffer, size_t size);
 
@@ -47,4 +68,5 @@ size_t hw_rng(void* buffer, size_t size);
 }
 #endif
 
-#endif
+
+#endif	// UAPKIC_CPU_FEATURES_H

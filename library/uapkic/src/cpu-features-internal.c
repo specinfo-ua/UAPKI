@@ -28,23 +28,18 @@
 #define FILE_MARKER "uapkic/cpu-features-internal.c"
 
 #include <inttypes.h>
-
-#if !defined(_M_IX86) && defined(__i386__)
-#define _M_IX86
-#endif
-
-#if !defined(_M_AMD64) && defined(__x86_64__)
-#define _M_AMD64
-#endif
-
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
-#include <intrin.h>
-#endif
-
 #include <string.h>
 #include <stdbool.h>
 
-//static bool aes_supported = false;
+#include "cpu-features-internal.h"
+
+/**
+ * References:
+ * https://www.intel.com/content/www/us/en/developer/articles/tool/intel-advanced-encryption-standard-aes-instructions-set.html
+ * https://www.intel.com/content/www/us/en/developer/articles/guide/intel-digital-random-number-generator-drng-software-implementation-guide.html
+ */
+
+static bool aes_supported = false;
 static bool rdrand_supported = false;
 static bool rdseed_supported = false;
 
@@ -62,7 +57,8 @@ typedef uint32_t rdrand_out_t;
 #endif
 #endif
 
-void cpu_features_init(void) {
+void cpu_features_init(void)
+{
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
 	int cpuInfo[4];	// EAX, EBX, ECX, EDX
 	__cpuid(cpuInfo, 0);
@@ -72,22 +68,40 @@ void cpu_features_init(void) {
 		return;
 	}
 	__cpuid(cpuInfo, 1);
-	//aes_supported = _bittest((const long*)cpuInfo + 2, 25);
-	rdrand_supported = _bittest((const long*)cpuInfo + 2, 30);
+	aes_supported = (cpuInfo[2] >> 25) & 1;
+	rdrand_supported = (cpuInfo[2] >> 30) & 1;
 
 	if (max_func_param < 7) {
 		return;
 	}
 	__cpuid(cpuInfo, 7);
-	rdseed_supported = _bittest((const long*)cpuInfo + 1, 18);
+	rdseed_supported = (cpuInfo[1] >> 18) & 1;
+#endif
+}
+
+bool cpu_aes_available(void)
+{
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+	return aes_supported;
+#else
+	return false;
 #endif
 }
 
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
-static bool rdrand(rdrand_out_t* n) {
+#ifdef __GNUC__
+#pragma GCC target("rdrnd", "rdseed")
+#elif defined(__clang__)
+__attribute__((target("rdrnd,rdseed")))
+#endif
+static bool rdrand(rdrand_out_t *n)
+{
+	rdrand_out_t a;
+
 	if (rdseed_supported) {
 		for (int i = 10; i; i--) {
-			if (RDSEED_FUNC(n)) {
+			if (RDSEED_FUNC(&a)) {
+				*n = a;
 				return true;
 			}
 		}
@@ -96,7 +110,8 @@ static bool rdrand(rdrand_out_t* n) {
 
 	if (rdrand_supported) {
 		for (int i = 10; i; i--) {
-			if (RDRAND_FUNC(n)) {
+			if (RDRAND_FUNC(&a)) {
+				*n = a;
 				return true;
 			}
 		}
@@ -107,7 +122,8 @@ static bool rdrand(rdrand_out_t* n) {
 }
 #endif
 
-size_t hw_rng(void* buffer, size_t size) {
+size_t hw_rng(void *buffer, size_t size)
+{
 #if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
 	union {
 		rdrand_out_t n;

@@ -66,7 +66,7 @@ struct AesCtx_st {
     CipherMode mode_id;
 };
 
-/*Precomputed sbox, shitf_rows and m_col operation for fast calculation*/
+/* Precomputed sbox, shift_rows and m_col operation for fast calculation */
 static const uint32_t Te0[256] = {
     0xc66363a5U, 0xf87c7c84U, 0xee777799U, 0xf67b7b8dU,
     0xfff2f20dU, 0xd66b6bbdU, 0xde6f6fb1U, 0x91c5c554U,

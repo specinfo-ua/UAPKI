@@ -290,17 +290,28 @@ struct Dstu7624Ctx_st {
 static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 {
     switch (size) {
+    case 2:
+        out[0] += in[0];
+        out[1] += in[1];
+        return;
+    case 4:
+        out[0] += in[0];
+        out[1] += in[1];
+        out[2] += in[2];
+        out[3] += in[3];
+        return;
     case 8:
+        out[0] += in[0];
+        out[1] += in[1];
+        out[2] += in[2];
+        out[3] += in[3];
         out[4] += in[4];
         out[5] += in[5];
         out[6] += in[6];
         out[7] += in[7];
-    case 4:
-        out[2] += in[2];
-        out[3] += in[3];
-    case 2:
-        out[0] += in[0];
-        out[1] += in[1];
+        return;
+    default:
+        return;
     }
 }
 
@@ -1457,7 +1468,7 @@ void dstu7624_free(Dstu7624Ctx *ctx)
         default:
             break;
         }
-        secure_zero(ctx, sizeof (Dstu7624Ctx));
+        secure_zero(ctx, sizeof(Dstu7624Ctx));
         free(ctx);
     }
 }
@@ -3467,9 +3478,8 @@ static int gmac_update(Dstu7624Ctx *ctx, const ByteArray *plain_data)
             data_len -= tail_len;
         }
     } else {
-
         if (data_len >= block_len) {
-            kalyna_xor(&data_buf[0], B8, block_len, B8);
+            kalyna_xor(data_buf, B8, block_len, B8);
         } else {
             memcpy(last_block, data_buf, data_len);
             ctx->mode.gmac.last_block_len = data_len;
@@ -3527,7 +3537,7 @@ static int gmac_final(Dstu7624Ctx *ctx, ByteArray **mac)
         //Если последний блок не нулевой, дополняем его.
         padding(ctx, last_block, &last_block_len, last_block);
 
-        kalyna_xor(&last_block, B8, last_block_len, B8);
+        kalyna_xor(last_block, B8, last_block_len, B8);
         DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
     }
     memset(H, 0, MAX_BLOCK_LEN);
@@ -4052,7 +4062,7 @@ int dstu7624_init_cmac(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bloc
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
-    CHECK_PARAM(q > 0 && q <= block_size);
+    CHECK_PARAM(q && q <= block_size);
 
     DO(dstu7624_init(ctx, key, block_size));
 
@@ -4122,7 +4132,7 @@ int dstu7624_init_ccm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
     CHECK_PARAM(iv != NULL);
-    CHECK_PARAM(q > 0);
+    CHECK_PARAM(q);
     CHECK_PARAM(n_max >= 8);
 
     DO(dstu7624_init(ctx, key, ba_get_len(iv)));
@@ -4151,7 +4161,7 @@ int dstu7624_init_gcm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
     CHECK_PARAM(iv != NULL);
-    CHECK_PARAM( (8 <= q) && (q <= iv->len) );
+    CHECK_PARAM(8 <= q && q <= iv->len);
 
     DO(dstu7624_init(ctx, key, ba_get_len(iv)));
 

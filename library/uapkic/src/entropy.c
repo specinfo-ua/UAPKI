@@ -63,7 +63,8 @@ static BCRYPT_ALG_HANDLE rng2 = NULL;
 #endif
 #endif
 
-int entropy_init(void) {
+int entropy_init(void)
+{
     int ret = RET_OK;
 
 #ifndef __EMSCRIPTEN__
@@ -141,7 +142,7 @@ static int os_prng(void *rnd, size_t size)
         ULONG block_size = (ULONG)min(size, ULONG_MAX);
         ULONG ioctl = block_size < 16384 ? IOCTL_KSEC_RNG : IOCTL_KSEC_RNG_REKEY;
         status = NtDeviceIoControlFile(rng, NULL, NULL, NULL, &iosb, ioctl, NULL, block_size, b, block_size);
-        b += iosb.Information;
+        b += iosb.Information;  // Advance by the number of random bytes we have just got.
         size -= iosb.Information;
         if (!NT_SUCCESS(status)) {
             break;
@@ -151,7 +152,7 @@ static int os_prng(void *rnd, size_t size)
         return RET_OK;
     }
 
-    // Try using BCryptGenRandom.
+    // If accessing the kernel-mode RNG fails, try using BCryptGenRandom.
     alg = InterlockedCompareExchangePointer(&rng2, NULL, NULL);
     if (alg == NULL) {
         BCRYPT_ALG_HANDLE alg2;
@@ -184,9 +185,10 @@ static int os_prng(void *rnd, size_t size)
     do {
         ssize_t r = getrandom(b, size, 0);
         if (r == -1) {
+            // We’ve got an error!
             break;
         }
-        b += r;
+        b += r; // Advance by the number of random bytes we have just got.
         size -= r;
     } while (size);
     if (!size) {
@@ -201,9 +203,10 @@ static int os_prng(void *rnd, size_t size)
     do {
         ssize_t r = read(f, b, size);
         if (r == -1) {
+            // We’ve got an error!
             break;
         }
-        b += r;
+        b += r; // Advance by the number of random bytes we have just got.
         size -= r;
     } while (size);
     close(f);
@@ -317,7 +320,7 @@ int entropy_jitter(ByteArray* random)
     JitentCtx* jec = NULL;
 
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, random->buf, random->len) != RET_OK) {
+    if (jent_read_entropy(jec, random->buf, random->len)) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 
@@ -343,7 +346,7 @@ int entropy_self_test(void)
 
 #ifndef __EMSCRIPTEN__
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, buf, sizeof(buf)) != RET_OK) {
+    if (jent_read_entropy(jec, buf, sizeof(buf))) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 #endif
@@ -354,7 +357,8 @@ cleanup:
     return ret;
 }
 
-void entropy_free(void) {
+void entropy_free(void)
+{
 #ifndef __EMSCRIPTEN__
 #if defined(_WIN32) && !defined(_WIN32_WCE)
     if (rng != NULL) {

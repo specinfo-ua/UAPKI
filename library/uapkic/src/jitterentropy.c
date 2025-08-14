@@ -768,7 +768,7 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 	if (jent_notime_settick(ec))
 		return -4;
 
-	while (len > 0) {
+	while (len) {
 		size_t tocopy;
 
 		jent_random_data(ec);
@@ -785,8 +785,8 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 		tocopy = min(DATA_SIZE_BITS >> 3, len);
 		memcpy(p, ba_get_buf_const(ec->data), tocopy);
 
-		len -= tocopy;
 		p += tocopy;
+		len -= tocopy;
 	}
 
 	/*

@@ -63,7 +63,7 @@ extern const uint64_t subrowcol_default[8][256];
                                                   (uint64_t) ( subrowcol_default[6][v7 >> 48 & 0xFF])^\
                                                   (uint64_t) ( subrowcol_default[7][v8 >> 56 & 0xFF]);
 
-/*Константа для P раунда*/
+/* Константа для P раунду */
 static uint64_t p_pconst[NR_1024][NB_1024] = {
     {
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
@@ -109,7 +109,7 @@ static uint64_t p_pconst[NR_1024][NB_1024] = {
     }
 };
 
-/*Константа для Q раунда, блок 64 байти*/
+/* Константа для Q раунду, блок 64 байти */
 static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     {
         8138269444283625715ULL, 6985347939676778739ULL, 5832426435069931763ULL, 4679504930463084787ULL, 
@@ -153,7 +153,7 @@ static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     }
 };
 
-/*Константа для Q раунда, блок 128 байт*/
+/* Константа для Q раунду, блок 128 байтів */
 static uint64_t p_qconst_NB_1024[NR_1024][NB_1024] = {
     {
         17361641481138401523ULL, 16208719976531554547ULL, 15055798471924707571ULL, 13902876967317860595ULL, 
@@ -621,7 +621,7 @@ int dstu7564_init(Dstu7564Ctx *ctx, size_t hash_nbytes)
     int ret = RET_OK;
 
     CHECK_PARAM(ctx);
-    CHECK_PARAM((hash_nbytes > 0) & (hash_nbytes <= 64));
+    CHECK_PARAM(hash_nbytes && hash_nbytes <= 64);
 
     if (hash_nbytes <= 32) {
         ctx->rounds = NR_512;
@@ -717,7 +717,7 @@ int dstu7564_final(Dstu7564Ctx *ctx, ByteArray **hash_code)
 
     padding(ctx->last_block, ctx->last_block_el, ctx->msg_tot_len, ctx->nbytes);
     digest(ctx, ctx->last_block);
-    /*Якщо доповнуння призвело до утворення додаткового блоку - гешуємо його*/
+    /* Якщо доповнення призвело до утворення додаткового блоку — гешуємо його */
     if (ctx->last_block_el > ctx->nbytes - 13) {
         digest(ctx, ctx->last_block + ctx->nbytes);
     }
@@ -843,10 +843,7 @@ cleanup:
 
 size_t dstu7564_get_block_size(const Dstu7564Ctx* ctx)
 {
-    if (ctx != NULL) {
-        return ctx->nbytes;
-    }
-    return 0;
+    return ctx != NULL ? ctx->nbytes : 0;
 }
 
 static int dstu7564_self_test_hash(void)

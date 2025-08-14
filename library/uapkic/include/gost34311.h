@@ -71,7 +71,7 @@ UAPKIC_EXPORT Gost34311Ctx *gost34311_copy_with_alloc(const Gost34311Ctx *ctx);
 UAPKIC_EXPORT int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує вироботку геша і повертає його значення.
+ * Завершує вироблення гешу й повертає його значення.
  *
  * @param ctx контекст ГОСТ 34.311
  * @param H геш вектор

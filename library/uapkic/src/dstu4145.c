@@ -58,7 +58,6 @@ int dstu4145_generate_privkey(const EcCtx *ctx, ByteArray **d)
 cleanup:
 
     return ret;
-
 }
 
 int dstu4145_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, ByteArray **qy)
@@ -279,7 +278,7 @@ int dstu4145_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(H != NULL);
-    CHECK_PARAM(H->len > 0);
+    CHECK_PARAM(H->len);
     CHECK_PARAM(r != NULL);
     CHECK_PARAM(s != NULL);
     CHECK_PARAM(ctx->params->ec_field == EC_FIELD_BINARY);
@@ -315,7 +314,7 @@ int dstu4145_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, co
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(H != NULL);
-    CHECK_PARAM(H->len > 0);
+    CHECK_PARAM(H->len);
     CHECK_PARAM(r != NULL);
     CHECK_PARAM(s != NULL);
     CHECK_PARAM(ctx->params->ec_field == EC_FIELD_BINARY);

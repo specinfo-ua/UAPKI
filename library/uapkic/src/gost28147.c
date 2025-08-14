@@ -469,8 +469,8 @@ static __inline void ctr_next_feed(uint32_t *feed)
     }
 }
 
-/*Используется в ДСТУ4145 и ГОСТ28147.*/
-int  gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool is_encrypt, uint8_t *dst)
+/* Используется в ГОСТ 28147-89. */
+int gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool is_encrypt, uint8_t *dst)
 {
     uint32_t block24[6] = {0};
     int part_block24_len;

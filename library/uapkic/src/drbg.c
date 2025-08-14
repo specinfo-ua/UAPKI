@@ -46,12 +46,6 @@ pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Up to 64 KiB as per NIST.
 static const int drbg_max_number_of_bits_per_request = 1 << 19;
 
-static const uint8_t _separator0 = 0x00;
-static const uint8_t _separator1 = 0x01;
-
-static const ByteArray separator0 = { (uint8_t*)&_separator0, sizeof(_separator0) };
-static const ByteArray separator1 = { (uint8_t*)&_separator1, sizeof(_separator1) };
-
 static void drbg_free_internal(void)
 {
 	hmac_free(drbg_hmac_ctx);
@@ -62,7 +56,8 @@ static void drbg_free_internal(void)
 	drbg_V = NULL;
 }
 
-void drbg_free(void) {
+void drbg_free(void)
+{
 	drbg_free_internal();
 }
 
@@ -70,6 +65,11 @@ static int drbg_update(const ByteArray *provided_data)
 {
 	int ret = RET_OK;
 	ByteArray* tmp = NULL;
+
+	static const uint8_t _separator0 = 0x00;
+	static const uint8_t _separator1 = 0x01;
+	static const ByteArray separator0 = {(uint8_t*)&_separator0, sizeof(_separator0)};
+	static const ByteArray separator1 = {(uint8_t*)&_separator1, sizeof(_separator1)};
 
 	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
 	DO(hmac_update(drbg_hmac_ctx, drbg_V));
@@ -235,6 +235,11 @@ int drbg_random(ByteArray* random)
 {
 	int ret;
 
+	CHECK_PARAM(random != NULL);
+
+	// Should we impose the request size limitation or work around it?
+	// And can we use another CSPRNG if ours is currently not available?
+#if 0
 	if (random->len > drbg_max_number_of_bits_per_request >> 3) {
 		// Cheat by accessing the operating system’s CSPRNG instead.
 		return entropy_std(random);
@@ -244,9 +249,16 @@ int drbg_random(ByteArray* random)
 		// Don’t bother waiting.
 		return entropy_std(random);
 	}
+#else
+	CHECK_PARAM(random->len && random->len <= drbg_max_number_of_bits_per_request >> 3);
+
+	pthread_mutex_lock(&drbg_mutex);
+#endif
 
 	ret = drbg_random_internal(random);
 	pthread_mutex_unlock(&drbg_mutex);
+
+cleanup:
 	return ret;
 }
 
@@ -283,8 +295,8 @@ int drbg_self_test(void)
 		0x2D, 0x22, 0x14, 0x7B, 0x0A, 0x17, 0x6E, 0xA8, 0xD9, 0xC4, 0xC3, 0x54, 0x04, 0x39, 0x5B, 0x65,
 		0x02, 0xEF, 0x33, 0x3A, 0x81, 0x3B, 0x65, 0x86, 0x03, 0x74, 0x79, 0xE0, 0xFA, 0x3C, 0x6A, 0x23 };
 
-	static const ByteArray ba_test_drbg_init_entropy = { (uint8_t*)&test_drbg_init_entropy, sizeof(test_drbg_init_entropy) };
-	static const ByteArray ba_test_reseed_entropy = { (uint8_t*)&test_drbg_reseed_entropy, sizeof(test_drbg_reseed_entropy) };
+	static const ByteArray ba_test_drbg_init_entropy = {(uint8_t*)test_drbg_init_entropy, sizeof(test_drbg_init_entropy)};
+	static const ByteArray ba_test_reseed_entropy = {(uint8_t*)test_drbg_reseed_entropy, sizeof(test_drbg_reseed_entropy)};
 
 	int ret = RET_OK;
 	ByteArray *test_drbg_out = NULL;
@@ -302,7 +314,7 @@ int drbg_self_test(void)
 
 	DO(drbg_random_internal(test_drbg_out));
 	DO(drbg_random_internal(test_drbg_out));
-	if (memcmp(test_drbg_out->buf, test_drbg_expected_bits, sizeof(test_drbg_expected_bits)) != 0) {
+	if (memcmp(test_drbg_out->buf, test_drbg_expected_bits, sizeof(test_drbg_expected_bits))) {
 		SET_ERROR(RET_SELF_TEST_FAIL);
 	}
 

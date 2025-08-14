@@ -135,7 +135,8 @@ cleanup:
 	return ret;
 }
 
-static void uapkic_free(void) {
+static void uapkic_free(void)
+{
 	drbg_free();
 	entropy_free();
 	ec_cache_free();
