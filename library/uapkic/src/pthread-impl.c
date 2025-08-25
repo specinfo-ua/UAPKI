@@ -70,31 +70,27 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*startu
 
 void pthread_exit(void *value_ptr)
 {
-    if (value_ptr) {
-        ExitThread(*(DWORD *)value_ptr);
-    } else {
-        ExitThread(0);
-    }
+    ExitThread(value_ptr ? *(DWORD*)value_ptr : 0);
 }
 
 int pthread_join(pthread_t thread, void **value_ptr)
 {
-    DWORD ret;
-
     if (!thread.handle) {
         return -1;
     }
 
-    ret = WaitForSingleObject(thread.handle, INFINITE);
-    if (ret == WAIT_FAILED) {
+    switch (WaitForSingleObject(thread.handle, INFINITE)) {
+    case WAIT_FAILED:
         return -1;
-    } else if ((ret == WAIT_ABANDONED) || (ret == WAIT_OBJECT_0)) {
+    case WAIT_OBJECT_0:
+    case WAIT_ABANDONED:
         if (value_ptr) {
             GetExitCodeThread(thread.handle, (LPDWORD)value_ptr);
         }
+        return 0;
+    default:
+        return 0;
     }
-
-    return 0;
 }
 
 int pthread_detach(pthread_t thread)

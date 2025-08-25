@@ -29,6 +29,7 @@
 #define UAPKIC_CPU_FEATURES_H
 
 #include <inttypes.h>
+#include <stdbool.h>
 
 #if !defined(_M_IX86) && defined(__i386__)
 #define _M_IX86
@@ -38,9 +39,13 @@
 #define _M_AMD64
 #endif
 
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#if defined(_M_IX86) || defined(_M_AMD64)
+#ifdef _MSC_VER
 #include <intrin.h>
-#endif
+#else
+#include <immintrin.h>
+#endif	// _MSC_VER
+#endif	// x86
 
 
 #ifdef  __cplusplus

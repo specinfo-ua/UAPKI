@@ -290,32 +290,26 @@ struct Dstu7624Ctx_st {
 static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 {
     switch (size) {
-    case 2:
-        out[0] += in[0];
-        out[1] += in[1];
-        return;
-    case 4:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
-        return;
     case 8:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
         out[4] += in[4];
         out[5] += in[5];
         out[6] += in[6];
         out[7] += in[7];
+        // fallthrough
+    case 4:
+        out[2] += in[2];
+        out[3] += in[3];
+        // fallthrough
+    case 2:
+        out[0] += in[0];
+        out[1] += in[1];
         return;
     default:
         return;
     }
 }
 
-/*memory safe xor*/
+/* memory safe xor */
 static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
 {
     uint8_t *a8, *b8, *o8;
@@ -1445,15 +1439,10 @@ void dstu7624_free(Dstu7624Ctx *ctx)
     if (ctx) {
         switch (ctx->mode_id) {
         case DSTU7624_MODE_CTR:
-            break;
         case DSTU7624_MODE_CBC:
-            break;
         case DSTU7624_MODE_OFB:
-            break;
         case DSTU7624_MODE_CFB:
-            break;
         case DSTU7624_MODE_CCM:
-            break;
         case DSTU7624_MODE_CMAC:
             break;
         case DSTU7624_MODE_XTS:

@@ -27,11 +27,10 @@
 
 #define FILE_MARKER "uapkic/cpu-features-internal.c"
 
-#include <inttypes.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "cpu-features-internal.h"
+#include "word-internal.h"
 
 /**
  * References:
@@ -43,23 +42,19 @@ static bool aes_supported = false;
 static bool rdrand_supported = false;
 static bool rdseed_supported = false;
 
-#ifdef _MSC_VER
 #ifdef _M_AMD64
-typedef uint64_t rdrand_out_t;
-#define RDRAND_SIZE (int)sizeof(uint64_t)
+#define RDRAND_SIZE (int)sizeof(word_t)
 #define RDRAND_FUNC _rdrand64_step
 #define RDSEED_FUNC _rdseed64_step
 #elif defined(_M_IX86)
-typedef uint32_t rdrand_out_t;
-#define RDRAND_SIZE (int)sizeof(uint32_t)
+#define RDRAND_SIZE (int)sizeof(word_t)
 #define RDRAND_FUNC _rdrand32_step
 #define RDSEED_FUNC _rdseed32_step
-#endif
 #endif
 
 void cpu_features_init(void)
 {
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#if defined(_M_IX86) || defined(_M_AMD64)
 	int cpuInfo[4];	// EAX, EBX, ECX, EDX
 	__cpuid(cpuInfo, 0);
 	int max_func_param = cpuInfo[0];
@@ -81,22 +76,22 @@ void cpu_features_init(void)
 
 bool cpu_aes_available(void)
 {
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#if defined(_M_IX86) || defined(_M_AMD64)
 	return aes_supported;
 #else
 	return false;
 #endif
 }
 
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#if defined(_M_IX86) || defined(_M_AMD64)
 #ifdef __GNUC__
 #pragma GCC target("rdrnd", "rdseed")
 #elif defined(__clang__)
 __attribute__((target("rdrnd,rdseed")))
 #endif
-static bool rdrand(rdrand_out_t *n)
+static bool rdrand(word_t *n)
 {
-	rdrand_out_t a;
+	word_t a;
 
 	if (rdseed_supported) {
 		for (int i = 10; i; i--) {
@@ -120,13 +115,13 @@ static bool rdrand(rdrand_out_t *n)
 
 	return false;
 }
-#endif
+#endif	// x86
 
 size_t hw_rng(void *buffer, size_t size)
 {
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+#if defined(_M_IX86) || defined(_M_AMD64)
 	union {
-		rdrand_out_t n;
+		word_t n;
 		uint8_t a[RDRAND_SIZE];
 	} rdrand_out;
 	intptr_t buffer_address = (intptr_t)buffer;
@@ -168,9 +163,9 @@ size_t hw_rng(void *buffer, size_t size)
 	}
 
 cleanup:
-	*(volatile rdrand_out_t*)&(rdrand_out.n) = 0;
+	*(volatile word_t*)&(rdrand_out.n) = 0;
 	return bytes_written;
-#else
+#else	// x86
 	// Not implemented.
 
 	buffer;
@@ -180,4 +175,4 @@ cleanup:
 #endif
 }
 
-// TODO: Реалізувати підтримку деяких інших розширень x86.
+// TODO: Реалізувати підтримку деяких інших розширень x86, як-от AES-NI.
