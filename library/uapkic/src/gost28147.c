@@ -967,9 +967,10 @@ int gost28147_encrypt(Gost28147Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_NOT_NULL(*out = ba_alloc());
     (*out)->buf = out_buf;
     (*out)->len = len;
+    out_buf = NULL;
 
 cleanup:
-
+    free(out_buf);
     return ret;
 }
 
@@ -1012,9 +1013,10 @@ int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_NOT_NULL(*out = ba_alloc());
     (*out)->buf = out_buf;
     (*out)->len = len;
+    out_buf = NULL;
 
 cleanup:
-
+    free(out_buf);
     return ret;
 }
 
