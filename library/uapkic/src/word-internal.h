@@ -79,7 +79,7 @@ typedef uint32_t word_t;
 
 #define WORD_BYTE_LENGTH (sizeof(word_t))
 
-/* Необходимо использовать, якщо не гарантировано, что величина смещения меньше бітовой длины слова. */
+/* Необхідно використовувати, якщо не гарантовано, що величина зсуву менша за довжину слова в бітах. */
 #define WORD_LSHIFT(_word, _bit) (((_bit) >= WORD_BIT_LENGTH) ? 0 : ((_word) << (_bit)))
 #define WORD_RSHIFT(_word, _bit) (((_bit) >= WORD_BIT_LENGTH) ? 0 : ((_word) >> (_bit)))
 

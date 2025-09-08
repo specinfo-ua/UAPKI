@@ -104,7 +104,7 @@ UAPKIC_EXPORT HashCtx* hash_alloc_gost34311_with_sbox(const ByteArray* sbox);
 UAPKIC_EXPORT int hash_update(HashCtx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку геша і повертає його значення.
+ * Завершує вироблення гешу й повертає його значення.
  *
  * @param ctx контекст гешування
  * @param out геш від даних

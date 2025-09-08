@@ -37,11 +37,12 @@
 
 static size_t words_len(const word_t *a, size_t len)
 {
-    int i;
-
-    for (i = (int)(len - 1); i > 0 && a[i] == 0; i--);
-
-    return (size_t)(i + 1);
+    while (len) {
+        if (a[--len]) {
+            return len + 1;
+        }
+    }
+    return 0;
 }
 
 /**

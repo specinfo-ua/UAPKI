@@ -34,20 +34,70 @@
 extern "C" {
 #endif
 
+/**
+ * Контекст ДСТУ 8845.
+ */
 typedef struct Dstu8845Ctx_st Dstu8845Ctx;
 
+/**
+ * Створює контекст потокового шифру ДСТУ 8845:2019 «Струмок».
+ *
+ * @return контекст ДСТУ 8845
+ */
 UAPKIC_EXPORT Dstu8845Ctx *dstu8845_alloc(void);
 
+/**
+ * Ініціалізує контекст ДСТУ 8845.
+ *
+ * @param ctx контекст ДСТУ 8845
+ * @param key ключ шифрування; його розмір повинен становити 32 або 64 байти
+ * @param iv вектор ініціалізації; його розмір повинен становити 32 байти
+ *
+ * @return код помилки
+ */
 UAPKIC_EXPORT int dstu8845_init(Dstu8845Ctx *ctx, const ByteArray* key, const ByteArray* iv);
 
+/**
+ * Задає в контексті ДСТУ 8845 вектор ініціалізації.
+ *
+ * @param ctx контекст ДСТУ 8845
+ * @param iv вектор ініціалізації; його розмір повинен становити 32 байти
+ *
+ * @return код помилки
+ */
 UAPKIC_EXPORT int dstu8845_set_iv(Dstu8845Ctx *ctx, const ByteArray* iv);
 
+/**
+ * Здійснює шифрування або розшифрування даних.
+ *
+ * @param ctx контекст ДСТУ 8845
+ * @param inout дані для шифрування або розшифрування
+ *
+ * @return код помилки
+ */
 UAPKIC_EXPORT int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray* inout);
 
+/**
+ * Звільняє контекст ДСТУ 8845.
+ *
+ * @param ctx контекст ДСТУ 8845
+ */
 UAPKIC_EXPORT void dstu8845_free(Dstu8845Ctx *ctx);
 
+/**
+ * Генерує ключ шифрування.
+ *
+ * @param key_len розмір ключа; повинен становити 32 або 64 байти
+ * @param key ключ шифрування
+ * @return код помилки
+ */
 UAPKIC_EXPORT int dstu8845_generate_key(size_t key_len, ByteArray** key);
 
+/**
+ * Виконує самотестування реалізації алгоритму ДСТУ 8845.
+ *
+ * @return код помилки
+ */
 UAPKIC_EXPORT int dstu8845_self_test(void);
 
 #ifdef  __cplusplus

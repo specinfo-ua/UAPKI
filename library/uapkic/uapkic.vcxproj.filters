@@ -145,6 +145,9 @@
     <ClCompile Include="src\word-internal.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\cpu-features-internal.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\aes.h">
@@ -301,6 +304,12 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\word-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\macros-internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cpu-features-internal.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

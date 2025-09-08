@@ -70,31 +70,27 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*startu
 
 void pthread_exit(void *value_ptr)
 {
-    if (value_ptr) {
-        ExitThread(*(DWORD *)value_ptr);
-    } else {
-        ExitThread(0);
-    }
+    ExitThread(value_ptr ? *(DWORD*)value_ptr : 0);
 }
 
 int pthread_join(pthread_t thread, void **value_ptr)
 {
-    DWORD ret;
-
     if (!thread.handle) {
         return -1;
     }
 
-    ret = WaitForSingleObject(thread.handle, INFINITE);
-    if (ret == WAIT_FAILED) {
+    switch (WaitForSingleObject(thread.handle, INFINITE)) {
+    case WAIT_FAILED:
         return -1;
-    } else if ((ret == WAIT_ABANDONED) || (ret == WAIT_OBJECT_0)) {
+    case WAIT_OBJECT_0:
+    case WAIT_ABANDONED:
         if (value_ptr) {
             GetExitCodeThread(thread.handle, (LPDWORD)value_ptr);
         }
+        return 0;
+    default:
+        return 0;
     }
-
-    return 0;
 }
 
 int pthread_detach(pthread_t thread)
@@ -120,14 +116,14 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
     (void)attr;
 
     if (mutex) {
-        if (mutex->init && !mutex->destroyed) {
+        if (mutex->mutex) {
             return EBUSY;
         }
 
-        mutex->mutex = CreateMutex(NULL, FALSE, NULL);
-        mutex->destroyed = 0;
-        mutex->init = 1;
-        mutex->lockedOrReferenced = 0;
+        mutex->mutex = CreateMutexW(NULL, FALSE, NULL);
+        if (!mutex->mutex) {
+            return ENOMEM;
+        }
     }
 
     return 0;
@@ -135,8 +131,6 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
     if (!mutex) {
         return EINVAL;
     }
@@ -149,45 +143,55 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
         return EINVAL;
     }
 
-    ret = WaitForSingleObject(mutex->mutex, INFINITE);
-
-    if (ret != WAIT_FAILED) {
-        mutex->lockedOrReferenced = 1;
+    if (WaitForSingleObject(mutex->mutex, INFINITE) != WAIT_FAILED) {
         return 0;
     } else {
         return EINVAL;
+    }
+}
+
+int pthread_mutex_trylock(pthread_mutex_t* mutex)
+{
+    if (!mutex) {
+        return EINVAL;
+    }
+
+    if (!mutex->mutex) {
+        pthread_mutex_init(mutex, NULL);
+    }
+
+    if (!mutex->mutex) {
+        return EINVAL;
+    }
+
+    switch (WaitForSingleObject(mutex->mutex, 0)) {
+    case WAIT_TIMEOUT:
+        return EBUSY;
+    case WAIT_FAILED:
+        return EINVAL;
+    case WAIT_OBJECT_0:
+    default:
+        return 0;
     }
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
-    if (!mutex) {
+    if (!mutex || !mutex->mutex) {
         return EINVAL;
     }
 
-    ret = ReleaseMutex(mutex->mutex);
-
-    if (ret != 0) {
-        mutex->lockedOrReferenced = 0;
-        return 0;
-    } else {
-        return EPERM;
-    }
+    return ReleaseMutex(mutex->mutex) ? 0 : EPERM;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-    if (!mutex) {
+    if (!mutex || !mutex->mutex) {
         return EINVAL;
     }
 
-    if (mutex->lockedOrReferenced) {
-        return EBUSY;
-    }
-
-    mutex->destroyed = 1;
+    CloseHandle(mutex->mutex);
+    mutex->mutex = NULL;
 
     return 0;
 }
@@ -207,13 +211,9 @@ int pthread_attr_destroy(pthread_attr_t* attr)
 
 unsigned long pthread_id(void)
 {
-    unsigned long ret = 0;
-
 #ifdef _WIN32
-    ret = (unsigned long)GetCurrentThreadId();
+    return GetCurrentThreadId();
 #else
-    ret = (unsigned long)pthread_self();
+    return (unsigned long)pthread_self();
 #endif
-
-    return ret;
 }

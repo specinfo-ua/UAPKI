@@ -51,7 +51,7 @@ UAPKIC_EXPORT AesCtx *aes_alloc(void);
 /**
  * Генерує секретний ключ.
  *
- * @param key_len размер ключа 16, 24 или 32
+ * @param key_len розмір ключа; повинен становити 16, 24 або 32
  * @param key секретний ключ
  * @return код помилки
  */
@@ -68,12 +68,12 @@ UAPKIC_EXPORT int aes_init_ecb(AesCtx *ctx, const ByteArray *key);
 
 /**
  * Ініціалізація контексту AES для режиму CBC.
- * Розмір даних при шифруванні/розшифруванні повинет бути кратен розміру блока AES (16 байт),
- * окрім останнього блоку при шифруванні.
+ * Розмір даних для шифрування/розшифрування повинен бути кратним розміру блока AES (16 байт),
+ * крім останнього блока при шифруванні.
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_cbc(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -83,7 +83,7 @@ UAPKIC_EXPORT int aes_init_cbc(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_cfb(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -93,7 +93,7 @@ UAPKIC_EXPORT int aes_init_cfb(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_ofb(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -103,45 +103,45 @@ UAPKIC_EXPORT int aes_init_ofb(AesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_ctr(AesCtx *ctx, const ByteArray *key, const ByteArray *iv);
 
 /**
- * Ініціалізує контекст для шифрування у режимі GCM.
+ * Ініціалізує контекст для шифрування в режимі GCM.
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @param tag_len розмір контрольної суми
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_gcm(AesCtx* ctx, const ByteArray* key, const ByteArray* iv, const size_t tag_len);
 
 /**
- * Ініціалізує контекст для шифрування у режимі CCM.
+ * Ініціалізує контекст для шифрування в режимі CCM.
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @param tag_len розмір контрольної суми
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_ccm(AesCtx* ctx, const ByteArray* key, const ByteArray* iv, const size_t tag_len);
 
 /**
- * Ініціалізує контекст для шифрування у режимі KEY WRAP.
+ * Ініціалізує контекст для шифрування в режимі KEY WRAP.
  *
  * @param ctx контекст AES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_wrap(AesCtx* ctx, const ByteArray* key, const ByteArray* iv);
 
 /**
- * Шифрування у режимі AES.
+ * Шифрування в режимі AES.
  *
  * @param ctx контекст AES
  * @param data дані
@@ -151,7 +151,7 @@ UAPKIC_EXPORT int aes_init_wrap(AesCtx* ctx, const ByteArray* key, const ByteArr
 UAPKIC_EXPORT int aes_encrypt(AesCtx *ctx, const ByteArray *data, ByteArray **encrypted_data);
 
 /**
- * Розшифрування у режимі AES.
+ * Розшифрування в режимі AES.
  *
  * @param ctx контекст AES
  * @param encrypted_data зашифровані дані
@@ -161,7 +161,7 @@ UAPKIC_EXPORT int aes_encrypt(AesCtx *ctx, const ByteArray *data, ByteArray **en
 UAPKIC_EXPORT int aes_decrypt(AesCtx *ctx, const ByteArray *encrypted_data, ByteArray **data);
 
 /**
- * Шифрування та вироблення імітовставки.
+ * Шифрування і вироблення імітовставки.
  *
  * @param ctx контекст AES
  * @param auth_data відкритий текст повідомлення
@@ -174,7 +174,7 @@ UAPKIC_EXPORT int aes_encrypt_mac(AesCtx* ctx, const ByteArray* auth_data, const
     ByteArray** mac, ByteArray** encrypted_data);
 
 /**
- * Розшифрування та забезпечення цілосності.
+ * Розшифрування і забезпечення цілісности.
  *
  * @param ctx контекст AES
  * @param auth_data відкритий текст повідомлення
@@ -196,7 +196,7 @@ UAPKIC_EXPORT void aes_free(AesCtx *ctx);
 /**
  * Виконує самотестування реалізації алгоритму AES.
  *
- * @return код помилки або RET_OK, якщо самотестування пройдено
+ * @return код помилки
  */
 UAPKIC_EXPORT int aes_self_test(void);
 

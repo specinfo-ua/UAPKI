@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright 2025 The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -25,41 +25,53 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef UAPKIC_DRBG_H
-#define UAPKIC_DRBG_H
+#ifndef UAPKIC_CPU_FEATURES_H
+#define UAPKIC_CPU_FEATURES_H
 
-#include "byte-array.h"
+#include <inttypes.h>
+#include <stdbool.h>
 
-#ifdef __cplusplus
+#if !defined(_M_IX86) && defined(__i386__)
+#define _M_IX86
+#endif
+
+#if !defined(_M_AMD64) && defined(__x86_64__)
+#define _M_AMD64
+#endif
+
+#if defined(_M_IX86) || defined(_M_AMD64)
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <immintrin.h>
+#endif	// _MSC_VER
+#endif	// x86
+
+
+#ifdef  __cplusplus
 extern "C" {
 #endif
 
 /**
- * Заповнює масив випадковими байтами, використовуючи КСГПВЧ криптографічної бібліотеки.
- * Максимальний розмір масиву для заповнення — 64 КіБ.
+ * Перевіряє наявність розширення AES-NI на процесорі архітектури x86 або AMD64.
  *
- * @param random масив для розміщення випадкових байтів
- * @return код помилки
+ * @return true, якщо розширення доступне, інакше false.
+ * @return на архітектурах, відмінних від x86 або AMD64, — завжди false.
  */
-UAPKIC_EXPORT int drbg_random(ByteArray* random);
+bool cpu_aes_available(void);
 
 /**
- * Перезерновує КСГПВЧ криптографічної бібліотеки.
+ * Заповнює буфер випадковими байтами з ГВЧ, якщо такий є.
  *
- * @param entropy масив байтів, що містить додаткову ентропію (зерно); може бути NULL
- * @return код помилки
+ * @param buffer указівник на буфер
+ * @param size розмір буферу
+ * @return кількість записаних у буфер випадкових байтів; може бути меншою за size у разі помилки.
  */
-UAPKIC_EXPORT int drbg_reseed(const ByteArray* entropy);
+size_t hw_rng(void* buffer, size_t size);
 
-/**
- * Виконує самотестування КСГПВЧ криптографічної бібліотеки.
- *
- * @return код помилки
- */
-UAPKIC_EXPORT int drbg_self_test(void);
-
-#ifdef __cplusplus
+#ifdef  __cplusplus
 }
 #endif
 
-#endif
+
+#endif	// UAPKIC_CPU_FEATURES_H

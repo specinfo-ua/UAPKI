@@ -66,7 +66,7 @@ struct AesCtx_st {
     CipherMode mode_id;
 };
 
-/*Precomputed sbox, shitf_rows and m_col operation for fast calculation*/
+/* Precomputed sbox, shift_rows and m_col operation for fast calculation */
 static const uint32_t Te0[256] = {
     0xc66363a5U, 0xf87c7c84U, 0xee777799U, 0xf67b7b8dU,
     0xfff2f20dU, 0xd66b6bbdU, 0xde6f6fb1U, 0x91c5c554U,
@@ -1134,12 +1134,13 @@ __inline static void block_encrypt(AesCtx *ctx, uint8_t *in, uint8_t *out)
 
 __inline static void aes_xor(void *arg1, void *arg2, void *out)
 {
-    uint8_t *a1 = (uint8_t*) arg1;
-    uint8_t*a2 = (uint8_t*) arg2;
-    uint8_t*o = (uint8_t*) out;
+    uint8_t *a1 = (uint8_t*)arg1;
+    uint8_t *a2 = (uint8_t*)arg2;
+    uint8_t *o = (uint8_t*)out;
 
-    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
-    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
+    // Побайтно, бо адреси блоків у пам’яті можуть не бути
+    // кратними 4 або 8 байтам для 32- та 64-розрядних систем
+    // відповідно.
     o[0] = a1[0] ^ a2[0];
     o[1] = a1[1] ^ a2[1];
     o[2] = a1[2] ^ a2[2];

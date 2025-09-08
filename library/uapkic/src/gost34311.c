@@ -39,7 +39,6 @@
 void base_cycle32(Gost28147Ctx *ctx, uint32_t src[8], const uint32_t k[32]);
 
 /** Контекст выработки хэш-вектора. */
-
 struct Gost34311Ctx_st {
     Gost28147Ctx *gost;
     uint8_t m32[32];          /* Часть сообщения, не прошедшая процедуру хэширования на предыдущих итерациях. */
@@ -71,10 +70,10 @@ static __inline void reset(Gost34311Ctx *ctx)
 static __inline void mix_transform(const uint8_t *a8_buf, const uint8_t *b8_buf, const uint8_t *c8_buf, uint8_t *out8)
 {
     /* Можно привести тип, поскольку на результат функции не влияет переворачивание порядка байт. */
-    uint16_t *a = (uint16_t *)a8_buf;
-    uint16_t *b = (uint16_t *)b8_buf;
-    uint16_t *c = (uint16_t *)c8_buf;
-    uint16_t *out = (uint16_t *)out8;
+    uint16_t *a = (uint16_t*)a8_buf;
+    uint16_t *b = (uint16_t*)b8_buf;
+    uint16_t *c = (uint16_t*)c8_buf;
+    uint16_t *out = (uint16_t*)out8;
     uint16_t p1, p2, p3, p4, p5, p6, p7, p8;
     uint16_t a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3], a4 = a[4], a5 = a[5], a6 = a[6], a7 = a[7];
     uint16_t a8 = a[8], a9 = a[9], a10 = a[10], a11 = a[11], a12 = a[12], a13 = a[13], a14 = a[14], a15 = a[15];
@@ -278,8 +277,7 @@ Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteArray *sync)
     if (sync) {
         CHECK_PARAM(sync->len == 32);
         DO(ba_to_uint8(sync, ctx->sync, sizeof(ctx->sync)));
-    }
-    else {
+    } else {
         memset(ctx->sync, 0, sizeof(ctx->sync));
     }
 
@@ -353,14 +351,14 @@ int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data)
 
     buf = data->buf;
 
-    while (1) {
-        size = 32 - ctx->m32_ind > len ? len : 32 - ctx->m32_ind;
+    for (;;) {
+        size = min(32 - ctx->m32_ind, len);
         memcpy(ctx->m32 + ctx->m32_ind, buf, size);
-        len -= size;
         ctx->m32_ind += size;
         buf += size;
+        len -= size;
 
-        if (len == 0) {
+        if (!len) {
             break;
         }
 

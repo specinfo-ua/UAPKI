@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2021 The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
@@ -841,7 +841,7 @@ int dstu8845_set_iv(Dstu8845Ctx* ctx, const ByteArray* iv)
 {
     int ret = RET_OK;
     int i;
-    uint64_t  iv64[4];
+    uint64_t iv64[4];
 
     CHECK_PARAM(ctx != NULL);
 
@@ -868,8 +868,7 @@ int dstu8845_set_iv(Dstu8845Ctx* ctx, const ByteArray* iv)
         ctx->st[13] = ~ctx->key[2];
         ctx->st[14] = ctx->key[1];
         ctx->st[15] = ~ctx->key[0];
-    }
-    else {
+    } else {
         ctx->st[0] = ctx->key[7] ^ iv64[0];
         ctx->st[1] = ctx->key[6];
         ctx->st[2] = ctx->key[5];
@@ -995,12 +994,10 @@ int dstu8845_init(Dstu8845Ctx* ctx, const ByteArray* key, const ByteArray* iv)
     if (key->len == 32) {
         ctx->key_size = key->len;
         uint8_to_uint64(key->buf, 32, ctx->key, 4);
-    }
-    else if (key->len == 64) {
+    } else if (key->len == 64) {
         ctx->key_size = key->len;
         uint8_to_uint64(key->buf, 64, ctx->key, 8);
-    }
-    else {
+    } else {
         SET_ERROR(RET_INVALID_KEY_SIZE);
     }
 
@@ -1048,7 +1045,7 @@ int dstu8845_generate_key(size_t key_len, ByteArray **key)
     int ret = RET_OK;
     ByteArray* k = NULL;
 
-    if ((key_len != 32) & (key_len != 64)) {
+    if (key_len != 32 && key_len != 64) {
         SET_ERROR(RET_INVALID_KEY_SIZE);
     }
 

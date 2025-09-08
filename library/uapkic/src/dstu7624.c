@@ -44,15 +44,15 @@
 #define MAX_NUM_IN_BYTE 256
 #define MAX_BLOCK_LEN 64
 #define BITS_IN_BYTE 8
-#define KALINA_128_KEY_LEN 16
-#define KALINA_256_KEY_LEN 32
-#define KALINA_512_KEY_LEN 64
-#define KALINA_128_BLOCK_LEN 16
-#define KALINA_256_BLOCK_LEN 32
-#define KALINA_512_BLOCK_LEN 64
+#define KALYNA_128_KEY_LEN 16
+#define KALYNA_256_KEY_LEN 32
+#define KALYNA_512_KEY_LEN 64
+#define KALYNA_128_BLOCK_LEN 16
+#define KALYNA_256_BLOCK_LEN 32
+#define KALYNA_512_BLOCK_LEN 64
 #define SBOX_LEN 1024
 
-#define GALUA_MUL(i, j, k, shift) (uint64_t)((uint64_t)multiply_galua(mds[j * ROWS + k], s_blocks[(k % 4) * MAX_NUM_IN_BYTE + i]) << ((uint64_t)shift))
+#define GALOIS_MUL(i, j, k, shift) (uint64_t)((uint64_t)multiply_galois(mds[j * ROWS + k], s_blocks[(k % 4) * MAX_NUM_IN_BYTE + i]) << ((uint64_t)shift))
 
 typedef enum {
     DSTU7624_MODE_ECB,
@@ -290,43 +290,37 @@ struct Dstu7624Ctx_st {
 static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 {
     switch (size) {
-    case 2:
-        out[0] += in[0];
-        out[1] += in[1];
-        break;
-    case 4:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
-        break;
     case 8:
-        out[0] += in[0];
-        out[1] += in[1];
-        out[2] += in[2];
-        out[3] += in[3];
         out[4] += in[4];
         out[5] += in[5];
         out[6] += in[6];
         out[7] += in[7];
-        break;
+        // fallthrough
+    case 4:
+        out[2] += in[2];
+        out[3] += in[3];
+        // fallthrough
+    case 2:
+        out[0] += in[0];
+        out[1] += in[1];
+        return;
     default:
-        break;
+        return;
     }
 }
 
-/*memory safe xor*/
+/* memory safe xor */
 static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
 {
     uint8_t *a8, *b8, *o8;
-    size_t i;
 
-    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
-    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
-    a8 = (uint8_t *) arg1;
-    b8 = (uint8_t *) arg2;
-    o8 = (uint8_t *) out;
-    for (i = 0; i < len; i++) {
+    // Побайтно, бо адреси блоків у пам’яті можуть не бути
+    // кратними 4 або 8 байтам для 32- та 64-розрядних систем
+    // відповідно.
+    a8 = (uint8_t*)arg1;
+    b8 = (uint8_t*)arg2;
+    o8 = (uint8_t*)out;
+    for (int i = 0; i < len; i++) {
         o8[i] = a8[i] ^ b8[i];
     }
 }
@@ -1329,7 +1323,7 @@ static const uint8_t inv_s_blocks_default[SBOX_LEN] = {
 };
 
 /*Russian peasant multiplication algorithm*/
-static uint8_t multiply_galua(uint8_t x, uint8_t y)
+static uint8_t multiply_galois(uint8_t x, uint8_t y)
 {
     int i;
     uint8_t r = 0;
@@ -1365,8 +1359,8 @@ static void p_sub_row_col(const uint8_t * s_blocks, uint64_t p_boxrowcol[ROWS][M
 
     for (k = 0; k < ROWS; k++) {
         for (i = 0; i < MAX_NUM_IN_BYTE; i++) {
-            p_boxrowcol[k][i] = GALUA_MUL(i, 0, k, 0) ^ GALUA_MUL(i, 1, k, 8) ^ GALUA_MUL(i, 2, k, 16) ^ GALUA_MUL(i, 3, k, 24) ^
-                    GALUA_MUL(i, 4, k, 32) ^ GALUA_MUL(i, 5, k, 40) ^ GALUA_MUL(i, 6, k, 48) ^ GALUA_MUL(i, 7, k, 56);
+            p_boxrowcol[k][i] = GALOIS_MUL(i, 0, k, 0) ^ GALOIS_MUL(i, 1, k, 8) ^ GALOIS_MUL(i, 2, k, 16) ^ GALOIS_MUL(i, 3, k, 24) ^
+                    GALOIS_MUL(i, 4, k, 32) ^ GALOIS_MUL(i, 5, k, 40) ^ GALOIS_MUL(i, 6, k, 48) ^ GALOIS_MUL(i, 7, k, 56);
         }
     }
 }
@@ -1445,15 +1439,10 @@ void dstu7624_free(Dstu7624Ctx *ctx)
     if (ctx) {
         switch (ctx->mode_id) {
         case DSTU7624_MODE_CTR:
-            break;
         case DSTU7624_MODE_CBC:
-            break;
         case DSTU7624_MODE_OFB:
-            break;
         case DSTU7624_MODE_CFB:
-            break;
         case DSTU7624_MODE_CCM:
-            break;
         case DSTU7624_MODE_CMAC:
             break;
         case DSTU7624_MODE_XTS:
@@ -1468,7 +1457,7 @@ void dstu7624_free(Dstu7624Ctx *ctx)
         default:
             break;
         }
-        secure_zero(ctx, sizeof (Dstu7624Ctx));
+        secure_zero(ctx, sizeof(Dstu7624Ctx));
         free(ctx);
     }
 }
@@ -1790,7 +1779,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
 {
     size_t block_len = ctx->block_len;
 
-    if (block_len == KALINA_128_BLOCK_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         out[0] = ((uint64_t) (ctx->inv_s_blocks[0 * 256 + (s0 & 255)]) ^
@@ -1809,8 +1798,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
                 (uint64_t) (ctx->inv_s_blocks[1 * 256 + ((s0 >> 40) & 255)]) << 40 ^
                 (uint64_t) (ctx->inv_s_blocks[2 * 256 + ((s0 >> 48) & 255)]) << 48 ^
                 (uint64_t) (ctx->inv_s_blocks[3 * 256 + ((s0 >> 56) & 255)]) << 56) - rkey[1];
-    }
-    if (block_len == KALINA_256_BLOCK_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         uint64_t s2 = state[2];
@@ -1847,8 +1835,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
                 (uint64_t) (ctx->inv_s_blocks[1 * 256 + ((s1 >> 40) & 255)]) << 40 ^
                 (uint64_t) (ctx->inv_s_blocks[2 * 256 + ((s2 >> 48) & 255)]) << 48 ^
                 (uint64_t) (ctx->inv_s_blocks[3 * 256 + ((s2 >> 56) & 255)]) << 56) - rkey[3];
-    }
-    if (block_len == KALINA_512_BLOCK_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN) {
         uint64_t s0 = state[0];
         uint64_t s1 = state[1];
         uint64_t s2 = state[2];
@@ -1929,7 +1916,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
     size_t block_len = ctx->block_len;
     uint8_t *s_blocks = ctx->s_blocks;
 
-    if (block_len == KALINA_128_BLOCK_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -1946,8 +1933,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
                 ctx->p_inv_boxrowcol[5][s_blocks[1 * 256 + ((state[1] >> 40) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[6][s_blocks[2 * 256 + ((state[1] >> 48) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[7][s_blocks[3 * 256 + ((state[1] >> 56) & 0xFF)]];
-    }
-    if (block_len == KALINA_256_BLOCK_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -1980,8 +1966,7 @@ static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
                 ctx->p_inv_boxrowcol[5][s_blocks[1 * 256 + ((state[3] >> 40) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[6][s_blocks[2 * 256 + ((state[3] >> 48) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[7][s_blocks[3 * 256 + ((state[3] >> 56) & 0xFF)]];
-    }
-    if (block_len == KALINA_512_BLOCK_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[1][s_blocks[1 * 256 + ((state[0] >> 8) & 0xFF)]] ^
                 ctx->p_inv_boxrowcol[2][s_blocks[2 * 256 + ((state[0] >> 16) & 0xFF)]] ^
@@ -2054,7 +2039,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
     size_t block_len = ctx->block_len;
     size_t key_len  = ctx->key_len;
 
-    if (block_len == KALINA_128_BLOCK_LEN && key_len == KALINA_128_KEY_LEN) {
+    if (block_len == KALYNA_128_BLOCK_LEN && key_len == KALYNA_128_KEY_LEN) {
         invert_state(&rkey[18], ctx);
         invert_state(&rkey[16], ctx);
         invert_state(&rkey[14], ctx);
@@ -2064,8 +2049,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[6], ctx);
         invert_state(&rkey[4], ctx);
         invert_state(&rkey[2], ctx);
-    }
-    if (block_len == KALINA_128_BLOCK_LEN && key_len == KALINA_256_KEY_LEN) {
+    } else if (block_len == KALYNA_128_BLOCK_LEN && key_len == KALYNA_256_KEY_LEN) {
         invert_state(&rkey[26], ctx);
         invert_state(&rkey[24], ctx);
         invert_state(&rkey[22], ctx);
@@ -2079,8 +2063,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[6], ctx);
         invert_state(&rkey[4], ctx);
         invert_state(&rkey[2], ctx);
-    }
-    if (block_len == KALINA_256_BLOCK_LEN && key_len == KALINA_256_KEY_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN && key_len == KALYNA_256_KEY_LEN) {
         invert_state(&rkey[52], ctx);
         invert_state(&rkey[48], ctx);
         invert_state(&rkey[44], ctx);
@@ -2094,8 +2077,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[12], ctx);
         invert_state(&rkey[8], ctx);
         invert_state(&rkey[4], ctx);
-    }
-    if (block_len == KALINA_256_BLOCK_LEN && key_len == KALINA_512_KEY_LEN) {
+    } else if (block_len == KALYNA_256_BLOCK_LEN && key_len == KALYNA_512_KEY_LEN) {
         invert_state(&rkey[68], ctx);
         invert_state(&rkey[64], ctx);
         invert_state(&rkey[60], ctx);
@@ -2113,8 +2095,7 @@ static void reverse_rkey(uint64_t *rkey, Dstu7624Ctx *ctx)
         invert_state(&rkey[12], ctx);
         invert_state(&rkey[8], ctx);
         invert_state(&rkey[4], ctx);
-    }
-    if (block_len == KALINA_512_BLOCK_LEN && key_len == KALINA_512_KEY_LEN) {
+    } else if (block_len == KALYNA_512_BLOCK_LEN && key_len == KALYNA_512_KEY_LEN) {
         invert_state(&rkey[136], ctx);
         invert_state(&rkey[128], ctx);
         invert_state(&rkey[120], ctx);
@@ -2450,7 +2431,7 @@ static int p_key_shift(const uint8_t *key, Dstu7624Ctx *ctx, uint64_t **key_shif
                     shift = 60 * i;
                     key_shift[(j + shift) % key_len] = key[j];
                 } else {
-                    if (key_len == KALINA_256_KEY_LEN) {
+                    if (key_len == KALYNA_256_KEY_LEN) {
                         shift = 48 - ((i >> 1) << 3);
                     } else {
                         shift = 96 - ((i >> 1) << 3);
@@ -2484,8 +2465,8 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
-    CHECK_PARAM(block_size == KALINA_128_BLOCK_LEN || block_size == KALINA_256_BLOCK_LEN || 
-        block_size == KALINA_512_BLOCK_LEN);
+    CHECK_PARAM(block_size == KALYNA_128_BLOCK_LEN || block_size == KALYNA_256_BLOCK_LEN || 
+        block_size == KALYNA_512_BLOCK_LEN);
 
     gf2m_free(ctx->mode.gmac.gf2m_ctx);
     ctx->mode.gmac.gf2m_ctx = NULL;
@@ -2493,38 +2474,38 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
     key_buf = key->buf;
     key_buf_len = key->len;
 
-    CHECK_PARAM(key_buf_len == KALINA_128_KEY_LEN || key_buf_len == KALINA_256_KEY_LEN
-            || key_buf_len == KALINA_512_KEY_LEN);
+    CHECK_PARAM(key_buf_len == KALYNA_128_KEY_LEN || key_buf_len == KALYNA_256_KEY_LEN
+            || key_buf_len == KALYNA_512_KEY_LEN);
 
     MALLOC_CHECKED(p_hrkey, key_buf_len);
     memset(p_hrkey, 0, key_buf_len);
 
     /*Ініціалізація початкових даних ДСТУ7624 у відповідності з розміром блока та ключа.*/
-    if (key_buf_len == KALINA_128_KEY_LEN && block_size == KALINA_128_BLOCK_LEN) {
+    if (key_buf_len == KALYNA_128_KEY_LEN && block_size == KALYNA_128_BLOCK_LEN) {
         p_hrkey[0] = 0x05;
         ctx->subrowcol = subrowcol128; // операція швидкого обчислення s_blocks, srow, mcol
         ctx->basic_transform = basic_transform_128; // операція базового перетворення
         ctx->subrowcol_dec = subrowcol128_dec; // операція зворотнього базового перетворення
         ctx->rounds = 10; // кількість раундів для генерування раундового ключа
-    } else if (key_buf_len == KALINA_256_KEY_LEN && block_size == KALINA_128_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_256_KEY_LEN && block_size == KALYNA_128_BLOCK_LEN) {
         p_hrkey[0] = 0x07;
         ctx->subrowcol = subrowcol128;
         ctx->basic_transform = basic_transform_128_256;
         ctx->subrowcol_dec = subrowcol128_256_dec;
         ctx->rounds = 14;
-    } else if (key_buf_len == KALINA_256_KEY_LEN && block_size == KALINA_256_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_256_KEY_LEN && block_size == KALYNA_256_BLOCK_LEN) {
         p_hrkey[0] = 0x09;
         ctx->subrowcol = subrowcol256;
         ctx->basic_transform = basic_transform_256;
         ctx->subrowcol_dec = subrowcol256_dec;
         ctx->rounds = 14;
-    } else if (key_buf_len == KALINA_512_KEY_LEN && block_size == KALINA_256_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_512_KEY_LEN && block_size == KALYNA_256_BLOCK_LEN) {
         p_hrkey[0] = 0x0D;
         ctx->subrowcol = subrowcol256;
         ctx->basic_transform = basic_transform_256_512;
         ctx->subrowcol_dec = subrowcol256_512_dec;
         ctx->rounds = 18;
-    } else if (key_buf_len == KALINA_512_KEY_LEN && block_size == KALINA_512_BLOCK_LEN) {
+    } else if (key_buf_len == KALYNA_512_KEY_LEN && block_size == KALYNA_512_BLOCK_LEN) {
         p_hrkey[0] = 0x11;
         ctx->subrowcol = subrowcol512;
         ctx->basic_transform = basic_transform_512;
@@ -2640,7 +2621,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     CHECK_PARAM(h_out != NULL);
     CHECK_PARAM(ctx->block_len >= Nb + 1);
 
-    /*Начало виробки імітовставки*/
+    // Початок утворення імітовставки.
     tmp = ctx->block_len - Nb - 1;
     block_len = ctx->block_len;
 
@@ -2656,7 +2637,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     CALLOC_CHECKED(p_data_buf, p_data_len + block_len);
     DO(ba_to_uint8(plain_data, p_data_buf, p_data_len));
 
-    //Создание заголовка аутентификации
+    // Створення заголовка автентифікації.
     G1[tmp] = (uint8_t) p_data_len;
 
     if (ba_get_len(plain_data) > 0) {
@@ -2664,7 +2645,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     } else {
         G1[block_len - 1] = 0;
     }
-    //Код довжини імітовставки. Определен у стандарте.
+    // Код довжини імітовставки. Визначений стандартом.
     switch (ctx->mode.ccm.q) {
     case 8:
         G1[block_len - 1] |= 2 << 4;
@@ -2685,7 +2666,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
         break;
     }
     G1[block_len - 1] |= ((Nb - 1));
-    //Конец создания заголовка аутентификации
+    // Кінець створення заголовка автентифікації.
 
     G2[0] = (uint8_t) a_data_len;
 
@@ -2716,7 +2697,7 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
     *h_out = h;
     h = NULL;
 
-    /*Конец виробки імітовставки*/
+    // Кінець утворення імітовставки.
 
 cleanup:
 
@@ -2751,7 +2732,7 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < ctx->block_len && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
@@ -2767,14 +2748,14 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Шифрування блоками по 8 байт. */
+        // Шифрування блоками по 8 байтів.
         for (; data_off + ctx->block_len <= src->len; data_off += ctx->block_len) {
             kalyna_xor(&src->buf[data_off], gamma, ctx->block_len, &out->buf[data_off]);
 
             gamma_gen(feed);
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
             offset++;
@@ -3041,17 +3022,17 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     if (padded_len != block_len) {
-        //Дополняем последний блок шифротекстом предпоследнего
+        // Доповнюємо останній блок шифротекстом передостаннього
         i += plain_size % block_len;
         memcpy(&plain_data[i], &plain_data[i - block_len], padded_len);
         i -= plain_size % block_len;
 
-        //Конвертируем а для бе машин.
+        // Конвертуємо a для Big Endian.
         DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
-        //Меняем n-1 блок и nй местами.
+        // Міняємо n-1 блок і n-й місцями.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3128,7 +3109,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
 
-        //Меняем n-1 блок и nй местами.
+        // Міняємо n-1 блок і n-й місцями.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3195,7 +3176,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3209,7 +3190,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in->len) {
-        /* Шифрування блоками по ctx->block_len байт. */
+        // Шифрування блоками по ctx->block_len байтів.
         for (; data_off + q <= in->len; data_off += q) {
             kalyna_xor(&in->buf[data_off], &gamma[offset], q, &out->buf[data_off]);
 
@@ -3218,7 +3199,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = out->buf[data_off];
@@ -3486,9 +3467,8 @@ static int gmac_update(Dstu7624Ctx *ctx, const ByteArray *plain_data)
             data_len -= tail_len;
         }
     } else {
-
         if (data_len >= block_len) {
-            kalyna_xor(&data_buf[0], B8, block_len, B8);
+            kalyna_xor(data_buf, B8, block_len, B8);
         } else {
             memcpy(last_block, data_buf, data_len);
             ctx->mode.gmac.last_block_len = data_len;
@@ -3546,7 +3526,7 @@ static int gmac_final(Dstu7624Ctx *ctx, ByteArray **mac)
         //Если последний блок не нулевой, дополняем его.
         padding(ctx, last_block, &last_block_len, last_block);
 
-        kalyna_xor(&last_block, B8, last_block_len, B8);
+        kalyna_xor(last_block, B8, last_block_len, B8);
         DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
     }
     memset(H, 0, MAX_BLOCK_LEN);
@@ -3769,7 +3749,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    // Використання гами, що залишилась.
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3792,7 +3772,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        // Шифрування останнього неповного блоку.
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = in->buf[data_off];
@@ -4071,7 +4051,7 @@ int dstu7624_init_cmac(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bloc
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
-    CHECK_PARAM(q > 0 && q <= block_size);
+    CHECK_PARAM(q && q <= block_size);
 
     DO(dstu7624_init(ctx, key, block_size));
 
@@ -4141,7 +4121,7 @@ int dstu7624_init_ccm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
     CHECK_PARAM(iv != NULL);
-    CHECK_PARAM(q > 0);
+    CHECK_PARAM(q);
     CHECK_PARAM(n_max >= 8);
 
     DO(dstu7624_init(ctx, key, ba_get_len(iv)));
@@ -4170,7 +4150,7 @@ int dstu7624_init_gcm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
     CHECK_PARAM(iv != NULL);
-    CHECK_PARAM( (8 <= q) && (q <= iv->len) );
+    CHECK_PARAM(8 <= q && q <= iv->len);
 
     DO(dstu7624_init(ctx, key, ba_get_len(iv)));
 

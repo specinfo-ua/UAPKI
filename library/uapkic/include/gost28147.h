@@ -123,7 +123,7 @@ UAPKIC_EXPORT int gost28147_init_ecb(Gost28147Ctx *ctx, const ByteArray *key);
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -133,7 +133,7 @@ UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, co
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_cfb(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -178,7 +178,7 @@ UAPKIC_EXPORT int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *encrypte
 UAPKIC_EXPORT int gost28147_update_mac(Gost28147Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершуе вироботку імітовектора і повертає його значення.
+ * Завершує вироблення імітовектору й повертає його значення.
  *
  * @param ctx контекст ГОСТ 28147
  * @param mac імітовектор
@@ -188,7 +188,7 @@ UAPKIC_EXPORT int gost28147_update_mac(Gost28147Ctx *ctx, const ByteArray *data)
 UAPKIC_EXPORT int gost28147_final_mac(Gost28147Ctx *ctx, ByteArray **mac);
 
 /**
- * Завершує вироботку імітовектора і повертає його розширене значення.
+ * Завершує вироблення імітовектору й повертає його розширене значення.
  *
  * @param ctx контекст ГОСТ 28147
  * @param mac розширений імітовектор

@@ -45,49 +45,67 @@ struct ByteArray_st {
 };
 
 /**
- * Создаёт контекст массива байт.
+ * Створює контекст масиву байтів.
  *
- * @param buf массив байт с инвертированным порядком байт
- * @param buf_len размер массива байт
- * @return контекст массива байт
+ * @param buf масив байтів у Big Endian
+ * @param buf_len кількість елементів у buf
+ * @return контекст масиву байтів
  */
 ByteArray *ba_alloc_from_uint8_be(const uint8_t *buf, size_t buf_len);
 
 /**
- * Создаёт контекст массива байт по массиву 64-битных слов.
+ * Створює контекст масиву байтів із масиву 32-розрядних цілих чисел.
  *
- * @param buf массив 64 битных слов
- * @param buf_len количество слов в buf
- * @return контекст массива байт
+ * @param buf масив 32-розрядних цілих чисел
+ * @param buf_len кількість елементів у buf
+ * @return контекст масиву байтів
+ */
+ByteArray* ba_alloc_from_uint32(const uint32_t* buf, size_t buf_len);
+
+/**
+ * Створює контекст масиву байтів із масиву 64-розрядних цілих чисел.
+ *
+ * @param buf масив 64-розрядних цілих чисел
+ * @param buf_len кількість елементів у buf
+ * @return контекст масиву байтів
  */
 ByteArray *ba_alloc_from_uint64(const uint64_t *buf, size_t buf_len);
 
 /**
- * Возвращает данные, которые хранит контекст массива байт, в формате массива 64-битных слов.
- * Выделяет память.
+ * Повертає дані, котрі містить контекст масиву байтів, у вигляді масиву 64-розрядних цілих чисел.
+ * Виділяє пам’ять.
  *
- * @param ba контекст массива байт
- * @param buf массив 64-битных слов
- * @param buf_len количество слов buf
- * @return код ошибки
+ * @param ba контекст масиву байтів
+ * @param buf масив 64-розрядних цілих чисел
+ * @param buf_len кількість елементів у buf
+ * @return код помилки
  */
 int ba_to_uint64_with_alloc(const ByteArray *ba, uint64_t **buf, size_t *buf_len);
 
 /**
- * Возвращает данные, которые хранит контекст массива байт, в формате массива 32-битных слов.
- * Не выделяет память.
+ * Повертає дані, котрі містить контекст масиву байтів, у вигляді масиву 32-розрядних цілих чисел.
+ * Не виділяє пам’ять.
  *
- * @param ba контекст массива байт
- * @param buf массив 32-битных слов
- * @param buf_len количество слов buf
- * @return код ошибки
+ * @param ba контекст масиву байтів
+ * @param buf масив 32-розрядних цілих чисел
+ * @param buf_len кількість елементів у buf
+ * @return код помилки
  */
 int ba_to_uint32(const ByteArray *ba, uint32_t *buf, size_t buf_len);
+
+/**
+ * Повертає дані, котрі містить контекст масиву байтів, у вигляді масиву 64-розрядних цілих чисел.
+ * Не виділяє пам’ять.
+ *
+ * @param ba контекст масиву байтів
+ * @param buf масив 64-розрядних цілих чисел
+ * @param buf_len кількість елементів у buf
+ * @return код помилки
+ */
+int ba_to_uint64(const ByteArray* ba, uint64_t* buf, size_t buf_len);
+
 int ba_from_uint32(const uint32_t *buf, size_t buf_len, ByteArray *ba);
-ByteArray *ba_alloc_from_uint32(const uint32_t *buf, size_t buf_len);
-int ba_to_uint64(const ByteArray *ba, uint64_t *buf, size_t buf_len);
 int ba_from_uint64(const uint64_t *buf, size_t buf_len, ByteArray *ba);
-int ba_to_uint64(const ByteArray *ba, uint64_t *buf, size_t buf_len);
 int ba_trim_leading_zeros(ByteArray *ba);
 int ba_truncate(ByteArray *a, size_t bit_len);
 bool ba_is_zero(const ByteArray *a);
