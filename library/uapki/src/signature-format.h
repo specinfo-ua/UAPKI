@@ -35,20 +35,26 @@
 
 namespace UapkiNS {
 
-    enum class SignatureFormat : uint32_t {
-        UNDEFINED       = 0,
-        RAW             = 1,
-        CMS_SID_KEYID   = 2,
-        CADES_BES       = 3,
-        CADES_T         = 4,
-        CADES_C         = 5,
-        CADES_XL        = 6,
-        CADES_A         = 7
-    };  //  end enum SignatureFormat
+enum class SignatureFormat : uint32_t {
+    UNDEFINED       = 0,
+    RAW             = 1,
+    CMS_SID_KEYID   = 2,
+    CADES_BES       = 3,
+    CADES_T         = 4,
+    CADES_C         = 5,
+    CADES_XL        = 6,
+    CADES_A         = 7
+};  //  end enum SignatureFormat
 
-    SignatureFormat signatureFormatFromString (const std::string& str);
-    const char* signatureFormatToStr (const SignatureFormat signatureFormat);
-    std::string signatureFormatToString (const SignatureFormat signatureFormat);
+SignatureFormat signatureFormatFromString (
+    const std::string& str
+);
+const char* signatureFormatToStr (
+    const SignatureFormat signatureFormat
+);
+std::string signatureFormatToString (
+    const SignatureFormat signatureFormat
+);
 
 }   //  end namespace UapkiNS
 

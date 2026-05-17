@@ -58,6 +58,8 @@ JksBufferCtx* jks_buffer_alloc_ba(const ByteArray *data)
     size_t offset = 0;
     JksBufferCtx *ctx = NULL;
 
+    if (ba_get_len(data) < SHA1_HASH_LEN) return NULL;
+
     MALLOC_CHECKED(ctx, sizeof(JksBufferCtx));
 
     offset = ba_get_len(data) - SHA1_HASH_LEN;

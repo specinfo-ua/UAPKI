@@ -29,13 +29,14 @@
 #define CM_STORAGE_PROXY_H
 
 
-#include "byte-array.h"
-#include "cm-api.h"
-#include "cm-loader.h"
 #include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
+#include "byte-array.h"
+#include "cm-api.h"
+#include "cm-loader.h"
+#include "uapki-ns.h"
 
 
 class CmStorageProxy {
@@ -49,6 +50,12 @@ class CmStorageProxy {
                 m_Session;
     const CM_KEY_API* 
                 m_SelectedKey;
+    UapkiNS::SmartBA
+                m_SelectedKeyId;
+    UapkiNS::SmartBA
+                m_SelectedKeyId2;
+    UapkiNS::SmartBA
+                m_PairedCertId;
 
 public:
     CmStorageProxy (void);
@@ -236,11 +243,29 @@ public:
         std::vector<ByteArray*>& vbaSessionKeys
     );
 
+    void deselectKey (void);
+    int setPairedCertId (
+        const ByteArray* baCertId
+    );
+    int setSelectedKeyId (
+        const ByteArray* baKeyId,
+        const ByteArray* baKeyId2
+    );
+
     CM_SESSION_API* getCmSessionApi (void) const {
         return m_Session;
     }
+    const ByteArray* getPairedCertId (void) const {
+        return m_PairedCertId.get();
+    }
     const CM_KEY_API* getSelectedKey (void) const {
         return m_SelectedKey;
+    }
+    const ByteArray* getSelectedKeyId (void) const {
+        return m_SelectedKeyId.get();
+    }
+    const ByteArray* getSelectedKeyId2 (void) const {
+        return m_SelectedKeyId2.get();
     }
     bool isAuthorizedSession (void) const {
         return m_IsAuthorizedSession;

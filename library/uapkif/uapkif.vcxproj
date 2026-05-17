@@ -119,6 +119,7 @@
     <ClInclude Include="include\DistributionPoint.h" />
     <ClInclude Include="include\DistributionPointName.h" />
     <ClInclude Include="include\DSTU4145Params.h" />
+    <ClInclude Include="include\DSTU7624Parameters.h" />
     <ClInclude Include="include\DSTUEllipticCurve.h" />
     <ClInclude Include="include\ECBinary.h" />
     <ClInclude Include="include\ECDSA-Sig-Value.h" />
@@ -473,6 +474,7 @@
     <ClCompile Include="src\struct\DistributionPoint.c" />
     <ClCompile Include="src\struct\DistributionPointName.c" />
     <ClCompile Include="src\struct\DSTU4145Params.c" />
+    <ClCompile Include="src\struct\DSTU7624Parameters.c" />
     <ClCompile Include="src\struct\DSTUEllipticCurve.c" />
     <ClCompile Include="src\struct\ECBinary.c" />
     <ClCompile Include="src\struct\ECDSA-Sig-Value.c" />
@@ -674,7 +676,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{246343b7-4d20-4797-9ca9-471692bb441a}</ProjectGuid>
     <RootNamespace>uapkif</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

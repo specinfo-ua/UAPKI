@@ -35,6 +35,7 @@
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
 constexpr size_t SIZE_DSTU4145_PARAM_M257_PB = 119;
@@ -52,65 +53,116 @@ static const char* SHEX_DSTU4145_PARAM_M431_PB =
                 "84065850A9A249ED7BC249AE5A4E878689F872EF7AD524082EC3038E9AEDE7BA6BA13381D979BA621A";
 
 
-int DstuNS::ba2BitStringEncapOctet (const ByteArray* baData, BIT_STRING_t* bsEncapOctet)
+int DstuNS::ba2BitStringEncapOctet (
+        const ByteArray* baData,
+        BIT_STRING_t* bsEncapOctet
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encap = nullptr;
+    SmartBA sba_encap;
 
     CHECK_PARAM(baData != nullptr);
     CHECK_PARAM(bsEncapOctet != nullptr);
 
-    DO(UapkiNS::Util::encodeOctetString(baData, &ba_encap));
+    DO(Util::encodeOctetString(baData, &sba_encap));
 
     bsEncapOctet->bits_unused = 0;
-    DO(asn_ba2BITSTRING(ba_encap, bsEncapOctet));
+    DO(asn_ba2BITSTRING(sba_encap.get(), bsEncapOctet));
 
 cleanup:
-    ba_free(ba_encap);
     return ret;
 }
 
-int DstuNS::calcKeyId (const ByteArray* baPubkey, ByteArray** baKeyId)
+int DstuNS::calcKeyId (
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId
+)
 {
     int ret = RET_OK;
-    ByteArray* ba_encappubkey = nullptr;
+    SmartBA sba_encappubkey;
 
-    CHECK_PARAM(baPubkey != nullptr);
+    CHECK_PARAM(baPublicKey != nullptr);
     CHECK_PARAM(baKeyId != nullptr);
 
-    DO(UapkiNS::Util::encodeOctetString(baPubkey, &ba_encappubkey));
+    DO(Util::encodeOctetString(baPublicKey, &sba_encappubkey));
 
-    DO(::hash(HASH_ALG_GOST34311, ba_encappubkey, baKeyId));
+    DO(::hash(HASH_ALG_GOST34311, sba_encappubkey.get(), baKeyId));
 
 cleanup:
-    ba_free(ba_encappubkey);
     return ret;
 }
 
-bool DstuNS::isDstu4145family (const char* algo)
+int DstuNS::calcKeyId (
+        const bool useKupyna,
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_encappubkey;
+
+    CHECK_PARAM(baPublicKey != nullptr);
+    CHECK_PARAM(baKeyId != nullptr);
+
+    DO(Util::encodeOctetString(baPublicKey, &sba_encappubkey));
+
+    DO(::hash(useKupyna ? HASH_ALG_DSTU7564_256 : HASH_ALG_GOST34311, sba_encappubkey.get(), baKeyId));
+
+cleanup:
+    return ret;
+}
+
+int DstuNS::calcKeyId (
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId,
+        ByteArray** baKeyId2
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_encappubkey;
+
+    CHECK_PARAM(baPublicKey != nullptr);
+    CHECK_PARAM(baKeyId != nullptr);
+    CHECK_PARAM(baKeyId2 != nullptr);
+
+    DO(Util::encodeOctetString(baPublicKey, &sba_encappubkey));
+
+    DO(::hash(HASH_ALG_GOST34311,    sba_encappubkey.get(), baKeyId ));
+    DO(::hash(HASH_ALG_DSTU7564_256, sba_encappubkey.get(), baKeyId2));
+
+cleanup:
+    return ret;
+}
+
+bool DstuNS::isDstu4145family (
+        const char* algo
+)
 {
     return (algo && (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, algo) || oid_is_parent(OID_DSTU4145_WITH_GOST3411, algo)));
 }
 
-bool DstuNS::isDstu4145family (const string& algo)
+bool DstuNS::isDstu4145family (
+        const string& algo
+)
 {
     return isDstu4145family(algo.c_str());
 }
 
-int DstuNS::Dstu4145::decodeParams (const ByteArray* baEncoded, string& oidNamedCurve)
+int DstuNS::Dstu4145::decodeParams (
+        const ByteArray* baEncoded,
+        string& oidNamedCurve
+)
 {
     int ret = RET_OK;
     DSTU4145Params_t* params = nullptr;
-    UapkiNS::SmartBA sba_ecbinary, sba_pattern;
-    char* s_oid = nullptr;
+    SmartBA sba_ecbinary, sba_pattern;
 
     CHECK_PARAM(baEncoded != nullptr);
 
     CHECK_NOT_NULL(params = (DSTU4145Params_t*)asn_decode_ba_with_alloc(get_DSTU4145Params_desc(), baEncoded));
 
     if (params->ellipticCurve.present == DSTUEllipticCurve_PR_namedCurve) {
-        DO(asn_oid_to_text(&params->ellipticCurve.choice.namedCurve, &s_oid));
-        oidNamedCurve = string(s_oid);
+        DO(Util::oidFromAsn1(&params->ellipticCurve.choice.namedCurve, oidNamedCurve));
     }
     else if (params->ellipticCurve.present == DSTUEllipticCurve_PR_ecbinary) {
         DO(asn_encode_ba(get_ECBinary_desc(), &params->ellipticCurve.choice.ecbinary, &sba_ecbinary));
@@ -142,11 +194,14 @@ int DstuNS::Dstu4145::decodeParams (const ByteArray* baEncoded, string& oidNamed
 
 cleanup:
     asn_free(get_DSTU4145Params_desc(), params);
-    ::free(s_oid);
     return ret;
 }
 
-int DstuNS::Dstu4145::encodeParams (const std::string& oidNamedCurve, const ByteArray* baDKE, ByteArray** baEncoded)
+int DstuNS::Dstu4145::encodeParams (
+        const string& oidNamedCurve,
+        const ByteArray* baDKE,
+        ByteArray** baEncoded
+)
 {
     int ret = RET_OK;
     DSTU4145Params_t* params = nullptr;

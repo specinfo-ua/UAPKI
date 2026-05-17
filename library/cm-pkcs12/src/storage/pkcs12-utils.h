@@ -38,7 +38,8 @@ extern "C" {
 #endif
 
 
-int pkcs12_calc_hmac (const HashAlg hash_alg, const ByteArray * key, const ByteArray * msg, ByteArray ** hmac);
+int pkcs12_calc_hmac (const HashAlg hash_alg, const ByteArray* key, const ByteArray * msg, ByteArray ** hmac);
+int pkcs12_calc_dstu7564kmac (const ByteArray * key, const size_t mac_len, const ByteArray * msg, ByteArray ** hmac);
 int pkcs12_get_data_and_calc_mac (const PFX_t * pfx, const char * pass,
         const char ** macAlgo, size_t * iterations, ByteArray ** baAuthsafe, ByteArray ** baMacValue);
 int pkcs12_read_encrypted_content (const ContentInfo_t * content, const char * password, ByteArray ** data);

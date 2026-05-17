@@ -175,14 +175,12 @@ int decodeSignaturePolicy (
     //  Note: current implementation ignore params sigPolicyHash and sigPolicyQualifiers (rfc3126)
     int ret = RET_OK;
     SignaturePolicyIdentifier_t* sig_policy = nullptr;
-    char* s_policyid = nullptr;
 
     CHECK_NOT_NULL(sig_policy = (SignaturePolicyIdentifier_t*)asn_decode_ba_with_alloc(get_SignaturePolicyIdentifier_desc(), baEncoded));
     if (sig_policy->present == SignaturePolicyIdentifier_PR_signaturePolicyId) {
         const SignaturePolicyId_t& signature_policyid = sig_policy->choice.signaturePolicyId;
         //  =sigPolicyId=
-        DO(asn_oid_to_text(&signature_policyid.sigPolicyId, &s_policyid));
-        sigPolicyId = string(s_policyid);
+        DO(Util::oidFromAsn1(&signature_policyid.sigPolicyId, sigPolicyId));
         //  =sigPolicyHash=
         //  Now skipped, later impl
         //  =sigPolicyQualifiers= (optional)
@@ -194,7 +192,6 @@ int decodeSignaturePolicy (
 
 cleanup:
     asn_free(get_SignaturePolicyIdentifier_desc(), sig_policy);
-    ::free(s_policyid);
     return ret;
 }
 
@@ -857,7 +854,6 @@ int RevocationRefsParser::CrlOcspRef::parse (
 )
 {
     int ret = RET_OK;
-    char* s_type = nullptr;
 
     //  =crlids= (optional)
     if (crlOcspRef.crlids && (crlOcspRef.crlids->crls.list.count > 0)) {
@@ -886,13 +882,11 @@ int RevocationRefsParser::CrlOcspRef::parse (
     //  =otherRev= (optional)
     if (crlOcspRef.otherRev) {
         const OtherRevRefs_t* other_revrefs = crlOcspRef.otherRev;
-        DO(asn_oid_to_text(&other_revrefs->otherRevRefType, &s_type));
-        m_OtherRevRefs.type = string(s_type);
+        DO(Util::oidFromAsn1(&other_revrefs->otherRevRefType, m_OtherRevRefs.type));
         m_OtherRevRefs.baValues = ba_alloc_from_uint8(other_revrefs->otherRevRefs.buf, other_revrefs->otherRevRefs.size);
     }
 
 cleanup:
-    ::free(s_type);
     return ret;
 }
 
@@ -1083,7 +1077,6 @@ int RevocationValuesParser::parse (
 {
     int ret = RET_OK;
     RevocationValues_t* rev_values;
-    char* s_type = nullptr;
 
     CHECK_NOT_NULL(rev_values = (RevocationValues_t*)asn_decode_ba_with_alloc(get_RevocationValues_desc(), baEncoded));
 
@@ -1106,14 +1099,12 @@ int RevocationValuesParser::parse (
     //  =otherRevVals= (optional)
     if (rev_values->otherRevVals) {
         const OtherRevVals_t* other_revvals = rev_values->otherRevVals;
-        DO(asn_oid_to_text(&other_revvals->otherRevValType, &s_type));
-        m_OtherRevVals.type = string(s_type);
+        DO(Util::oidFromAsn1(&other_revvals->otherRevValType, m_OtherRevVals.type));
         m_OtherRevVals.baValues = ba_alloc_from_uint8(other_revvals->otherRevVals.buf, other_revvals->otherRevVals.size);
     }
 
 cleanup:
     asn_free(get_RevocationValues_desc(), rev_values);
-    ::free(s_type);
     return ret;
 }
 

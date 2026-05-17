@@ -111,3 +111,10 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 cleanup:
 	return ret;
 }
+
+void uapkic_free(void* ptr)
+{
+	if (ptr != NULL) {
+		free(ptr);
+	}
+}

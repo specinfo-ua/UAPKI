@@ -36,6 +36,13 @@
 #include "cm-errors.h"
 
 
+#define DEBUG_OUTCON(expression)
+#ifndef DEBUG_OUTCON
+  #include "ba-utils.h"
+  #define DEBUG_OUTCON(expression) expression
+#endif
+
+
 static int gost28147_crypt(const AlgorithmIdentifier_t* aid, const ByteArray* key, CryptDirection direction, const ByteArray* data, ByteArray** crypted)
 {
     int ret = RET_OK;
@@ -87,11 +94,154 @@ cleanup:
     return ret;
 }
 
+static int aid_dstu7624_get_iv(const AlgorithmIdentifier_t* aid, ByteArray** iv)
+{
+    int ret = RET_OK;
+    uint8_t* dke = NULL;
+    //  Dstu7624Parameters_t is missed - use GOST28147ParamsOptionalDke_t without DKE instead it
+    GOST28147ParamsOptionalDke_t* gost28147_params = NULL;
+
+    CHECK_NOT_NULL(gost28147_params = asn_any2type(aid->parameters, get_GOST28147ParamsOptionalDke_desc()));
+    DO(asn_OCTSTRING2ba(&gost28147_params->iv, iv));
+    if (gost28147_params->dke) {
+        SET_ERROR(RET_CM_UNSUPPORTED_PARAMETER);
+    }
+
+cleanup:
+    free(dke);
+    asn_free(get_GOST28147ParamsOptionalDke_desc(), gost28147_params);
+    return ret;
+}
+
+static int dstu7624_crypt(const ByteArray* key, const ByteArray* iv, CryptDirection direction, const ByteArray* data, ByteArray** crypted)
+{
+    int ret = RET_OK;
+    Dstu7624Ctx* ctx = NULL;
+
+    CHECK_NOT_NULL(ctx = dstu7624_alloc(DSTU7624_SBOX_1));
+    DO(dstu7624_init_cbc(ctx, key, iv));
+
+    if (direction == DIRECTION_ENCRYPT) {
+        DO(dstu7624_encrypt(ctx, data, crypted));
+    }
+    else {
+        DO(dstu7624_decrypt(ctx, data, crypted));
+    }
+
+cleanup:
+    dstu7624_free(ctx);
+    return ret;
+}
+
+static int pbkdf2_dstu7564kmac(const char* pass, const ByteArray* salt, size_t iterations, size_t key_len, HashAlg hash_alg, ByteArray** dk)
+{
+    int ret = RET_OK;
+    ByteArray* iv = NULL;
+    ByteArray* pass_ba = NULL;
+    ByteArray* count_ba = NULL;
+    ByteArray* key = NULL;
+    ByteArray* out = NULL;
+    ByteArray* u = NULL;
+    size_t cplen = 0;
+    size_t i;
+    unsigned int count = 1;
+    uint8_t count_buf[4] = { 0 };
+    Dstu7564Ctx* hmac_ctx = NULL;
+    size_t hash_len = 0;
+
+    CHECK_PARAM(pass != NULL);
+    CHECK_PARAM(salt != NULL);
+    CHECK_PARAM(dk != NULL);
+
+    CHECK_NOT_NULL(out = ba_alloc());
+
+    CHECK_NOT_NULL(pass_ba = ba_alloc_from_str(pass));
+
+    /* F(P, S, c, i) = U1 xor U2 xor ... Uc
+     *
+     * U1 = PRF(P, S || i)
+     * U2 = PRF(P, U1)
+     * Uc = PRF(P, Uc-1)
+     *
+     * T_1 = F (P, S, c, 1) ,
+     * T_2 = F (P, S, c, 2) ,
+     * ...
+     * T_l = F (P, S, c, l)
+     */
+
+    CHECK_NOT_NULL(hmac_ctx = dstu7564_alloc());
+    hash_len = hash_get_size(hash_alg);
+    DO(ba_change_len(pass_ba, hash_len));
+
+    while (key_len) {
+        if (key_len > hash_len) {
+            cplen = hash_len;
+        }
+        else {
+            cplen = key_len;
+        }
+
+        count_buf[0] = (count >> 24) & 0xff;
+        count_buf[1] = (count >> 16) & 0xff;
+        count_buf[2] = (count >> 8) & 0xff;
+        count_buf[3] = count & 0xff;
+
+        CHECK_NOT_NULL((count_ba = ba_alloc_from_uint8(count_buf, sizeof(count_buf))));
+
+        if (count == 1) {
+            DO(dstu7564_init_kmac(hmac_ctx, pass_ba, 32));
+        }
+
+        DO(dstu7564_update_kmac(hmac_ctx, salt));
+        DO(dstu7564_update_kmac(hmac_ctx, count_ba));
+        DO(dstu7564_final_kmac(hmac_ctx, &u));
+
+        CHECK_NOT_NULL(key = ba_copy_with_alloc(u, 0, cplen));
+
+        for (i = 1; i < iterations; i++) {
+            DO(dstu7564_update_kmac(hmac_ctx, u));
+
+            ba_free(u);
+            u = NULL;
+
+            DO(dstu7564_final_kmac(hmac_ctx, &u));
+            DO(ba_xor(key, u));
+        }
+
+        //Добавляем результат в Т
+        ba_append(key, 0, cplen, out);
+        //Увеличиваем счетчик.
+        count++;
+        key_len -= cplen;
+
+        ba_free(count_ba);
+        ba_free_private(key);
+        ba_free(u);
+        count_ba = NULL;
+        key = NULL;
+        u = NULL;
+    }
+
+    *dk = out;
+    out = NULL;
+
+cleanup:
+    dstu7564_free(hmac_ctx);
+    ba_free_private(pass_ba);
+    ba_free_private(out);
+    ba_free(key);
+    ba_free(u);
+    ba_free(iv);
+    ba_free(count_ba);
+
+    return ret;
+}
+
 static int crypt_get_key_len_by_oid(const char* oid, size_t* key_len)
 {
     int ret = RET_OK;
 
-    if (oid_is_parent(OID_GOST28147, oid)) {
+    if (oid_is_parent(OID_GOST28147, oid) || oid_is_equal(OID_DSTU7624_256_CBC, oid)) {
         *key_len = 32;
     }
     else if (oid_is_equal(OID_AES128_CBC_PAD, oid)) {
@@ -117,11 +267,14 @@ static int crypt_get_iv_len_by_oid(const char* oid, size_t* iv_len)
 {
     int ret = RET_OK;
 
-    if (oid_is_parent(OID_GOST28147, oid) || 
+    if (oid_is_equal(OID_DSTU7624_256_CBC, oid)) {
+        *iv_len = 32;
+    }
+    else if (oid_is_parent(OID_GOST28147, oid) ||
         oid_is_equal(OID_DES_EDE3_CBC, oid)) {
         *iv_len = 8;
     }
-    else if (oid_is_equal(OID_AES128_CBC_PAD, oid) || 
+    else if (oid_is_equal(OID_AES128_CBC_PAD, oid) ||
         oid_is_equal(OID_AES192_CBC_PAD, oid) ||
         oid_is_equal(OID_AES256_CBC_PAD, oid)) {
         *iv_len = 16;
@@ -177,9 +330,32 @@ int pbes2_crypt(CryptDirection direction, const PBES2_params_t *params, const ch
     DO(asn_oid_to_text(&params->encryptionScheme.algorithm, &crypt_oid));
     DO(crypt_get_key_len_by_oid(crypt_oid, &key_len));
     
-    DO(pbkdf2(pass, salt, iterations, key_len, hash_alg, &dk));
+    switch (hash_alg) {
+    case HASH_ALG_DSTU7564_256:
+    case HASH_ALG_DSTU7564_384:
+    case HASH_ALG_DSTU7564_512:
+        DO(pbkdf2_dstu7564kmac(pass, salt, iterations, key_len, hash_alg, &dk));
+        break;
+    default:
+        DO(pbkdf2(pass, salt, iterations, key_len, hash_alg, &dk));
+    }
 
-    if (oid_is_parent(OID_GOST28147, crypt_oid)) {
+    if (oid_is_parent(OID_DSTU7624_256_CBC, crypt_oid)) {
+        DO(aid_dstu7624_get_iv(&params->encryptionScheme, &iv));
+        if (direction == DIRECTION_ENCRYPT) {
+            DO(make_pkcs7_padding(data, 32, &tmp));
+            DEBUG_OUTCON( printf("pbes2_crypt(), dstu7624_crypt(ENCRYPT), padded:    "); ba_print(stdout, tmp); )
+            DO(dstu7624_crypt(dk, iv, direction, tmp, crypted));
+            DEBUG_OUTCON( printf("pbes2_crypt(), dstu7624_crypt(ENCRYPT), encrypted: "); ba_print(stdout, *crypted); )
+        }
+        else {
+            DO(dstu7624_crypt(dk, iv, direction, data, &tmp));
+            DEBUG_OUTCON( printf("pbes2_crypt(), dstu7624_crypt(DECRYPT), decrypted: "); ba_print(stdout, tmp); )
+            DO(make_pkcs7_unpadding(tmp, crypted));
+            DEBUG_OUTCON( printf("pbes2_crypt(), dstu7624_crypt(DECRYPT), unpadded:  "); ba_print(stdout, *crypted); )
+        }
+    }
+    else if (oid_is_parent(OID_GOST28147, crypt_oid)) {
         DO(gost28147_crypt(&params->encryptionScheme, dk, direction, data, crypted));
     }
     else {
@@ -486,7 +662,7 @@ int pkcs8_pbes2_encrypt(const ByteArray* key, const char* pass, size_t iteration
 
     ASN_ALLOC(encrypt_aid);
     DO(asn_set_oid_from_text(cipher_oid, &encrypt_aid->algorithm));
-    if (oid_is_parent(OID_GOST28147, cipher_oid)) {
+    if (oid_is_parent(OID_DSTU7624, cipher_oid) || oid_is_parent(OID_GOST28147, cipher_oid)) {
         ASN_ALLOC(gost28147_params);
         DO(asn_copy(get_OCTET_STRING_desc(), iv_oct_str, &gost28147_params->iv));
         DO(asn_create_any(get_GOST28147ParamsOptionalDke_desc(), gost28147_params, &encrypt_aid->parameters));

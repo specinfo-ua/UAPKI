@@ -62,6 +62,7 @@ namespace Tsp {
         ByteArray*  m_BaEncoded;
         PkiStatus   m_Status;
         ByteArray*  m_BaTsToken;
+        uint64_t    m_GenTime;
 
     public:
         TspHelper (void);
@@ -100,7 +101,12 @@ namespace Tsp {
         );
         int tstInfoIsEqualRequest (void);
 
-        PkiStatus getStatus (void) const { return m_Status; }
+        uint64_t getGenTime (void) const {
+            return m_GenTime;
+        }
+        PkiStatus getStatus (void) const {
+            return m_Status;
+        }
 
     };  //  end class TspHelper
 

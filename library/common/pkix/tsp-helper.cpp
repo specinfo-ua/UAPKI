@@ -52,6 +52,7 @@ TspHelper::TspHelper (void)
     , m_BaEncoded(nullptr)
     , m_Status(PkiStatus::UNDEFINED)
     , m_BaTsToken(nullptr)
+    , m_GenTime(0)
 {
 }
 
@@ -210,7 +211,10 @@ int TspHelper::parseResponse (
 
     if (!baEncoded) return RET_UAPKI_TSP_RESPONSE_INVALID;
 
-    CHECK_NOT_NULL(tsp_response = (TimeStampResp_t*)asn_decode_ba_with_alloc(get_TimeStampResp_desc(), baEncoded));
+    tsp_response = (TimeStampResp_t*)asn_decode_ba_with_alloc(get_TimeStampResp_desc(), baEncoded);
+    if (!tsp_response) {
+        SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
+    }
 
     DO(asn_INTEGER2ulong(&tsp_response->status.status, &pkistatus_status));
     m_Status = (PkiStatus)pkistatus_status;
@@ -230,7 +234,11 @@ int TspHelper::parseResponse (
             SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
         }
 
-        CHECK_NOT_NULL(m_TstInfo = (TSTInfo_t*)asn_decode_ba_with_alloc(get_TSTInfo_desc(), encap_cinfo.baEncapContent));
+        m_TstInfo = (TSTInfo_t*)asn_decode_ba_with_alloc(get_TSTInfo_desc(), encap_cinfo.baEncapContent);
+        if (!m_TstInfo) {
+            SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
+        }
+        DO(Util::genTimeFromAsn1(&m_TstInfo->genTime, m_GenTime));
     }
 
 cleanup:

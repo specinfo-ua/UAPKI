@@ -202,34 +202,6 @@ vector<StoreBag*> FileStorage::listBags (
     return rv_bags;
 }
 
-void FileStorage::loadFromBuffer (
-        ByteArray* baEncoded,
-        const bool readOnly
-)
-{
-    DEBUG_OUTCON(printf("FileStorage::loadFromBuffer(buf-size: %d, readOnly: %d)\n", (int)ba_get_len(baEncoded), readOnly));
-    reset();
-
-    m_Buffer = baEncoded;
-    m_ReadOnly = readOnly;
-}
-
-int FileStorage::loadFromFile (
-        const string& fileName,
-        const bool readOnly
-)
-{
-    DEBUG_OUTCON(printf("FileStorage::loadFromFile(fileName: '%s', readOnly: %d)\n", fileName.c_str(), readOnly));
-    reset();
-
-    const int ret = ba_alloc_from_file(fileName.c_str(), &m_Buffer);
-    if (ret == RET_OK) {
-        m_Filename = fileName;
-        m_ReadOnly = readOnly;
-    }
-    return ret;
-}
-
 void FileStorage::reset (void)
 {
     ba_free(m_Buffer);
@@ -303,7 +275,7 @@ int FileStorage::decodeIit (
         DEBUG_OUTCON(printf("pkcs8_decrypt(iit), ba_privkey[%d]: ", (int)i); ba_print(stdout, ba_privkeys[i]));
 
         CHECK_NOT_NULL(store_bag = new StoreBag());
-        store_bag->setBagId(string(OID_PKCS12_P8_SHROUDED_KEY_BAG));
+        (void)store_bag->setBagId(string(OID_PKCS12_P8_SHROUDED_KEY_BAG));
         store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkeys[i]);
 
         ba_privkeys[i] = nullptr;
@@ -451,7 +423,7 @@ int FileStorage::decodePkcs8e (
     DEBUG_OUTCON(printf("pkcs8_decrypt(), ba_privkey: ");ba_print(stdout, ba_privkey));
 
     CHECK_NOT_NULL(store_bag = new StoreBag());
-    store_bag->setBagId(string(OID_PKCS12_P8_SHROUDED_KEY_BAG));
+    (void)store_bag->setBagId(string(OID_PKCS12_P8_SHROUDED_KEY_BAG));
     store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkey);
     ba_privkey = nullptr;
     addBag(store_bag);
@@ -546,8 +518,7 @@ int FileStorage::readSafeContents (
     SafeContents_t* safe_contents = nullptr;
     StoreBag* store_bag = nullptr;
     ByteArray* ba_data = nullptr;
-    string s_oidbag;
-    char* oid = nullptr;
+    char* oid_kdf = nullptr;
     char* oid_cipher = nullptr;
 
     DEBUG_OUTCON(printf("FileStorage::readSafeContents(), baSafeContents: "); ba_print(stdout, baSafeContents));
@@ -557,22 +528,20 @@ int FileStorage::readSafeContents (
         CHECK_NOT_NULL(store_bag = new StoreBag());
 
         const SafeBag_t* safe_bag = safe_contents->list.array[i];
-        DO(Util::oidFromAsn1(&safe_bag->bagId, s_oidbag));
-        DEBUG_OUTCON(printf("FileStorage::readSafeContents(), SafeBag.oid: %s\n", s_oidbag.c_str()));
-        if (!s_oidbag.empty()) {
-            store_bag->setBagId(s_oidbag);
-        }
-        else {
+        string s_bagid;
+        DO(Util::oidFromAsn1(&safe_bag->bagId, s_bagid));
+        DEBUG_OUTCON(printf("FileStorage::readSafeContents(), SafeBag.oid: %s\n", s_bagid.c_str()));
+        if (!store_bag->setBagId(s_bagid)) {
             SET_ERROR(RET_CM_INVALID_SAFE_BAG);
         }
 
         if (oid_is_equal(OID_PKCS12_P8_SHROUDED_KEY_BAG, store_bag->bagId())) {
-            DO(pkcs12_read_shrouded_key_bag(&safe_bag->bagValue, password, &ba_data, &oid, &oid_cipher));
+            DO(pkcs12_read_shrouded_key_bag(&safe_bag->bagValue, password, &ba_data, &oid_kdf, &oid_cipher));
             store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_data);
-            if (oid) {
+            if (oid_kdf) {
                 //  PBES2
                 store_bag->setPbes2Param(
-                    checkHashOid(oid, m_StorageParam.bagKdf),
+                    checkHashOid(oid_kdf, m_StorageParam.bagKdf),
                     checkCipherOid(oid_cipher, m_StorageParam.bagCipher)
                 );
             }
@@ -584,8 +553,8 @@ int FileStorage::readSafeContents (
                         ? OID_DES_EDE3_CBC : checkCipherOid(oid_cipher, m_StorageParam.bagCipher)
                 );
             }
-            free(oid);
-            oid = nullptr;
+            free(oid_kdf);
+            oid_kdf = nullptr;
             free(oid_cipher);
             oid_cipher = nullptr;
         }
@@ -614,16 +583,40 @@ int FileStorage::readSafeContents (
         ba_data = nullptr;
 
         store_bag->scanStdAttrs();
+        if ((store_bag->bagType() == StoreBag::BAG_TYPE::KEY) && store_bag->localKeyId()) {
+            SmartBA sba_bagattrvalue;
+            if ((Util::decodeOctetString(store_bag->localKeyId(), &sba_bagattrvalue) != RET_OK) ||
+                !store_bag->setKeyId(sba_bagattrvalue.get())
+            ) {
+                SET_ERROR(RET_CM_INVALID_SAFE_BAG);
+            }
+        }
         addBag(store_bag);
         store_bag = nullptr;
     }
 
 cleanup:
     if (store_bag) delete store_bag;
-    free(oid);
+    free(oid_kdf);
     ba_free(ba_data);
     asn_free(get_SafeContents_desc(), safe_contents);
     return ret;
+}
+
+void FileStorage::setBuffer (
+        ByteArray* baEncoded,
+        const char* fileName,
+        const bool readOnly
+)
+{
+    DEBUG_OUTCON(printf("FileStorage::setBuffer(bufSize: %zu, fileName: %s, readOnly: %d)\n", ba_get_len(baEncoded), fileName, readOnly));
+    reset();
+
+    m_Buffer = baEncoded;
+    if (fileName) {
+        m_Filename = string(fileName);
+    }
+    m_ReadOnly = readOnly;
 }
 
 void FileStorage::setOpen (
@@ -710,9 +703,9 @@ const char* FileStorage::checkCipherOid (
         const char* oidDefault
 )
 {
-    static const int N = 6;
+    static const int N = 7;
     static const char* SUPPORTED_CIPHERS[N] = {
-        OID_GOST28147_ECB, OID_GOST28147_CFB,
+        OID_DSTU7624_256_CBC, OID_GOST28147_ECB, OID_GOST28147_CFB,
         OID_AES128_CBC_PAD, OID_AES192_CBC_PAD, OID_AES256_CBC_PAD,
         OID_DES_EDE3_CBC
     };

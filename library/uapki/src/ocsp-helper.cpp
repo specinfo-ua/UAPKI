@@ -584,7 +584,8 @@ int OcspHelper::verifyTbsResponseData (
 
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
 
-    if (cerResponder->getAlgoKeyId() == HASH_ALG_GOST34311) {
+    if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo)
+    ||  oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo)) {
         DO(Util::bitStringEncapOctetFromAsn1(&m_BasicOcspResp->signature, &ba_signature));
     }
     else {

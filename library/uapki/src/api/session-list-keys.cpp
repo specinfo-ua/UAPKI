@@ -29,11 +29,14 @@
 
 #include "api-json-internal.h"
 #include "cm-providers.h"
+#include "oids.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
+#include "uapki-ns-util.h"
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
 static JSON_Status json_object_copy_string (
@@ -46,6 +49,17 @@ static JSON_Status json_object_copy_string (
     return json_object_set_string(joDest, key, s.c_str());
 }   //  json_object_copy_string
 
+static int keyid2_from_publickey (
+        const char* b64PublicKey,
+        ByteArray** baKeyId2
+)
+{
+    SmartBA sba_encoded, sba_keyid2, sba_pubkey;
+    if (!sba_pubkey.set(ba_alloc_from_base64(b64PublicKey))) return RET_INVALID_BASE64_STRING;
+    if (Util::encodeOctetString(sba_pubkey.get(), &sba_encoded) != RET_OK) return RET_UAPKI_GENERAL_ERROR;
+    return ::hash(HASH_ALG_DSTU7564_256, sba_encoded.get(), baKeyId2);
+}   //  keyid2_from_publickey
+
 
 int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
 {
@@ -53,7 +67,9 @@ int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
     CmStorageProxy* storage = CmProviders::openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
-    UapkiNS::VectorBA vba_keyids;
+    const bool flag_retpubkey = ParsonHelper::jsonObjectGetBoolean(joParams, "returnPublicKey");
+
+    VectorBA vba_keyids;
     string s_infokeys;
     int ret = storage->sessionListKeys(vba_keyids, s_infokeys);
     if (ret != RET_OK) return ret;
@@ -83,6 +99,18 @@ int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
         DO_JSON(json_object_copy_string(jo_dstkeyinfo, jo_srckeyinfo, "application"));
         DO_JSON(json_object_set_value(jo_dstkeyinfo, "signAlgo", json_value_init_array()));
         DO_JSON(json_array_copy_all_items(json_object_get_array(jo_dstkeyinfo, "signAlgo"), json_object_get_array(jo_srckeyinfo, "signAlgo")));
+        if (json_object_get_string_len(jo_srckeyinfo, "publicKey") > 0) {
+            const char* s_keyalgo = json_object_get_string(jo_srckeyinfo, "mechanismId");
+            const char* s_pubkey = json_object_get_string(jo_srckeyinfo, "publicKey");
+            if (flag_retpubkey && s_pubkey) {
+                DO_JSON(json_object_set_string(jo_dstkeyinfo, "publicKey", s_pubkey));
+            }
+            if (oid_is_equal(s_keyalgo, OID_DSTU4145_PARAM_PB_LE)) {
+                SmartBA sba_keyid2;
+                DO(keyid2_from_publickey(s_pubkey, &sba_keyid2));
+                DO_JSON(json_object_set_hex(jo_dstkeyinfo, "keyId2", sba_keyid2.get()));
+            }
+        }
     }
 
 cleanup:

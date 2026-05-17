@@ -31,8 +31,8 @@
 
 #include "cm-api.h"
 #include "byte-array.h"
-#include <string>
-#include <vector>
+#include "hash.h"
+#include "uapki-ns.h"
 
 
 struct StoreAttr {
@@ -53,9 +53,10 @@ struct StoreKeyInfo {
     std::string mechanismId;
     std::string parameterId;
     std::string label;
-    std::string application;
     std::vector<std::string>
                 signAlgo;
+    std::string publicKey;
+    std::string application;
 };  //  end struct StoreKeyInfo
 
 class StoreBag {
@@ -70,11 +71,18 @@ class StoreBag {
     private:
         BAG_TYPE    m_BagType;
         std::string m_BagId;
-        ByteArray*  m_BagValue;
+        UapkiNS::SmartBA
+                    m_BagValue;
         std::vector<StoreAttr*>
                     m_BagAttributes;
-        ByteArray*  m_EncodedBag;
-        ByteArray*  m_KeyId;
+        UapkiNS::SmartBA
+                    m_EncodedBag;
+        std::string m_MechanismId;
+        std::string m_ParameterId;
+        UapkiNS::SmartBA
+                    m_KeyId;
+        UapkiNS::SmartBA
+                    m_KeyId2; // only for DSTU-key
         ByteArray*  m_PtrFriendlyName;
         ByteArray*  m_PtrLocalKeyId;
         struct {
@@ -96,13 +104,22 @@ class StoreBag {
             return m_BagType;
         }
         const ByteArray* bagValue (void) const {
-            return m_BagValue;
+            return m_BagValue.get();
         }
         const ByteArray* encodedBag (void) const {
-            return m_EncodedBag;
+            return m_EncodedBag.get();
         }
         const ByteArray* keyId (void) const {
-            return m_KeyId;
+            return m_KeyId.get();
+        }
+        const ByteArray* keyId2 (void) const {
+            return m_KeyId2.get();
+        }
+        const std::string& mechanismId (void) const {
+            return m_MechanismId;
+        }
+        const std::string& parameterId (void) const {
+            return m_ParameterId;
         }
         const ByteArray* friendlyName (void) const {
             return m_PtrFriendlyName;
@@ -115,14 +132,20 @@ class StoreBag {
             const char* password = nullptr,
             const size_t iterations = 0
         );
-        StoreAttr* findAttrByOid (
+        bool equalKeyId (
+            const ByteArray* baKeyId
+        ) const;
+        StoreAttr* findBagAttr (
             const char* oid
         );
         bool getKeyInfo (
             StoreKeyInfo& keyInfo
         );
         void scanStdAttrs (void);
-        void setBagId (
+        StoreAttr* setBagAttr (
+            const char* oid
+        );
+        bool setBagId (
             const std::string& bagId
         );
         void setData (
@@ -135,14 +158,20 @@ class StoreBag {
         bool setFriendlyName (
             const char* utf8label
         );
-        bool setLocalKeyID (
-            const char* hex
+        bool setKeyId (
+            const ByteArray* baKeyId
         );
         void setPbes2Param (
             const char* oidKdf,
             const char* oidCipher
         );
 
+    public:
+        static bool keyIdFromPrivKeyInfo (
+            const HashAlg hashAlg,
+            const ByteArray* baPrivKeyInfo,
+            ByteArray** baKeyId
+        );
 };  //  end class StoreBag
 
 

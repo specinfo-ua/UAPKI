@@ -34,6 +34,7 @@
 #include "private-key.h"
 #include "uapkif.h"
 #include "uapki-ns.h"
+#include "uapki-ns-util.h"
 #include "cm-pkcs12-debug.h"
 
 
@@ -205,7 +206,7 @@ static CM_ERROR cm_session_select_key (
     DEBUG_OUTPUT(std::string("cm_session_select_key(), count keys: ") + std::to_string(list_keys.size()));
 
     for (size_t i = 0; i < list_keys.size(); i++) {
-        if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
+        if (list_keys[i]->equalKeyId((ByteArray*)baKeyId)) {
             storage.selectKey(list_keys[i]);
             break;
         }
@@ -239,12 +240,35 @@ static CM_ERROR cm_session_create_key (
     if (!json.parse((const char*)keyParam)) return RET_CM_INVALID_JSON;
 
     const char* algo = json.getString("mechanismId");
-    const char* param = json.getString("parameterId");
     if (!algo || (strlen(algo) == 0)) return RET_CM_INVALID_PARAMETER;
 
+    SmartBA sba_encodedfriendlyname;
+    const char* param = json.getString("label");
+    if (param && (strlen(param) > 0)) {
+        if (Util::encodeBmpString(param, &sba_encodedfriendlyname) != RET_OK) return RET_CM_INVALID_PARAMETER;
+    }
+
     SmartBA sba_privkey;
-    int ret = private_key_generate(algo, param, &sba_privkey);
+    param = json.getString("parameterId");
+    const char* gen_keyalgo = (!oid_is_parent(OID_DSTU4145_WITH_DSTU7564, algo)) ? algo : OID_DSTU4145_PARAM_PB_LE;
+    int ret = private_key_generate(gen_keyalgo, param, &sba_privkey);
     if (ret != RET_OK) return ret;
+
+    SmartBA sba_encodedlocalkeyid;
+    {
+        HashAlg hash_alg = HASH_ALG_SHA1;
+        if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, algo)) {
+            hash_alg = HASH_ALG_DSTU7564_256;
+        }
+        else if (oid_is_parent(OID_DSTU4145_WITH_GOST3411, algo)) {
+            hash_alg = HASH_ALG_GOST34311;
+        }
+        SmartBA sba_keyid;
+        if (!StoreBag::keyIdFromPrivKeyInfo(hash_alg, sba_privkey.get(), &sba_keyid)) {
+            return RET_CM_GENERAL_ERROR;
+        }
+        if (Util::encodeOctetString(sba_keyid.get(), &sba_encodedlocalkeyid) != RET_OK) return RET_CM_GENERAL_ERROR;
+    }
 
     StoreBag* store_bag = new StoreBag();
     if (!store_bag) return RET_CM_GENERAL_ERROR;
@@ -252,15 +276,31 @@ static CM_ERROR cm_session_create_key (
     store_bag->setBagId(OID_PKCS12_P8_SHROUDED_KEY_BAG);
     store_bag->setData(StoreBag::BAG_TYPE::KEY, sba_privkey.pop());
 
-    param = json.getString("label");
-    if (param && (strlen(param) > 0)) {
-        store_bag->setFriendlyName(param);
+    if (!sba_encodedfriendlyname.empty()) {
+        StoreAttr* store_attr = store_bag->setBagAttr(OID_PKCS9_FRIENDLY_NAME);
+        if (!store_attr) {
+            delete store_bag;
+            return RET_CM_GENERAL_ERROR;
+        }
+        store_attr->data = sba_encodedfriendlyname.pop();
     }
-    param = json.getString("application");
-    if (param && (strlen(param) > 0)) {
-        store_bag->setLocalKeyID(param);
+    // attribute localKeyID set always
+    StoreAttr* store_attr = store_bag->setBagAttr(OID_PKCS9_LOCAL_KEYID);
+    if (!store_attr) {
+        delete store_bag;
+        return RET_CM_GENERAL_ERROR;
     }
+    store_attr->data = sba_encodedlocalkeyid.pop();
     store_bag->scanStdAttrs();
+    if (store_bag->bagType() == StoreBag::BAG_TYPE::KEY) {
+        SmartBA sba_bagattrvalue;
+        if ((Util::decodeOctetString(store_bag->localKeyId(), &sba_bagattrvalue) != RET_OK) ||
+            !store_bag->setKeyId(sba_bagattrvalue.get())
+        ) {
+            delete store_bag;
+            return RET_CM_GENERAL_ERROR;
+        }
+    }
 
     const FileStorageParam& storage_param = storage.storageParam();
     store_bag->setPbes2Param(storage_param.bagKdf, storage_param.bagCipher);

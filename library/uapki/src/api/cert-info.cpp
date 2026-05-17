@@ -43,13 +43,11 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     SmartBA sba_certid, sba_encoded;
+    Cert::CerItem* cer_item = nullptr;
 
     if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-        Cert::CerItem* cer_item = nullptr;
         DO(Cert::parseCert(sba_encoded.get(), &cer_item));
-
         DO(Cert::detailInfoToJson(joResult, cer_item));
-        delete cer_item;
     }
     else {
         LibraryConfig* lib_config = get_config();
@@ -69,5 +67,6 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
     }
 
 cleanup:
+    delete cer_item;
     return ret;
 }

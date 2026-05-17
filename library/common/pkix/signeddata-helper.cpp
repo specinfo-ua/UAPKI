@@ -188,6 +188,11 @@ cleanup:
     return ret;
 }
 
+size_t SignedDataBuilder::getCountSignerInfos (void) const
+{
+    return m_SignerInfos.size();
+}
+
 SignedDataBuilder::SignerInfo* SignedDataBuilder::getSignerInfo (
         const size_t index
 ) const
@@ -449,21 +454,29 @@ cleanup:
 }
 
 int SignedDataBuilder::SignerInfo::addUnsignedAttr (
-        const Attribute& unsignedAttr
+        const char* type,
+        const ByteArray* baValues
 )
 {
     int ret = RET_OK;
 
-    if (!unsignedAttr.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
+    if (!type || !oid_is_valid(type) || !baValues) return RET_UAPKI_INVALID_PARAMETER;
 
     if (!m_UnsignedAttrs) {
         ASN_ALLOC_TYPE(m_UnsignedAttrs, Attributes_t);
     }
 
-    DO(Util::addToAttributes(m_UnsignedAttrs, unsignedAttr));
+    DO(Util::addToAttributes(m_UnsignedAttrs, type, baValues));
 
 cleanup:
     return ret;
+}
+
+int SignedDataBuilder::SignerInfo::addUnsignedAttr (
+        const Attribute& unsignedAttr
+)
+{
+    return addUnsignedAttr(unsignedAttr.type.c_str(), unsignedAttr.baValues);
 }
 
 int SignedDataBuilder::SignerInfo::setUnsignedAttrs (
@@ -504,6 +517,22 @@ cleanup:
     return ret;
 }
 
+int SignedDataBuilder::SignerInfo::fillFromEncoded (
+        const ByteArray* baEncoded
+)
+{
+    if (ba_get_len(baEncoded) == 0) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+
+    DO(asn_decode_ba(get_SignerInfo_desc(), m_SignerInfo, baEncoded));
+
+    DO(asn_encode_ba(get_AlgorithmIdentifier_desc(), &m_SignerInfo->digestAlgorithm, &m_BaDigestAlgoEncoded));
+
+cleanup:
+    return ret;
+}
+
 int SignedDataBuilder::SignerInfo::addSignedAttrContentType (
         const char* contentType
 )
@@ -513,7 +542,7 @@ int SignedDataBuilder::SignerInfo::addSignedAttrContentType (
     int ret = RET_OK;
     SmartBA sba_encoded;
 
-    DO(Util::encodeOid(OID_PKCS7_DATA, &sba_encoded));
+    DO(Util::encodeOid(contentType, &sba_encoded));
     DO(addSignedAttr(OID_PKCS9_CONTENT_TYPE, sba_encoded.get()));
 
 cleanup:
@@ -639,6 +668,16 @@ int SignedDataParser::parseSignerInfo (
     if (index >= m_CountSignerInfos) return RET_INDEX_OUT_OF_RANGE;
 
     return signerInfo.parse(m_SignedData->signerInfos.list.array[index]);
+}
+
+int SignedDataParser::encodeSignerInfo (
+        const size_t index,
+        ByteArray** baEncoded
+)
+{
+    if (index >= m_CountSignerInfos) return RET_INDEX_OUT_OF_RANGE;
+
+    return asn_encode_ba(get_SignerInfo_desc(), m_SignedData->signerInfos.list.array[index], baEncoded);
 }
 
 bool SignedDataParser::isContainDigestAlgorithm (

@@ -29,7 +29,7 @@
 #ifndef UAPKIC_H
 #define UAPKIC_H
 
-#define UAPKIC_VERSION 2001
+#define UAPKIC_VERSION 2002
 
 #include "entropy.h"
 #include "drbg.h"
@@ -114,6 +114,13 @@ extern "C" {
  * @return код помилки
  */
 UAPKIC_EXPORT int uapkic_init(uint32_t* version, uint32_t* self_test_status);
+
+/**
+ * Звільняє блок даних
+ *
+ * @param ptr блок даних
+ */
+UAPKIC_EXPORT void uapkic_free(void* ptr);
 
 #ifdef  __cplusplus
 }

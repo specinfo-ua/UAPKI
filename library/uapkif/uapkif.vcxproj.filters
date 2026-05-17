@@ -996,6 +996,9 @@
     <ClInclude Include="include\TBSCertListAlt.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\DSTU7624Parameters.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\struct\AccessDescription.c">
@@ -1956,6 +1959,9 @@
       <Filter>src\struct</Filter>
     </ClCompile>
     <ClCompile Include="src\struct\TBSCertListAlt.c">
+      <Filter>src\struct</Filter>
+    </ClCompile>
+    <ClCompile Include="src\struct\DSTU7624Parameters.c">
       <Filter>src\struct</Filter>
     </ClCompile>
   </ItemGroup>

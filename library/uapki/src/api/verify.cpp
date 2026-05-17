@@ -311,7 +311,8 @@ static int result_certificaterefs_to_json (
             DO(Cert::issuerFromGeneralNames(cert_ref.issuerSerial.baIssuer, &sba_issuer));
             DO(nameToJson(json_object_get_object(jo_certref, "issuer"), sba_issuer.get()));
             DO(json_object_set_hex(jo_certref, "serialNumber", cert_ref.issuerSerial.baSerialNumber));
-            DO_JSON(json_object_set_string(jo_certref, "status", verifyStatusToStr(cadesXlInfo.statusesCertRefs[i])));
+            DO_JSON(json_object_set_string(jo_certref, "status",
+                verifyStatusToStr((i < cadesXlInfo.statusesCertRefs.size()) ? cadesXlInfo.statusesCertRefs[i] : VerifyStatus::UNDEFINED)));
         }
     }
 
@@ -459,21 +460,21 @@ static int result_verifyinfo_to_json (
         }
     }
 
-    if (!verifyInfo.getExpectedCertItems().empty()) {
+    if (!verifyInfo.getExpectedCerts().empty()) {
         DO_JSON(json_object_set_value(joSignInfo, "expectedCerts", json_value_init_array()));
         JSON_Array* ja_expcertitems = json_object_get_array(joSignInfo, "expectedCerts");
         size_t idx = 0;
-        for (const auto& it : verifyInfo.getExpectedCertItems()) {
+        for (const auto& it : verifyInfo.getExpectedCerts()) {
             DO_JSON(json_array_append_value(ja_expcertitems, json_value_init_object()));
             DO(CertValidator::expectedCertItemToJson(json_array_get_object(ja_expcertitems, idx++), *it));
         }
     }
 
-    if (!verifyInfo.getExpectedCrlItems().empty()) {
+    if (!verifyInfo.getExpectedCrls().empty()) {
         DO_JSON(json_object_set_value(joSignInfo, "expectedCrls", json_value_init_array()));
         JSON_Array* ja_expcrlitems = json_object_get_array(joSignInfo, "expectedCrls");
         size_t idx = 0;
-        for (const auto& it : verifyInfo.getExpectedCrlItems()) {
+        for (const auto& it : verifyInfo.getExpectedCrls()) {
             DO_JSON(json_array_append_value(ja_expcrlitems, json_value_init_object()));
             DO(CertValidator::expectedCrlItemToJson(json_array_get_object(ja_expcrlitems, idx++), *it));
         }
@@ -541,10 +542,8 @@ static int validate_by_crl (
     int ret = RET_OK;
     Doc::Verify::ResultValidationByCrl& result_valbycrl = certChainItem.getResultValidationByCrl();
 
-    result_valbycrl.cerIssuer = certChainItem.getIssuer();
     DO(verifiedSignerInfo.validateByCrl(
         certChainItem.getSubject(),
-        result_valbycrl.cerIssuer,
         verifiedSignerInfo.getBestSignatureTime(),
         false,
         result_valbycrl
@@ -717,6 +716,7 @@ static int verify_p7s (
             DO(verified_sinfo.verifySigningCertificateV2());
 
             verified_sinfo.determineSignFormat();
+            DO(verified_sinfo.tspCertToStore());
             DO(verified_sinfo.certValuesToStore());
             DO(verified_sinfo.verifyContentTimeStamp(*verify_sdoc.refContentHasher));
             DO(verified_sinfo.verifySignatureTimeStamp());

@@ -45,99 +45,222 @@
 extern "C" const char* error_code_to_str (int errorCode);
 
 
-typedef int (*fUapkiMethod)(JSON_Object* joParams, JSON_Object* joResult);
-
-
 using namespace std;
 
+typedef int (*fUapkiMethod)(JSON_Object* joParams, JSON_Object* joResult);
+typedef int (*fUapkiMethodType)(fUapkiMethod method, JSON_Object* joParams, JSON_Object* joResult);
 
-/*static int dev_method(JSON_Object* joParams, JSON_Object* joResult)
-{
-    (void)joResult;
-    const char* s_msg = json_object_get_string(joParams, "message");
-    if (s_msg) {
-        printf("@@@ dev_method, message: '%s' @@@\n", s_msg);
-    }
-    const uint32_t ms = ParsonHelper::jsonObjectGetUint32(joParams, "sleep", 0);
-    if (ms > 0) {
-        sleep_ms(ms);
-    }
-    return RET_OK;
-}// */
+struct UapkiMethod {
+    const char* name;
+    const fUapkiMethod
+                method;
+    const fUapkiMethodType
+                methodType;
+};
 
-enum class UapkiMethod : uint32_t {
-    VERSION             = 0,
-    INIT                = 1,
-    DEINIT              = 2,
-    PROVIDERS           = 3,
-    STORAGES            = 4,
-    STORAGE_INFO        = 5,
-    OPEN                = 6,
-    CLOSE               = 7,
-    KEYS                = 8,
-    SELECT_KEY          = 9,
-    CREATE_KEY          = 10,
-    DELETE_KEY          = 11,
-    GET_CSR             = 12,
-    CHANGE_PASSWORD     = 13,
-    INIT_KEY_USAGE      = 14,
-    SIGN                = 15,
-    VERIFY              = 16,
-    ADD_CERT            = 17,
-    CERT_INFO           = 18,
-    GET_CERT            = 19,
-    LIST_CERTS          = 20,
-    REMOVE_CERT         = 21,
-    VERIFY_CERT         = 22,
-    ADD_CRL             = 23,
-    CRL_INFO            = 24,
-    LIST_CRLS           = 25,
-    REMOVE_CRL          = 26,
-    DECRYPT             = 27,
-    ENCRYPT             = 28,
-    RANDOM_BYTES        = 29,
-    CERT_STATUS_BY_OCSP = 30,
-    DIGEST              = 31,
-    ASN1_DECODE         = 32,
-    ASN1_ENCODE         = 33,
-    UNDEFINED           = 34
-};  //  end enum UapkiMethod
+static int call_serial_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
+static int call_static_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
+static int call_thread_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
 
-static const fUapkiMethod UAPKI_METHODS[34] = {
-    uapki_version,
-    uapki_init,
-    uapki_deinit,
-    uapki_list_providers,
-    uapki_provider_list_storages,
-    uapki_provider_storage_info,
-    uapki_storage_open,
-    uapki_storage_close,
-    uapki_session_list_keys,
-    uapki_session_select_key,
-    uapki_session_key_create,
-    uapki_session_key_delete,
-    uapki_key_get_csr,
-    uapki_storage_change_password,
-    uapki_key_init_usage,
-    uapki_sign,
-    uapki_verify_signature,
-    uapki_add_cert,
-    uapki_cert_info,
-    uapki_get_cert,
-    uapki_list_certs,
-    uapki_remove_cert,
-    uapki_verify_cert,
-    uapki_add_crl,
-    uapki_crl_info,
-    uapki_list_crls,
-    uapki_remove_crl,
-    uapki_decrypt,
-    uapki_encrypt,
-    uapki_random_bytes,
-    uapki_cert_status_by_ocsp,
-    uapki_digest,
-    uapki_asn1_decode,
-    uapki_asn1_encode
+static const UapkiMethod uapki_methods[] = {
+    {
+        "VERSION",
+        uapki_version,
+        call_static_method
+    },
+    {
+        "INIT",
+        uapki_init,
+        call_serial_method
+    },
+    {
+        "DEINIT",
+        uapki_deinit,
+        call_serial_method
+    },
+    {
+        "PROVIDERS",
+        uapki_list_providers,
+        call_serial_method
+    },
+    {
+        "STORAGES",
+        uapki_provider_list_storages,
+        call_serial_method
+    },
+    {
+        "STORAGE_INFO",
+        uapki_provider_storage_info,
+        call_serial_method
+    },
+    {
+        "OPEN",
+        uapki_storage_open,
+        call_serial_method
+    },
+    {
+        "CLOSE",
+        uapki_storage_close,
+        call_serial_method
+    },
+    {
+        "KEYS",
+        uapki_session_list_keys,
+        call_serial_method
+    },
+    {
+        "SELECT_KEY",
+        uapki_session_select_key,
+        call_serial_method
+    },
+    {
+        "CREATE_KEY",
+        uapki_session_key_create,
+        call_serial_method
+    },
+    {
+        "DELETE_KEY",
+        uapki_session_key_delete,
+        call_serial_method
+    },
+    {
+        "GET_CSR",
+        uapki_key_get_csr,
+        call_serial_method
+    },
+    {
+        "CHANGE_PASSWORD",
+        uapki_storage_change_password,
+        call_serial_method
+    },
+    {
+        "INIT_KEY_USAGE",
+        uapki_key_init_usage,
+        call_serial_method
+    },
+    {
+        "SIGN",
+        uapki_sign,
+        call_thread_method
+    },
+    {
+        "VERIFY",
+        uapki_verify_signature,
+        call_thread_method
+    },
+    {
+        "BUILD_CMS_2PASS",
+        uapki_build_cms_2pass,
+        call_thread_method
+    },
+    {
+        "BUILD_CSR_2PASS",
+        uapki_build_csr_2pass,
+        call_thread_method
+    },
+    {
+        "ADD_CERT",
+        uapki_add_cert,
+        call_thread_method
+    },
+    {
+        "CERT_INFO",
+        uapki_cert_info,
+        call_thread_method
+    },
+    {
+        "GET_CERT",
+        uapki_get_cert,
+        call_thread_method
+    },
+    {
+        "LIST_CERTS",
+        uapki_list_certs,
+        call_thread_method
+    },
+    {
+        "REMOVE_CERT",
+        uapki_remove_cert,
+        call_serial_method
+    },
+    {
+        "VERIFY_CERT",
+        uapki_verify_cert,
+        call_thread_method
+    },
+    {
+        "ADD_CRL",
+        uapki_add_crl,
+        call_thread_method
+    },
+    {
+        "CRL_INFO",
+        uapki_crl_info,
+        call_thread_method
+    },
+    {
+        "LIST_CRLS",
+        uapki_list_crls,
+        call_thread_method
+    },
+    {
+        "REMOVE_CRL",
+        uapki_remove_crl,
+        call_serial_method
+    },
+    {
+        "DECRYPT",
+        uapki_decrypt,
+        call_thread_method
+    },
+    {
+        "ENCRYPT",
+        uapki_encrypt,
+        call_thread_method
+    },
+    {
+        "RANDOM_BYTES",
+        uapki_random_bytes,
+        call_thread_method
+    },
+    {
+        "CERT_STATUS_BY_OCSP",
+        uapki_cert_status_by_ocsp,
+        call_thread_method
+    },
+    {
+        "DIGEST",
+        uapki_digest,
+        call_static_method
+    },
+    {
+        "VERIFY_CSR",
+        uapki_verify_csr,
+        call_static_method
+    },
+    {
+        "GENERATE_CERTBUNDLE",
+        uapki_generate_certbundle,
+        call_static_method
+    },
+    {
+        "MODIFY_SIGN",
+        uapki_modify_signature,
+        call_static_method
+    },
+    {
+        "ASN1_DECODE",
+        uapki_asn1_decode,
+        call_static_method
+    },
+    {
+        "ASN1_ENCODE",
+        uapki_asn1_encode,
+        call_static_method
+    },
+#ifdef API_JSON_CUSTOM_METHODS
+    API_JSON_CUSTOM_METHODS
+#endif
 };
 
 
@@ -146,118 +269,11 @@ static atomic_bool api_serialmethod_is_running(false);
 static mutex api_mtx_serialmethod;
 
 
-static UapkiMethod method_from_str (const char* method)
-{
-    UapkiMethod rv_method = UapkiMethod::UNDEFINED;
-    if (method) {
-        if (strcmp(method, "VERSION") == 0) {
-            rv_method = UapkiMethod::VERSION;
-        }
-        else if (strcmp(method, "INIT") == 0) {
-            rv_method = UapkiMethod::INIT;
-        }
-        else if (strcmp(method, "DEINIT") == 0) {
-            rv_method = UapkiMethod::DEINIT;
-        }
-        else if (strcmp(method, "PROVIDERS") == 0) {
-            rv_method = UapkiMethod::PROVIDERS;
-        }
-        else if (strcmp(method, "STORAGES") == 0) {
-            rv_method = UapkiMethod::STORAGES;
-        }
-        else if (strcmp(method, "STORAGE_INFO") == 0) {
-            rv_method = UapkiMethod::STORAGE_INFO;
-        }
-        else if (strcmp(method, "OPEN") == 0) {
-            rv_method = UapkiMethod::OPEN;
-        }
-        else if (strcmp(method, "CLOSE") == 0) {
-            rv_method = UapkiMethod::CLOSE;
-        }
-        else if (strcmp(method, "KEYS") == 0) {
-            rv_method = UapkiMethod::KEYS;
-        }
-        else if (strcmp(method, "SELECT_KEY") == 0) {
-            rv_method = UapkiMethod::SELECT_KEY;
-        }
-        else if (strcmp(method, "CREATE_KEY") == 0) {
-            rv_method = UapkiMethod::CREATE_KEY;
-        }
-        else if (strcmp(method, "DELETE_KEY") == 0) {
-            rv_method = UapkiMethod::DELETE_KEY;
-        }
-        else if (strcmp(method, "GET_CSR") == 0) {
-            rv_method = UapkiMethod::GET_CSR;
-        }
-        else if (strcmp(method, "CHANGE_PASSWORD") == 0) {
-            rv_method = UapkiMethod::CHANGE_PASSWORD;
-        }
-        else if (strcmp(method, "INIT_KEY_USAGE") == 0) {
-            rv_method = UapkiMethod::INIT_KEY_USAGE;
-        }
-        else if (strcmp(method, "SIGN") == 0) {
-            rv_method = UapkiMethod::SIGN;
-        }
-        else if (strcmp(method, "VERIFY") == 0) {
-            rv_method = UapkiMethod::VERIFY;
-        }
-        else if (strcmp(method, "ADD_CERT") == 0) {
-            rv_method = UapkiMethod::ADD_CERT;
-        }
-        else if (strcmp(method, "CERT_INFO") == 0) {
-            rv_method = UapkiMethod::CERT_INFO;
-        }
-        else if (strcmp(method, "GET_CERT") == 0) {
-            rv_method = UapkiMethod::GET_CERT;
-        }
-        else if (strcmp(method, "LIST_CERTS") == 0) {
-            rv_method = UapkiMethod::LIST_CERTS;
-        }
-        else if (strcmp(method, "REMOVE_CERT") == 0) {
-            rv_method = UapkiMethod::REMOVE_CERT;
-        }
-        else if (strcmp(method, "VERIFY_CERT") == 0) {
-            rv_method = UapkiMethod::VERIFY_CERT;
-        }
-        else if (strcmp(method, "ADD_CRL") == 0) {
-            rv_method = UapkiMethod::ADD_CRL;
-        }
-        else if (strcmp(method, "CRL_INFO") == 0) {
-            rv_method = UapkiMethod::CRL_INFO;
-        }
-        else if (strcmp(method, "LIST_CRLS") == 0) {
-            rv_method = UapkiMethod::LIST_CRLS;
-        }
-        else if (strcmp(method, "REMOVE_CRL") == 0) {
-            rv_method = UapkiMethod::REMOVE_CRL;
-        }
-        else if (strcmp(method, "DECRYPT") == 0) {
-            rv_method = UapkiMethod::DECRYPT;
-        }
-        else if (strcmp(method, "ENCRYPT") == 0) {
-            rv_method = UapkiMethod::ENCRYPT;
-        }
-        else if (strcmp(method, "RANDOM_BYTES") == 0) {
-            rv_method = UapkiMethod::RANDOM_BYTES;
-        }
-        else if (strcmp(method, "CERT_STATUS_BY_OCSP") == 0) {
-            rv_method = UapkiMethod::CERT_STATUS_BY_OCSP;
-        }
-        else if (strcmp(method, "DIGEST") == 0) {
-            rv_method = UapkiMethod::DIGEST;
-        }
-        else if (strcmp(method, "ASN1_DECODE") == 0) {
-            rv_method = UapkiMethod::ASN1_DECODE;
-        }
-        else if (strcmp(method, "ASN1_ENCODE") == 0) {
-            rv_method = UapkiMethod::ASN1_ENCODE;
-        }
-    }
-    return rv_method;
-}
-
-
-static int call_serial_method (UapkiMethod method, JSON_Object* joParams, JSON_Object* joResult)
+static int call_serial_method (
+        fUapkiMethod fMethod,
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
     lock_guard<mutex> lock(api_mtx_serialmethod);
     api_serialmethod_is_running = true;
@@ -271,21 +287,28 @@ static int call_serial_method (UapkiMethod method, JSON_Object* joParams, JSON_O
         DEBUG_OUTCON(printf("%d", cnt_threadmethods));
     }
 
-    const fUapkiMethod f_method = UAPKI_METHODS[(uint32_t)method];
-    const int ret = f_method(joParams, joResult);
-    DEBUG_OUTCON(printf("  ret[M:%d]=%d\n", method, ret));
-
+    const int ret = fMethod(joParams, joResult);
+    DEBUG_OUTCON(printf("  ret=%d\n", ret));
     api_serialmethod_is_running = false;
     return ret;
 }
 
-static int call_static_method (UapkiMethod method, JSON_Object* joParams, JSON_Object* joResult)
+static int call_static_method (
+        fUapkiMethod fMethod,
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
-    const fUapkiMethod f_method = UAPKI_METHODS[(uint32_t)method];
-    return f_method(joParams, joResult);
+    const int ret = fMethod(joParams, joResult);
+    DEBUG_OUTCON(printf("  ret=%d\n", ret));
+    return ret;
 }
 
-static int call_thread_method (UapkiMethod method, JSON_Object* joParams, JSON_Object* joResult)
+static int call_thread_method (
+        fUapkiMethod fMethod,
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
     bool serialmethod_is_running = api_serialmethod_is_running;
     DEBUG_OUTCON(printf("call_thread_method(), serial method is running: %c", serialmethod_is_running ? '+' : '-'));
@@ -298,10 +321,8 @@ static int call_thread_method (UapkiMethod method, JSON_Object* joParams, JSON_O
 
     unsigned int cnt_methods = ++api_counter_methods;
 
-    const fUapkiMethod f_method = UAPKI_METHODS[(uint32_t)method];
-    const int ret = f_method(joParams, joResult);
-    DEBUG_OUTCON(printf("  ret[M:%d]=%d\n", method, ret));
-
+    const int ret = fMethod(joParams, joResult);
+    DEBUG_OUTCON(printf("  ret=%d\n", ret));
     cnt_methods = --api_counter_methods;
     return ret;
 }
@@ -314,7 +335,7 @@ UAPKI_EXPORT char* process (const char* request)
     const chrono::time_point<chrono::high_resolution_clock> dt_start = chrono::high_resolution_clock::now();
 #endif
     ParsonHelper json_request, json_result;
-    UapkiMethod method = UapkiMethod::UNDEFINED;
+    const UapkiMethod* uapki_method = nullptr;
     JSON_Object* jo_params = nullptr;
     JSON_Object* jo_result = nullptr;
     const char* s_method = nullptr;
@@ -329,12 +350,22 @@ UAPKI_EXPORT char* process (const char* request)
     };
 
     s_method = json_request.getString("method");
-    method = method_from_str(s_method);
-    if (method == UapkiMethod::UNDEFINED) {
+    if (!s_method) {
         err_code = RET_UAPKI_INVALID_METHOD;
         goto cleanup;
     }
+
     json_result.setString("method", s_method);
+    for (size_t i = 0; i < sizeof(uapki_methods) / sizeof(UapkiMethod); i++) {
+        if (strcmp(s_method, uapki_methods[i].name) == 0) {
+            uapki_method = &uapki_methods[i];
+            break;
+        }
+    }
+    if (!uapki_method) {
+        err_code = RET_UAPKI_INVALID_METHOD;
+        goto cleanup;
+    }
 
     jo_params = json_request.getObject("parameters");
     jo_result = json_result.setObject("result");
@@ -343,53 +374,7 @@ UAPKI_EXPORT char* process (const char* request)
         goto cleanup;
     }
 
-    switch (method) {
-    //  List serial(monopoly access)-methods
-    case UapkiMethod::INIT:
-    case UapkiMethod::DEINIT:
-    case UapkiMethod::PROVIDERS:
-    case UapkiMethod::STORAGES:
-    case UapkiMethod::STORAGE_INFO:
-    case UapkiMethod::OPEN:
-    case UapkiMethod::CLOSE:
-    case UapkiMethod::KEYS:
-    case UapkiMethod::SELECT_KEY:
-    case UapkiMethod::CREATE_KEY:
-    case UapkiMethod::DELETE_KEY:
-    case UapkiMethod::GET_CSR:
-    case UapkiMethod::CHANGE_PASSWORD:
-    case UapkiMethod::INIT_KEY_USAGE:
-    case UapkiMethod::REMOVE_CERT:
-    case UapkiMethod::REMOVE_CRL:
-        err_code = call_serial_method(method, jo_params, jo_result);
-        break;
-    //  List thread(parallel access)-methods
-    case UapkiMethod::SIGN:
-    case UapkiMethod::VERIFY:
-    case UapkiMethod::ADD_CERT:
-    case UapkiMethod::CERT_INFO:
-    case UapkiMethod::GET_CERT:
-    case UapkiMethod::LIST_CERTS:
-    case UapkiMethod::VERIFY_CERT:
-    case UapkiMethod::ADD_CRL:
-    case UapkiMethod::CRL_INFO:
-    case UapkiMethod::LIST_CRLS:
-    case UapkiMethod::DECRYPT:
-    case UapkiMethod::ENCRYPT:
-    case UapkiMethod::RANDOM_BYTES:
-    case UapkiMethod::CERT_STATUS_BY_OCSP:
-        err_code = call_thread_method(method, jo_params, jo_result);
-        break;
-    //  List static-methods
-    case UapkiMethod::VERSION:
-    case UapkiMethod::DIGEST:
-    case UapkiMethod::ASN1_DECODE:
-    case UapkiMethod::ASN1_ENCODE:
-        err_code = call_static_method(method, jo_params, jo_result);
-        break;
-    default:
-        break;
-    }
+    err_code = uapki_method->methodType(uapki_method->method, jo_params, jo_result);
 
 cleanup:
     json_result.setInt32("errorCode", err_code);

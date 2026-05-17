@@ -66,6 +66,7 @@ int getAuthorityKeyId (
 );
 int getBasicConstrains (
     const Extensions_t* extns,
+    bool& critical,
     bool& cA,
     int& pathLenConstraint
 );
@@ -89,6 +90,10 @@ int getCrlUris (
 int getDeltaCrlIndicator (
     const Extensions_t* extns,
     ByteArray** baDeltaCrlIndicator
+);
+int getExtendedKeyUsage (
+    const Extensions_t* extns,
+    std::vector<std::string>& keyPurposeIds
 );
 int getKeyUsage (
     const Extensions_t* extns,

@@ -43,7 +43,7 @@
 #endif
 
 
-int pkcs12_calc_hmac(const HashAlg hash_alg, const ByteArray * key, const ByteArray * msg, ByteArray ** hmac)
+int pkcs12_calc_hmac (const HashAlg hash_alg, const ByteArray * key, const ByteArray * msg, ByteArray ** hmac)
 {
     int ret = RET_OK;
     HmacCtx *ctx = NULL;
@@ -63,6 +63,26 @@ cleanup:
     return ret;
 }
 
+int pkcs12_calc_dstu7564kmac (const ByteArray * key, const size_t mac_len, const ByteArray * msg, ByteArray ** hmac)
+{
+    int ret = RET_OK;
+    Dstu7564Ctx* ctx = NULL;
+
+    CHECK_PARAM(key != NULL);
+    CHECK_PARAM(msg != NULL);
+    CHECK_PARAM(hmac != NULL);
+
+    DEBUG_OUTCON( printf("pkcs12_calc_dstu7564kmac(mac_len=%d)\n key: ", mac_len); ba_print(stdout, key); printf("\n msg: "); ba_print(stdout, msg); )
+    CHECK_NOT_NULL(ctx = dstu7564_alloc());
+    DO(dstu7564_init_kmac(ctx, key, mac_len));
+    DO(dstu7564_update_kmac(ctx, msg));
+    DO(dstu7564_final_kmac(ctx, hmac));
+
+cleanup:
+    dstu7564_free(ctx);
+    return ret;
+}
+
 int pkcs12_get_data_and_calc_mac (const PFX_t * pfx, const char * pass,
         const char ** macAlgo, size_t * iterations,  ByteArray ** baAuthsafe, ByteArray ** baMacValue)
 {
@@ -71,13 +91,15 @@ int pkcs12_get_data_and_calc_mac (const PFX_t * pfx, const char * pass,
     ByteArray *dk = NULL;
     unsigned long iter = 0;
     HashAlg hash_algo = HASH_ALG_UNDEFINED;
+    char* s_oid = NULL;
 
     CHECK_PARAM(pfx != NULL);
     CHECK_PARAM(pass != NULL);
     CHECK_PARAM(baAuthsafe != NULL);
     CHECK_PARAM(baMacValue != NULL);
 
-    hash_algo = hash_from_OID(&pfx->macData->mac.digestAlgorithm.algorithm);
+    DO(asn_oid_to_text(&pfx->macData->mac.digestAlgorithm.algorithm, &s_oid));
+    hash_algo = hash_from_oid(s_oid);
     if (hash_algo == HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_CM_UNSUPPORTED_ALG);
     }
@@ -86,7 +108,12 @@ int pkcs12_get_data_and_calc_mac (const PFX_t * pfx, const char * pass,
 
     DO(pbkdf1(pass, salt, 3, iter, 0, hash_algo, &dk));
     DO(cinfo_get_data(&pfx->authSafe, baAuthsafe));
-    DO(pkcs12_calc_hmac(hash_algo, dk, *baAuthsafe, baMacValue));
+    if (!oid_is_equal(OID_DSTU7564_256, s_oid)) {
+        DO(pkcs12_calc_hmac(hash_algo, dk, *baAuthsafe, baMacValue));
+    }
+    else {
+        DO(pkcs12_calc_dstu7564kmac(dk, 32, *baAuthsafe, baMacValue));
+    }
 
     *macAlgo = hash_to_oid(hash_algo);
     *iterations = (size_t)iter;
@@ -94,6 +121,7 @@ int pkcs12_get_data_and_calc_mac (const PFX_t * pfx, const char * pass,
 cleanup:
     ba_free(salt);
     ba_free(dk);
+    free(s_oid);
     return ret;
 }   //  pkcs12_get_data_and_calc_mac
 
@@ -330,7 +358,12 @@ int pkcs12_gen_macdata (const char * password, const char * hash, const size_t i
     DEBUG_OUTCON( printf("pkcs12_gen_macdata(), ba_salt: \n"); ba_print(stdout, ba_salt); );
 
     DO(pbkdf1(password, ba_salt, 3, iterations, 0, hash_alg, &ba_dk));
-    DO(pkcs12_calc_hmac(hash_alg, ba_dk, baData, &ba_macvalue));
+    if (hash_alg != HASH_ALG_DSTU7564_256) {
+        DO(pkcs12_calc_hmac(hash_alg, ba_dk, baData, &ba_macvalue));
+    }
+    else {
+        DO(pkcs12_calc_dstu7564kmac(ba_dk, 32, baData, &ba_macvalue));
+    }
     DEBUG_OUTCON( printf("pkcs12_gen_macdata(), ba_macvalue: \n"); ba_print(stdout, ba_macvalue); );
 
     ASN_ALLOC(mac_data);

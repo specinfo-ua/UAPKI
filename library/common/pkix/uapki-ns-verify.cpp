@@ -29,6 +29,7 @@
 
 #include "uapki-ns-verify.h"
 #include "dstu4145-params.h"
+#include "ecdsa-params.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapkif.h"
@@ -233,17 +234,15 @@ cleanup:
 static int parse_ecdsa_spki (const SubjectPublicKeyInfo_t* spki, EcParamsId* ecParamsId, ByteArray** baPubkey)
 {
     int ret = RET_OK;
-    OBJECT_IDENTIFIER_t* oid_namedcurve = nullptr;
 
-    CHECK_NOT_NULL(oid_namedcurve = (OBJECT_IDENTIFIER_t*)asn_any2type(spki->algorithm.parameters, get_OBJECT_IDENTIFIER_desc()));
-    *ecParamsId = ecid_from_OID(oid_namedcurve);
-    if (*ecParamsId == EC_PARAMS_ID_UNDEFINED) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
+    if (!spki->algorithm.parameters) return RET_UAPKI_UNSUPPORTED_ALG;
+
+    *ecParamsId = EcParamsId(ecdsa_ecparams_get_ecid(spki->algorithm.parameters->buf, spki->algorithm.parameters->size));
+    if (*ecParamsId == EC_PARAMS_ID_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+
     DO(asn_BITSTRING2ba(&spki->subjectPublicKey, baPubkey));
 
 cleanup:
-    asn_free(get_OBJECT_IDENTIFIER_desc(), oid_namedcurve);
     return ret;
 }
 

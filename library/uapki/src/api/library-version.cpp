@@ -28,11 +28,21 @@
 #define FILE_MARKER "uapki/api/library-version.cpp"
 
 #include "api-json-internal.h"
+#include "uapkic.h"
+#include "uapkif.h"
+#include <string>
 
 
 static const char* LIB_NAME     = "UAPKI";
-static const char* LIB_VERSION  = "2.0.12";
+static const char* LIB_VERSION  = "2.0.16";
 
+
+using namespace std;
+
+
+static string versionToStr (uint32_t version) {
+    return to_string(version / 1000) + "." + to_string((version / 100) % 10) + "." + to_string(version % 100);
+}
 
 int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
 {
@@ -41,6 +51,8 @@ int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
 
     DO_JSON(json_object_set_string(joResult, "name", LIB_NAME));
     DO_JSON(json_object_set_string(joResult, "version", LIB_VERSION));
+    DO_JSON(json_object_set_string(joResult, "uapkicVersion", versionToStr(UAPKIC_VERSION).c_str()));
+    DO_JSON(json_object_set_string(joResult, "uapkifVersion", versionToStr(UAPKIF_VERSION).c_str()));
 
 cleanup:
     return ret;

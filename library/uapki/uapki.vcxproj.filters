@@ -267,6 +267,27 @@
     <ClCompile Include="src\content-hasher.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\api\verify-csr.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\generate-certbundle.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\modify-signature.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\ecdsa-params.c">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\build-cms-2pass.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="src\api\build-csr-2pass.cpp">
+      <Filter>src\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\extnreq-helper.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\uapki-export.h">
@@ -427,6 +448,12 @@
     </ClInclude>
     <ClInclude Include="src\content-hasher.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\ecdsa-params.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\pkix\extnreq-helper.h">
+      <Filter>common\pkix</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

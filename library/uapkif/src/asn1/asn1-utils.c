@@ -395,7 +395,7 @@ int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
         count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
         ASSERT(count == arc_slots);
     }
-       
+
     CALLOC_CHECKED(*text, (size_t)count * 11); /*10 digits + 1 point or zero teminator*/
 
     // Print the contents of the arcs array.
@@ -413,7 +413,7 @@ int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
             SET_ERROR(RET_INVALID_OID);
         }
     }
-        
+
 cleanup:
 
     if (arcs != fixed_arcs) {
@@ -1211,6 +1211,13 @@ void asn_free(asn_TYPE_descriptor_t *td, void *ptr)
 {
     if (td != NULL && ptr != NULL) {
         td->free_struct(td, ptr, 0);
+    }
+}
+
+void uapkif_free(void* ptr)
+{
+    if (ptr != NULL) {
+        free(ptr);
     }
 }
 

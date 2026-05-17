@@ -85,38 +85,38 @@ static int decode_general_name_to_json (
 )
 {
     int ret = RET_OK;
-    ByteArray* ba_value = nullptr;
-    char* s_value = nullptr;
-    string s_name;
+    SmartBA sba_encoded;
+    string s_value;
 
     switch (generalName->present) {
     case GeneralName_PR_otherName:
         DO_JSON(json_object_set_value(joResult, "otherName", json_value_init_object()));
-        DO(decode_other_name_to_json(&generalName->choice.otherName, json_object_get_object(joResult, "otherName")));
+        (void)decode_other_name_to_json(&generalName->choice.otherName, json_object_get_object(joResult, "otherName"));
         break;
     case GeneralName_PR_rfc822Name:
-        DO(Util::pbufToStr(generalName->choice.rfc822Name.buf, generalName->choice.rfc822Name.size, &s_value));
-        DO_JSON(json_object_set_string(joResult, "email", s_value));
+        if (Util::pbufToStr(generalName->choice.rfc822Name.buf, generalName->choice.rfc822Name.size, s_value) == RET_OK) {
+            DO_JSON(json_object_set_string(joResult, "email", s_value.c_str()));
+        }
         break;
     case GeneralName_PR_dNSName:
-        DO(Util::pbufToStr(generalName->choice.dNSName.buf, generalName->choice.dNSName.size, &s_value));
-        DO_JSON(json_object_set_string(joResult, "dns", s_value));
+        if (Util::pbufToStr(generalName->choice.dNSName.buf, generalName->choice.dNSName.size, s_value) == RET_OK) {
+            DO_JSON(json_object_set_string(joResult, "dns", s_value.c_str()));
+        }
         break;
     case GeneralName_PR_uniformResourceIdentifier:
-        DO(Util::pbufToStr(generalName->choice.uniformResourceIdentifier.buf, generalName->choice.uniformResourceIdentifier.size, &s_value));
-        DO_JSON(json_object_set_string(joResult, "uri", s_value));
+        if (Util::pbufToStr(generalName->choice.uniformResourceIdentifier.buf, generalName->choice.uniformResourceIdentifier.size, s_value) == RET_OK) {
+            DO_JSON(json_object_set_string(joResult, "uri", s_value.c_str()));
+        }
         break;
     default:
         // GeneralName_PR_x400Address, GeneralName_PR_directoryName, GeneralName_PR_ediPartyName, GeneralName_PR_iPAddress, GeneralName_PR_registeredID
-        CHECK_NOT_NULL(ba_value = ba_alloc_from_uint8(generalName->choice.iPAddress.buf, generalName->choice.iPAddress.size));
-        s_name = "[" + to_string((int)generalName->present - (int)GeneralName_PR_otherName) + "]";
-        DO_JSON(json_object_set_base64(joResult, s_name.c_str(), ba_value));
+        if (asn_encode_ba(get_GeneralName_desc(), generalName, &sba_encoded) == RET_OK) {
+            DO_JSON(json_object_set_base64(joResult, "bytes", sba_encoded.get()));
+        }
         break;
     }
 
 cleanup:
-    ba_free(ba_value);
-    ::free(s_value);
     return ret;
 }   //  decode_general_name_to_json
 
@@ -162,7 +162,6 @@ int ExtensionHelper::DecodeToJsonObject::accessDescriptions (
     int ret = RET_OK;
     SubjectInfoAccess_t* subject_infoaccess = nullptr;
     JSON_Array* ja_accessdescrs = nullptr;
-    char* s_uri = nullptr;
 
     CHECK_NOT_NULL(subject_infoaccess = (SubjectInfoAccess_t*)asn_decode_ba_with_alloc(get_SubjectInfoAccess_desc(), baEncoded));
 
@@ -173,7 +172,7 @@ int ExtensionHelper::DecodeToJsonObject::accessDescriptions (
         DO_JSON(json_array_append_value(ja_accessdescrs, json_value_init_object()));
         JSON_Object* jo_accessdescr = json_array_get_object(ja_accessdescrs, i);
         const AccessDescription_t* access_descr = subject_infoaccess->list.array[i];
-        string s_accessmethod;
+        string s_accessmethod, s_uri;
 
         DO(Util::oidFromAsn1(&access_descr->accessMethod, s_accessmethod));
 
@@ -182,20 +181,20 @@ int ExtensionHelper::DecodeToJsonObject::accessDescriptions (
             (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)
         ) {
             DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                    access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "ocsp", s_uri));
+                    access_descr->accessLocation.choice.uniformResourceIdentifier.size, s_uri));
+            DO(json_object_set_string(jo_accessdescr, "ocsp", s_uri.c_str()));
         }
         else if (oid_is_equal(s_accessmethod.c_str(), OID_PKIX_CaIssuers)
             && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
             DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "caIssuers", s_uri));
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, s_uri));
+            DO(json_object_set_string(jo_accessdescr, "caIssuers", s_uri.c_str()));
         }
         else if (oid_is_equal(s_accessmethod.c_str(), OID_PKIX_TimeStamping)
             && (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier)) {
             DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            DO(json_object_set_string(jo_accessdescr, "timeStamping", s_uri));
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, s_uri));
+            DO(json_object_set_string(jo_accessdescr, "timeStamping", s_uri.c_str()));
         }
         else {
             SmartBA sba_accesslocation;
@@ -203,14 +202,10 @@ int ExtensionHelper::DecodeToJsonObject::accessDescriptions (
             DO_JSON(json_object_set_string(jo_accessdescr, "accessMethod", s_accessmethod.c_str()));
             DO(json_object_set_base64(jo_accessdescr, "accessLocation", sba_accesslocation.get()));
         }
-
-        ::free(s_uri);
-        s_uri = nullptr;
     }
 
 cleanup:
     asn_free(get_SubjectInfoAccess_desc(), subject_infoaccess);
-    ::free(s_uri);
     return ret;
 }
 

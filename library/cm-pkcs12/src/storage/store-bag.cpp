@@ -91,9 +91,6 @@ cleanup:
 
 StoreBag::StoreBag (void)
     : m_BagType(BAG_TYPE::UNDEFINED)
-    , m_BagValue(nullptr)
-    , m_EncodedBag(nullptr)
-    , m_KeyId(nullptr)
     , m_PtrFriendlyName(nullptr)
     , m_PtrLocalKeyId(nullptr)
 {
@@ -105,15 +102,13 @@ StoreBag::~StoreBag (void)
 {
     m_BagType = BAG_TYPE::UNDEFINED;
     m_BagId.clear();
-    ba_free(m_BagValue);
-    m_BagValue = nullptr;
     for (auto& it : m_BagAttributes) {
         delete it;
     }
     m_BagAttributes.clear();
     setEncodedBag(nullptr);
-    ba_free(m_KeyId);
-    m_KeyId = nullptr;
+    m_KeyId.clear();
+    m_KeyId2.clear();
     m_PtrFriendlyName = nullptr;
     m_PtrLocalKeyId = nullptr;
 }
@@ -123,8 +118,7 @@ int StoreBag::encodeBag (
         const size_t iterations
 )
 {
-    ba_free(m_EncodedBag);
-    m_EncodedBag = nullptr;
+    m_EncodedBag.clear();
     SafeBag_t* safe_bag = (SafeBag_t*)calloc(1, sizeof(SafeBag_t));
     if (!safe_bag) return RET_CM_GENERAL_ERROR;
 
@@ -155,9 +149,9 @@ int StoreBag::encodeBag (
     DO(set_bag_attributes(m_BagAttributes, &safe_bag->bagAttributes));
 
     DO(asn_encode_ba(get_SafeBag_desc(), safe_bag, &ba_data));
-    m_EncodedBag = ba_data;
+    m_EncodedBag.set(ba_data);
     ba_data = nullptr;
-    DEBUG_OUTCON( printf("EncodedBag: "); ba_print(stdout, m_EncodedBag); )
+    DEBUG_OUTCON( printf("EncodedBag: "); ba_print(stdout, m_EncodedBag.get()); )
 
 cleanup:
     ba_free(ba_data);
@@ -165,7 +159,17 @@ cleanup:
     return ret;
 }
 
-StoreAttr* StoreBag::findAttrByOid (
+bool StoreBag::equalKeyId (
+        const ByteArray* baKeyId
+) const
+{
+    return (
+        ((ba_get_len(keyId2()) > 0) && (ba_cmp(keyId2(), baKeyId) == 0)) ||
+        (ba_cmp(keyId(), baKeyId) == 0)
+    );
+}
+
+StoreAttr* StoreBag::findBagAttr (
         const char* oid
 )
 {
@@ -181,23 +185,26 @@ bool StoreBag::getKeyInfo (
         StoreKeyInfo& keyInfo
 )
 {
-    char* s_param1 = nullptr;
-    char* s_param2 = nullptr;
+    char* s_param = nullptr;
     if (bagValue() == nullptr) return false;
 
-    if ((ba_to_hex_with_alloc(keyId(), &s_param1) == RET_OK) && s_param1) {
-        keyInfo.id = string(s_param1);
-        free(s_param1);
-        s_param1 = nullptr;
+    if ((ba_to_hex_with_alloc(keyId(), &s_param) == RET_OK) && s_param) {
+        keyInfo.id = string(s_param);
+        free(s_param);
+        s_param = nullptr;
     }
 
-    if ((private_key_get_info(bagValue(), &s_param1, &s_param2) == RET_OK) && s_param1 && s_param2) {
-        keyInfo.mechanismId = string(s_param1);
-        keyInfo.parameterId = string(s_param2);
-        free(s_param1);
-        free(s_param2);
-        s_param1 = nullptr;
-        s_param2 = nullptr;
+    keyInfo.mechanismId = mechanismId();
+    keyInfo.parameterId = parameterId();
+
+    SmartBA sba_pubkey, sba_spki;
+    if ((private_key_get_spki(bagValue(), &sba_spki) == RET_OK) &&
+        (spki_get_pubkey(sba_spki.get(), &sba_pubkey) == RET_OK)) {
+        if ((ba_to_base64_with_alloc(sba_pubkey.get(), &s_param) == RET_OK) && s_param) {
+            keyInfo.publicKey = string(s_param);
+            free(s_param);
+            s_param = nullptr;
+        }
     }
 
     const ByteArray* ba_attrvalue = friendlyName();
@@ -205,50 +212,55 @@ bool StoreBag::getKeyInfo (
         (void)Util::decodeBmpString(ba_attrvalue, keyInfo.label);
     }
 
-    ba_attrvalue = localKeyId();//getApplication()?
+    ba_attrvalue = localKeyId();
     if (ba_attrvalue) {
-        ByteArray* ba_data = nullptr;
-        if (Util::decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {//now used OCTET_STRING - oid 'localKeyId'
-            if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
-                keyInfo.application = string(s_param1);
-                free(s_param1);
-                s_param1 = nullptr;
+        SmartBA sba_data;
+        if (Util::decodeOctetString(ba_attrvalue, &sba_data) == RET_OK) {
+            if ((ba_to_hex_with_alloc(sba_data.get(), &s_param) == RET_OK) && s_param) {
+                keyInfo.application = string(s_param);
+                free(s_param);
+                s_param = nullptr;
             }
-            ba_free(ba_data);
         }
     }
 
-    //ba_attrvalue = localKeyId();
-    //if (ba_attrvalue) {
-    //    ByteArray* ba_data = nullptr;
-    //    if (decodeOctetString(ba_attrvalue, &ba_data) == RET_OK) {
-    //        if ((ba_to_hex_with_alloc(ba_data, &s_param1) == RET_OK) && s_param1) {
-    //            keyInfo.localKeyId = string(s_param1);
-    //            free(s_param1);
-    //            s_param1 = nullptr;
-    //        }
-    //        ba_free(ba_data);
-    //    }
-    //}
-
-    free(s_param1);
-    free(s_param2);
+    free(s_param);
     return true;
 }
 
 void StoreBag::scanStdAttrs (void)
 {
-    StoreAttr* store_attr = findAttrByOid(OID_PKCS9_FRIENDLY_NAME);
+    StoreAttr* store_attr = findBagAttr(OID_PKCS9_FRIENDLY_NAME);
     m_PtrFriendlyName = (store_attr) ? store_attr->data : nullptr;
-    store_attr = findAttrByOid(OID_PKCS9_LOCAL_KEYID);
+    store_attr = findBagAttr(OID_PKCS9_LOCAL_KEYID);
     m_PtrLocalKeyId = (store_attr) ? store_attr->data : nullptr;
 }
 
-void StoreBag::setBagId (
+StoreAttr* StoreBag::setBagAttr (
+        const char* oid
+)
+{
+    StoreAttr* rv_storeattr = findBagAttr(oid);
+    if (!rv_storeattr) {
+        rv_storeattr = new StoreAttr(oid);
+        if (!rv_storeattr) {
+            return nullptr;
+        }
+        m_BagAttributes.push_back(rv_storeattr);
+    }
+    else {
+        ba_free(rv_storeattr->data);
+        rv_storeattr->data = nullptr;
+    }
+    return rv_storeattr;
+}
+
+bool StoreBag::setBagId (
         const string& bagId
 )
 {
     m_BagId = bagId;
+    return (!m_BagId.empty());
 }
 
 void StoreBag::setData (
@@ -256,13 +268,28 @@ void StoreBag::setData (
         ByteArray* bagValue
 )
 {
-    //DEBUG_OUTCON( printf("StoreBag::setData(), bagType: %d", bagType); ba_print(stdout, bagValue); )
+    DEBUG_OUTCON( printf("StoreBag::setData(), bagType: %d", bagType); ba_print(stdout, bagValue); )
     m_BagType = bagType;
-    m_BagValue = bagValue;
+    m_BagValue.set(bagValue);
     if (bagType == BAG_TYPE::KEY) {
-        const int ret = keyid_by_privkeyinfo(bagValue, &m_KeyId);
-        if (ret != RET_OK) {
-            m_BagType = BAG_TYPE::DATA;
+        m_BagType = BAG_TYPE::DATA;
+        char* s_param1 = nullptr;
+        char* s_param2 = nullptr;
+        if ((private_key_get_info(bagValue, &s_param1, &s_param2) == RET_OK) && s_param1 && s_param2) {
+            m_MechanismId = string(s_param1);
+            m_ParameterId = string(s_param2);
+            free(s_param1);
+            free(s_param2);
+            s_param1 = nullptr;
+            s_param2 = nullptr;
+            if (keyid_by_privkeyinfo(bagValue, &m_KeyId) == RET_OK) {
+                m_BagType = BAG_TYPE::KEY;
+                if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, m_MechanismId.c_str()) ||
+                    oid_is_parent(OID_DSTU4145_WITH_GOST3411, m_MechanismId.c_str())
+                ) {
+                    (void)StoreBag::keyIdFromPrivKeyInfo(HASH_ALG_DSTU7564_256, bagValue, &m_KeyId2);
+                }
+            }
         }
     }
 }
@@ -271,62 +298,33 @@ void StoreBag::setEncodedBag (
         const ByteArray* baEncoded
 )
 {
-    ba_free(m_EncodedBag);
-    m_EncodedBag = (ByteArray*)baEncoded;
+    m_EncodedBag.clear();
+    m_EncodedBag.set((ByteArray*)baEncoded);
 }
 
 bool StoreBag::setFriendlyName (
         const char* utf8label
 )
 {
-    ByteArray* ba_encoded = nullptr;
-    if (Util::encodeBmpString(utf8label, &ba_encoded) != RET_OK) return false;
+    SmartBA sba_encoded;
+    if (Util::encodeBmpString(utf8label, &sba_encoded) != RET_OK) return false;
 
-    StoreAttr* store_attr = findAttrByOid(OID_PKCS9_FRIENDLY_NAME);
-    if (!store_attr) {
-        store_attr = new StoreAttr(OID_PKCS9_FRIENDLY_NAME);
-        if (!store_attr) {
-            ba_free(ba_encoded);
-            return false;
-        }
-        m_BagAttributes.push_back(store_attr);
-    }
+    StoreAttr* store_attr = setBagAttr(OID_PKCS9_FRIENDLY_NAME);
+    if (!store_attr) return false;
 
-    DEBUG_OUTCON( printf("StoreBag::setFriendlyName(), oid: '%s', data: ", store_attr->oid.c_str()); ba_print(stdout, ba_encoded); )
-    ba_free(store_attr->data);
-    store_attr->data = ba_encoded;
+    DEBUG_OUTCON(printf("StoreBag::setFriendlyName(), oid: '%s', data: ", store_attr->oid.c_str()); ba_print(stdout, sba_encoded.get()); )
+    store_attr->data = sba_encoded.pop();
     return true;
 }
 
-bool StoreBag::setLocalKeyID (
-        const char* hex
+bool StoreBag::setKeyId (
+        const ByteArray* baKeyId
 )
 {
-    ByteArray* ba_data = ba_alloc_from_hex(hex);
-    if (!ba_data) return false;
+    if (ba_get_len(baKeyId) == 0) return true;
 
-    ByteArray* ba_encoded = nullptr;
-    if (Util::encodeOctetString(ba_data, &ba_encoded) != RET_OK) {
-        ba_free(ba_data);
-        return false;
-    }
-
-    ba_free(ba_data);
-
-    StoreAttr* store_attr = findAttrByOid(OID_PKCS9_LOCAL_KEYID);
-    if (!store_attr) {
-        store_attr = new StoreAttr(OID_PKCS9_LOCAL_KEYID);
-        if (!store_attr) {
-            ba_free(ba_encoded);
-            return false;
-        }
-        m_BagAttributes.push_back(store_attr);
-    }
-
-    DEBUG_OUTCON( printf("StoreBag::setLocalKeyID(), oid: '%s', data: ", store_attr->oid.c_str()); ba_print(stdout, ba_encoded); )
-    ba_free(store_attr->data);
-    store_attr->data = ba_encoded;
-    return true;
+    m_KeyId.clear();
+    return m_KeyId.set(ba_copy_with_alloc(baKeyId, 0, ba_get_len(baKeyId)));
 }
 
 void StoreBag::setPbes2Param (
@@ -338,3 +336,15 @@ void StoreBag::setPbes2Param (
     m_Pbes2param.cipher = oidCipher;
 }
 
+bool StoreBag::keyIdFromPrivKeyInfo (
+        const HashAlg hashAlg,
+        const ByteArray* baPrivKeyInfo,
+        ByteArray** baKeyId
+)
+{
+    SmartBA sba_pubkey, sba_spki;
+    if (private_key_get_spki(baPrivKeyInfo, &sba_spki) != RET_OK) return false;
+    if (spki_get_subject_publickey(sba_spki.get(), &sba_pubkey) != RET_OK) return false;
+    if (::hash(hashAlg, sba_pubkey.get(), baKeyId) != RET_OK) return false;
+    return true;
+}

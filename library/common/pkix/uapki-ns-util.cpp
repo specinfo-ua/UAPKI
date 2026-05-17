@@ -67,7 +67,7 @@ int Util::algorithmIdentifierFromAsn1 (
     }
 
 cleanup:
-    ::free(s_algo);
+    uapkif_free(s_algo);
     return ret;
 }
 
@@ -85,7 +85,7 @@ int Util::algorithmIdentifierToAsn1 (
     DO(asn_set_oid_from_text(algo, &asn1.algorithm));
 
     //  =parameters=
-    if (baParams) {
+    if (ba_get_len(baParams) > 0) {
         asn1.parameters = (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baParams);
         if (!asn1.parameters) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
@@ -636,7 +636,7 @@ int Util::bmpStringFromAsn1 (
     DO(utf16be_to_utf8(bmpStr->buf, bmpStr->size, &str));
     if (str) {
         sValue = string(str);
-        ::free(str);
+        uapkif_free(str);
     }
 
 cleanup:
@@ -1040,7 +1040,7 @@ int Util::oidFromAsn1 (
     if ((ret == RET_OK) && s_oid) {
         sOid = string(s_oid);
     }
-    ::free(s_oid);
+    uapkif_free(s_oid);
     return ret;
 }
 

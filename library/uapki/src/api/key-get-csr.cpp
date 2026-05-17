@@ -94,7 +94,10 @@ static int get_default_signalgo (
     return ret;
 }
 
-int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
+int uapki_key_get_csr (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
     UapkiNS::AlgorithmIdentifier aid_signalgo;
     SmartBA sba_attrs, sba_csr, sba_subject;
@@ -104,11 +107,11 @@ int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
-    if (jo_parameters) {
-        aid_signalgo.algorithm = ParsonHelper::jsonObjectGetString(jo_parameters, "signAlgo");
-        aid_signalgo.baParameters = json_object_get_base64(jo_parameters, "signAlgoParams");
-        sba_subject.set(json_object_get_base64(jo_parameters, "subject"));
-        sba_attrs.set(json_object_get_base64(jo_parameters, "attributes"));
+    if (joParams) {
+        aid_signalgo.algorithm = ParsonHelper::jsonObjectGetString(joParams, "signAlgo");
+        aid_signalgo.baParameters = json_object_get_base64(joParams, "signAlgoParams");
+        sba_subject.set(json_object_get_base64(joParams, "subject"));
+        sba_attrs.set(json_object_get_base64(joParams, "attributes"));
     }
 
     int ret = RET_OK;
@@ -116,7 +119,9 @@ int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
         DO(get_default_signalgo(*storage, aid_signalgo.algorithm));
     }
 
-    ret = storage->keyGetCsr(aid_signalgo.algorithm, aid_signalgo.baParameters, sba_subject.get(), sba_attrs.get(), &sba_csr);
+    ret = !ParsonHelper::jsonObjectGetBoolean(joParams, "ignoreProviderGetCsr", false)
+        ? storage->keyGetCsr(aid_signalgo.algorithm, aid_signalgo.baParameters, sba_subject.get(), sba_attrs.get(), &sba_csr)
+        : RET_UAPKI_NOT_SUPPORTED;
     switch (ret) {
     case RET_OK:
         break;
@@ -127,7 +132,7 @@ int uapki_key_get_csr (JSON_Object* jo_parameters, JSON_Object* jo_result)
         SET_ERROR(ret);
     }
 
-    DO_JSON(json_object_set_base64(jo_result, "bytes", sba_csr.get()));
+    DO_JSON(json_object_set_base64(joResult, "bytes", sba_csr.get()));
 
 cleanup:
     return ret;

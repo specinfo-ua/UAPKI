@@ -44,8 +44,6 @@
 #define DEBUG_OUTCON(expression) expression
 #endif
 
-//#define DEBUG_USE_FIXED_RND
-
 
 using namespace std;
 using namespace UapkiNS;
@@ -53,9 +51,9 @@ using namespace UapkiNS;
 
 struct EncryptContent {
     UapkiNS::AlgorithmIdentifier
-            algo;
+            algoId;
     SmartBA data;
-    SmartBA secretkey;
+    SmartBA secretKey;
     SmartBA encrypted;
     string  type;
 };  //  end struct EncryptContent
@@ -222,10 +220,8 @@ static int setup_kari (
     UapkiNS::AlgorithmIdentifier aid_keyencryption;
     SmartBA sba_ephemkey, sba_ephemspki, sba_recipissasn,sba_wrappedkey;
     string s_keywrapalgo;
-    bool keyusage_keyagreement = false;
 
-    DO(cerRecipient.keyUsageByBit(KeyUsage_keyAgreement, keyusage_keyagreement));
-    if (!keyusage_keyagreement) {
+    if (!cerRecipient.keyUsageByBit(KeyUsage_keyAgreement)) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
 
@@ -236,7 +232,7 @@ static int setup_kari (
         aid_keyencryption.algorithm,
         s_keywrapalgo,
         cerRecipient.getSpki(),
-        encryptContent.secretkey.get(),
+        encryptContent.secretKey.get(),
         nullptr,
         &sba_wrappedkey
     ));
@@ -311,23 +307,25 @@ static int encrypt_content (
 {
     int ret = RET_OK;
 
-    if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        DO(Cipher::Dstu7624::cryptData(
-            content.algo,
-            content.secretkey.get(),
-            Cipher::Direction::ENCRYPT,
-            content.data.get(),
-            &content.encrypted
-        ));
-    }
-    else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
-        DO(Cipher::Gost28147::cryptData(
-            content.algo,
-            content.secretkey.get(),
-            Cipher::Direction::ENCRYPT,
-            content.data.get(),
-            &content.encrypted
-        ));
+    if (!content.data.empty()) {
+        if (content.algoId.algorithm == string(OID_DSTU7624_256_CFB)) {
+            DO(Cipher::Dstu7624::cryptData(
+                content.algoId,
+                content.secretKey.get(),
+                Cipher::Direction::ENCRYPT,
+                content.data.get(),
+                &content.encrypted
+            ));
+        }
+        else if (content.algoId.algorithm == string(OID_GOST28147_CFB)) {
+            DO(Cipher::Gost28147::cryptData(
+                content.algoId,
+                content.secretKey.get(),
+                Cipher::Direction::ENCRYPT,
+                content.data.get(),
+                &content.encrypted
+            ));
+        }
     }
 
 cleanup:
@@ -341,32 +339,34 @@ static int generate_secretkey (
     int ret = RET_OK;
     SmartBA sba_dke, sba_iv;
 
-    if (content.algo.algorithm == string(OID_DSTU7624_256_CFB)) {
-        ba_free(content.algo.baParameters);
-        content.algo.baParameters = nullptr;
-        DO(Cipher::Dstu7624::generateIV(&sba_iv));
-#ifdef DEBUG_USE_FIXED_RND
-        sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB303132333435363738394142434445464748494A4B4C4D4E"));
-#endif
-        DO(Cipher::Dstu7624::encodeParams(sba_iv.get(), &content.algo.baParameters));
-        DO(Cipher::Dstu7624::generateKey(32, &content.secretkey));
-#ifdef DEBUG_USE_FIXED_RND
-content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B76191597150D29E212B92937E1A6CA2CDA925DACF3B2C7FBB8E4FFC"));
-#endif
+    if (content.algoId.algorithm == string(OID_DSTU7624_256_CFB)) {
+        if (!content.algoId.baParameters) {
+            DO(Cipher::Dstu7624::generateIV(&sba_iv));
+            DO(Cipher::Dstu7624::encodeParams(sba_iv.get(), &content.algoId.baParameters));
+        }
+        else {
+            // Check decoding Dstu7624-params
+            DO(Cipher::Dstu7624::decodeParams(content.algoId.baParameters, &sba_iv));
+        }
+        if (content.secretKey.empty()) {
+            DO(Cipher::Dstu7624::generateKey(32, &content.secretKey));
+        }
     }
-    else if (content.algo.algorithm == string(OID_GOST28147_CFB)) {
-        sba_dke.set(content.algo.baParameters);
-        content.algo.baParameters = nullptr;
-        DO(Cipher::Gost28147::generateIV(&sba_iv));
-#ifdef DEBUG_USE_FIXED_RND
-sba_iv.clear(); sba_iv.set(ba_alloc_from_hex("119070DE12D7C6AB"));
-sba_dke.clear(); //Cipher::Gost28147::getDKE(GOST28147_SBOX_DEFAULT, &sba_dke);
-#endif
-        DO(Cipher::Gost28147::encodeParams(sba_iv.get(), sba_dke.get(), &content.algo.baParameters));
-        DO(Cipher::Gost28147::generateKey(&content.secretkey));
-#ifdef DEBUG_USE_FIXED_RND
-content.secretkey.clear(); content.secretkey.set(ba_alloc_from_hex("9040E744B76191597150D29E212B92937E1A6CA2CDA925DACF3B2C7FBB8E4FFC"));
-#endif
+    else if (content.algoId.algorithm == string(OID_GOST28147_CFB)) {
+        if (!content.algoId.baParameters) {
+            DO(Cipher::Gost28147::generateIV(&sba_iv));
+            DO(Cipher::Gost28147::encodeParams(sba_iv.get(), sba_dke.get(), &content.algoId.baParameters));
+        }
+        else {
+            // Check decoding Gost28147-params
+            DO(Cipher::Gost28147::decodeParams(content.algoId.baParameters, &sba_iv, &sba_dke, true));
+        }
+        if (content.secretKey.empty()) {
+            DO(Cipher::Gost28147::generateKey(&content.secretKey));
+        }
+    }
+    else if (content.data.empty() && !content.algoId.algorithm.empty()  && !content.secretKey.empty()) {
+        // No action: uses external encryption data
     }
     else {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
@@ -378,14 +378,28 @@ cleanup:
 
 static int parse_content (
         JSON_Object* joContent,
-        EncryptContent& encryptContent
+        EncryptContent& content
 )
 {
-    if (!encryptContent.data.set(json_object_get_base64(joContent, "bytes"))) return RET_UAPKI_INVALID_PARAMETER;
+    // content is optional (possible use an external encryption)
+    if (ParsonHelper::jsonObjectHasValue(joContent, "bytes", JSONString)) {
+        if (!content.data.set(json_object_get_base64(joContent, "bytes"))) return RET_UAPKI_INVALID_PARAMETER;
+    }
 
-    encryptContent.algo.algorithm = ParsonHelper::jsonObjectGetString(joContent, "encryptionAlgo", string(OID_DSTU7624_256_CFB));
-    //TODO: encryptContent.algo.baParameters (optional) - later
-    encryptContent.type = ParsonHelper::jsonObjectGetString(joContent, "type", string(OID_PKCS7_DATA));
+    // secretKey is optional (possible use an exists value)
+    if (ParsonHelper::jsonObjectHasValue(joContent, "dataEncryptionKey", JSONString)) {
+        if (!content.secretKey.set(json_object_get_base64(joContent, "dataEncryptionKey"))) return RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    content.algoId.algorithm = ParsonHelper::jsonObjectGetString(joContent, "encryptionAlgo", string(OID_DSTU7624_256_CFB));
+    if (ParsonHelper::jsonObjectHasValue(joContent, "encryptionAlgoParams", JSONString)) {
+        content.algoId.baParameters = json_object_get_base64(joContent, "encryptionAlgoParams");
+        if (!content.algoId.baParameters) return RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    content.type = ParsonHelper::jsonObjectGetString(joContent, "type", string(OID_PKCS7_DATA));
+
+    if (content.data.empty() && content.secretKey.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     return RET_OK;
 }   //  parse_content
@@ -416,7 +430,7 @@ int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult)
     DO(add_unprotected_attrs(envdata_builder, json_object_get_array(joParams, "unprotectedAttrs")));
 
     DO(encrypt_content(econtent));
-    DO(envdata_builder.setEncryptedContentInfo(econtent.type, econtent.algo, econtent.encrypted.get()));
+    DO(envdata_builder.setEncryptedContentInfo(econtent.type, econtent.algoId, econtent.encrypted.get()));
 
     DO(envdata_builder.encode());
     DEBUG_OUTCON(printf("p7e(encoded), hex: "); ba_print(stdout, envdata_builder.getEncoded()));

@@ -36,14 +36,41 @@
 
 namespace DstuNS {
 
-    int ba2BitStringEncapOctet (const ByteArray* baData, BIT_STRING_t* bsEncapOctet);
-    int calcKeyId (const ByteArray* baPubkey, ByteArray** baKeyId);
-    bool isDstu4145family (const char* algo);
-    bool isDstu4145family (const std::string& algo);
+    int ba2BitStringEncapOctet (
+        const ByteArray* baData,
+        BIT_STRING_t* bsEncapOctet
+    );
+    int calcKeyId (
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId
+    );
+    int calcKeyId (
+        const bool useKupyna,
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId
+    );
+    int calcKeyId (
+        const ByteArray* baPublicKey,
+        ByteArray** baKeyId,
+        ByteArray** baKeyId2
+    );
+    bool isDstu4145family (
+        const char* algo
+    );
+    bool isDstu4145family (
+        const std::string& algo
+    );
 
     namespace Dstu4145 {
-        int decodeParams (const ByteArray* baEncoded, std::string& oidNamedCurve);
-        int encodeParams (const std::string& oidNamedCurve, const ByteArray* baDKE, ByteArray** baEncoded);
+        int decodeParams (
+            const ByteArray* baEncoded,
+            std::string& oidNamedCurve
+        );
+        int encodeParams (
+            const std::string& oidNamedCurve,
+            const ByteArray* baDKE,
+            ByteArray** baEncoded
+        );
 
     }   //  end namespace Dstu4145
 

@@ -28,22 +28,16 @@
 #define FILE_MARKER "uapki/api/sign.cpp"
 
 #include "api-json-internal.h"
-#include "attribute-helper.h"
 #include "cert-validator.h"
 #include "cm-providers.h"
 #include "doc-sign.h"
 #include "global-objects.h"
-#include "http-helper.h"
-#include "ocsp-helper.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
-#include "signeddata-helper.h"
 #include "store-json.h"
 #include "time-util.h"
-#include "tsp-helper.h"
 #include "uapki-ns.h"
 #include "uapki-debug.h"
-#include "uapki-ns-verify.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -51,33 +45,9 @@
 #define DEBUG_OUTCON(expression) expression
 #endif
 
-#define DEBUG_OUTPUT_OUTSTREAM(msg,baData)
-#ifndef DEBUG_OUTPUT_OUTSTREAM
-DEBUG_OUTPUT_OUTSTREAM_FUNC
-#define DEBUG_OUTPUT_OUTSTREAM(msg,baData) debug_output_stream(DEBUG_OUTSTREAM_FOPEN,"SIGN",msg,baData)
-#endif
-
 
 using namespace std;
 using namespace UapkiNS;
-
-
-enum class TsAttrType : uint32_t {
-    UNDEFINED           = 0,
-    CONTENT_TIMESTAMP   = 1,
-    TIMESTAMP_TOKEN     = 2,
-    ARCHIVE_TIMESTAMP   = 3
-};
-
-
-struct SignOptions {
-    bool ignoreCertStatus;
-
-    SignOptions (void)
-        : ignoreCertStatus(false)
-    {}
-
-};  //  end struct SignOptions
 
 
 static int get_info_signalgo_and_keyid (
@@ -122,219 +92,41 @@ static int get_info_signalgo_and_keyid (
     return ret;
 }   //  get_info_signalgo_and_keyid
 
-static void parse_sign_options (
-        JSON_Object* joSignOptions,
-        Doc::Sign::SigningDoc::SignParams& signParams,
-        SignOptions& signOptions
-)
-{
-    if (joSignOptions) {
-        if (
-            (signParams.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) ||
-            (signParams.signatureFormat == UapkiNS::SignatureFormat::CADES_T)
-        ) {
-            signOptions.ignoreCertStatus = ParsonHelper::jsonObjectGetBoolean(joSignOptions, "ignoreCertStatus", false);
-        }
-    }
-}   //  parse_sign_options
-
 static int parse_sign_params (
         JSON_Object* joSignParams,
-        Doc::Sign::SigningDoc::SignParams& signParams
+        JSON_Object* joSignOptions,
+        Doc::Sign::SharedData& sharedData
 )
 {
     int ret = RET_OK;
 
-    const UapkiNS::SignatureFormat signature_format = UapkiNS::signatureFormatFromString(
+    sharedData.signatureFormat = signatureFormatFromString(
         ParsonHelper::jsonObjectGetString(joSignParams, "signatureFormat")
     );
-    signParams.aidSignature.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
-    signParams.aidDigest.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "digestAlgo");
-    signParams.detachedData = ParsonHelper::jsonObjectGetBoolean(joSignParams, "detachedData", true);
-    signParams.includeCert = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeCert", false);
-    signParams.includeTime = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeTime", false);
-    signParams.includeContentTS = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeContentTS", false);
+    sharedData.aidSignature.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
+    sharedData.aidDigest.algorithm = ParsonHelper::jsonObjectGetString(joSignParams, "digestAlgo");
+    sharedData.detachedData = ParsonHelper::jsonObjectGetBoolean(joSignParams, "detachedData", true);
+    sharedData.includeCert = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeCert", false);
+    sharedData.includeTime = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeTime", false);
+    sharedData.includeContentTS = ParsonHelper::jsonObjectGetBoolean(joSignParams, "includeContentTS", false);
 
-    DO(signParams.setSignatureFormat(signature_format));
+    if (
+        (sharedData.signatureFormat == SignatureFormat::CADES_BES) ||
+        (sharedData.signatureFormat == SignatureFormat::CADES_T)
+    ) {
+        sharedData.options.ignoreCertStatus = ParsonHelper::jsonObjectGetBoolean(joSignOptions, "ignoreCertStatus", false);
+    }
+
+    DO(sharedData.paramsBySignatureFormat());
 
     if (ParsonHelper::jsonObjectHasValue(joSignParams, "signaturePolicy", JSONObject)) {
         JSON_Object* jo_sigpolicy = json_object_get_object(joSignParams, "signaturePolicy");
-        DO(Doc::Sign::SigningDoc::encodeSignaturePolicy(
-            ParsonHelper::jsonObjectGetString(jo_sigpolicy, "sigPolicyId"),
-            signParams.attrSignPolicy
-        ));
+        DO(sharedData.encodeSignaturePolicy(ParsonHelper::jsonObjectGetString(jo_sigpolicy, "sigPolicyId")));
     }
 
 cleanup:
     return ret;
 }   //  parse_sign_params
-
-static int verify_signeddata (
-        CertValidator::CertValidator& certValidator,
-        const ByteArray* baEncoded,
-        Cert::CerItem** cerSigner
-)
-{
-    int ret = RET_OK;
-    Cert::CerStore& cer_store = *certValidator.getCerStore();
-    Pkcs7::SignedDataParser sdata_parser;
-    Pkcs7::SignedDataParser::SignerInfo signer_info;
-    vector<Cert::CerStore::AddedCerItem> added_ceritems;
-    SmartBA sba_hashtstinfo;
-    HashAlg hash_alg = HASH_ALG_UNDEFINED;
-
-    DO(sdata_parser.parse(baEncoded));
-    if (
-        (!sdata_parser.getEncapContentInfo().baEncapContent) ||
-        (sdata_parser.getCountSignerInfos() == 0)
-    ) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-
-    DO(cer_store.addCerts(
-        Cert::NOT_TRUSTED,
-        Cert::NOT_PERMANENT,
-        sdata_parser.getCerts(),
-        added_ceritems
-    ));
-
-    DO(sdata_parser.parseSignerInfo(0, signer_info));
-    if (!sdata_parser.isContainDigestAlgorithm(signer_info.getDigestAlgorithm())) {
-        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
-    }
-    hash_alg = hash_from_oid(signer_info.getDigestAlgorithm().algorithm.c_str());
-    if (hash_alg == HASH_ALG_UNDEFINED) {
-        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-    }
-    DO(::hash(hash_alg, sdata_parser.getEncapContentInfo().baEncapContent, &sba_hashtstinfo));
-    if (ba_cmp(signer_info.getMessageDigest(), sba_hashtstinfo.get()) != 0) {
-        SET_ERROR(RET_UAPKI_TSP_RESPONSE_INVALID);
-    }
-
-    ret = certValidator.verifySignatureSignerInfo(CertValidator::CertEntity::TSP, signer_info, cerSigner);
-
-cleanup:
-    return ret;
-}   //  verify_signeddata
-
-static int tsp_process (
-        CertValidator::CertValidator& certValidator,
-        Tsp::TspHelper& tspHelper,
-        Doc::Sign::SigningDoc& sdoc
-)
-{
-    int ret = RET_OK;
-    const LibraryConfig::TspParams& tsp_params = sdoc.signParams->tsp;
-    SmartBA sba_resp, sba_tstinfo, sba_tstoken;
-    Cert::CerItem* cer_signer = nullptr;
-
-    if (tsp_params.nonceLen > 0) {
-        DO(tspHelper.genNonce(tsp_params.nonceLen));
-    }
-    DO(tspHelper.setCertReq(tsp_params.certReq));
-    DO(tspHelper.setReqPolicy(tsp_params.policyId));
-
-    DO(tspHelper.encodeRequest());
-
-    if (sdoc.tspUri.empty()) {
-        const vector<string> shuffled_uris = HttpHelper::randomURIs(tsp_params.uris);
-        for (auto& it : shuffled_uris) {
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
-            ret = HttpHelper::post(
-                it,
-                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-                tspHelper.getRequestEncoded(),
-                &sba_resp
-            );
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
-            if (ret == RET_OK) {
-                sdoc.tspUri = it;
-                break;
-            }
-        }
-    }
-    else {
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
-        ret = HttpHelper::post(
-            sdoc.tspUri,
-            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-            tspHelper.getRequestEncoded(),
-            &sba_resp
-        );
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
-    }
-    if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
-    }
-
-    DO(tspHelper.parseResponse(sba_resp.get()));
-    if (
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED) &&
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED_WITHMODS)
-    ) {
-        SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
-    }
-
-    DO(verify_signeddata(
-        certValidator,
-        tspHelper.getTsToken(),
-        &cer_signer
-    ));
-    sdoc.addCert(cer_signer);
-
-    DO(tspHelper.tstInfoIsEqualRequest());
-
-cleanup:
-    return ret;
-}   //  tsp_process
-
-static int add_timestamp_to_attrs (
-        CertValidator::CertValidator& certValidator,
-        const TsAttrType tsAttrType,
-        Doc::Sign::SigningDoc& sdoc
-)
-{
-    int ret = RET_OK;
-    Tsp::TspHelper tsp_helper;
-    SmartBA sba_hash;
-
-    DO(tsp_helper.init());
-
-    switch (tsAttrType) {
-    case TsAttrType::CONTENT_TIMESTAMP:
-        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.messageDigest.get()));
-        break;
-    case TsAttrType::TIMESTAMP_TOKEN:
-        DO(sdoc.digestSignature(&sba_hash));
-        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sba_hash.get()));
-        break;
-    case TsAttrType::ARCHIVE_TIMESTAMP:
-        DO(tsp_helper.setMessageImprint(sdoc.signParams->aidDigest, sdoc.getAtsHash()));
-        break;
-    default:
-        break;
-    }
-
-    DO(tsp_process(certValidator, tsp_helper, sdoc));
-
-    switch (tsAttrType) {
-    case TsAttrType::CONTENT_TIMESTAMP:
-        DO(sdoc.addSignedAttribute(string(OID_PKCS9_CONTENT_TIMESTAMP), tsp_helper.getTsToken(true)));
-        break;
-    case TsAttrType::TIMESTAMP_TOKEN:
-        DO(sdoc.addUnsignedAttribute(OID_PKCS9_TIMESTAMP_TOKEN, tsp_helper.getTsToken(true)));
-        break;
-    case TsAttrType::ARCHIVE_TIMESTAMP:
-        DO(sdoc.addArchiveAttribute(OID_ETSI_ARCHIVE_TIMESTAMP_V3, tsp_helper.getTsToken(true)));
-        break;
-    default:
-        break;
-    }
-    
-
-cleanup:
-    return ret;
-}   //  add_timestamp_to_attrs
 
 static int parse_docattrs_from_json (
         Doc::Sign::SigningDoc& sdoc,
@@ -343,8 +135,6 @@ static int parse_docattrs_from_json (
 )
 {
     const JSON_Array* ja_attrs = json_object_get_array(joDoc, keyAttributes.c_str());
-    if (!ja_attrs) return RET_OK;
-
     const size_t cnt_attrs = json_array_get_count(ja_attrs);
     if (cnt_attrs == 0) return RET_OK;
 
@@ -407,7 +197,7 @@ static int parse_doc_from_json (
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    if (sdoc.signParams->signatureFormat != UapkiNS::SignatureFormat::RAW) {
+    if (sdoc.sharedData->signatureFormat != SignatureFormat::RAW) {
         sdoc.contentType = ParsonHelper::jsonObjectGetString(joDoc, "type", string(OID_PKCS7_DATA));
         if (!oid_is_valid(sdoc.contentType.c_str())) return RET_UAPKI_INVALID_PARAMETER;
         DO(parse_docattrs_from_json(sdoc, joDoc, string("signedAttributes")));
@@ -418,84 +208,48 @@ cleanup:
     return ret;
 }   //  parse_doc_from_json
 
-static int get_cert_status_by_crl (
-        CertValidator::CertValidator& certValidator,
-        Doc::Sign::SigningDoc::CerDataItem& cerDataItem
+static int resultdoc_to_json (
+        JSON_Object* joResultDoc,
+        Doc::Sign::SigningDoc& sDoc
 )
 {
     int ret = RET_OK;
-    const uint64_t validate_time = TimeUtil::mtimeNow();
-    CertValidator::ResultValidationByCrl result_valbycrl;
 
-    DO(cerDataItem.pCerSubject->checkValidity(TimeUtil::mtimeNow()));
+    if (!joResultDoc) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
 
-    DO(certValidator.getIssuerCert(cerDataItem.pCerSubject, &cerDataItem.pCerIssuer, cerDataItem.isSelfSigned));
-    if (cerDataItem.isSelfSigned) return RET_OK;
+    DO_JSON(json_object_set_string(joResultDoc, "id", sDoc.id.c_str()));
+    DO(json_object_set_base64(joResultDoc, "bytes", sDoc.getEncoded()));
+    if (!sDoc.contentType.empty()) {
+        DO_JSON(json_object_set_string(joResultDoc, "contentType", sDoc.contentType.c_str()));
+    }
+    DO(json_object_set_base64(joResultDoc, "messageDigest", sDoc.messageDigest.get()));
 
-    DO(certValidator.validateByCrl(
-        cerDataItem.pCerSubject,
-        cerDataItem.pCerIssuer,
-        validate_time,
-        true,
-        result_valbycrl
-    ));
-    cerDataItem.pCrl = result_valbycrl.crlItem;
-
-cleanup:
-    return ret;
-}   //  get_cert_status_by_crl
-
-static int get_cert_status_by_ocsp (
-        CertValidator::CertValidator& certValidator,
-        Doc::Sign::SigningDoc::SignParams& signParams,
-        Doc::Sign::SigningDoc::CerDataItem& cerDataItem
-)
-{
-    int ret = RET_OK;
-    const bool need_ocspresp = (signParams.signatureFormat > SignatureFormat::CADES_T);
-    CertValidator::ResultValidationByOcsp result_valbyocsp(need_ocspresp);
-
-    DO(cerDataItem.pCerSubject->checkValidity(TimeUtil::mtimeNow()));
-
-    DO(certValidator.getIssuerCert(cerDataItem.pCerSubject, &cerDataItem.pCerIssuer, cerDataItem.isSelfSigned));
-    if (cerDataItem.isSelfSigned) return RET_OK;
-
-    DO(certValidator.validateByOcsp(
-        cerDataItem.pCerSubject,
-        cerDataItem.pCerIssuer,
-        result_valbyocsp
-    ));
-
-    switch (result_valbyocsp.singleResponseInfo.certStatus) {
-    case UapkiNS::CertStatus::GOOD:
-        if (need_ocspresp) {
-            (void)cerDataItem.basicOcspResponse.set(result_valbyocsp.basicOcspResponse.pop());
-            (void)cerDataItem.ocspIdentifier.set(result_valbyocsp.ocspIdentifier.pop());
-            DO(Ocsp::generateOtherHash(
-                result_valbyocsp.ocspResponse.get(),
-                signParams.aidDigest,
-                &cerDataItem.ocspRespHash
-            ));
-        }
-        break;
-    case UapkiNS::CertStatus::REVOKED:
-        SET_ERROR(RET_UAPKI_CERT_STATUS_REVOKED);
-        break;
-    default:
-        SET_ERROR(RET_UAPKI_CERT_STATUS_UNKNOWN);
-        break;
+    if (sDoc.signingTime > 0) {
+        DO_JSON(json_object_set_string(joResultDoc, "signingTime", TimeUtil::mtimeToFtime(sDoc.signingTime).c_str()));
+    }
+    if (sDoc.contentTimeStamp > 0) {
+        DO_JSON(json_object_set_string(joResultDoc, "contentTimeStamp", TimeUtil::mtimeToFtime(sDoc.contentTimeStamp).c_str()));
+    }
+    if (sDoc.signatureTimeStamp > 0) {
+        DO_JSON(json_object_set_string(joResultDoc, "signatureTimeStamp", TimeUtil::mtimeToFtime(sDoc.signatureTimeStamp).c_str()));
+    }
+    if (sDoc.archiveTimeStamp > 0) {
+        DO_JSON(json_object_set_string(joResultDoc, "archiveTimeStamp", TimeUtil::mtimeToFtime(sDoc.archiveTimeStamp).c_str()));
     }
 
 cleanup:
     return ret;
-}   //  get_cert_status_by_ocsp
+}   //  resultdoc_to_json
 
 int uapki_sign (
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
-    CertValidator::CertValidator cert_validator;
+    Doc::Sign::SharedData shared_data;
+    CertValidator::CertValidator& cert_validator = shared_data.certValidator;
     if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
@@ -506,20 +260,21 @@ int uapki_sign (
     int ret = RET_OK;
     Cert::CerStore& cer_store = *cert_validator.getCerStore();
     LibraryConfig& config = *cert_validator.getLibConfig();
-    SignOptions sign_options;
-    Doc::Sign::SigningDoc::SignParams sign_params;
     size_t cnt_docs = 0;
     JSON_Array* ja_results = nullptr;
     JSON_Array* ja_sources = nullptr;
     vector<Doc::Sign::SigningDoc> signing_docs;
     vector<ByteArray*> refba_hashes;
-    UapkiNS::VectorBA vba_signatures;
+    VectorBA vba_signatures;
 
-    DO(parse_sign_params(json_object_get_object(joParams, "signParams"), sign_params));
-    parse_sign_options(json_object_get_object(joParams, "options"), sign_params, sign_options);
+    DO(parse_sign_params(
+        json_object_get_object(joParams, "signParams"),
+        json_object_get_object(joParams, "options"),
+        shared_data
+    ));
 
-    sign_params.ocsp = config.getOcsp();
-    if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
+    shared_data.ocsp = config.getOcsp();
+    if (shared_data.includeContentTS || shared_data.includeSignatureTS) {
         if (config.getOffline()) {
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
         }
@@ -527,117 +282,87 @@ int uapki_sign (
 
     ja_sources = json_object_get_array(joParams, "dataTbs");
     cnt_docs = json_array_get_count(ja_sources);
-    if ((cnt_docs == 0) || (cnt_docs > Doc::Sign::SigningDoc::MAX_COUNT_DOCS)) {
+    if ((cnt_docs == 0) || (cnt_docs > Doc::Sign::MAX_COUNT_DOCS)) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO(get_info_signalgo_and_keyid(*storage, sign_params.aidSignature.algorithm, &sign_params.keyId));
-    sign_params.hashSignature = hash_from_oid(sign_params.aidSignature.algorithm.c_str());
-    if (sign_params.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
+    DO(get_info_signalgo_and_keyid(*storage, shared_data.aidSignature.algorithm, &shared_data.keyId));
+
+    shared_data.hashSignature = hash_from_oid(shared_data.aidSignature.algorithm.c_str());
+    if (shared_data.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
-    if (sign_params.aidDigest.algorithm.empty() || (sign_params.signatureFormat == UapkiNS::SignatureFormat::RAW)) {
-        sign_params.hashDigest = sign_params.hashSignature;
-        sign_params.aidDigest.algorithm = string(hash_to_oid(sign_params.hashDigest));
+    if (shared_data.aidDigest.algorithm.empty() || (shared_data.signatureFormat == SignatureFormat::RAW)) {
+        shared_data.hashDigest = shared_data.hashSignature;
+        shared_data.aidDigest.algorithm = string(hash_to_oid(shared_data.hashDigest));
     }
     else {
-        sign_params.hashDigest = hash_from_oid(sign_params.aidDigest.algorithm.c_str());
+        shared_data.hashDigest = hash_from_oid(shared_data.aidDigest.algorithm.c_str());
     }
-    if (sign_params.hashDigest == HashAlg::HASH_ALG_UNDEFINED) {
+    if (shared_data.hashDigest == HashAlg::HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
+    DO_JSON(json_object_set_string(joResult, "digestAlgo", hash_to_oid(shared_data.hashDigest)));
 
-    if ((sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) && ((!sign_params.sidUseKeyId || sign_params.includeCert))) {
-        DO(cer_store.getCertByKeyId(sign_params.keyId.get(), &sign_params.signer.pCerSubject));
-        if (sign_params.isCadesFormat) {
-            if (!sign_options.ignoreCertStatus) {
-                if (
-                    (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_C) ||
-                    ((sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_BES) && config.getOffline())
-                ) {
-                    DO(get_cert_status_by_crl(cert_validator, sign_params.signer));
-                }
-                else {
-                    DO(get_cert_status_by_ocsp(cert_validator, sign_params, sign_params.signer));
-                }
+    if ((shared_data.signatureFormat != SignatureFormat::RAW) && ((!shared_data.sidUseKeyId || shared_data.includeCert))) {
+        if (storage->getPairedCertId()) {
+            DO(cer_store.getCertByCertId(storage->getPairedCertId(), &shared_data.cerSigner));
+        }
+        else {
+            DO(cer_store.getCertByKeyId(shared_data.keyId.get(), &shared_data.cerSigner));
+        }
+        DO(json_object_set_base64(joResult, "signerCertId", shared_data.cerSigner->getCertId()));
+        if (!shared_data.cerSigner->keyUsageByBit(KeyUsage_digitalSignature)) {
+            SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
+        }
+
+        if (shared_data.isCadesFormat) {
+            if (!shared_data.options.ignoreCertStatus) {
+                const Cert::ValidationType validation_type = (
+                        (shared_data.signatureFormat == SignatureFormat::CADES_C) ||
+                        ((shared_data.signatureFormat == SignatureFormat::CADES_BES) && config.getOffline())
+                    ) ? Cert::ValidationType::CRL : Cert::ValidationType::OCSP;
+                cert_validator.setValidationType(validation_type);
             }
+            DO(cert_validator.getStatus(
+                shared_data.cerSigner,
+                CertValidator::CertEntity::SIGNER,
+                TimeUtil::mtimeNow()
+            ));
 
-            const UapkiNS::EssCertId* ess_certid;
-            DO(sign_params.signer.pCerSubject->generateEssCertId(sign_params.aidDigest, &ess_certid));
-            DO(Doc::Sign::SigningDoc::encodeSigningCertificate(*ess_certid, sign_params.attrSigningCert));
-            if (sign_params.isCadesCXA) {
-                vector<Cert::CerItem*> service_certs;
-                DO(cer_store.getChainCerts(sign_params.signer.pCerSubject, service_certs));
-                for (auto& it : service_certs) {
-                    DO(sign_params.addCert(it));
-                }
-                for (auto& it : sign_params.chainCerts) {
-                    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
-                        DO(get_cert_status_by_ocsp(cert_validator, sign_params, *it));
-                    }
-                    else {
-                        DO(get_cert_status_by_crl(cert_validator, *it));
-                    }
-                }
-
-                if (sign_params.signer.pCerResponder) {
-                    sign_params.addCert(sign_params.signer.pCerResponder);
-                }
-            }
+            DO(shared_data.encodeSigningCertificate());
         }
     }
 
-    if (sign_params.includeContentTS || sign_params.includeSignatureTS) {
-        const LibraryConfig::TspParams& tsp_config = config.getTsp();
-        LibraryConfig::TspParams& tsp_params = sign_params.tsp;
-        tsp_params.certReq = tsp_config.certReq;
-        tsp_params.nonceLen = tsp_config.nonceLen;
-        tsp_params.policyId = tsp_config.policyId;
-        if (sign_params.signer.pCerSubject) {
-            if (tsp_config.forced && !tsp_config.uris.empty()) {
-                tsp_params.uris = tsp_config.uris;
-            }
-            else {
-                tsp_params.uris = sign_params.signer.pCerSubject->getUris().tsp;
-                if (tsp_params.uris.empty()) {
-                    tsp_params.uris = tsp_config.uris;
-                }
-            }
-        }
-        else {
-            tsp_params.uris = tsp_config.uris;
-        }
-
-        if (tsp_params.uris.empty()) {
-            SET_ERROR(RET_UAPKI_TSP_URL_NOT_PRESENT);
-        }
+    if (shared_data.includeContentTS || shared_data.includeSignatureTS) {
+        DO(shared_data.setupTsp(config.getTsp()));
     }
 
     signing_docs.resize(cnt_docs);
     //  Parse and load all TBS-data
     for (size_t i = 0; i < signing_docs.size(); i++) {
         Doc::Sign::SigningDoc& sdoc = signing_docs[i];
-        DO(sdoc.init(&sign_params));
+        DO(sdoc.init(&shared_data));
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
         if (
             (sdoc.contentHasher.getSourceType() != ContentHasher::SourceType::BYTEARRAY) &&
-            (sign_params.detachedData == false)
+            (shared_data.detachedData == false)
         ) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
     }
 
-    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::RAW) {
+    if (shared_data.signatureFormat != SignatureFormat::RAW) {
         for (size_t i = 0; i < signing_docs.size(); i++) {
             Doc::Sign::SigningDoc& sdoc = signing_docs[i];
 
             DO(sdoc.setupSignerIdentifier());
 
             DO(sdoc.digestMessage());
-            if (sign_params.includeContentTS) {
+            if (shared_data.includeContentTS) {
                 //  After digestMessage and before buildSignedAttributes
-                DO(add_timestamp_to_attrs(cert_validator, TsAttrType::CONTENT_TIMESTAMP, sdoc));
+                DO(sdoc.addTimestamp(Doc::Sign::TsAttr::CONTENT_TIMESTAMP));
             }
 
             DO(sdoc.buildSignedAttributes());
@@ -646,7 +371,7 @@ int uapki_sign (
         }
 
         DO(storage->keySign(
-            sign_params.aidSignature.algorithm,
+            shared_data.aidSignature.algorithm,
             nullptr,
             refba_hashes,
             vba_signatures
@@ -657,42 +382,13 @@ int uapki_sign (
             DO(sdoc.setSignature(vba_signatures[i]));
             vba_signatures[i] = nullptr;
             //  Add unsigned attrs before call buildSignedData
-            if (sign_params.includeSignatureTS) {
-                DO(add_timestamp_to_attrs(cert_validator, TsAttrType::TIMESTAMP_TOKEN, sdoc));
-            }
-
-            if (sign_params.isCadesCXA) {
-                vector<Cert::CerItem*> chain_certs;
-                for (auto& it : sdoc.getCerts()) {
-                    DO(cer_store.getChainCerts(it->pCerSubject, chain_certs));
-                }
-                for (auto& it : chain_certs) {
-                    DO(sdoc.addCert(it));
-                }
-
-                const vector<Doc::Sign::SigningDoc::CerDataItem*> certs = sdoc.getCerts();
-                for (auto& it : certs) {
-                    if (sign_params.signatureFormat != UapkiNS::SignatureFormat::CADES_C) {
-                        ret = get_cert_status_by_ocsp(cert_validator, sign_params, *it);
-                        if (ret == RET_OK) {
-                            DO(sdoc.addCert(it->pCerResponder));
-                        }
-                        else if (ret == RET_UAPKI_OCSP_URL_NOT_PRESENT) {
-                            //  It's a nornal case - nothing
-                        }
-                        else {
-                            SET_ERROR(ret);
-                        }
-                    }
-                    else {
-                        DO(get_cert_status_by_crl(cert_validator, *it));
-                    }
-                }
+            if (shared_data.includeSignatureTS) {
+                DO(sdoc.addTimestamp(Doc::Sign::TsAttr::TIMESTAMP_TOKEN));
             }
 
             DO(sdoc.buildUnsignedAttributes());
-            if (sign_params.signatureFormat == UapkiNS::SignatureFormat::CADES_A) {
-                DO(add_timestamp_to_attrs(cert_validator, TsAttrType::ARCHIVE_TIMESTAMP, sdoc));
+            if (shared_data.signatureFormat == SignatureFormat::CADES_A) {
+                DO(sdoc.addTimestamp(Doc::Sign::TsAttr::ARCHIVE_TIMESTAMP));
             }
             DO(sdoc.buildSignedData());
         }
@@ -705,7 +401,7 @@ int uapki_sign (
         }
 
         DO(storage->keySign(
-            sign_params.aidSignature.algorithm,
+            shared_data.aidSignature.algorithm,
             nullptr,
             refba_hashes,
             vba_signatures
@@ -720,20 +416,17 @@ int uapki_sign (
     DO_JSON(json_object_set_value(joResult, "signatures", json_value_init_array()));
     ja_results = json_object_get_array(joResult, "signatures");
     for (size_t i = 0; i < signing_docs.size(); i++) {
-        JSON_Object* jo_doc = nullptr;
-        Doc::Sign::SigningDoc& sdoc = signing_docs[i];
         DO_JSON(json_array_append_value(ja_results, json_value_init_object()));
-        if ((jo_doc = json_array_get_object(ja_results, i)) == nullptr) {
-            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
-        }
-        DO_JSON(json_object_set_string(jo_doc, "id", sdoc.id.c_str()));
-        DO_JSON(json_object_set_base64(jo_doc, "bytes", sdoc.getEncoded()));
+        DO(resultdoc_to_json(json_array_get_object(ja_results, i), signing_docs[i]));
     }
 
 cleanup:
     if (ret != RET_OK) {
-        (void)cert_validator.expectedCertItemsToJson(joResult, "expectedCerts");
-        (void)cert_validator.expectedCrlItemsToJson(joResult, "expectedCrls");
+        for (const auto& it : signing_docs) {
+            (void)it.collectExpectedItems(cert_validator);
+        }
+        (void)cert_validator.expectedCertsToJson(joResult, "expectedCerts");
+        (void)cert_validator.expectedCrlsToJson(joResult, "expectedCrls");
     }
     return ret;
 }

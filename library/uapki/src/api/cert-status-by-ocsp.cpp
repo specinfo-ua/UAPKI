@@ -130,10 +130,10 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
         DO_JSON(json_object_set_string(joResult, "responseStatus", Ocsp::responseStatusToStr(ocsp_helper.getResponseStatus())));
 
         if ((ret == RET_OK) && (ocsp_helper.getResponseStatus() == Ocsp::ResponseStatus::SUCCESSFUL)) {
-            Ocsp::OcspHelper::SingleResponseInfo singleresp_info;
+            CertValidator::ResultValidationByOcsp result_validation;
             DO(cert_validator.processResponseData(
                 ocsp_helper,
-                singleresp_info,
+                result_validation,
                 joResult
             ));
 
@@ -148,8 +148,8 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
                 if ((ret == RET_OK) && cer_subject) {
                     lock_guard<mutex> lock(cer_subject->getMutex());
                     DO(cer_subject->getCertStatusByOcsp().set(
-                        singleresp_info.certStatus,
-                        singleresp_info.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,
+                        result_validation.singleResponseInfo.certStatus,
+                        result_validation.singleResponseInfo.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,
                         sba_resp.get()
                     ));
                 }
