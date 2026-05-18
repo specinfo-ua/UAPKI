@@ -49,6 +49,7 @@ public:
     UapkiLoader (void);
     ~UapkiLoader (void);
 
+    static std::string getDlError (void);
     static std::string getLibName (
         const std::string& libName
     );
