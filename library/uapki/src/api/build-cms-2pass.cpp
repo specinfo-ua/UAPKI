@@ -303,6 +303,8 @@ int uapki_build_cms_2pass (
 )
 {
     int ret = RET_OK;
+    int cnt_steps = 0;
+
     CertValidator::CertValidator cert_validator;
     if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
@@ -314,6 +316,7 @@ int uapki_build_cms_2pass (
             json_object_get_object(joParams, "step1"),
             json_object_get_object(joResult, "step1")
         ));
+        cnt_steps++;
     }
     else if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step2", json_value_init_object()));
@@ -322,6 +325,11 @@ int uapki_build_cms_2pass (
             json_object_get_object(joParams, "step2"),
             json_object_get_object(joResult, "step2"))
         );
+        cnt_steps++;
+    }
+
+    if (cnt_steps == 0) {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
 cleanup:
