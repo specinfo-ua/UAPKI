@@ -66,7 +66,7 @@
     <ClCompile Include="src\api\get-cert.cpp" />
     <ClCompile Include="src\api\list-certs.cpp" />
     <ClCompile Include="src\api\list-crls.cpp" />
-    <ClCompile Include="src\api\modify-signature.cpp" />
+    <ClCompile Include="src\api\modify-cms.cpp" />
     <ClCompile Include="src\api\random-bytes.cpp" />
     <ClCompile Include="src\api\remove-cert.cpp" />
     <ClCompile Include="src\api\remove-crl.cpp" />

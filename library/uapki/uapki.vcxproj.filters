@@ -273,7 +273,7 @@
     <ClCompile Include="src\api\generate-certbundle.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
-    <ClCompile Include="src\api\modify-signature.cpp">
+    <ClCompile Include="src\api\modify-cms.cpp">
       <Filter>src\api</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\ecdsa-params.c">

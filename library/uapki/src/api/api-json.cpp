@@ -156,7 +156,7 @@ static const UapkiMethod uapki_methods[] = {
     {
         "BUILD_CSR_2PASS",
         uapki_build_csr_2pass,
-        call_thread_method
+        call_static_method
     },
     {
         "ADD_CERT",
@@ -244,8 +244,8 @@ static const UapkiMethod uapki_methods[] = {
         call_static_method
     },
     {
-        "MODIFY_SIGN",
-        uapki_modify_signature,
+        "MODIFY_CMS",
+        uapki_modify_cms,
         call_static_method
     },
     {

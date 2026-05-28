@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FILE_MARKER "uapki/api/modify-signature.cpp"
+#define FILE_MARKER "uapki/api/modify-cms.cpp"
 
 
 #include "api-json-internal.h"
@@ -92,7 +92,7 @@ cleanup:
 }   //  result_signinfo_to_json
 
 
-int uapki_modify_signature (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     Pkcs7::SignedDataParser sdata_parser, sdata2_parser;

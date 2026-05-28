@@ -313,7 +313,7 @@ static void save_result (
         const string s_method = ParsonHelper::jsonObjectGetString(joResponse, "method");
         JSON_Object* jo_result = json_object_get_object(joResponse, "result");
         if ((s_method == "DIGEST") || (s_method == "ENCRYPT") || (s_method == "GENERATE_CERTBUNDLE") ||
-            (s_method == "GET_CERT") || (s_method == "GET_CSR") || (s_method == "MODIFY_SIGN")
+            (s_method == "GET_CERT") || (s_method == "GET_CSR") || (s_method == "MODIFY_CMS")
         ) {
             const string b64_bytes = ParsonHelper::jsonObjectGetString(jo_result, "bytes");
             if (!b64_bytes.empty()) {
@@ -333,12 +333,18 @@ static void save_result (
         }
         else if ((s_method == "BUILD_CMS_2PASS") || (s_method == "BUILD_CSR_2PASS")) {
             JSON_Object* jo_step = json_object_get_object(jo_result, "step1");
-            if (!jo_step) {
-                jo_step = json_object_get_object(jo_result, "step2");
+            if (jo_step) {
+                const string b64_bytes = ParsonHelper::jsonObjectGetString(jo_step, "bytes");
+                if (!b64_bytes.empty()) {
+                    save_file(fn_saveresult + "-step1.der", b64_bytes);
+                }
             }
-            const string b64_bytes = ParsonHelper::jsonObjectGetString(jo_step, "bytes");
-            if (!b64_bytes.empty()) {
-                save_file(fn_saveresult, b64_bytes);
+            jo_step = json_object_get_object(jo_result, "step2");
+            if (jo_step) {
+                const string b64_bytes = ParsonHelper::jsonObjectGetString(jo_step, "bytes");
+                if (!b64_bytes.empty()) {
+                    save_file(fn_saveresult, b64_bytes);
+                }
             }
         }
     }
@@ -407,7 +413,7 @@ static bool run_task (
         if ((itest == 0) && (cnt_tasks ==  1)) {
             if ((s_method == "BUILD_CMS_2PASS") || (s_method == "BUILD_CSR_2PASS") ||
                 (s_method == "DIGEST") || (s_method == "ENCRYPT") || (s_method == "GENERATE_CERTBUNDLE") ||
-                (s_method == "GET_CERT") || (s_method == "GET_CSR") || (s_method == "MODIFY_SIGN") ||
+                (s_method == "GET_CERT") || (s_method == "GET_CSR") || (s_method == "MODIFY_CMS") ||
                 (s_method == "SIGN")
             ) {
                 save_result(ParsonHelper::jsonObjectGetString(joTask, "saveResult"), json_resp.rootObject());

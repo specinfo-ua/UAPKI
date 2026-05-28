@@ -69,7 +69,7 @@ int uapki_key_init_usage (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_sign (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_verify_signature (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_modify_signature (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_build_cms_2pass (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_build_csr_2pass (JSON_Object* joParams, JSON_Object* joResult);
