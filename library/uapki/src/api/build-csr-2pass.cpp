@@ -77,8 +77,8 @@ static int step1_encodetbs (
         JSON_Object* jo_extnreq = json_object_get_object(joStep1Params, "extensionRequest");
         JSON_Array* ja_extns = json_object_get_array(jo_extnreq, "extensions");
 
-        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "extKeyUsage", JSONArray)) {
-            JSON_Array* ja_extkeyusage = json_object_get_array(jo_extnreq, "extKeyUsage");
+        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "extendedKeyUsage", JSONArray)) {
+            JSON_Array* ja_extkeyusage = json_object_get_array(jo_extnreq, "extendedKeyUsage");
             const size_t cnt_ekus = json_array_get_count(ja_extkeyusage);
             if (cnt_ekus > 0) {
                 vector<string> ekus;
@@ -89,17 +89,17 @@ static int step1_encodetbs (
                     }
                 }
                 extnreq_helper.setKeyPurposeIds(ekus);
-                DO(extnreq_helper.encodeExtKeyUsage(nullptr, true));
+                DO(extnreq_helper.encodeExtKeyUsage(nullptr, false));
             }
         }
-        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "subjectKeyId", JSONString)) {
+        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "subjectKeyIdentifier", JSONString)) {
             SmartBA sba_keyid;
-            if (!sba_keyid.set(json_object_get_hex(jo_extnreq, "subjectKeyId"))) return RET_UAPKI_INVALID_PARAMETER;
+            if (!sba_keyid.set(json_object_get_hex(jo_extnreq, "subjectKeyIdentifier"))) return RET_UAPKI_INVALID_PARAMETER;
             DO(extnreq_helper.encodeSubjectKeyId(sba_keyid.get(), false));
         }
-        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "pka", JSONString)) {
+        if (ParsonHelper::jsonObjectHasValue(jo_extnreq, "pkaBytes", JSONString)) {
             SmartBA sba_pkattestate;
-            if (!sba_pkattestate.set(json_object_get_base64(jo_extnreq, "pka"))) return RET_UAPKI_INVALID_PARAMETER;
+            if (!sba_pkattestate.set(json_object_get_base64(jo_extnreq, "pkaBytes"))) return RET_UAPKI_INVALID_PARAMETER;
             DO(extnreq_helper.encodePkAttestate(sba_pkattestate.get(), false));
         }
         if (json_array_get_count(ja_extns) > 0) {
@@ -191,6 +191,7 @@ int uapki_build_csr_2pass (
 )
 {
     int ret = RET_OK;
+    int cnt_steps = 0;
 
     if (ParsonHelper::jsonObjectHasValue(joParams, "step1", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step1", json_value_init_object()));
@@ -198,13 +199,19 @@ int uapki_build_csr_2pass (
             json_object_get_object(joParams, "step1"),
             json_object_get_object(joResult, "step1")
         ));
+        cnt_steps++;
     }
-    else if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
+    if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step2", json_value_init_object()));
         DO(step2_encodecsr(
             json_object_get_object(joParams, "step2"),
             json_object_get_object(joResult, "step2"))
         );
+        cnt_steps++;
+    }
+
+    if (cnt_steps == 0) {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
 cleanup:
