@@ -400,16 +400,10 @@ int CertValidator::getStatus (
     if (!checkCertUsage(certEntity, cerItem)) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
-    //todo: check CA-inter
     entity = m_CertChain[idx_root];
-    if (!entity->getSubject()->isTrusted()) {
-        (void)addExpectedCert(entity->getCertEntity(), entity->getSubject());
-        SET_ERROR(RET_UAPKI_CERT_NOT_TRUSTED);
-    }
     if (!entity->getSubject()->getCertExtKeyUsage().isCa()) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
-    //todo: check pathLen, later
     for (const auto it : obtained_certs) {
         if (!checkCertUsage(expected_certentity, it)) {
             SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
@@ -427,13 +421,7 @@ int CertValidator::getStatus (
                 SET_ERROR(RET_UAPKI_CERT_CHAIN_NOT_FOUND);
             }
 
-            if (it_obtcert->getUris().ocsp.empty()) {
-                if (!it_obtcert->isTrusted()) {
-                    (void)addExpectedCert(CertEntity::OCSP, it_obtcert);
-                    SET_ERROR(RET_UAPKI_CERT_NOT_TRUSTED);
-                }
-            }
-            else {
+            if (!it_obtcert->getUris().ocsp.empty()) {
                 Cert::CerItem* cer_issuer = nullptr;
                 bool is_selfsigned;
                 ResultValidationByOcsp result_validation;
