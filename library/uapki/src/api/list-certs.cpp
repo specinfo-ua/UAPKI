@@ -92,12 +92,15 @@ static int extendedkeyusage_to_json (
     ExtendedKeyUsage_t* ext_keyusage = (ExtendedKeyUsage_t*)asn_decode_ba_with_alloc(get_ExtendedKeyUsage_desc(), baEncoded);
     if (!ext_keyusage) return RET_UAPKI_INVALID_STRUCT;
 
-    (void)json_object_set_value(joResult, "extKeyUsage", json_value_init_array());
-    JSON_Array* ja_keypurposeids = json_object_get_array(joResult, "extKeyUsage");
+    (void)json_object_set_value(joResult, "extKeyUsage", json_value_init_array()); // deprecated
+    (void)json_object_set_value(joResult, "extendedKeyUsage", json_value_init_array());
+    JSON_Array* ja_keypurposeids_depr = json_object_get_array(joResult, "extKeyUsage"); // deprecated
+    JSON_Array* ja_keypurposeids = json_object_get_array(joResult, "extendedKeyUsage");
 
     for (int i = 0; i < ext_keyusage->list.count; i++) {
         string s_keypurposeid;
         DO(Util::oidFromAsn1(ext_keyusage->list.array[i], s_keypurposeid));
+        DO_JSON(json_array_append_string(ja_keypurposeids_depr, s_keypurposeid.c_str())); // deprecated
         DO_JSON(json_array_append_string(ja_keypurposeids, s_keypurposeid.c_str()));
     }
 
@@ -195,7 +198,7 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
     VectorBA vba_subjectkeyids;
     Pagination pagination;
 
-    if (ParsonHelper::jsonObjectHasValue(joParams, "subjectKeyId", JSONString)) {
+    if (ParsonHelper::jsonObjectHasValue(joParams, "subjectKeyId", JSONString)) { // deprecated
         if (!sba_subjectkeyid.set(json_object_get_hex(joParams, "subjectKeyId"))) return RET_UAPKI_INVALID_PARAMETER;
     }
     if (ParsonHelper::jsonObjectHasValue(joParams, "subjectKeyIdentifiers", JSONArray)) {
