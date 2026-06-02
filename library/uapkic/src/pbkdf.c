@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The UAPKI Project Authors.
+ * Copyright 2021-2026 The UAPKI Project Authors.
  * Copyright 2016 PrivatBank IT <acsk@privatbank.ua>
  * 
  * Redistribution and use in source and binary forms, with or without 
@@ -28,12 +28,6 @@
 
 #define FILE_MARKER "uapkic/pbkdf.c"
 
-#ifdef _WIN32
-#include <windows.h>
-#elif defined(__linux__) || defined(__APPLE__) || defined(__GNUC__)
-#include <iconv.h>
-#endif
-
 #include <string.h>
 #include "macros-internal.h"
 #include "byte-utils-internal.h"
@@ -47,72 +41,117 @@
 static int utf8_to_utf16be(const char* in, unsigned char** out, size_t* out_len)
 {
     int ret = RET_OK;
+    size_t in_len;
+    size_t max_out_len;
+    uint8_t* out_buf = NULL;
+    const uint8_t* in_ptr = (const uint8_t*)in;
+    unsigned char* out_ptr;
+    size_t remaining_in;
+    size_t written_bytes;
 
-    CHECK_PARAM(in);
-    CHECK_PARAM(out);
-    CHECK_PARAM(out_len);
+    CHECK_NOT_NULL(in);
+    CHECK_NOT_NULL(out);
+    CHECK_NOT_NULL(out_len);
 
-#ifdef _WIN32
+    in_len = strlen(in) + 1;
 
-    wchar_t* wout = NULL;
-    int wchar_len = 0;
-    int i;
+    // Максимально можливий розмір UTF-16BE буфера (2 байти на кожен ASCII/UTF-8 байт)
+    max_out_len = in_len * 2;
+    if ((out_buf = malloc(max_out_len)) == NULL) {
+        SET_ERROR(RET_MEMORY_ALLOC_ERROR); // Помилка виділення пам'яті
+	}
 
-    wchar_len = MultiByteToWideChar(CP_UTF8, 0, in, -1, 0, 0);
-    if (!wchar_len) {
-        SET_ERROR(RET_INVALID_UTF8_STR);
+    out_ptr = out_buf;
+    remaining_in = in_len;
+    written_bytes = 0;
+
+    while (remaining_in > 0) {
+        uint32_t cp = 0;
+        size_t bytes_read = 0;
+
+        // 1. Декодування UTF-8 у Code Point
+        if ((in_ptr[0] & 0x80) == 0x00) {
+            cp = in_ptr[0];
+            bytes_read = 1;
+        }
+        else if (((in_ptr[0] & 0xE0) == 0xC0) && (remaining_in >= 2)) {
+            if ((in_ptr[1] & 0xC0) != 0x80) { 
+                SET_ERROR(RET_INVALID_UTF8_STR);
+            }
+            cp = ((in_ptr[0] & 0x1F) << 6) | (in_ptr[1] & 0x3F);
+            bytes_read = 2;
+        }
+        else if (((in_ptr[0] & 0xF0) == 0xE0) && (remaining_in >= 3)) {
+            if ((in_ptr[1] & 0xC0) != 0x80 || (in_ptr[2] & 0xC0) != 0x80) {
+                SET_ERROR(RET_INVALID_UTF8_STR);
+            }
+            cp = ((in_ptr[0] & 0x0F) << 12) | ((in_ptr[1] & 0x3F) << 6) | (in_ptr[2] & 0x3F);
+            bytes_read = 3;
+        }
+        else if (((in_ptr[0] & 0xF8) == 0xF0) && (remaining_in >= 4)) {
+            if ((in_ptr[1] & 0xC0) != 0x80 || (in_ptr[2] & 0xC0) != 0x80 || (in_ptr[3] & 0xC0) != 0x80) {
+                SET_ERROR(RET_INVALID_UTF8_STR);
+            }
+            cp = ((in_ptr[0] & 0x07) << 18) | ((in_ptr[1] & 0x3F) << 12) | ((in_ptr[2] & 0x3F) << 6) | (in_ptr[3] & 0x3F);
+            bytes_read = 4;
+        }
+        else {
+            SET_ERROR(RET_INVALID_UTF8_STR);
+        }
+
+        in_ptr += bytes_read;
+        remaining_in -= bytes_read;
+
+        // 2. Кодування Code Point в UTF-16BE (Big Endian)
+        if (cp <= 0xFFFF) {
+            // Захист від виходу за межі буфера (з урахуванням виділення
+            // з припущення на однобайтні символи не має ніколи статись)
+            if (written_bytes + 2 > max_out_len) {
+                SET_ERROR(RET_INDEX_OUT_OF_RANGE);
+            }
+
+            out_ptr[0] = (unsigned char)(cp >> 8);   // Старший байт першим
+            out_ptr[1] = (unsigned char)(cp & 0xFF); // Молодший байт другим
+            out_ptr += 2;
+            written_bytes += 2;
+        }
+        else if (cp <= 0x10FFFF) {
+            uint16_t high_surrogate;
+            uint16_t low_surrogate;
+
+            if (written_bytes + 4 > max_out_len) {
+                SET_ERROR(RET_INDEX_OUT_OF_RANGE);
+            }
+
+            // Розрахунок сурогатних пар для символів > 0xFFFF
+            cp -= 0x10000;
+            high_surrogate = (uint16_t)((cp >> 10) + 0xD800);
+            low_surrogate = (uint16_t)((cp & 0x3FF) + 0xDC00);
+
+            out_ptr[0] = (unsigned char)(high_surrogate >> 8);
+            out_ptr[1] = (unsigned char)(high_surrogate & 0xFF);
+            out_ptr[2] = (unsigned char)(low_surrogate >> 8);
+            out_ptr[3] = (unsigned char)(low_surrogate & 0xFF);
+            out_ptr += 4;
+            written_bytes += 4;
+        }
+        else {
+            SET_ERROR(RET_INVALID_UTF8_STR); // Code Point поза межами Unicode
+        }
     }
 
-    MALLOC_CHECKED(wout, wchar_len * sizeof(wchar_t));
-
-    wchar_len = MultiByteToWideChar(CP_UTF8, 0, in, -1, wout, wchar_len);
-    if (!wchar_len) {
-        SET_ERROR(RET_INVALID_UTF8_STR);
-    }
-
-    *out_len = (size_t)wchar_len * 2;
-    MALLOC_CHECKED(*out, (*out_len) * sizeof(char));
-
-    /* LE to BE  UTF-16 */
-    for (i = 0; i < wchar_len; i++) {
-        (*out)[2 * i] = wout[i] >> 8;
-        (*out)[2 * i + 1] = wout[i] & 0xff;
-    }
-
-    free(wout);
-
-#elif defined(__linux__) || defined(__APPLE__) || defined(__GNUC__)
-    size_t in_len = strlen(in) + 1;
-    char* _out = (char*)malloc(2 * in_len);
-    size_t _out_len = 2 * in_len;
-    char* _out_ptr = _out;
-    iconv_t cd;
-
-    if (_out == NULL) {
-        SET_ERROR(RET_MEMORY_ALLOC_ERROR);
-    }
-
-    cd = iconv_open("UTF-16BE", "UTF-8");
-
-    if (cd == (iconv_t)(-1) || iconv(cd, (char**)&in, &in_len, &_out_ptr, &_out_len) == (size_t)-1) {
-        free(_out);
-        _out = NULL;
-        _out_len = 0;
-        SET_ERROR(RET_INVALID_UTF8_STR);
-    }
-
-    *out = (uint8_t*)_out;
-    *out_len = (size_t)(_out_ptr - _out);
-
-    iconv_close(cd);
-#else
-#error Unsupported platform
-#endif
-cleanup:
+    *out = out_buf;
+    *out_len = written_bytes;
     return ret;
-}   //  utf8_to_utf16be
 
- //TODO: Это апгрейдженый pbkdf1, но нет описания в RFC.
+cleanup:
+    free(out_buf);
+    *out = NULL;
+    *out_len = 0;
+    return ret;
+}
+
+ //Це апгрейджений pbkdf1, але немає опису в RFC.
  //https://github.com/openssl/openssl/blob/54c68d35c6b7e7650856beb949b45363ce40ca93/crypto/pkcs12/p12_key.c FUNC: PKCS12_key_gen_uni
  //TESTS: https://github.com/openssl/openssl/blob/76f572ed0469a277d92378848250b7a9705d3071/test/evptests.txt  FIND: # PKCS#12 tests
 int pbkdf1(const char* pass, const ByteArray* salt, uint8_t id, size_t iter, size_t n, HashAlg hash_alg, ByteArray** out_ba)
@@ -297,9 +336,9 @@ int pbkdf2(const char* pass, const ByteArray* salt, size_t iterations, size_t ke
             DO(ba_xor(key, u));
         }
 
-        //Добавляем результат в Т
+        // Додаємо результат в Т
         ba_append(key, 0, cplen, out);
-        //Увеличиваем счетчик.
+		// Збільшуємо лічильник
         count++;
         key_len -= cplen;
 
