@@ -38,7 +38,7 @@
 
 static ByteArray *drbg_Key = NULL;
 static ByteArray *drbg_V = NULL;
-static int drbg_reseed_counter;
+static uint_fast16_t drbg_reseed_counter;
 static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
 pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -203,7 +203,7 @@ static int drbg_random_internal(ByteArray* random)
 		DO(drbg_init());
 	}
 
-	if (drbg_reseed_counter > 128 || drbg_prediction_resistance) {
+	if (drbg_reseed_counter > 32768 || drbg_prediction_resistance) {
 		DO(entropy_get(&entropy));
 		DO(drbg_reseed_internal(entropy));
 	}
