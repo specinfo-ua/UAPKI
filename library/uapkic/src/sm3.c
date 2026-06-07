@@ -161,7 +161,7 @@ static void sm3_process(Sm3Ctx* ctx, const uint8_t data[64])
 
     for (j = 16; j < 64; j++)
     {
-        SS1 = ROTL((ROTL(A, 12) + E + ROTL(T[j], j)), 7);
+        SS1 = ROTL((ROTL(A, 12) + E + ROTL(T[j], (j & 31))), 7);
         SS2 = SS1 ^ ROTL(A, 12);
         TT1 = FF1(A, B, C) + D + SS2 + W1[j];
         TT2 = GG1(E, F, G) + H + SS1 + W[j];

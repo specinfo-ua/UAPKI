@@ -708,6 +708,34 @@ cleanup:
     return ret;
 }
 
+int VerifiedSignerInfo::tspCertToStore() {
+    int ret = RET_OK;
+
+    if (m_ContentTS.isPresent()) {
+        Pkcs7::SignedDataParser& sdata_parser = m_ContentTS.tsTokenParser.getSignedDataParser();
+        vector<Cert::CerStore::AddedCerItem> added_ceritems;
+        DO(getCerStore()->addCerts(
+            Cert::NOT_TRUSTED,
+            Cert::NOT_PERMANENT,
+            sdata_parser.getCerts(),
+            added_ceritems
+        ));
+    }
+    if (m_SignatureTS.isPresent()) {
+        Pkcs7::SignedDataParser& sdata_parser = m_SignatureTS.tsTokenParser.getSignedDataParser();
+        vector<Cert::CerStore::AddedCerItem> added_ceritems;
+        DO(getCerStore()->addCerts(
+            Cert::NOT_TRUSTED,
+            Cert::NOT_PERMANENT,
+            sdata_parser.getCerts(),
+            added_ceritems
+        ));
+    }
+
+cleanup:
+    return ret;
+}
+
 void VerifiedSignerInfo::validateSignFormat (
         const uint64_t validateTime,
         const bool contentIsPresent
@@ -806,7 +834,7 @@ void VerifiedSignerInfo::validateStatusCerts (void)
         }
     }
 
-    if (!getExpectedCertItems().empty() || !getExpectedCrlItems().empty()) {
+    if (!getExpectedCerts().empty() || !getExpectedCrls().empty()) {
         validation_status.setIndeterminate();
         DEBUG_OUTCON(printf("VerifiedSignerInfo::validateStatusCerts() set INDETERMINATE because expected certs/CRLs"));
     }

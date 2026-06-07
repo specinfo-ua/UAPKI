@@ -27,6 +27,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "ba-utils.h"
 #include "cm-api.h"
 #include "cm-errors.h"
 #include "cm-pkcs12.h"
@@ -42,6 +43,9 @@
 #ifndef DEBUG_OUTCON
     #define DEBUG_OUTCON(expression) expression
 #endif
+
+
+#define MIN_FILESIZE 32
 
 
 static CM_ERROR err_to_cmerror (int err)
@@ -90,13 +94,17 @@ CM_ERROR CmPkcs12::open (
     case OPEN_MODE_RO:
         if (strcmp(fileName, FILENAME_ON_MEMORY) == 0) {
             cm_err = CmPkcs12::parseBytes(openParams, &sba_pfx);
-            if ((cm_err == RET_OK) && (sba_pfx.size() > 0)) {
-                ss_ctx->fileStorage.loadFromBuffer(sba_pfx.get(), openMode == OPEN_MODE_RO);
-                sba_pfx.set(nullptr);
-            }
         }
         else {
-            cm_err = err_to_cmerror(ss_ctx->fileStorage.loadFromFile(fileName, openMode == OPEN_MODE_RO));
+            cm_err = err_to_cmerror(ba_alloc_from_file(fileName, &sba_pfx));
+        }
+        if (cm_err == RET_OK) {
+            if (sba_pfx.size() >= MIN_FILESIZE) {
+                ss_ctx->fileStorage.setBuffer(sba_pfx.pop(), fileName, (openMode == OPEN_MODE_RO));
+            }
+            else {
+                cm_err = RET_CM_UNSUPPORTED_FORMAT;
+            }
         }
         break;
     case OPEN_MODE_CREATE:

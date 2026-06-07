@@ -83,6 +83,32 @@ void debug_ceritem_info (CerItem& cerItem)
 }   //  debug_ceritem_info
 #endif
 
+static int basicconstrains_from_extns (
+    const Extensions_t* extns,
+    CertExtKeyUsage& certExtKeyUsage
+)
+{
+    bool ca = false, critical = false;
+    int pathlen_constraint = -1;
+    const int ret = ExtensionHelper::getBasicConstrains(extns, critical, ca, pathlen_constraint);
+    if (ret == RET_OK) {
+        if (critical) {
+            certExtKeyUsage.set(ExtKeyUsageMask::CA_EXTN_CRITICAL);
+        }
+        if (ca) {
+            certExtKeyUsage.set(ExtKeyUsageMask::CA);
+        };
+        if (pathlen_constraint >= 0) {
+            certExtKeyUsage.setPathLenConstraint((uint32_t)pathlen_constraint);
+        }
+    }
+    else if (ret != RET_UAPKI_EXTENSION_NOT_PRESENT) {
+        return ret;
+    }
+
+    return RET_OK;
+}   //  basicconstrains_from_extns
+
 static int encode_issuer_and_sn (
         const TBSCertificate_t* tbsCert,
         ByteArray** baIssuerAndSN
@@ -104,6 +130,44 @@ cleanup:
     asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
     return ret;
 }   //  encode_issuer_and_sn
+
+static int extkeyusage_from_extns (
+    const Extensions_t* extns,
+    CertExtKeyUsage& certExtKeyUsage
+)
+{
+    vector<string> key_purposeids;
+    const int ret = ExtensionHelper::getExtendedKeyUsage(extns, key_purposeids);
+    if (ret == RET_OK) {
+        for (const auto& it : key_purposeids) {
+            if (oid_is_equal(it.c_str(), OID_PKIX_KpOcspSigning)) {
+                certExtKeyUsage.set(ExtKeyUsageMask::OCSP);
+            }
+            else if (oid_is_equal(it.c_str(), OID_PKIX_KpTspSigning)) {
+                certExtKeyUsage.set(ExtKeyUsageMask::TSP);
+            }
+            else if (oid_is_equal(it.c_str(), OID_IIT_KEYPURPOSE_CMP_SIGNING)) {
+                certExtKeyUsage.set(ExtKeyUsageMask::CMP);
+            }
+            else {
+                certExtKeyUsage.set(ExtKeyUsageMask::UNKNOWN);
+            }
+        }
+    }
+    else if (ret != RET_UAPKI_EXTENSION_NOT_PRESENT) {
+        return ret;
+    }
+
+    return RET_OK;
+}   //  extkeyusage_from_extns
+
+static size_t publickey_size (
+        const size_t len,
+        const bool isDstu
+) {
+    //  DSTU public key encapsulated to OCTET_STRING
+    return len - (isDstu ? 2 : 0);
+}   //  publickey_size
 
 static int scan_and_parse_uris (
         const Extensions_t& extns,
@@ -201,11 +265,14 @@ CerItem::CerItem (void)
     , m_NotBefore(0)
     , m_NotAfter(0)
     , m_KeyUsage(0)
+    , m_PublicKeySize(0)
+    , m_SelfSigned(false)
     , m_Trusted(false)
     , m_VerifyStatus(VerifyStatus::UNDEFINED)
     , m_CertStatusByCrl(ValidationType::CRL)
     , m_CertStatusByOcsp(ValidationType::OCSP)
     , m_MarkedToRemove(false)
+    , m_UniqueKeyId(true)
 {
 }
 
@@ -224,6 +291,8 @@ CerItem::~CerItem (void)
     m_NotBefore = 0;
     m_NotAfter = 0;
     m_KeyUsage = 0;
+    m_CertExtKeyUsage.reset();
+    m_PublicKeySize = 0;
     m_VerifyStatus = VerifyStatus::UNDEFINED;
     for (auto& it : m_EssCertIds) {
         delete it;
@@ -303,6 +372,15 @@ void CerItem::setTrusted (
     m_Trusted = trusted;
 }
 
+void CerItem::setUniqueKeyId (
+    const bool uniqueKeyId
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    m_UniqueKeyId = uniqueKeyId;
+}
+
 int CerItem::verify (
         const CerItem* cerIssuer,
         const bool force
@@ -330,14 +408,23 @@ int CerItem::verify (
     }
 
     DO(Util::oidFromAsn1(&m_Cert->signatureAlgorithm.algorithm, s_signalgo));
-    if (m_AlgoKeyId == HASH_ALG_GOST34311) {
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo.c_str()) ||
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo.c_str())
+    ) {
         DO(Util::bitStringEncapOctetFromAsn1(&m_Cert->signature, &sba_signvalue));
     }
     else {
         DO(asn_BITSTRING2ba(&m_Cert->signature, &sba_signvalue));
     }
 
-    ret = Verify::verifySignature(s_signalgo.c_str(), sba_tbs.get(), false, cerIssuer->getSpki(), sba_signvalue.get());
+    ret = Verify::verifySignature(
+        s_signalgo.c_str(),
+        sba_tbs.get(),
+        false,
+        cerIssuer->getSpki(),
+        sba_signvalue.get()
+    );
     switch (ret) {
     case RET_OK:
         m_VerifyStatus = VerifyStatus::VALID;
@@ -351,9 +438,7 @@ int CerItem::verify (
     }
 
     if (m_VerifyStatus == VerifyStatus::VALID) {
-        bool is_digitalsign = false;
-        DO(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign, is_digitalsign));
-        if (!is_digitalsign) {
+        if (!cerIssuer->keyUsageByBit(KeyUsage_keyCertSign)) {
             m_VerifyStatus = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
         }
     }
@@ -378,16 +463,24 @@ int CerItem::checkValidity (
 
 string CerItem::generateFileName (void) const
 {
-    string rv_s;
-    const string s_keyid = Util::baToHex(m_KeyId);
-    string s_authkeyid = Util::baToHex(m_AuthorityKeyId);
-    if (s_keyid.empty() || s_authkeyid.empty()) return rv_s;
+    SmartBA sba_issuerandsn, sba_hashvalue;
+    int ret = getIssuerAndSN(&sba_issuerandsn);
+    if (ret != RET_OK) return string();
+    ret = ::hash(HASH_ALG_SHA1, sba_issuerandsn.get(), &sba_hashvalue);
+    if (ret != RET_OK) return string();
 
-    if (s_authkeyid.length() > 16) {
-        s_authkeyid.resize(16);
+    string s_keyid = Util::baToHex(m_KeyId);
+    string s_authkeyid = Util::baToHex(m_AuthorityKeyId);
+    string s_hashvalue = Util::baToHex(sba_hashvalue.get());
+    if (s_keyid.empty() || s_authkeyid.empty() || s_hashvalue.empty()) return string();
+    if (s_authkeyid.length() > 8) {
+        s_authkeyid.resize(8);
+    }
+    if (s_keyid.length() > 8) {
+        s_keyid.resize(8);
     }
 
-    rv_s = s_keyid + string("-") + s_authkeyid + string(CER_EXT);
+    const string rv_s = s_authkeyid + string("-") + s_keyid + string("-") + s_hashvalue + string(CER_EXT);
     return rv_s;
 }
 
@@ -399,16 +492,13 @@ int CerItem::getIssuerAndSN (
     return ret;
 }
 
-int CerItem::keyUsageByBit (
-        const uint32_t bitNum,
-        bool& bitValue
+bool CerItem::keyUsageByBit (
+        const uint32_t bitNum
 ) const
 {
     const uint32_t masked_bit = (uint32_t)(1 << bitNum);
-    bitValue = ((m_KeyUsage & masked_bit) > 0);
-    return RET_OK;
+    return ((m_KeyUsage & masked_bit) > 0);
 }
-
 
 
 bool addCertIfUnique (
@@ -438,11 +528,13 @@ int calcKeyId (
     CHECK_PARAM(baPubkey != nullptr);
     CHECK_PARAM(baKeyId != nullptr);
 
-    if (algoKeyId == HASH_ALG_GOST34311) {
+    switch (algoKeyId) {
+    case HASH_ALG_DSTU7564_256:
+    case HASH_ALG_GOST34311:
         DO(Util::encodeOctetString(baPubkey, &ba_encappubkey));
         ref_ba = ba_encappubkey;
-    }
-    else {
+        break;
+    default:
         ref_ba = baPubkey;
     }
 
@@ -609,6 +701,7 @@ int parseCert (
     SmartBA sba_encoded;
     SmartBA sba_issuer;
     SmartBA sba_keyid;
+    SmartBA sba_keyid2;
     SmartBA sba_pubkey;
     SmartBA sba_serialnum;
     SmartBA sba_spki;
@@ -618,7 +711,9 @@ int parseCert (
     string s_keyalgo;
     uint64_t not_after = 0, not_before = 0;
     uint32_t key_usage = 0;
+    CertExtKeyUsage cert_extkeyusage;
     CerItem::Uris uris;
+    bool is_dstu, is_selfsigned;
 
     DO(asn_INTEGER2ba(&tbs.serialNumber, &sba_serialnum));
     DO(asn_encode_ba(get_Name_desc(), &tbs.issuer, &sba_issuer));
@@ -627,17 +722,31 @@ int parseCert (
     DO(asn_encode_ba(get_Name_desc(), &tbs.subject, &sba_subject));
     DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &tbs.subjectPublicKeyInfo, &sba_spki));
     DO(Util::oidFromAsn1(&tbs.subjectPublicKeyInfo.algorithm.algorithm, s_keyalgo));
-    if (DstuNS::isDstu4145family(s_keyalgo)) {
-        algo_keyid = HASH_ALG_GOST34311;
-        //  Note: calcKeyId() automatic wrapped pubkey into octet-string before compute hash
-        DO(Util::bitStringEncapOctetFromAsn1(&tbs.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
+    DO(encode_issuer_and_sn(&tbs, &sba_certid));
+    DO(asn_BITSTRING2ba(&tbs.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
+
+    is_dstu = DstuNS::isDstu4145family(s_keyalgo);
+    ret = ExtensionHelper::getSubjectKeyId(extns, &sba_keyid);
+    if (ret == RET_OK) {
+        if (is_dstu) {
+            // if calcKeyId(GOST34311) equal subjectKeyId then algo_keyid set old-keyId-algo(GOST34311) else - new-keyId-algo(DSTU7564_256)
+            DO(::hash(HASH_ALG_GOST34311, sba_pubkey.get(), &sba_keyid2));
+            algo_keyid = (ba_cmp(sba_keyid.get(), sba_keyid2.get()) == 0) ? HASH_ALG_GOST34311 : HASH_ALG_DSTU7564_256;
+        }
     }
     else {
-        DO(asn_BITSTRING2ba(&tbs.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
+        if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
+            if (is_dstu) {
+                algo_keyid = HASH_ALG_GOST34311;
+            }
+            // Note: use hash() instead calcKeyId() because calcKeyId() required unwrapped publicKey value
+            DO(::hash(algo_keyid, sba_pubkey.get(), &sba_keyid));
+            ret = RET_OK;
+        }
+        else {
+            SET_ERROR(ret);
+        }
     }
-
-    DO(calcKeyId(algo_keyid, sba_pubkey.get(), &sba_keyid));
-    DO(encode_issuer_and_sn(&tbs, &sba_certid));
 
     ret = ExtensionHelper::getKeyUsage(extns, key_usage);
     if (ret != RET_OK) {
@@ -645,9 +754,28 @@ int parseCert (
             key_usage = 0;
             ret = RET_OK;
         }
+        else {
+            SET_ERROR(ret);
+        }
     }
+    DO(basicconstrains_from_extns(extns, cert_extkeyusage));
+    DO(extkeyusage_from_extns(extns, cert_extkeyusage));
     //  Required attribute authorityKeyIdentifier
-    DO(ExtensionHelper::getAuthorityKeyId(extns, &sba_authoritykeyid));
+    ret = ExtensionHelper::getAuthorityKeyId(extns, &sba_authoritykeyid);
+    if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
+        if (!sba_authoritykeyid.set(ba_alloc_from_uint8(sba_keyid.buf(), sba_keyid.size()))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+    }
+    if (cert_extkeyusage.isOcsp()) {
+        SmartBA sba_encoded;
+        if (Util::extnValueFromExtensions(extns, OID_PKIX_OcspNoCheck, nullptr, &sba_encoded) == RET_OK) {
+            cert_extkeyusage.set(ExtKeyUsageMask::OCSP_NO_CHECK);
+        }
+    }
+
+    is_selfsigned = (ba_cmp(sba_keyid.get(), sba_authoritykeyid.get()) == 0) &&
+        (ba_cmp(sba_subject.get(), sba_issuer.get()) == 0);
 
     DO(scan_and_parse_uris(*extns, uris));
 
@@ -674,6 +802,9 @@ int parseCert (
     cer_item->m_NotBefore = not_before;
     cer_item->m_NotAfter = not_after;
     cer_item->m_KeyUsage = key_usage;
+    cer_item->m_CertExtKeyUsage = cert_extkeyusage;
+    cer_item->m_PublicKeySize = publickey_size(sba_pubkey.size(), is_dstu);
+    cer_item->m_SelfSigned = is_selfsigned;
     cer_item->m_Uris = uris;
 
     cert = nullptr;

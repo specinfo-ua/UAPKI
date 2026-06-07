@@ -49,6 +49,18 @@ static const bool NOT_PERMANENT = false;
 static const bool PERMANENT     = true;
 
 
+enum class ExtKeyUsageMask : uint32_t {
+    CA_PATHLEN_MASK     = 0x0003, // value: 0..3
+    CA_PATHLEN          = 0x0004, // pathLen is present
+    CA                  = 0x0008,
+    CA_EXTN_CRITICAL    = 0x0010, // BasicConstrains-extension with critical flag
+    OCSP                = 0x0020,
+    OCSP_NO_CHECK       = 0x0040,
+    TSP                 = 0x0080,
+    CMP                 = 0x0100,
+    UNKNOWN             = 0x8000
+};  //  end enum ExtKeyUsageMask
+
 enum class ValidationType : uint32_t {
     UNDEFINED   = 0,
     NONE        = 1,
@@ -93,6 +105,51 @@ struct CertStatusInfo {
     );
 
 };  //  end struct CertStatusInfo
+
+
+struct CertExtKeyUsage {
+    uint32_t value;
+
+    CertExtKeyUsage (void)
+        : value(0) {}
+    bool isCaExtnCritical (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::CA_EXTN_CRITICAL) > 0;
+    }
+    bool isCa (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::CA) > 0;
+    }
+    bool isCmp (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::CMP) > 0;
+    }
+    bool isOcsp (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::OCSP) > 0;
+    }
+    bool isOcspNoCheck (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::OCSP_NO_CHECK) > 0;
+    }
+    bool isTsp (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::TSP) > 0;
+    }
+    bool isUnknown (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::UNKNOWN) > 0;
+    }
+    int pathLen (void) const {
+        if ((value & (uint32_t)ExtKeyUsageMask::CA_PATHLEN) == 0) {
+            return -1;
+        }
+        return (int)(value & (uint32_t)ExtKeyUsageMask::CA_PATHLEN_MASK);
+    }
+    void reset (void) {
+        value = 0;
+    }
+    void set (const ExtKeyUsageMask ekuMask) {
+        value |= (uint32_t)ekuMask;
+    }
+    void setPathLenConstraint (uint32_t pathLen) {
+        if (pathLen > 3) pathLen = 3;
+        value |= (uint32_t)ExtKeyUsageMask::CA_PATHLEN | pathLen;
+    }
+};  //  end struct CertExtKeyUsage
 
 
 class CerItem {
@@ -140,6 +197,11 @@ private:
     uint64_t    m_NotBefore;
     uint64_t    m_NotAfter;
     uint32_t    m_KeyUsage;
+    CertExtKeyUsage
+                m_CertExtKeyUsage;
+    size_t      m_PublicKeySize;
+    std::atomic_bool
+                m_SelfSigned;
     std::atomic_bool
                 m_Trusted;
     Uris        m_Uris;
@@ -153,6 +215,8 @@ private:
                 m_CertStatusByOcsp;
     std::atomic_bool
                 m_MarkedToRemove;
+    std::atomic_bool
+                m_UniqueKeyId;
 
 public:
     CerItem (void);
@@ -167,6 +231,9 @@ public:
     }
     const Certificate_t* const getCert (void) const {
         return m_Cert;
+    }
+    const CertExtKeyUsage& getCertExtKeyUsage (void) const {
+        return m_CertExtKeyUsage;
     }
     const ByteArray* getCertId (void) const {
         return m_CertId;
@@ -210,6 +277,9 @@ public:
     uint64_t getNotBefore (void) const {
         return m_NotBefore;
     }
+    const size_t getPublicKeySize (void) const {
+        return m_PublicKeySize;
+    }
     const ByteArray* getSerialNumber (void) const {
         return m_SerialNumber;
     }
@@ -225,11 +295,36 @@ public:
     VerifyStatus getVerifyStatus (void) const {
         return m_VerifyStatus;
     }
+
+public:
     bool isMarkedToRemove (void) const {
         return m_MarkedToRemove;
     }
+    bool isSelfSigned (void) const {
+        return m_SelfSigned;
+    }
     bool isTrusted (void) const {
         return m_Trusted;
+    }
+    bool isUniqueKeyId (void) const {
+        return m_UniqueKeyId;
+    }
+
+public:
+    bool equalCertId (
+        const ByteArray* baCertId
+    ) const {
+        return (ba_cmp(m_CertId, baCertId) == 0);
+    }
+    bool equalKeyId (
+        const ByteArray* baKeyId
+    ) const {
+        return (ba_cmp(m_KeyId, baKeyId) == 0);
+    }
+    bool equalSerialNumber (
+        const ByteArray* baSerialNumber
+    ) const {
+        return (ba_cmp(m_SerialNumber, baSerialNumber) == 0);
     }
 
 public:
@@ -247,6 +342,9 @@ public:
     void setTrusted (
         const bool trusted
     );
+    void setUniqueKeyId (
+        const bool uniqueKeyId
+    );
     int verify (
         const CerItem* cerIssuer,
         const bool force = false
@@ -260,9 +358,8 @@ public:
     int getIssuerAndSN (
         ByteArray** baIssuerAndSN
     ) const;
-    int keyUsageByBit (
-        const uint32_t bitNum,
-        bool& bitValue
+    bool keyUsageByBit (
+        const uint32_t bitNum
     ) const;
 
 public:

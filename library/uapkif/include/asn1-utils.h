@@ -441,6 +441,8 @@ UAPKIF_EXPORT int asn_OCTSTRING_to_type(const OCTET_STRING_t *src, asn_TYPE_desc
 UAPKIF_EXPORT int asn_print(FILE *stream, asn_TYPE_descriptor_t *td, void *sptr);
 UAPKIF_EXPORT void asn_free(asn_TYPE_descriptor_t *td, void *ptr);
 
+UAPKIF_EXPORT void uapkif_free(void* ptr);
+
 //  From "asn_utils_x.h" and "[asn1]", redesigned
 struct tm;    /* <time.h> */
 

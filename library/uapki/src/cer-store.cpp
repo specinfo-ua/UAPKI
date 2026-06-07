@@ -57,6 +57,28 @@ namespace UapkiNS {
 
 namespace Cert {
 
+static bool set_ceritem_by_notbefore_internal (
+        CerItem** cerItemActual,
+        const CerItem* cerItemNew
+)
+{
+    if (cerItemNew->isUniqueKeyId()) {
+        // one cert - to break (return true)
+        *cerItemActual = (CerItem*)cerItemNew;
+        return true;
+    }
+
+    // few certs - to continue search (return false)
+    if (*cerItemActual == nullptr) {
+        *cerItemActual = (CerItem*)cerItemNew;
+    }
+    else {
+        if (cerItemNew->getNotBefore() > (*cerItemActual)->getNotBefore()) {
+            *cerItemActual = (CerItem*)cerItemNew;
+        }
+    }
+    return false;
+}
 
 static int get_cert_by_keyid_internal (
         const vector<CerItem*>& cerItems,
@@ -66,10 +88,11 @@ static int get_cert_by_keyid_internal (
 {
     int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : cerItems) {
-        if (ba_cmp(baKeyId, it->getKeyId()) == RET_OK) {
-            *cerItem = it;
+        if (ba_cmp(baKeyId, it->getKeyId()) == 0) {
             ret = RET_OK;
-            break;
+            if (set_ceritem_by_notbefore_internal(cerItem, it)) {
+                break;
+            }
         }
     }
     return ret;
@@ -144,11 +167,21 @@ int CerStore::addCerts (
     return RET_OK;
 }
 
-vector<CerItem*> CerStore::getCerItems (void)
+vector<CerItem*> CerStore::getCerItems (
+        const FilterListCerts& filter
+)
 {
     lock_guard<mutex> lock(m_Mutex);
 
-    return m_Items;
+    vector<CerItem*> rv_listcerts;
+    rv_listcerts.reserve(m_Items.size());
+    for (auto& it : m_Items) {
+        if (filter.check(it)) {
+            rv_listcerts.push_back(it);
+        }
+    }
+
+    return rv_listcerts;
 }
 
 int CerStore::getCertByCertId (
@@ -290,9 +323,10 @@ int CerStore::getCertBySPKI (
     int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
         if (ba_cmp(baSPKI, it->getSpki()) == RET_OK) {
-            *cerItem = it;
             ret = RET_OK;
-            break;
+            if (set_ceritem_by_notbefore_internal(cerItem, it)) {
+                break;
+            }
         }
     }
     return ret;
@@ -308,9 +342,10 @@ int CerStore::getCertBySubject (
     int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto& it : m_Items) {
         if (ba_cmp(baSubject, it->getSubject()) == RET_OK) {
-            *cerItem = it;
             ret = RET_OK;
-            break;
+            if (set_ceritem_by_notbefore_internal(cerItem, it)) {
+                break;
+            }
         }
     }
     return ret;
@@ -403,15 +438,14 @@ int CerStore::getIssuerCert (
     if (!cerSubject || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
-    if (ba_cmp(cerSubject->getKeyId(), cerSubject->getAuthorityKeyId()) != 0) {
-        isSelfSigned = false;
+    isSelfSigned = cerSubject->isSelfSigned();
+    if (!isSelfSigned) {
         ret = getCertByKeyId(cerSubject->getAuthorityKeyId(), cerIssuer);
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
         }
     }
     else {
-        isSelfSigned = true;
         *cerIssuer = cerSubject;
     }
 
@@ -491,15 +525,33 @@ CerItem* CerStore::addItem (
 )
 {
     for (auto& it : m_Items) {
-        const int ret = ba_cmp(item->getKeyId(), it->getKeyId());
-        if (ret == RET_OK) {
-            DEBUG_OUTCON(printf("CerStore::addItem(), cert is found. keyId: "); ba_print(stdout, it->baKeyId));
-            return it;
+        int ret = ba_cmp(item->getKeyId(), it->getKeyId());
+        if (ret != 0) continue;
+
+        ret = ba_cmp(item->getAuthorityKeyId(), it->getAuthorityKeyId());
+        if (ret != 0) continue;
+
+        DEBUG_OUTCON(
+        printf("CerStore::addItem(), cert is found. keyId: "); ba_print(stdout, it->getKeyId());
+        printf("  authorityKeyId: "); ba_print(stdout, it->getAuthorityKeyId());
+        printf("  notBefore: %08X", uint32_t(it->getNotBefore()));
+        );
+
+        if (item->getNotBefore() != it->getNotBefore()) {
+            DEBUG_OUTCON(puts("  detected duplicate keyId, reset flag for both"));
+            item->setUniqueKeyId(false);
+            if (it->isUniqueKeyId()) {
+                it->setUniqueKeyId(false);
+            }
+            continue;
         }
+        DEBUG_OUTCON(puts(""));
+
+        return it;
     }
 
     m_Items.push_back(item);
-    DEBUG_OUTCON(printf("CerStore::addItem(), cert is unique - add it. keyId: "); ba_print(stdout, item->baKeyId));
+    DEBUG_OUTCON(printf("CerStore::addItem(), cert is unique - add it. keyId: "); ba_print(stdout, item->getKeyId()));
     return item;
 }
 
@@ -599,6 +651,41 @@ void CerStore::saveStatToLog (
     fputs(s_line.c_str(), f);
 
     fclose(f);
+}
+
+bool CerStore::FilterListCerts::check (
+    const Cert::CerItem* cerItem
+) const
+{
+    if (!subjectKeyIds.empty()) {
+        bool is_equal = false;
+        for (const auto& it : subjectKeyIds) {
+            if (ba_cmp(it, cerItem->getKeyId()) == 0) {
+                is_equal = true;
+                break;
+            }
+        }
+        if (!is_equal) {
+            return false;
+        }
+    }
+
+    if (!publicKeyBytes.empty()) {
+        if (publicKeyBytes.size() != cerItem->getPublicKeySize()) {
+            return false;
+        }
+        const ByteArray* ba_spki = cerItem->getSpki();
+        if (ba_get_len(ba_spki) > publicKeyBytes.size()) {
+            if (memcmp(ba_get_buf((ByteArray*)ba_spki) + ba_get_len(ba_spki) - publicKeyBytes.size(), publicKeyBytes.buf(), publicKeyBytes.size()) != 0) {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 

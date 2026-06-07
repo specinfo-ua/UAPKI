@@ -229,8 +229,8 @@ int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
     CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
     if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
 
-    CmStorageProxy* storage = cm_provider->storage;
     string s_storlist;
+    CmStorageProxy* storage = cm_provider->storage;
     int ret = storage->storageList(s_storlist);
     if (ret != RET_OK) return ret;
 
@@ -259,8 +259,8 @@ int CmProviders::storageInfo (const string& providerId, const string& storageId,
     CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
     if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
 
-    CmStorageProxy* storage = cm_provider->storage;
     string s_storinfo;
+    CmStorageProxy* storage = cm_provider->storage;
     int ret = storage->storageInfo(storageId, s_storinfo);
     if (ret != RET_OK) return ret;
 
@@ -288,7 +288,8 @@ int CmProviders::storageOpen (const string& providerId, const string& storageId,
     CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
     if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
 
-    CmStorageProxy* storage = cm_provider->storage;
+    if (lib_cmproviders.storageIsOpen()) return RET_UAPKI_STORAGE_ALREADY_OPENED;
+
     string s_openparams;
     if (ParsonHelper::jsonObjectHasValue(joParams, "openParams", JSONObject)) {
         ParsonHelper json;
@@ -296,6 +297,7 @@ int CmProviders::storageOpen (const string& providerId, const string& storageId,
         json.serialize(s_openparams);
     }
 
+    CmStorageProxy* storage = cm_provider->storage;
     int ret = storage->storageOpen(storageId, mode, s_openparams);
     if (ret != RET_OK) return ret;
 

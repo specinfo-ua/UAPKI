@@ -1,0 +1,386 @@
+/*
+ * Copyright (c) 2021, The UAPKI Project Authors.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef CRYPTOKI_CONST_H
+#define CRYPTOKI_CONST_H
+
+
+#include "pkcs11types.h"
+
+
+namespace Cryptoki {
+
+
+constexpr CK_BBOOL ATTRIBUTE_FALSE  = CK_FALSE;
+constexpr CK_BBOOL ATTRIBUTE_TRUE   = CK_TRUE;
+
+
+namespace CKA {
+
+    constexpr CK_ATTRIBUTE_TYPE CLASS               = CKA_CLASS;
+    constexpr CK_ATTRIBUTE_TYPE TOKEN               = CKA_TOKEN;
+    constexpr CK_ATTRIBUTE_TYPE PRIVATE             = CKA_PRIVATE;
+    constexpr CK_ATTRIBUTE_TYPE LABEL               = CKA_LABEL;
+    constexpr CK_ATTRIBUTE_TYPE UNIQUE_ID           = CKA_UNIQUE_ID;
+    constexpr CK_ATTRIBUTE_TYPE APPLICATION         = CKA_APPLICATION;
+    constexpr CK_ATTRIBUTE_TYPE VALUE               = CKA_VALUE;
+    //  CKA_OBJECT_ID is new for v2.11
+    constexpr CK_ATTRIBUTE_TYPE OBJECT_ID           = CKA_OBJECT_ID;
+    constexpr CK_ATTRIBUTE_TYPE CERTIFICATE_TYPE    = CKA_CERTIFICATE_TYPE;
+    constexpr CK_ATTRIBUTE_TYPE ISSUER              = CKA_ISSUER;
+    constexpr CK_ATTRIBUTE_TYPE SERIAL_NUMBER       = CKA_SERIAL_NUMBER;
+    //  CKA_AC_ISSUER, CKA_OWNER, CKA_ATTR_TYPES and CKA_TRUSTED are new for v2.11
+    constexpr CK_ATTRIBUTE_TYPE AC_ISSUER           = CKA_AC_ISSUER;
+    constexpr CK_ATTRIBUTE_TYPE OWNER               = CKA_OWNER;
+    constexpr CK_ATTRIBUTE_TYPE ATTR_TYPES          = CKA_ATTR_TYPES;
+    constexpr CK_ATTRIBUTE_TYPE TRUSTED             = CKA_TRUSTED;
+    constexpr CK_ATTRIBUTE_TYPE CERTIFICATE_CATEGORY = CKA_CERTIFICATE_CATEGORY;
+    constexpr CK_ATTRIBUTE_TYPE JAVA_MIDP_SECURITY_DOMAIN = CKA_JAVA_MIDP_SECURITY_DOMAIN;
+    constexpr CK_ATTRIBUTE_TYPE URL                 = CKA_URL;
+    constexpr CK_ATTRIBUTE_TYPE HASH_OF_SUBJECT_PUBLIC_KEY = CKA_HASH_OF_SUBJECT_PUBLIC_KEY;
+    constexpr CK_ATTRIBUTE_TYPE HASH_OF_ISSUER_PUBLIC_KEY = CKA_HASH_OF_ISSUER_PUBLIC_KEY;
+    constexpr CK_ATTRIBUTE_TYPE NAME_HASH_ALGORITHM = CKA_NAME_HASH_ALGORITHM;
+    constexpr CK_ATTRIBUTE_TYPE CHECK_VALUE         = CKA_CHECK_VALUE;
+    constexpr CK_ATTRIBUTE_TYPE KEY_TYPE            = CKA_KEY_TYPE;
+    constexpr CK_ATTRIBUTE_TYPE SUBJECT             = CKA_SUBJECT;
+    constexpr CK_ATTRIBUTE_TYPE ID                  = CKA_ID;
+    constexpr CK_ATTRIBUTE_TYPE SENSITIVE           = CKA_SENSITIVE;
+    constexpr CK_ATTRIBUTE_TYPE ENCRYPT             = CKA_ENCRYPT;
+    constexpr CK_ATTRIBUTE_TYPE DECRYPT             = CKA_DECRYPT;
+    constexpr CK_ATTRIBUTE_TYPE WRAP                = CKA_WRAP;
+    constexpr CK_ATTRIBUTE_TYPE UNWRAP              = CKA_UNWRAP;
+    constexpr CK_ATTRIBUTE_TYPE SIGN                = CKA_SIGN;
+    constexpr CK_ATTRIBUTE_TYPE SIGN_RECOVER        = CKA_SIGN_RECOVER;
+    constexpr CK_ATTRIBUTE_TYPE VERIFY              = CKA_VERIFY;
+    constexpr CK_ATTRIBUTE_TYPE VERIFY_RECOVER      = CKA_VERIFY_RECOVER;
+    constexpr CK_ATTRIBUTE_TYPE DERIVE              = CKA_DERIVE;
+    constexpr CK_ATTRIBUTE_TYPE START_DATE          = CKA_START_DATE;
+    constexpr CK_ATTRIBUTE_TYPE END_DATE            = CKA_END_DATE;
+    constexpr CK_ATTRIBUTE_TYPE MODULUS             = CKA_MODULUS;
+    constexpr CK_ATTRIBUTE_TYPE MODULUS_BITS        = CKA_MODULUS_BITS;
+    constexpr CK_ATTRIBUTE_TYPE PUBLIC_EXPONENT     = CKA_PUBLIC_EXPONENT;
+    constexpr CK_ATTRIBUTE_TYPE PRIVATE_EXPONENT    = CKA_PRIVATE_EXPONENT;
+    constexpr CK_ATTRIBUTE_TYPE PRIME_1             = CKA_PRIME_1;
+    constexpr CK_ATTRIBUTE_TYPE PRIME_2             = CKA_PRIME_2;
+    constexpr CK_ATTRIBUTE_TYPE EXPONENT_1          = CKA_EXPONENT_1;
+    constexpr CK_ATTRIBUTE_TYPE EXPONENT_2          = CKA_EXPONENT_2;
+    constexpr CK_ATTRIBUTE_TYPE COEFFICIENT         = CKA_COEFFICIENT;
+    constexpr CK_ATTRIBUTE_TYPE PUBLIC_KEY_INFO     = CKA_PUBLIC_KEY_INFO;
+    constexpr CK_ATTRIBUTE_TYPE PRIME               = CKA_PRIME;
+    constexpr CK_ATTRIBUTE_TYPE SUBPRIME            = CKA_SUBPRIME;
+    constexpr CK_ATTRIBUTE_TYPE BASE                = CKA_BASE;
+    //  CKA_PRIME_BITS and CKA_SUB_PRIME_BITS are new for v2.11
+    constexpr CK_ATTRIBUTE_TYPE PRIME_BITS          = CKA_PRIME_BITS;
+    constexpr CK_ATTRIBUTE_TYPE SUBPRIME_BITS       = CKA_SUBPRIME_BITS;
+    constexpr CK_ATTRIBUTE_TYPE VALUE_BITS          = CKA_VALUE_BITS;
+    constexpr CK_ATTRIBUTE_TYPE VALUE_LEN           = CKA_VALUE_LEN;
+    //  CKA_EXTRACTABLE, CKA_LOCAL, CKA_NEVER_EXTRACTABLE, CKA_ALWAYS_SENSITIVE,
+    //  CKA_MODIFIABLE, CKA_ECDSA_PARAMS, and CKA_EC_POINT are new for v2.0
+    constexpr CK_ATTRIBUTE_TYPE EXTRACTABLE         = CKA_EXTRACTABLE;
+    constexpr CK_ATTRIBUTE_TYPE LOCAL               = CKA_LOCAL;
+    constexpr CK_ATTRIBUTE_TYPE NEVER_EXTRACTABLE   = CKA_NEVER_EXTRACTABLE;
+    constexpr CK_ATTRIBUTE_TYPE ALWAYS_SENSITIVE    = CKA_ALWAYS_SENSITIVE;
+    //  CKA_KEY_GEN_MECHANISM is new for v2.11
+    constexpr CK_ATTRIBUTE_TYPE KEY_GEN_MECHANISM   = CKA_KEY_GEN_MECHANISM;
+    constexpr CK_ATTRIBUTE_TYPE MODIFIABLE          = CKA_MODIFIABLE;
+    constexpr CK_ATTRIBUTE_TYPE COPYABLE            = CKA_COPYABLE;
+    constexpr CK_ATTRIBUTE_TYPE DESTROYABLE         = CKA_DESTROYABLE;
+    //  CKA_ECDSA_PARAMS is deprecated in v2.11, CKA_EC_PARAMS is preferred
+    constexpr CK_ATTRIBUTE_TYPE EC_PARAMS           = CKA_EC_PARAMS;
+    constexpr CK_ATTRIBUTE_TYPE EC_POINT            = CKA_EC_POINT;
+    //  The following are new for v2.11
+    constexpr CK_ATTRIBUTE_TYPE SECONDARY_AUTH      = CKA_SECONDARY_AUTH;
+    constexpr CK_ATTRIBUTE_TYPE AUTH_PIN_FLAGS      = CKA_AUTH_PIN_FLAGS;
+    constexpr CK_ATTRIBUTE_TYPE ALWAYS_AUTHENTICATE = CKA_ALWAYS_AUTHENTICATE;
+    constexpr CK_ATTRIBUTE_TYPE WRAP_WITH_TRUSTED   = CKA_WRAP_WITH_TRUSTED;
+    constexpr CK_ATTRIBUTE_TYPE HW_FEATURE_TYPE     = CKA_HW_FEATURE_TYPE;
+    constexpr CK_ATTRIBUTE_TYPE RESET_ON_INIT       = CKA_RESET_ON_INIT;
+    constexpr CK_ATTRIBUTE_TYPE HAS_RESET           = CKA_HAS_RESET;
+    constexpr CK_ATTRIBUTE_TYPE WRAP_TEMPLATE       = CKA_WRAP_TEMPLATE;
+    constexpr CK_ATTRIBUTE_TYPE UNWRAP_TEMPLATE     = CKA_UNWRAP_TEMPLATE;
+    constexpr CK_ATTRIBUTE_TYPE DERIVE_TEMPLATE     = CKA_DERIVE_TEMPLATE;
+    constexpr CK_ATTRIBUTE_TYPE ALLOWED_MECHANISMS  = CKA_ALLOWED_MECHANISMS;
+    constexpr CK_ATTRIBUTE_TYPE PROFILE_ID          = CKA_PROFILE_ID;
+
+};  //  end namespace CKA
+
+namespace CKC {
+
+    constexpr CK_CERTIFICATE_TYPE X_509             = CKC_X_509;
+    constexpr CK_CERTIFICATE_TYPE X_509_ATTR_CERT   = CKC_X_509_ATTR_CERT;
+    constexpr CK_CERTIFICATE_TYPE VENDOR_DEFINED    = CKC_VENDOR_DEFINED;
+
+};  //  end namespace CKC
+
+namespace CKK {
+
+    constexpr CK_KEY_TYPE RSA               = CKK_RSA;
+    constexpr CK_KEY_TYPE DSA               = CKK_DSA;
+    constexpr CK_KEY_TYPE DH                = CKK_DH;
+    constexpr CK_KEY_TYPE ECDSA             = CKK_EC;
+    constexpr CK_KEY_TYPE X9_42_DH          = CKK_X9_42_DH;
+    constexpr CK_KEY_TYPE KEA               = CKK_KEA;
+    constexpr CK_KEY_TYPE GENERIC_SECRET    = CKK_GENERIC_SECRET;
+    constexpr CK_KEY_TYPE RC2               = CKK_RC2;
+    constexpr CK_KEY_TYPE RC4               = CKK_RC4;
+    constexpr CK_KEY_TYPE DES               = CKK_DES;
+    constexpr CK_KEY_TYPE DES2              = CKK_DES2;
+    constexpr CK_KEY_TYPE DES3              = CKK_DES3;
+    constexpr CK_KEY_TYPE CAST              = CKK_CAST;
+    constexpr CK_KEY_TYPE CAST3             = CKK_CAST3;
+    constexpr CK_KEY_TYPE CAST128           = CKK_CAST128;  //  CAST128 equal CAST5, CKK_CAST5 is deprecated in v2.11, CKK_CAST128 is preferred
+    constexpr CK_KEY_TYPE RC5               = CKK_RC5;
+    constexpr CK_KEY_TYPE IDEA              = CKK_IDEA;
+    constexpr CK_KEY_TYPE SKIPJACK          = CKK_SKIPJACK;
+    constexpr CK_KEY_TYPE BATON             = CKK_BATON;
+    constexpr CK_KEY_TYPE JUNIPER           = CKK_JUNIPER;
+    constexpr CK_KEY_TYPE CDMF              = CKK_CDMF;
+    constexpr CK_KEY_TYPE AES               = CKK_AES;
+    constexpr CK_KEY_TYPE AES_XTS           = CKK_AES_XTS;
+    constexpr CK_KEY_TYPE VENDOR_DEFINED    = CKK_VENDOR_DEFINED;
+
+};  //  end namespace CKK
+
+namespace CKM {
+
+    constexpr CK_MECHANISM_TYPE RSA_PKCS_KEY_PAIR_GEN   = CKM_RSA_PKCS_KEY_PAIR_GEN;
+    constexpr CK_MECHANISM_TYPE RSA_PKCS                = CKM_RSA_PKCS;
+
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA1           = CKM_SHA1_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA224         = CKM_SHA224_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA256         = CKM_SHA256_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA384         = CKM_SHA384_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA512         = CKM_SHA512_RSA_PKCS;
+
+    constexpr CK_MECHANISM_TYPE SHA224_RSA_PKCS_PSS     = CKM_SHA224_RSA_PKCS_PSS;
+    constexpr CK_MECHANISM_TYPE SHA256_RSA_PKCS_PSS     = CKM_SHA256_RSA_PKCS_PSS;
+    constexpr CK_MECHANISM_TYPE SHA384_RSA_PKCS_PSS     = CKM_SHA384_RSA_PKCS_PSS;
+    constexpr CK_MECHANISM_TYPE SHA512_RSA_PKCS_PSS     = CKM_SHA512_RSA_PKCS_PSS;
+
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA3_224       = CKM_SHA3_224_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA3_256       = CKM_SHA3_256_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA3_384       = CKM_SHA3_384_RSA_PKCS;
+    constexpr CK_MECHANISM_TYPE RSA_WITH_SHA3_512       = CKM_SHA3_512_RSA_PKCS;
+
+    constexpr CK_MECHANISM_TYPE EC_KEY_PAIR_GEN         = CKM_EC_KEY_PAIR_GEN;
+    constexpr CK_MECHANISM_TYPE ECDSA                   = CKM_ECDSA;
+
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA1         = CKM_ECDSA_SHA1;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA224       = CKM_ECDSA_SHA224;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA256       = CKM_ECDSA_SHA256;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA384       = CKM_ECDSA_SHA384;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA512       = CKM_ECDSA_SHA512;
+
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA3_224     = CKM_ECDSA_SHA3_224;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA3_256     = CKM_ECDSA_SHA3_256;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA3_384     = CKM_ECDSA_SHA3_384;
+    constexpr CK_MECHANISM_TYPE ECDSA_WITH_SHA3_512     = CKM_ECDSA_SHA3_512;
+
+    constexpr CK_MECHANISM_TYPE ECDH1_DERIVE            = CKM_ECDH1_DERIVE;
+    constexpr CK_MECHANISM_TYPE ECDH1_COFACTOR_DERIVE   = CKM_ECDH1_COFACTOR_DERIVE;
+    constexpr CK_MECHANISM_TYPE ECMQV_DERIVE            = CKM_ECMQV_DERIVE;
+
+    constexpr CK_MECHANISM_TYPE SHA_1                   = CKM_SHA_1;
+    constexpr CK_MECHANISM_TYPE SHA_1_HMAC              = CKM_SHA_1_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA_1_HMAC_GENERAL      = CKM_SHA_1_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA224                  = CKM_SHA224;
+    constexpr CK_MECHANISM_TYPE SHA224_HMAC             = CKM_SHA224_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA224_HMAC_GENERAL     = CKM_SHA224_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA256                  = CKM_SHA256;
+    constexpr CK_MECHANISM_TYPE SHA256_HMAC             = CKM_SHA256_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA256_HMAC_GENERAL     = CKM_SHA256_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA384                  = CKM_SHA384;
+    constexpr CK_MECHANISM_TYPE SHA384_HMAC             = CKM_SHA384_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA384_HMAC_GENERAL     = CKM_SHA384_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA512                  = CKM_SHA512;
+    constexpr CK_MECHANISM_TYPE SHA512_HMAC             = CKM_SHA512_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA512_HMAC_GENERAL     = CKM_SHA512_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA512_224              = CKM_SHA512_224;
+    constexpr CK_MECHANISM_TYPE SHA512_224_HMAC         = CKM_SHA512_224_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA512_224_HMAC_GENERAL = CKM_SHA512_224_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA512_256              = CKM_SHA512_256;
+    constexpr CK_MECHANISM_TYPE SHA512_256_HMAC         = CKM_SHA512_256_HMAC;
+    constexpr CK_MECHANISM_TYPE SHA512_256_HMAC_GENERAL = CKM_SHA512_256_HMAC_GENERAL;
+
+    constexpr CK_MECHANISM_TYPE SHA3_224                = CKM_SHA3_224;
+    constexpr CK_MECHANISM_TYPE SHA3_256                = CKM_SHA3_256;
+    constexpr CK_MECHANISM_TYPE SHA3_384                = CKM_SHA3_384;
+    constexpr CK_MECHANISM_TYPE SHA3_512                = CKM_SHA3_512;
+
+};  //  end namespace CKM
+
+namespace CKO {
+
+    constexpr CK_OBJECT_CLASS DATA              = CKO_DATA;
+    constexpr CK_OBJECT_CLASS CERTIFICATE       = CKO_CERTIFICATE;
+    constexpr CK_OBJECT_CLASS PUBLIC_KEY        = CKO_PUBLIC_KEY;
+    constexpr CK_OBJECT_CLASS PRIVATE_KEY       = CKO_PRIVATE_KEY;
+    constexpr CK_OBJECT_CLASS SECRET_KEY        = CKO_SECRET_KEY;
+    constexpr CK_OBJECT_CLASS HW_FEATURE        = CKO_HW_FEATURE;
+    constexpr CK_OBJECT_CLASS DOMAIN_PARAMETERS = CKO_DOMAIN_PARAMETERS;
+    #ifdef CKO_MECHANISM
+    constexpr CK_OBJECT_CLASS MECHANISM         = CKO_MECHANISM;
+    #endif
+    #ifdef CKO_OTP_KEY
+    constexpr CK_OBJECT_CLASS OTP_KEY           = CKO_OTP_KEY;
+    #endif
+    constexpr CK_OBJECT_CLASS VENDOR_DEFINED    = CKO_VENDOR_DEFINED;
+
+};  //  end namespace CKO
+
+namespace CKR {
+
+    constexpr CK_RV OK                          = CKR_OK;
+    constexpr CK_RV CANCEL                      = CKR_CANCEL;
+    constexpr CK_RV HOST_MEMORY                 = CKR_HOST_MEMORY;
+    constexpr CK_RV SLOT_ID_INVALID             = CKR_SLOT_ID_INVALID;
+    //  CKR_FLAGS_INVALID was removed for v2.0
+    constexpr CK_RV GENERAL_ERROR               = CKR_GENERAL_ERROR;
+    constexpr CK_RV FUNCTION_FAILED             = CKR_FUNCTION_FAILED;
+    constexpr CK_RV ARGUMENTS_BAD               = CKR_ARGUMENTS_BAD;
+    constexpr CK_RV NO_EVENT                    = CKR_NO_EVENT;
+    constexpr CK_RV NEED_TO_CREATE_THREADS      = CKR_NEED_TO_CREATE_THREADS;
+    constexpr CK_RV CANT_LOCK                   = CKR_CANT_LOCK;
+    constexpr CK_RV ATTRIBUTE_READ_ONLY         = CKR_ATTRIBUTE_READ_ONLY;
+    constexpr CK_RV ATTRIBUTE_SENSITIVE         = CKR_ATTRIBUTE_SENSITIVE;
+    constexpr CK_RV ATTRIBUTE_TYPE_INVALID      = CKR_ATTRIBUTE_TYPE_INVALID;
+    constexpr CK_RV ATTRIBUTE_VALUE_INVALID     = CKR_ATTRIBUTE_VALUE_INVALID;
+    constexpr CK_RV ACTION_PROHIBITED           = CKR_ACTION_PROHIBITED;
+    constexpr CK_RV DATA_INVALID                = CKR_DATA_INVALID;
+    constexpr CK_RV DATA_LEN_RANGE              = CKR_DATA_LEN_RANGE;
+    constexpr CK_RV DEVICE_ERROR                = CKR_DEVICE_ERROR;
+    constexpr CK_RV DEVICE_MEMORY               = CKR_DEVICE_MEMORY;
+    constexpr CK_RV DEVICE_REMOVED              = CKR_DEVICE_REMOVED;
+    constexpr CK_RV ENCRYPTED_DATA_INVALID      = CKR_ENCRYPTED_DATA_INVALID;
+    constexpr CK_RV ENCRYPTED_DATA_LEN_RANGE    = CKR_ENCRYPTED_DATA_LEN_RANGE;
+    constexpr CK_RV AEAD_DECRYPT_FAILED         = CKR_AEAD_DECRYPT_FAILED;
+    constexpr CK_RV FUNCTION_CANCELED           = CKR_FUNCTION_CANCELED;
+    constexpr CK_RV FUNCTION_NOT_PARALLEL       = CKR_FUNCTION_NOT_PARALLEL;
+    //  CKR_FUNCTION_NOT_SUPPORTED is new for v2.0
+    constexpr CK_RV FUNCTION_NOT_SUPPORTED      = CKR_FUNCTION_NOT_SUPPORTED;
+    constexpr CK_RV KEY_HANDLE_INVALID          = CKR_KEY_HANDLE_INVALID;
+    //  CKR_KEY_SENSITIVE was removed for v2.0
+    constexpr CK_RV KEY_SIZE_RANGE              = CKR_KEY_SIZE_RANGE;
+    constexpr CK_RV KEY_TYPE_INCONSISTENT       = CKR_KEY_TYPE_INCONSISTENT;
+    //  CKR_KEY_NOT_NEEDED, CKR_KEY_CHANGED, CKR_KEY_NEEDED,
+    //  CKR_KEY_INDIGESTIBLE, CKR_KEY_FUNCTION_NOT_PERMITTED,
+    //  CKR_KEY_NOT_WRAPPABLE, and CKR_KEY_UNEXTRACTABLE are new for v2.0
+    constexpr CK_RV KEY_NOT_NEEDED              = CKR_KEY_NOT_NEEDED;
+    constexpr CK_RV KEY_CHANGED                 = CKR_KEY_CHANGED;
+    constexpr CK_RV KEY_NEEDED                  = CKR_KEY_NEEDED;
+    constexpr CK_RV KEY_INDIGESTIBLE            = CKR_KEY_INDIGESTIBLE;
+    constexpr CK_RV KEY_FUNCTION_NOT_PERMITTED  = CKR_KEY_FUNCTION_NOT_PERMITTED;
+    constexpr CK_RV KEY_NOT_WRAPPABLE           = CKR_KEY_NOT_WRAPPABLE;
+    constexpr CK_RV KEY_UNEXTRACTABLE           = CKR_KEY_UNEXTRACTABLE;
+    constexpr CK_RV MECHANISM_INVALID           = CKR_MECHANISM_INVALID;
+    constexpr CK_RV MECHANISM_PARAM_INVALID     = CKR_MECHANISM_PARAM_INVALID;
+    //  CKR_OBJECT_CLASS_INCONSISTENT and CKR_OBJECT_CLASS_INVALID were removed for v2.0
+    constexpr CK_RV OBJECT_HANDLE_INVALID       = CKR_OBJECT_HANDLE_INVALID;
+    constexpr CK_RV OPERATION_ACTIVE            = CKR_OPERATION_ACTIVE;
+    constexpr CK_RV OPERATION_NOT_INITIALIZED   = CKR_OPERATION_NOT_INITIALIZED;
+    constexpr CK_RV PIN_INCORRECT               = CKR_PIN_INCORRECT;
+    constexpr CK_RV PIN_INVALID                 = CKR_PIN_INVALID;
+    constexpr CK_RV PIN_LEN_RANGE               = CKR_PIN_LEN_RANGE;
+    //  CKR_PIN_EXPIRED and CKR_PIN_LOCKED are new for v2.0
+    constexpr CK_RV PIN_EXPIRED                 = CKR_PIN_EXPIRED;
+    constexpr CK_RV PIN_LOCKED                  = CKR_PIN_LOCKED;
+    constexpr CK_RV SESSION_CLOSED              = CKR_SESSION_CLOSED;
+    constexpr CK_RV SESSION_COUNT               = CKR_SESSION_COUNT;
+    constexpr CK_RV SESSION_HANDLE_INVALID      = CKR_SESSION_HANDLE_INVALID;
+    constexpr CK_RV SESSION_PARALLEL_NOT_SUPPORTED = CKR_SESSION_PARALLEL_NOT_SUPPORTED;
+    constexpr CK_RV SESSION_READ_ONLY           = CKR_SESSION_READ_ONLY;
+    constexpr CK_RV SESSION_EXISTS              = CKR_SESSION_EXISTS;
+    //  CKR_SESSION_READ_ONLY_EXISTS and CKR_SESSION_READ_WRITE_SO_EXISTS are new for v2.0
+    constexpr CK_RV SESSION_READ_ONLY_EXISTS    = CKR_SESSION_READ_ONLY_EXISTS;
+    constexpr CK_RV SESSION_READ_WRITE_SO_EXISTS = CKR_SESSION_READ_WRITE_SO_EXISTS;
+    constexpr CK_RV SIGNATURE_INVALID           = CKR_SIGNATURE_INVALID;
+    constexpr CK_RV SIGNATURE_LEN_RANGE         = CKR_SIGNATURE_LEN_RANGE;
+    constexpr CK_RV TEMPLATE_INCOMPLETE         = CKR_TEMPLATE_INCOMPLETE;
+    constexpr CK_RV TEMPLATE_INCONSISTENT       = CKR_TEMPLATE_INCONSISTENT;
+    constexpr CK_RV TOKEN_NOT_PRESENT           = CKR_TOKEN_NOT_PRESENT;
+    constexpr CK_RV TOKEN_NOT_RECOGNIZED        = CKR_TOKEN_NOT_RECOGNIZED;
+    constexpr CK_RV TOKEN_WRITE_PROTECTED       = CKR_TOKEN_WRITE_PROTECTED;
+    constexpr CK_RV UNWRAPPING_KEY_HANDLE_INVALID = CKR_UNWRAPPING_KEY_HANDLE_INVALID;
+    constexpr CK_RV UNWRAPPING_KEY_SIZE_RANGE   = CKR_UNWRAPPING_KEY_SIZE_RANGE;
+    constexpr CK_RV UNWRAPPING_KEY_TYPE_INCONSISTENT = CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT;
+    constexpr CK_RV USER_ALREADY_LOGGED_IN      = CKR_USER_ALREADY_LOGGED_IN;
+    constexpr CK_RV USER_NOT_LOGGED_IN          = CKR_USER_NOT_LOGGED_IN;
+    constexpr CK_RV USER_PIN_NOT_INITIALIZED    = CKR_USER_PIN_NOT_INITIALIZED;
+    constexpr CK_RV USER_TYPE_INVALID           = CKR_USER_TYPE_INVALID;
+    //  CKR_USER_ANOTHER_ALREADY_LOGGED_IN and CKR_USER_TOO_MANY_TYPES are new to v2.01
+    constexpr CK_RV USER_ANOTHER_ALREADY_LOGGED_IN = CKR_USER_ANOTHER_ALREADY_LOGGED_IN;
+    constexpr CK_RV USER_TOO_MANY_TYPES         = CKR_USER_TOO_MANY_TYPES;
+    constexpr CK_RV WRAPPED_KEY_INVALID         = CKR_WRAPPED_KEY_INVALID;
+    constexpr CK_RV WRAPPED_KEY_LEN_RANGE       = CKR_WRAPPED_KEY_LEN_RANGE;
+    constexpr CK_RV WRAPPING_KEY_HANDLE_INVALID = CKR_WRAPPING_KEY_HANDLE_INVALID;
+    constexpr CK_RV WRAPPING_KEY_SIZE_RANGE     = CKR_WRAPPING_KEY_SIZE_RANGE;
+    constexpr CK_RV WRAPPING_KEY_TYPE_INCONSISTENT = CKR_WRAPPING_KEY_TYPE_INCONSISTENT;
+    constexpr CK_RV RANDOM_SEED_NOT_SUPPORTED   = CKR_RANDOM_SEED_NOT_SUPPORTED;
+    //  These are new to v2.0
+    constexpr CK_RV RANDOM_NO_RNG               = CKR_RANDOM_NO_RNG;
+    //  CKR_DOMAIN_PARAMS_INVALID is new for v2.11
+    constexpr CK_RV DOMAIN_PARAMS_INVALID       = CKR_DOMAIN_PARAMS_INVALID;
+    //  CKR_CURVE_NOT_SUPPORTED is new for v2.40
+    constexpr CK_RV CURVE_NOT_SUPPORTED         = CKR_CURVE_NOT_SUPPORTED;
+    constexpr CK_RV BUFFER_TOO_SMALL            = CKR_BUFFER_TOO_SMALL;
+    constexpr CK_RV SAVED_STATE_INVALID         = CKR_SAVED_STATE_INVALID;
+    constexpr CK_RV INFORMATION_SENSITIVE       = CKR_INFORMATION_SENSITIVE;
+    constexpr CK_RV STATE_UNSAVEABLE            = CKR_STATE_UNSAVEABLE;
+    //  These are new to v2.01
+    constexpr CK_RV CRYPTOKI_NOT_INITIALIZED    = CKR_CRYPTOKI_NOT_INITIALIZED;
+    constexpr CK_RV CRYPTOKI_ALREADY_INITIALIZED = CKR_CRYPTOKI_ALREADY_INITIALIZED;
+    constexpr CK_RV MUTEX_BAD                   = CKR_MUTEX_BAD;
+    constexpr CK_RV MUTEX_NOT_LOCKED            = CKR_MUTEX_NOT_LOCKED;
+    constexpr CK_RV NEW_PIN_MODE                = CKR_NEW_PIN_MODE;
+    constexpr CK_RV NEXT_OTP                    = CKR_NEXT_OTP;
+    constexpr CK_RV EXCEEDED_MAX_ITERATIONS     = CKR_EXCEEDED_MAX_ITERATIONS;
+    constexpr CK_RV FIPS_SELF_TEST_FAILED       = CKR_FIPS_SELF_TEST_FAILED;
+    constexpr CK_RV LIBRARY_LOAD_FAILED         = CKR_LIBRARY_LOAD_FAILED;
+    constexpr CK_RV PIN_TOO_WEAK                = CKR_PIN_TOO_WEAK;
+    constexpr CK_RV PUBLIC_KEY_INVALID          = CKR_PUBLIC_KEY_INVALID;
+    //  CKR_FUNCTION_REJECTED is new for v2.20
+    constexpr CK_RV FUNCTION_REJECTED           = CKR_FUNCTION_REJECTED;
+    //  New to v3.0
+    constexpr CK_RV TOKEN_RESOURCE_EXCEEDED     = CKR_TOKEN_RESOURCE_EXCEEDED;
+    constexpr CK_RV OPERATION_CANCEL_FAILED     = CKR_OPERATION_CANCEL_FAILED;
+    //  Vendor specific
+    constexpr CK_RV VENDOR_DEFINED              = CKR_VENDOR_DEFINED;
+    //  Not really a return value, but stored in ulDeviceError of session info for policy violations.
+    constexpr CK_RV POLICY_VIOLATION            = CKR_POLICY_VIOLATION;
+
+};  //  end namespace CKR
+
+
+}   //  end namespace Cryptoki
+
+#endif

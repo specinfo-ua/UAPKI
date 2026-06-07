@@ -156,6 +156,9 @@ int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult)
             if (ret == RET_UAPKI_NOT_SUPPORTED) {
                 DO(storage->keyAddCertificate(it));
             }
+            else {
+                SET_ERROR(ret);
+            }
         }
 
         DO(add_certs_to_store(

@@ -106,17 +106,14 @@ public:
     std::vector<StoreBag*> listBags (
         const StoreBag::BAG_TYPE bagType
     );
-    void loadFromBuffer (
-        ByteArray* baEncoded,
-        const bool readOnly
-    );
-    int loadFromFile (
-        const std::string& fileName,
-        const bool readOnly
-    );
     void reset (void);
     void selectKey (
         const StoreBag* storeBagKey
+    );
+    void setBuffer (
+        ByteArray* baEncoded,
+        const char* fileName,
+        const bool readOnly
     );
     void setOpen (
         const char* password

@@ -49,12 +49,14 @@ extern "C" {
     int json_object_set_hex (JSON_Object* jsonObject, const char* name, const ByteArray* baData);
     ByteArray* json_object_get_hex (const JSON_Object* jsonObject, const char* name);
 
+    int json_array_append_hex (JSON_Array* jsonArray, const ByteArray* baData);
+    ByteArray* json_array_get_hex (const JSON_Array* jsonArray, size_t index);
+
     int json_object_set_base64 (JSON_Object* jsonObject, const char* name, const ByteArray* baData);
     ByteArray* json_object_get_base64 (const JSON_Object* jsonObject, const char* name);
 
     int json_array_append_base64 (JSON_Array* jsonArray, const ByteArray* baData);
     ByteArray* json_array_get_base64 (const JSON_Array* jsonArray, size_t index);
-
 
 #ifdef __cplusplus
 }

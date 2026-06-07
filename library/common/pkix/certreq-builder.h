@@ -40,8 +40,8 @@ class CertReqBuilder {
     CertificationRequestInfo_t*
                 m_TbsCsrInfo;
     std::string m_KeyAlgo;
-    ByteArray*  m_BaTbsEncoded;
-    ByteArray*  m_BaCsrEncoded;
+    SmartBA     m_TbsEncoded;
+    SmartBA     m_CsrEncoded;
 
 public:
     CertReqBuilder (void);
@@ -50,25 +50,28 @@ public:
     int init (
         const uint32_t version = 1
     );
+    int init (
+        const ByteArray* tbsEncoded
+    );
     int setSubject (
-        const ByteArray* baNameEncoded
+        const ByteArray* nameEncoded
     );
     int setSubject (
         const std::vector<UapkiNS::RdName>& rdNames
     );
     int setSubjectPublicKeyInfo (
-        const ByteArray* baSpkiEncoded
+        const ByteArray* spkiEncoded
     );
     int setSubjectPublicKeyInfo (
-        const ByteArray* baAlgoId,
-        const ByteArray* baSubjectPublicKey
+        const ByteArray* algoIdEncoded,
+        const ByteArray* publicKey
     );
     int setSubjectPublicKeyInfo (
         const UapkiNS::AlgorithmIdentifier& algorithm,
-        const ByteArray* baSubjectPublicKey
+        const ByteArray* publicKey
     );
     int addExtensions (
-        const ByteArray* baExtensionsEncoded
+        const ByteArray* extensionsEncoded
     );
     int addExtensions (
         const std::vector<UapkiNS::Extension>& extensions
@@ -82,17 +85,17 @@ public:
 
     int encodeTbs (void);
     const ByteArray* getTbsEncoded (void) const {
-        return m_BaTbsEncoded;
+        return m_TbsEncoded.get();
     }
 
     int encodeCertRequest (
         const char* signAlgo,
-        const ByteArray* baSignAlgoParam,
-        const ByteArray* baSignature
+        const ByteArray* signAlgoParam,
+        const ByteArray* signature
     );
     int encodeCertRequest (
         const UapkiNS::AlgorithmIdentifier& aidSignature,
-        const ByteArray* baSignature
+        const ByteArray* signature
     );
     ByteArray* getCsrEncoded (
         const bool move = false
@@ -101,11 +104,11 @@ public:
 public:
     static int encodeExtensions (
         const std::vector<UapkiNS::Extension>& extensions,
-        ByteArray** baEncoded
+        ByteArray** encoded
     );
     static int encodeExtensions (
         const std::vector<ByteArray*>& vbaEncodedExtensions,
-        ByteArray** baEncoded
+        ByteArray** encoded
     );
     static int nameAddRdName (
         Name_t* name,

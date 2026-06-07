@@ -92,25 +92,16 @@ static int extendedkeyusage_to_json (
     ExtendedKeyUsage_t* ext_keyusage = (ExtendedKeyUsage_t*)asn_decode_ba_with_alloc(get_ExtendedKeyUsage_desc(), baEncoded);
     if (!ext_keyusage) return RET_UAPKI_INVALID_STRUCT;
 
-    (void)json_object_set_value(joResult, "extKeyUsage", json_value_init_array());
-    JSON_Array* ja_keypurposeids = json_object_get_array(joResult, "extKeyUsage");
+    (void)json_object_set_value(joResult, "extKeyUsage", json_value_init_array()); // deprecated
+    (void)json_object_set_value(joResult, "extendedKeyUsage", json_value_init_array());
+    JSON_Array* ja_keypurposeids_depr = json_object_get_array(joResult, "extKeyUsage"); // deprecated
+    JSON_Array* ja_keypurposeids = json_object_get_array(joResult, "extendedKeyUsage");
 
     for (int i = 0; i < ext_keyusage->list.count; i++) {
-        const KeyPurposeId_t* key_purposeid = ext_keyusage->list.array[i];
         string s_keypurposeid;
-
-        DO(Util::oidFromAsn1(key_purposeid, s_keypurposeid));
+        DO(Util::oidFromAsn1(ext_keyusage->list.array[i], s_keypurposeid));
+        DO_JSON(json_array_append_string(ja_keypurposeids_depr, s_keypurposeid.c_str())); // deprecated
         DO_JSON(json_array_append_string(ja_keypurposeids, s_keypurposeid.c_str()));
-
-        if (s_keypurposeid == string(OID_PKIX_KpOcspSigning)) {
-            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isOcsp", true));
-        }
-        if (s_keypurposeid == string(OID_PKIX_KpTspSigning)) {
-            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isTsp", true));
-        }
-        if (s_keypurposeid == string(OID_IIT_KEYPURPOSE_CMP_SIGNING)) {
-            DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isCmp", true));
-        }
     }
 
 cleanup:
@@ -177,6 +168,16 @@ static int info_to_json (
     DO(json_object_set_hex(joResult, "authorityKeyIdentifier", cerItem->getAuthorityKeyId()));
     DO(extensions_to_json(joResult, tbs_cert.extensions));
 
+    if (cerItem->getCertExtKeyUsage().isOcsp()) {
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isOcsp", true));
+    }
+    if (cerItem->getCertExtKeyUsage().isTsp()) {
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isTsp", true));
+    }
+    if (cerItem->getCertExtKeyUsage().isCmp()) {
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "isCmp", true));
+    }
+
     DO(certstatusinfo_to_json(joResult, "statusByCRL", cerItem->getCertStatusByCrl()));
     DO(certstatusinfo_to_json(joResult, "statusByOCSP", cerItem->getCertStatusByOcsp()));
 
@@ -192,7 +193,33 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
     Cert::CerStore* cer_store = get_cerstore();
     const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
     const bool show_certinfos = ParsonHelper::jsonObjectGetBoolean(joParams, "showCertInfos", false);
+    Cert::CerStore::FilterListCerts filter;
+    SmartBA sba_subjectkeyid;
+    VectorBA vba_subjectkeyids;
     Pagination pagination;
+
+    if (ParsonHelper::jsonObjectHasValue(joParams, "subjectKeyId", JSONString)) { // deprecated
+        if (!sba_subjectkeyid.set(json_object_get_hex(joParams, "subjectKeyId"))) return RET_UAPKI_INVALID_PARAMETER;
+    }
+    if (ParsonHelper::jsonObjectHasValue(joParams, "subjectKeyIdentifiers", JSONArray)) {
+        JSON_Array* ja_subjectkeyids = json_object_get_array(joParams, "subjectKeyIdentifiers");
+        vba_subjectkeyids.resize(json_array_get_count(ja_subjectkeyids));
+        for (size_t i = 0; i < vba_subjectkeyids.size(); i++) {
+            vba_subjectkeyids[i] = json_array_get_hex(ja_subjectkeyids, i);
+            if (!vba_subjectkeyids[i]) return RET_UAPKI_INVALID_PARAMETER;
+        }
+    }
+    filter.subjectKeyIds.resize(vba_subjectkeyids.size() + (sba_subjectkeyid.empty() ? 0 : 1));
+    for (size_t i = 0; i < vba_subjectkeyids.size(); i++) {
+        filter.subjectKeyIds[i] = vba_subjectkeyids[i];
+        vba_subjectkeyids[i] = nullptr;
+    }
+    if (!sba_subjectkeyid.empty()) {
+        filter.subjectKeyIds[filter.subjectKeyIds.size() - 1] = sba_subjectkeyid.pop();
+    }
+    if (ParsonHelper::jsonObjectHasValue(joParams, "publicKeyBytes", JSONString)) {
+        if (!filter.publicKeyBytes.set(json_object_get_base64(joParams, "publicKeyBytes"))) return RET_UAPKI_INVALID_PARAMETER;
+    }
 
     if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
     if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
@@ -208,7 +235,7 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     if (!from_storage) {
-        const vector<Cert::CerItem*> cer_items = cer_store->getCerItems();
+        const vector<Cert::CerItem*> cer_items = cer_store->getCerItems(filter);
         pagination.count = cer_items.size();
         pagination.calcParams();
         for (size_t idx = pagination.offset; idx < pagination.offsetLast; idx++) {
@@ -222,7 +249,7 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
         }
     }
     else {
-        UapkiNS::VectorBA vba_certs;
+        VectorBA vba_certs;
         vector<Cert::CerItem*> cer_items;
 
         CmStorageProxy* storage = CmProviders::openedStorage();
@@ -236,7 +263,7 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
         for (const auto& it : vba_certs) {
             Cert::CerItem* cer_item = nullptr;
             ret = cer_store->getCertByEncoded(it, &cer_item);
-            if (ret == RET_OK) {
+            if ((ret == RET_OK) && filter.check((const Cert::CerItem*)cer_store)) {
                 cer_items.push_back(cer_item);
                 pagination.count++;
             }

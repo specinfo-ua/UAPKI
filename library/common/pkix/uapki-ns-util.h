@@ -44,7 +44,8 @@ namespace Util {
     );
     int algorithmIdentifierToAsn1 (
         AlgorithmIdentifier_t& asn1,
-        const char* algo, const ByteArray* baParams
+        const char* algo,
+        const ByteArray* baParams
     );
     int algorithmIdentifierToAsn1 (
         AlgorithmIdentifier_t& asn1,

@@ -30,6 +30,7 @@
 #include "cm-pkcs12.h"
 #include "cm-pkcs12-ctx.h"
 #include "key-wrap.h"
+#include "oid-utils.h"
 #include "parson-helper.h"
 #include "private-key.h"
 #include "uapki-ns.h"
@@ -46,6 +47,62 @@ DEBUG_OUTPUT_FUNC
 using namespace std;
 using namespace UapkiNS;
 
+
+static const uint8_t DER_ALGOID_ECDSA_P256[] = {
+    0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A, 0x86, 0x48,
+    0xCE, 0x3D, 0x03, 0x01, 0x07
+};
+static const uint8_t DER_ALGOID_ECDSA_P384[] = {
+    0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x05, 0x2B, 0x81, 0x04,
+    0x00, 0x22
+};
+static const uint8_t DER_ALGOID_ECDSA_P521[] = {
+    0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x05, 0x2B, 0x81, 0x04,
+    0x00, 0x23
+};
+static const uint8_t DER_ALGOID_RSA_NULL[] = {
+    0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00
+};
+
+
+static bool substitute_algoid (
+        const string& algo,
+        const string& param,
+        SmartBA& sbaAlgoId
+) {
+    const uint8_t* pbuf_substitution = nullptr;
+    size_t len_substitution = 0;
+
+    if (algo == string(OID_EC_KEY)) {
+#ifndef CM_PKCS12_SKIP_SUBSTITUTE_ALGOID
+        //  if param is not a named curve then substitute it
+        if ((param == string(OID_NIST_P256)) && (sbaAlgoId.size() != sizeof(DER_ALGOID_ECDSA_P256))) {
+            pbuf_substitution = DER_ALGOID_ECDSA_P256;
+            len_substitution = sizeof(DER_ALGOID_ECDSA_P256);
+        }
+        else if ((param == string(OID_NIST_P384)) && (sbaAlgoId.size() != sizeof(DER_ALGOID_ECDSA_P384))) {
+            pbuf_substitution = DER_ALGOID_ECDSA_P384;
+            len_substitution = sizeof(DER_ALGOID_ECDSA_P384);
+        }
+        else if ((param == string(OID_NIST_P521)) && (sbaAlgoId.size() != sizeof(DER_ALGOID_ECDSA_P521))) {
+            pbuf_substitution = DER_ALGOID_ECDSA_P521;
+            len_substitution = sizeof(DER_ALGOID_ECDSA_P521);
+        }
+#endif
+    }
+    else if ((algo == string(OID_RSA)) && (sbaAlgoId.size() != sizeof(DER_ALGOID_RSA_NULL))) {
+        //  when PFX and RSA-key was created in IIT-EU - possible AlgorithmIdentifier RSA without NULL (stored in BAG)
+        pbuf_substitution = DER_ALGOID_RSA_NULL;
+        len_substitution = sizeof(DER_ALGOID_RSA_NULL);
+    }
+
+    if (pbuf_substitution) {
+        sbaAlgoId.clear();
+        if (!sbaAlgoId.set(ba_alloc_from_uint8(pbuf_substitution, len_substitution))) return false;
+    }
+
+    return true;
+}   //  substitute_algoid
 
 static CM_ERROR cm_key_get_info (
         CM_SESSION_API* session,
@@ -107,12 +164,27 @@ static CM_ERROR cm_key_get_public_key (
     StoreBag* selected_key = storage.selectedKey();
     if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
 
+    SmartBA sba_algoid, sba_publickey;
     const int ret = spki_by_privkeyinfo(
         selected_key->bagValue(),
-        (ByteArray**)baAlgorithmIdentifier,
-        (ByteArray**)baPublicKey
+        &sba_algoid,
+        &sba_publickey
     );
-    return ret;
+    if (ret != RET_OK) return ret;
+
+    if (!substitute_algoid(
+        selected_key->mechanismId().c_str(),
+        selected_key->parameterId().c_str(),
+        sba_algoid)
+    ) return RET_CM_GENERAL_ERROR;
+
+    if (baAlgorithmIdentifier) {
+        *baAlgorithmIdentifier = (CM_BYTEARRAY*)sba_algoid.pop();
+    }
+    if (baPublicKey) {
+        *baPublicKey = (CM_BYTEARRAY*)sba_publickey.pop();
+    }
+    return RET_OK;
 }   //  cm_key_get_public_key
 
 static CM_ERROR cm_key_sign (

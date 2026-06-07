@@ -66,6 +66,14 @@ public:
         {}
     };  //  end struct AddedCerItem
 
+    struct FilterListCerts {
+        SmartBA     publicKeyBytes;
+        VectorBA    subjectKeyIds;
+        bool check (
+            const CerItem* cerItem
+        ) const;
+    };  //  end struct FilterListCerts
+
     //  The group of functions that have lock_guard
     int addCerts (
         const bool trusted,
@@ -73,7 +81,9 @@ public:
         const VectorBA& vbaEncodedCerts,
         std::vector<AddedCerItem>& addedCerItems
     );
-    std::vector<CerItem*> getCerItems (void);
+    std::vector<CerItem*> getCerItems (
+        const FilterListCerts& filter
+    );
     int getCertByCertId (
         const ByteArray* baCertId,
         CerItem** cerItem

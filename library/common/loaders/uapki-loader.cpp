@@ -50,6 +50,23 @@ UapkiLoader::~UapkiLoader (void)
     unload();
 }
 
+string UapkiLoader::getDlError (void)
+{
+    string rv;
+#if defined(_WIN32) || defined(__WINDOWS__)
+    const DWORD dw_err = GetLastError();
+    if (dw_err > 0) {
+        rv = to_string(dw_err);
+    }
+#else
+    const char* s_err = dlerror();
+    if (s_err) {
+        rv = string(s_err);
+    }
+#endif
+    return rv;
+}
+
 string UapkiLoader::getLibName (
         const string& libName
 )

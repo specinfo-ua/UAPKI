@@ -618,14 +618,10 @@ int EnvelopedDataParser::parseEncryptedContentInfo (
 )
 {
     int ret = RET_OK;
-    char* s_contype = nullptr;
-    char* s_encalgo = nullptr;
 
-    DO(asn_oid_to_text(&encryptedContentInfo.contentType, &s_contype));
-    parsedECI.contentType = string(s_contype);
+    DO(Util::oidFromAsn1(&encryptedContentInfo.contentType, parsedECI.contentType));
 
-    DO(asn_oid_to_text(&encryptedContentInfo.contentEncryptionAlgorithm.algorithm, &s_encalgo));
-    parsedECI.contentEncryptionAlgo.algorithm = string(s_encalgo);
+    DO(Util::oidFromAsn1(&encryptedContentInfo.contentEncryptionAlgorithm.algorithm, parsedECI.contentEncryptionAlgo.algorithm));
 
     if (encryptedContentInfo.contentEncryptionAlgorithm.parameters) {
         const ANY_t* any_param = encryptedContentInfo.contentEncryptionAlgorithm.parameters;
@@ -640,8 +636,6 @@ int EnvelopedDataParser::parseEncryptedContentInfo (
     }
 
 cleanup:
-    ::free(s_contype);
-    ::free(s_encalgo);
     return ret;
 }
 
@@ -678,7 +672,6 @@ int EnvelopedDataParser::parseUnprotectedAttrs (
 )
 {
     int ret = RET_OK;
-    char* s_type = nullptr;
 
     if (attrs && (attrs->list.count > 0)) {
         parsedAttrs.resize(attrs->list.count);
@@ -688,10 +681,7 @@ int EnvelopedDataParser::parseUnprotectedAttrs (
             UapkiNS::Attribute& dst_attr = parsedAttrs[i];
 
             //  =attrType=
-            DO(asn_oid_to_text(&src_attr->type, &s_type));
-            dst_attr.type = string(s_type);
-            ::free(s_type);
-            s_type = nullptr;
+            DO(Util::oidFromAsn1(&src_attr->type, dst_attr.type));
 
             //  =attrValues=
             if (src_attr->value.list.count > 0) {
@@ -708,7 +698,6 @@ int EnvelopedDataParser::parseUnprotectedAttrs (
     }
 
 cleanup:
-    ::free(s_type);
     return ret;
 }
 
@@ -830,7 +819,6 @@ EnvelopedDataParser::KeyAgreeRecipientInfo::~KeyAgreeRecipientInfo (void)
 int EnvelopedDataParser::KeyAgreeRecipientInfo::parse (const KeyAgreeRecipientInfo_t& kari)
 {
     int ret = RET_OK;
-    char* s_encralgo = nullptr;
     long version = 0;
 
     //  =version=
@@ -850,8 +838,7 @@ int EnvelopedDataParser::KeyAgreeRecipientInfo::parse (const KeyAgreeRecipientIn
     }
 
     //  =keyEncryptionAlgorithm=
-    DO(asn_oid_to_text(&kari.keyEncryptionAlgorithm.algorithm, &s_encralgo));
-    m_KeyEncryptionAlgorithm.algorithm = string(s_encralgo);
+    DO(Util::oidFromAsn1(&kari.keyEncryptionAlgorithm.algorithm, m_KeyEncryptionAlgorithm.algorithm));
     if (kari.keyEncryptionAlgorithm.parameters) {
         const ANY_t* any_param = kari.keyEncryptionAlgorithm.parameters;
         m_KeyEncryptionAlgorithm.baParameters = ba_alloc_from_uint8(any_param->buf, any_param->size);
@@ -869,7 +856,6 @@ int EnvelopedDataParser::KeyAgreeRecipientInfo::parse (const KeyAgreeRecipientIn
     }
 
 cleanup:
-    ::free(s_encralgo);
     return ret;
 }
 

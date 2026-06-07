@@ -43,7 +43,7 @@ using namespace UapkiNS;
 static int load_config (ParsonHelper& json, const string& configFile)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_json;
+    SmartBA sba_json;
     size_t len = 0;
 
     DO(ba_alloc_from_file(configFile.c_str(), &sba_json));
@@ -177,8 +177,8 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
     //  =policyId=
     tsp_params.policyId = ParsonHelper::jsonObjectGetString(joParams, "policyId");
     if (!tsp_params.policyId.empty()) {
-        UapkiNS::SmartBA sba_encoded;
-        if (UapkiNS::Util::encodeOid(tsp_params.policyId.c_str(), &sba_encoded) != RET_OK) {
+        SmartBA sba_encoded;
+        if (Util::encodeOid(tsp_params.policyId.c_str(), &sba_encoded) != RET_OK) {
             tsp_params.policyId.clear();
         }
     }
@@ -214,12 +214,16 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     JSON_Object* jo_category = nullptr;
     size_t cnt_certs, cnt_crls, cnt_trustedcerts;
     bool offline;
+    uint32_t selftest_status = 0;
+    uint32_t* p_selftest_status = ParsonHelper::jsonObjectGetBoolean(joParams, "skipSelfTest", false) ? nullptr : &selftest_status;
 
     if (!lib_config || !lib_cerstore || !lib_crlstore) {
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
     if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
+
+    DO(uapkic_init(nullptr, p_selftest_status));
 
     if (!fn_config.empty()) {
         DO(load_config(json, fn_config));
@@ -287,7 +291,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     jo_category = json_object_get_object(joResult, "tsp");
     if (jo_category) {
         const LibraryConfig::TspParams& tsp_params = lib_config->getTsp();
-        const string s_url = UapkiNS::Util::joinStrings(tsp_params.uris);
+        const string s_url = Util::joinStrings(tsp_params.uris);
 
         DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "certReq", tsp_params.certReq));
         DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "forced", tsp_params.forced));

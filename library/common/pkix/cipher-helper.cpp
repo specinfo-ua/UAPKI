@@ -36,16 +36,17 @@
 
 
 using namespace std;
+using namespace UapkiNS;
 
 
 static const char* SHEX_GOST28147_SBOX_ID_1 = "A9D6EB45F13C708280C4967B231F5EADF658EBA4C037291D38D96BF025CA4E17F8E9720DC615B43A28975F0BC1DEA36438B564EA2C179FD0123E6DB8FAC57904";
 
 
-int UapkiNS::Cipher::Dstu7624::cryptData (const UapkiNS::AlgorithmIdentifier& algoId, const ByteArray* baKey,
+int Cipher::Dstu7624::cryptData (const AlgorithmIdentifier& algoId, const ByteArray* baKey,
     const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_iv;
+    SmartBA sba_iv;
     Dstu7624Ctx* ctx = nullptr;
     int dstu7624_mode = 0;
 
@@ -80,7 +81,7 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Dstu7624::decodeParams (const ByteArray* baEncoded, ByteArray** baIV)
+int Cipher::Dstu7624::decodeParams (const ByteArray* baEncoded, ByteArray** baIV)
 {
     int ret = RET_OK;
     //  Dstu7624Parameters_t is missed - use GOST28147ParamsOptionalDke_t without DKE instead it
@@ -98,7 +99,7 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Dstu7624::encodeParams (const ByteArray* baIV, ByteArray** baEncoded)
+int Cipher::Dstu7624::encodeParams (const ByteArray* baIV, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     //  Dstu7624Parameters_t is missed - use GOST28147ParamsOptionalDke_t without DKE instead it
@@ -114,12 +115,12 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Dstu7624::generateKey (const size_t keyLen, ByteArray** baKey)
+int Cipher::Dstu7624::generateKey (const size_t keyLen, ByteArray** baKey)
 {
     return dstu7624_generate_key(keyLen, baKey);
 }
 
-int UapkiNS::Cipher::Dstu7624::generateIV (ByteArray** baIV)
+int Cipher::Dstu7624::generateIV (ByteArray** baIV)
 {
     int ret = RET_OK;
     ByteArray* ba_iv = nullptr;
@@ -136,11 +137,11 @@ cleanup:
 }
 
 
-int UapkiNS::Cipher::Gost28147::cryptData (const UapkiNS::AlgorithmIdentifier& algoId, const ByteArray* baKey,
+int Cipher::Gost28147::cryptData (const AlgorithmIdentifier& algoId, const ByteArray* baKey,
                     const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut)
 {
     int ret = RET_OK;
-    UapkiNS::SmartBA sba_iv, sba_sbox;
+    SmartBA sba_iv, sba_sbox;
     Gost28147Ctx* ctx = nullptr;
     int gost28147_mode = 0;
 
@@ -185,11 +186,11 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Gost28147::decodeParams (const ByteArray* baEncoded, ByteArray** baIV, ByteArray** baDKE, const bool compressed)
+int Cipher::Gost28147::decodeParams (const ByteArray* baEncoded, ByteArray** baIV, ByteArray** baDKE, const bool compressed)
 {
     int ret = RET_OK;
     GOST28147ParamsOptionalDke_t* gost28147_params = nullptr;
-    UapkiNS::SmartBA sba_sbox;
+    SmartBA sba_sbox;
 
     CHECK_NOT_NULL(gost28147_params = (GOST28147ParamsOptionalDke_t*)asn_decode_ba_with_alloc(get_GOST28147ParamsOptionalDke_desc(), baEncoded));
     DO(asn_OCTSTRING2ba(&gost28147_params->iv, baIV));
@@ -219,7 +220,7 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Gost28147::encodeParams (const ByteArray* baIV, const ByteArray* baDKE, ByteArray** baEncoded)
+int Cipher::Gost28147::encodeParams (const ByteArray* baIV, const ByteArray* baDKE, ByteArray** baEncoded)
 {
     int ret = RET_OK;
     GOST28147ParamsOptionalDke_t* gost28147_params = nullptr;
@@ -238,12 +239,12 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Gost28147::generateKey (ByteArray** baKey)
+int Cipher::Gost28147::generateKey (ByteArray** baKey)
 {
     return gost28147_generate_key(baKey);
 }
 
-int UapkiNS::Cipher::Gost28147::generateIV (ByteArray** baIV)
+int Cipher::Gost28147::generateIV (ByteArray** baIV)
 {
     int ret = RET_OK;
     ByteArray* ba_iv = nullptr;
@@ -259,7 +260,7 @@ cleanup:
     return ret;
 }
 
-int UapkiNS::Cipher::Gost28147::getDKE (const Gost28147SboxId sboxId, ByteArray** baCompressedDKE)
+int Cipher::Gost28147::getDKE (const Gost28147SboxId sboxId, ByteArray** baCompressedDKE)
 {
     const char* s_hex = nullptr;
 

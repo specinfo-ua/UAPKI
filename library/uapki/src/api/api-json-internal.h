@@ -28,6 +28,7 @@
 #ifndef UAPKI_API_JSON_H
 #define UAPKI_API_JSON_H
 
+#include <string.h>
 #include "ba-utils.h"
 #include "cm-api.h"
 #include "cm-errors.h"
@@ -38,7 +39,7 @@
 #include "uapki-errors.h"
 #include "uapki-export.h"
 #include "uapki-ns.h"
-#include <string.h>
+#include "api-json-custom.h"
 
 
 #ifdef __cplusplus
@@ -63,10 +64,15 @@ int uapki_session_key_create (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_session_key_delete (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_key_get_csr (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_verify_csr (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_key_init_usage (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_sign (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_verify_signature (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult);
+
+int uapki_build_cms_2pass (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_build_csr_2pass (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult);
@@ -83,12 +89,18 @@ int uapki_remove_crl (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_digest (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_asn1_encode (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_generate_certbundle (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult);
+
+#ifdef API_JSON_INTERNAL_CUSTOM
+  API_JSON_INTERNAL_CUSTOM
+#endif
+
 
 #ifdef __cplusplus
 }

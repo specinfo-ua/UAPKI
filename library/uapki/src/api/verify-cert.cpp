@@ -135,7 +135,6 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
         DO_JSON(json_object_set_value(joResult, "validateByCRL", json_value_init_object()));
         DO(cert_validator.validateByCrl(
             cer_subject,
-            cer_issuer,
             validate_time,
             need_updatecert,
             result_valbycrl,
@@ -143,20 +142,28 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
         ));
     }
     else if (validation_type == Cert::ValidationType::OCSP) {
-        CertValidator::ResultValidationByOcsp result_valbyocsp;
+        JSON_Object* jo_resvalbyocsp = nullptr;
         DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
-        DO(cert_validator.validateByOcsp(
-            cer_subject,
-            cer_issuer,
-            result_valbyocsp,
-            json_object_get_object(joResult, "validateByOCSP")
-        ));
+        jo_resvalbyocsp = json_object_get_object(joResult, "validateByOCSP");
+        if (!cer_subject->getCertExtKeyUsage().isOcspNoCheck()) {
+            CertValidator::ResultValidationByOcsp result_valbyocsp;
+            DO(cert_validator.validateByOcsp(
+                cer_subject,
+                cer_issuer,
+                result_valbyocsp,
+                jo_resvalbyocsp
+            ));
+        }
+        else {
+            DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_resvalbyocsp, "ocspNoCheck", true));
+            DO_JSON(json_object_set_string(jo_resvalbyocsp, "status", Crl::certStatusToStr(UapkiNS::CertStatus::UNDEFINED)));
+        }
     }
 
 cleanup:
     if (ret != RET_OK) {
-        (void)cert_validator.expectedCertItemsToJson(joResult, "expectedCerts");
-        (void)cert_validator.expectedCrlItemsToJson(joResult, "expectedCrls");
+        (void)cert_validator.expectedCertsToJson(joResult, "expectedCerts");
+        (void)cert_validator.expectedCrlsToJson(joResult, "expectedCrls");
     }
     delete cer_parsed;
     DEBUG_OUTPUT_OUTSTREAM("OCSP-request=", cert_validator.getOcspRequest());

@@ -182,7 +182,7 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "STORAGE_NOT_OPEN",             //  (UAPKI_ERROR_NAME_CODE | 0x00000019)
     "PROVIDER_NOT_LOADED",          //  (UAPKI_ERROR_NAME_CODE | 0x0000001A)
     "UNSUPPORTED_CM_API",           //  (UAPKI_ERROR_NAME_CODE | 0x0000001B)
-    "",
+    "STORAGE_ALREADY_OPENED",       //  (UAPKI_ERROR_NAME_CODE | 0x0000001C)
     "",
     "",
     "",
@@ -213,8 +213,8 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "INVALID_COUNT_ITEMS",          //  (UAPKI_ERROR_NAME_CODE | 0x00000038)
     "INVALID_DIGEST",               //  (UAPKI_ERROR_NAME_CODE | 0x00000039)
     "OTHER_RECIPIENT",              //  (UAPKI_ERROR_NAME_CODE | 0x0000003A)
-    "",
-    "",
+    "INDEX_OUT_OF_RANGE",           //  (UAPKI_ERROR_NAME_CODE | 0x0000003B)
+    "INVALID_CONTENT_TYPE",         //  (UAPKI_ERROR_NAME_CODE | 0x0000003C)
     "",
     "",
     "",
@@ -225,8 +225,8 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "CERT_ISSUER_NOT_FOUND",            //  (UAPKI_ERROR_NAME_CODE | 0x00000044)
     "CERT_STATUS_REVOKED",              //  (UAPKI_ERROR_NAME_CODE | 0x00000045)
     "CERT_STATUS_UNKNOWN",              //  (UAPKI_ERROR_NAME_CODE | 0x00000046)
-    "",
-    "",
+    "CERT_NOT_TRUSTED",                 //  (UAPKI_ERROR_NAME_CODE | 0x00000047)
+    "CERT_CHAIN_NOT_FOUND",             //  (UAPKI_ERROR_NAME_CODE | 0x00000048)
     "",
     "",
     "",

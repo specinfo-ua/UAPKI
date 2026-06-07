@@ -93,12 +93,10 @@ int ExtensionHelper::decodeAccessDescriptions (
             (access_descr->accessLocation.present == GeneralName_PR_uniformResourceIdentifier) &&
             (access_descr->accessLocation.choice.uniformResourceIdentifier.size > 0)
         ) {
-            char* s_uri = nullptr;
+            string s_uri;
             DO(Util::pbufToStr(access_descr->accessLocation.choice.uniformResourceIdentifier.buf,
-                access_descr->accessLocation.choice.uniformResourceIdentifier.size, &s_uri));
-            uris.push_back(string(s_uri));
-            ::free(s_uri);
-            s_uri = nullptr;
+                access_descr->accessLocation.choice.uniformResourceIdentifier.size, s_uri));
+            uris.push_back(s_uri);
         }
     }
 
@@ -114,32 +112,32 @@ int ExtensionHelper::decodeDistributionPoints (
 {
     int ret = RET_OK;
     CRLDistributionPoints_t* distrib_points = nullptr;
-    char* s_uri = nullptr;
 
     CHECK_NOT_NULL(distrib_points = (CRLDistributionPoints_t*)asn_decode_ba_with_alloc(get_CRLDistributionPoints_desc(), baEncoded));
 
-    for (int i = 0; i < distrib_points->list.count; i++) {
-        const DistributionPoint_t* distrib_point = distrib_points->list.array[i];
+    for (int i_dp = 0; i_dp < distrib_points->list.count; i_dp++) {
+        const DistributionPoint_t* distrib_point = distrib_points->list.array[i_dp];
         if (
             distrib_point->distributionPoint &&
-            (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName) &&
-            (distrib_point->distributionPoint->choice.fullName.list.count > 0)
+            (distrib_point->distributionPoint->present == DistributionPointName_PR_fullName)
         ) {
-            const GeneralName_t* general_name = distrib_point->distributionPoint->choice.fullName.list.array[0];
-            if ((general_name->present == GeneralName_PR_uniformResourceIdentifier)
-                && (general_name->choice.uniformResourceIdentifier.size > 0)) {
-                DO(Util::pbufToStr(general_name->choice.uniformResourceIdentifier.buf,
-                    general_name->choice.uniformResourceIdentifier.size, &s_uri));
-                uris.push_back(string(s_uri));
-                ::free(s_uri);
-                s_uri = nullptr;
+            for (int j_fn = 0; j_fn < distrib_point->distributionPoint->choice.fullName.list.count; j_fn++) {
+                const GeneralName_t* general_name = distrib_point->distributionPoint->choice.fullName.list.array[j_fn];
+                if ((general_name->present == GeneralName_PR_uniformResourceIdentifier) &&
+                    (general_name->choice.uniformResourceIdentifier.size > 0)) {
+                    string s_uri;
+                    DO(Util::pbufToStr(general_name->choice.uniformResourceIdentifier.buf,
+                        general_name->choice.uniformResourceIdentifier.size,
+                        s_uri
+                    ));
+                    uris.push_back(s_uri);
+                }
             }
         }
     }
 
 cleanup:
     asn_free(get_CRLDistributionPoints_desc(), distrib_points);
-    ::free(s_uri);
     return ret;
 }
 
@@ -171,6 +169,7 @@ cleanup:
 
 int ExtensionHelper::getBasicConstrains (
         const Extensions_t* extns,
+        bool& critical,
         bool& cA,
         int& pathLenConstraint
 )
@@ -178,10 +177,6 @@ int ExtensionHelper::getBasicConstrains (
     int ret = RET_OK;
     BasicConstraints_t* basic_constraints = nullptr;
     SmartBA sba_encoded;
-    bool critical = false;
-
-    CHECK_PARAM(cA);
-    CHECK_PARAM(pathLenConstraint);
 
     DO(Util::extnValueFromExtensions(extns, OID_X509v3_BasicConstraints, &critical, &sba_encoded));
 
@@ -198,8 +193,6 @@ int ExtensionHelper::getBasicConstrains (
         DO(asn_INTEGER2long(basic_constraints->pathLenConstraint, &path_len));
         pathLenConstraint = path_len;
     }
-
-    ret = (critical) ? RET_OK : RET_UAPKI_EXTENSION_NOT_SET_CRITICAL;
 
 cleanup:
     asn_free(get_BasicConstraints_desc(), basic_constraints);
@@ -297,6 +290,30 @@ int ExtensionHelper::getDeltaCrlIndicator (
 
 cleanup:
     asn_free(get_CRLNumber_desc(), deltacrl_indicator);
+    return ret;
+}
+
+int ExtensionHelper::getExtendedKeyUsage (
+        const Extensions_t* extns,
+        vector<string>& keyPurposeIds
+)
+{
+    int ret = RET_OK;
+    ExtendedKeyUsage_t* ext_keyusage = nullptr;
+    SmartBA sba_encoded;
+
+    DO(Util::extnValueFromExtensions(extns, OID_X509v3_ExtendedKeyUsage, nullptr, &sba_encoded));
+
+    CHECK_NOT_NULL(ext_keyusage = (ExtendedKeyUsage_t*)asn_decode_ba_with_alloc(get_ExtendedKeyUsage_desc(), sba_encoded.get()));
+
+    keyPurposeIds.resize((size_t)ext_keyusage->list.count);
+    for (int i = 0; i < ext_keyusage->list.count; i++) {
+        const KeyPurposeId_t* key_purposeid = ext_keyusage->list.array[i];
+        DO(Util::oidFromAsn1(key_purposeid, keyPurposeIds[i]));
+    }
+
+cleanup:
+    asn_free(get_ExtendedKeyUsage_desc(), ext_keyusage);
     return ret;
 }
 

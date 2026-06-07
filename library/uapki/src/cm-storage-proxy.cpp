@@ -245,6 +245,8 @@ int CmStorageProxy::sessionLogin (
 int CmStorageProxy::sessionLogout (void)
 {
     int ret = RET_OK;
+
+    deselectKey();
     if (isAuthorizedSession()) {
         ret = (int)m_Session->logout(m_Session);
         m_IsAuthorizedSession = false;
@@ -359,6 +361,7 @@ int CmStorageProxy::sessionSelectKey (
 {
     lock_guard<mutex> lock(m_Mutex);
 
+    deselectKey();
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->selectKey) return RET_UAPKI_NOT_SUPPORTED;
 
@@ -977,4 +980,45 @@ int CmStorageProxy::keyDhUnwrapKey (
     }
     arrayCmbaFree(cnt_keys, cmba_seskeys);
     return ret;
+}
+
+void CmStorageProxy::deselectKey (void)
+{
+    m_PairedCertId.clear();
+    m_SelectedKeyId.clear();
+    m_SelectedKeyId2.clear();
+    m_SelectedKey = nullptr;
+}
+
+int CmStorageProxy::setPairedCertId (
+        const ByteArray* baCertId
+)
+{
+    m_PairedCertId.clear();
+    if (baCertId) {
+        if (!m_PairedCertId.set(ba_copy_with_alloc(baCertId, 0, 0))) {
+            return RET_UAPKI_GENERAL_ERROR;
+        }
+    }
+    return RET_OK;
+}
+
+int CmStorageProxy::setSelectedKeyId (
+        const ByteArray* baKeyId,
+        const ByteArray* baKeyId2
+)
+{
+    m_SelectedKeyId.clear();
+    m_SelectedKeyId2.clear();
+    if (baKeyId) {
+        if (!m_SelectedKeyId.set(ba_copy_with_alloc(baKeyId, 0, 0))) {
+            return RET_UAPKI_GENERAL_ERROR;
+        }
+    }
+    if (baKeyId2) {
+        if (!m_SelectedKeyId2.set(ba_copy_with_alloc(baKeyId2, 0, 0))) {
+            return RET_UAPKI_GENERAL_ERROR;
+        }
+    }
+    return RET_OK;
 }

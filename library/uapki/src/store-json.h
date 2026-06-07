@@ -79,8 +79,7 @@ int detailInfoToJson (
 );
 int extensionsToJson (
     JSON_Array* jaResult,
-    const CerItem* cerItem,
-    bool& selfSigned
+    const CerItem* cerItem
 );
 int ocspIdentifierToJson (
     JSON_Object* joResult,
