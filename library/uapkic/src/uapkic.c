@@ -174,3 +174,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	return TRUE;
 }
 #endif
+
+void uapkic_free(void* ptr)
+{
+	if (ptr != NULL) {
+		free(ptr);
+	}
+}
