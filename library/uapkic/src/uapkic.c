@@ -128,6 +128,8 @@ int uapkic_init(uint32_t *version, uint32_t *self_test_status)
 		*self_test_status = uapkic_self_test();
 	}
 
+	pthread_mutex_init(&drbg_mutex, NULL);
+
 	if (!init) {
 		DO(entropy_init());
 		DO(drbg_init());

@@ -336,8 +336,8 @@ void ba_free(ByteArray *ba)
 {
     if (ba) {
         free(ba->buf);
+        free(ba);
     }
-    free(ba);
 }
 
 
@@ -365,8 +365,8 @@ void ba_free_private(ByteArray *ba)
     if (ba) {
         secure_zero(ba->buf, ba->len);
         free(ba->buf);
+        free(ba);
     }
-    free(ba);
 }
 
 int ba_trim_leading_zeros_le(ByteArray* ba)

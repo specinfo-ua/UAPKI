@@ -142,7 +142,6 @@ int drbg_init(void)
 
 	DO(entropy_get(&entropy));
 	DO(drbg_init_internal(entropy));
-	pthread_mutex_init(&drbg_mutex, NULL);
 
 cleanup:
 	ba_free_private(entropy);
