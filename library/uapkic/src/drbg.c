@@ -250,7 +250,7 @@ int drbg_random(ByteArray* random)
 		return entropy_std(random);
 	}
 #else
-	CHECK_PARAM(random->len && random->len <= drbg_max_number_of_bits_per_request >> 3);
+	CHECK_PARAM(random->len && random->len <= (unsigned)(drbg_max_number_of_bits_per_request >> 3));
 
 	pthread_mutex_lock(&drbg_mutex);
 #endif

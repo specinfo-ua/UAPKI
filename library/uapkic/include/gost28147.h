@@ -66,9 +66,10 @@ typedef enum {
 } Gost28147SboxId;
 
 /**
- * Створює контекст ГОСТ 28147 зі стандартною таблицею замін.
+ * Створює контекст ГОСТ 28147 (ДСТУ ГОСТ 28147:2009, «Маґма») зі стандартною таблицею замін.
  *
  * @param sbox_id ідентифікатор стандартної таблиці замін
+ *
  * @return контекст ГОСТ 28147
  */
 UAPKIC_EXPORT Gost28147Ctx *gost28147_alloc(Gost28147SboxId sbox_id);
@@ -77,6 +78,7 @@ UAPKIC_EXPORT Gost28147Ctx *gost28147_alloc(Gost28147SboxId sbox_id);
  * Створює контекст ГОСТ 28147 з користувацьким sbox.
  *
  * @param sbox користувацька таблиця замін разміром 128 байт
+ *
  * @return контекст ГОСТ 28147
  */
 UAPKIC_EXPORT Gost28147Ctx *gost28147_alloc_user_sbox(const ByteArray *sbox);
@@ -88,52 +90,58 @@ UAPKIC_EXPORT Gost28147Ctx *gost28147_copy_with_alloc(const Gost28147Ctx *ctx);
  *
  * @param ctx контекст ГОСТ 28147
  * @param sbox таблиця замін разміром 128 байт
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_get_ext_sbox(const Gost28147Ctx *ctx, ByteArray **sbox);
 
 /**
- * Повертає зжату таблицю замін.
+ * Повертає стиснуту таблицю замін.
  *
  * @param ctx контекст ГОСТ 28147
  * @param sbox таблиця замін разміром 128 байт
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_get_compress_sbox(const Gost28147Ctx *ctx, ByteArray **sbox);
 
 /**
- * Генерує секретний ключ відповідно до ГОСТ 28147-89.
+ * Генерує секретний ключ відповідно до ГОСТ 28147.
  *
  * @param key секретний ключ
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_generate_key(ByteArray **key);
 
 /**
- * Ініціалізує контекст для шифрування у режимі простої заміни.
+ * Ініціалізує контекст для шифрування в режимі простої заміни.
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_ecb(Gost28147Ctx *ctx, const ByteArray *key);
 
 /**
- * Ініціалізує контекст для шифрування у режимі гамування.
+ * Ініціалізує контекст для шифрування в режимі гамування.
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
  * @param iv ініціалізаційний вектор
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
 
 /**
- * Ініціалізує контекст для шифрування у режимі гамування зі зворотнім зв'язком.
+ * Ініціалізує контекст для шифрування в режимі гамування зі зворотнім зв’язком.
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
  * @param iv ініціалізаційний вектор
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_cfb(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -143,6 +151,7 @@ UAPKIC_EXPORT int gost28147_init_cfb(Gost28147Ctx *ctx, const ByteArray *key, co
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_init_mac(Gost28147Ctx *ctx, const ByteArray *key);
@@ -164,12 +173,13 @@ UAPKIC_EXPORT int gost28147_encrypt(Gost28147Ctx *ctx, const ByteArray *data, By
  * @param ctx контекст ГОСТ 28147
  * @param encrypted_data зашифровані дані
  * @param data розшифровані дані
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *encrypted_data, ByteArray **data);
 
 /**
- * Обновлюемо імітовектор блоком даних.
+ * Оновити імітовектор блоком даних.
  *
  * @param ctx контекст ГОСТ 28147
  * @param data дані
@@ -209,7 +219,7 @@ UAPKIC_EXPORT void gost28147_free(Gost28147Ctx *ctx);
 /**
  * Виконує самотестування реалізації алгоритму ГОСТ 28147.
  *
- * @return код помилки або RET_OK, якщо самотестування пройдено
+ * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_self_test(void);
 

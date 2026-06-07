@@ -40,14 +40,14 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*startu
     if (attr) {
         h = CreateThread(attr->threadAttributes,
                 attr->stackSize,
-                (DWORD (WINAPI *)(LPVOID))startup,
+                (LPTHREAD_START_ROUTINE)startup,
                 params,
                 attr->creationFlags,
                 &threadid);
     } else {
         h = CreateThread(NULL,
                 0,
-                (DWORD (WINAPI *)(LPVOID))startup,
+                (LPTHREAD_START_ROUTINE)startup,
                 params,
                 0,
                 &threadid);

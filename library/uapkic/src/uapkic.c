@@ -88,6 +88,13 @@ static uint32_t uapkic_self_test(void)
 	return test_status;
 }
 
+void uapkic_free(void* ptr)
+{
+	if (ptr != NULL) {
+		free(ptr);
+	}
+}
+
 void cpu_features_init(void);
 int entropy_init(void);
 int drbg_init(void);
@@ -135,7 +142,7 @@ cleanup:
 	return ret;
 }
 
-static void uapkic_free(void)
+static void uapkic_free_lib(void)
 {
 	drbg_free();
 	entropy_free();
@@ -156,7 +163,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 	switch (fdwReason) {
 	case DLL_PROCESS_DETACH:
-		uapkic_free();
+		uapkic_free_lib();
 		break;
 	case DLL_PROCESS_ATTACH:
 	case DLL_THREAD_ATTACH:

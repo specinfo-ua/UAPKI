@@ -114,6 +114,13 @@ extern "C" {
  */
 UAPKIC_EXPORT int uapkic_init(uint32_t* version, uint32_t* self_test_status);
 
+/**
+ * Звільняє блок даних
+ *
+ * @param ptr блок даних
+ */
+UAPKIC_EXPORT void uapkic_free(void* ptr);
+
 #ifdef  __cplusplus
 }
 #endif

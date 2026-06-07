@@ -320,7 +320,7 @@ static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
     a8 = (uint8_t*)arg1;
     b8 = (uint8_t*)arg2;
     o8 = (uint8_t*)out;
-    for (int i = 0; i < len; i++) {
+    for (unsigned i = 0; i < len; i++) {
         o8[i] = a8[i] ^ b8[i];
     }
 }

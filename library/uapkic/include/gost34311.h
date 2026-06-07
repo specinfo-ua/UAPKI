@@ -46,6 +46,7 @@ typedef struct Gost34311Ctx_st Gost34311Ctx;
  *
  * @param sbox_id ідентифікатор стандартной таблиці замін
  * @param sync ініціалізаційний вектор (необов’язково; якщо NULL, то ініціалізаційний вектор становить 0)
+ *
  * @return контекст ГОСТ 34.311
  */
 UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteArray *sync);
@@ -55,6 +56,7 @@ UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteA
  *
  * @param sbox користувацький sbox
  * @param sync ініціалізаційний вектор
+ *
  * @return контекст ГОСТ 34.311
  */
 UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc_user_sbox(const ByteArray *sbox, const ByteArray *sync);
@@ -66,6 +68,7 @@ UAPKIC_EXPORT Gost34311Ctx *gost34311_copy_with_alloc(const Gost34311Ctx *ctx);
  *
  * @param ctx контекст ГОСТ 34.311
  * @param data дані для шифрування
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data);
@@ -74,7 +77,8 @@ UAPKIC_EXPORT int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data);
  * Завершує вироблення гешу й повертає його значення.
  *
  * @param ctx контекст ГОСТ 34.311
- * @param H геш вектор
+ * @param H геш-сума
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gost34311_final(Gost34311Ctx *ctx, ByteArray **H);
@@ -90,13 +94,15 @@ UAPKIC_EXPORT void gost34311_free(Gost34311Ctx *ctx);
  * Повертає розмір блоку геш-функції.
  *
  * @param ctx контекст ГОСТ 34.311
- * @return розмір блоку, 0 у разі помилки
+ *
+ * @return розмір блока, 0 у разі помилки
  */
 UAPKIC_EXPORT size_t gost34311_get_block_size(const Gost34311Ctx* ctx);
 
 /**
  * Виконує самотестування реалізації алгоритму ГОСТ 34.311.
- * @return код помилки або RET_OK, якщо самотестування пройдено
+ *
+ * @return код помилки
  */
 UAPKIC_EXPORT int gost34311_self_test(void);
 

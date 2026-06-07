@@ -39,6 +39,7 @@ extern "C" {
  * Максимальний розмір масиву для заповнення — 64 КіБ.
  *
  * @param random масив для розміщення випадкових байтів
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int drbg_random(ByteArray* random);
@@ -47,6 +48,7 @@ UAPKIC_EXPORT int drbg_random(ByteArray* random);
  * Перезерновує КСГПВЧ криптографічної бібліотеки.
  *
  * @param entropy масив байтів, що містить додаткову ентропію (зерно); може бути NULL
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int drbg_reseed(const ByteArray* entropy);

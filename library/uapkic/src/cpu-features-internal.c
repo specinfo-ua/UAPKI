@@ -35,7 +35,7 @@
 /**
  * References:
  * https://www.intel.com/content/www/us/en/developer/articles/tool/intel-advanced-encryption-standard-aes-instructions-set.html
- * https://www.intel.com/content/www/us/en/developer/articles/guide/intel-digital-random-number-generator-drng-software-implementation-guide.html
+ * https://cdrdv2-public.intel.com/864722/drng-software-implementation-guide.pdf
  */
 
 static bool aes_supported = false;
@@ -99,7 +99,16 @@ static bool rdrand(word_t *n)
 				*n = a;
 				return true;
 			}
+
+			// Intel suggest using the PAUSE instruction in the
+			// retry loop.
+			_mm_pause();
 		}
+
+		// Intel say,
+		// ‘[…] Given the design margins of the DRNG, the odds of ten
+		// failures in a row are astronomically small and would in fact
+		// be an indication of a larger CPU issue.’
 		rdseed_supported = false;
 	}
 
@@ -109,7 +118,16 @@ static bool rdrand(word_t *n)
 				*n = a;
 				return true;
 			}
+
+			// Intel suggest using the PAUSE instruction in the
+			// retry loop.
+			_mm_pause();
 		}
+
+		// Intel say,
+		// ‘[…] Given the design margins of the DRNG, the odds of ten
+		// failures in a row are astronomically small and would in fact
+		// be an indication of a larger CPU issue.’
 		rdrand_supported = false;
 	}
 
@@ -126,7 +144,7 @@ size_t hw_rng(void *buffer, size_t size)
 	} rdrand_out;
 	intptr_t buffer_address = (intptr_t)buffer;
 	size_t bytes_written = 0;
-	int head_align = buffer_address & (RDRAND_SIZE - 1);
+	unsigned head_align = buffer_address & (RDRAND_SIZE - 1);
 
 	if (head_align) {
 		if (!rdrand(&rdrand_out.n)) {
@@ -138,7 +156,8 @@ size_t hw_rng(void *buffer, size_t size)
 			goto cleanup;
 		}
 		int head_len = RDRAND_SIZE - head_align;
-		memcpy((void*)buffer_address, rdrand_out.a + head_align, head_len);
+		memcpy((void*)buffer_address, rdrand_out.a + head_align,
+			head_len);
 		buffer_address += head_len;
 		bytes_written += head_len;
 		size -= head_len;
