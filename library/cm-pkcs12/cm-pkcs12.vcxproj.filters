@@ -111,6 +111,9 @@
     <ClInclude Include="..\common\pkix\uapki-ns-util.h">
       <Filter>common\pkix</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\pkix\ecdsa-params.h">
+      <Filter>common\pkix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\crypto\pkcs5.c">
@@ -195,6 +198,9 @@
       <Filter>common\pkix</Filter>
     </ClCompile>
     <ClCompile Include="..\common\pkix\uapki-ns-util.cpp">
+      <Filter>common\pkix</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\pkix\ecdsa-params.c">
       <Filter>common\pkix</Filter>
     </ClCompile>
   </ItemGroup>

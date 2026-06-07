@@ -46,7 +46,7 @@ DEBUG_OUTPUT_FUNC
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS12\","                                   //  required
     "\"apiVersion\": \"1.0.0\","                            //  required
-    "\"libVersion\": \"1.0.13\","                           //  required
+    "\"libVersion\": \"1.0.20\","                           //  required
     "\"description\": \"PKCS#12 (PFX) file key storage\","  //  required
     "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","            //  required
     "\"supportListStorages\": false,"                       //  optional
@@ -80,7 +80,6 @@ CM_EXPORT CM_ERROR provider_init (
     DEBUG_OUTPUT("provider_init()");
     CM_ERROR cm_err = RET_CM_GENERAL_ERROR;
     if (!cm_pkcs12) {
-        uapkic_init(nullptr, nullptr);
         cm_pkcs12 = new CmPkcs12();
         if (cm_pkcs12) {
             cm_err = cm_pkcs12->parseConfig(providerParams, cm_pkcs12->getDefaultParam());

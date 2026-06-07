@@ -56,34 +56,21 @@
 #define RET_UAPKI_KEY_NOT_SELECTED                                    (UAPKI_ERROR_NAME_CODE | 0x0000000C)
 /** Ключ не може бути використаний для операції за призначенням. */
 #define RET_UAPKI_INVALID_KEY_USAGE                                   (UAPKI_ERROR_NAME_CODE | 0x0000000D)
-
 #define RET_UAPKI_UNSUPPORTED_ALG                                     (UAPKI_ERROR_NAME_CODE | 0x0000000E)
-
 #define RET_UAPKI_INVALID_HASH_SIZE                                   (UAPKI_ERROR_NAME_CODE | 0x0000000F)
-
 #define RET_UAPKI_INVALID_KEY_ID                                      (UAPKI_ERROR_NAME_CODE | 0x00000010)
-
 #define RET_UAPKI_JSON_FAILURE                                        (UAPKI_ERROR_NAME_CODE | 0x00000011)
-
 #define RET_UAPKI_INVALID_BIT_STRING                                  (UAPKI_ERROR_NAME_CODE | 0x00000012)
-
 #define RET_UAPKI_UNEXPECTED_BIT_STRING                               (UAPKI_ERROR_NAME_CODE | 0x00000013)
-
 #define RET_UAPKI_TOO_LONG_BIT_STRING                                 (UAPKI_ERROR_NAME_CODE | 0x00000014)
-
 #define RET_UAPKI_TIME_ERROR                                          (UAPKI_ERROR_NAME_CODE | 0x00000015)
-
 #define RET_UAPKI_NOT_SUPPORTED                                       (UAPKI_ERROR_NAME_CODE | 0x00000016)
-
 #define RET_UAPKI_NOT_ALLOWED                                         (UAPKI_ERROR_NAME_CODE | 0x00000017)
-
 #define RET_UAPKI_OFFLINE_MODE                                        (UAPKI_ERROR_NAME_CODE | 0x00000018)
-
 #define RET_UAPKI_STORAGE_NOT_OPEN                                    (UAPKI_ERROR_NAME_CODE | 0x00000019)
-
 #define RET_UAPKI_PROVIDER_NOT_LOADED                                 (UAPKI_ERROR_NAME_CODE | 0x0000001A)
-
 #define RET_UAPKI_UNSUPPORTED_CMAPI                                   (UAPKI_ERROR_NAME_CODE | 0x0000001B)
+#define RET_UAPKI_STORAGE_ALREADY_OPENED                              (UAPKI_ERROR_NAME_CODE | 0x0000001C)
 
 
 #define RET_UAPKI_FILE_OPEN_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000020)
@@ -105,6 +92,8 @@
 #define RET_UAPKI_INVALID_COUNT_ITEMS                                 (UAPKI_ERROR_NAME_CODE | 0x00000038)
 #define RET_UAPKI_INVALID_DIGEST                                      (UAPKI_ERROR_NAME_CODE | 0x00000039)
 #define RET_UAPKI_OTHER_RECIPIENT                                     (UAPKI_ERROR_NAME_CODE | 0x0000003A)
+#define RET_UAPKI_INDEX_OUT_OF_RANGE                                  (UAPKI_ERROR_NAME_CODE | 0x0000003B)
+#define RET_UAPKI_INVALID_CONTENT_TYPE                                (UAPKI_ERROR_NAME_CODE | 0x0000003C)
 
 
 #define RET_UAPKI_CERT_STORE_LOAD_ERROR                               (UAPKI_ERROR_NAME_CODE | 0x00000040)
@@ -114,6 +103,8 @@
 #define RET_UAPKI_CERT_ISSUER_NOT_FOUND                               (UAPKI_ERROR_NAME_CODE | 0x00000044)
 #define RET_UAPKI_CERT_STATUS_REVOKED                                 (UAPKI_ERROR_NAME_CODE | 0x00000045)
 #define RET_UAPKI_CERT_STATUS_UNKNOWN                                 (UAPKI_ERROR_NAME_CODE | 0x00000046)
+#define RET_UAPKI_CERT_NOT_TRUSTED                                    (UAPKI_ERROR_NAME_CODE | 0x00000047)
+#define RET_UAPKI_CERT_CHAIN_NOT_FOUND                                (UAPKI_ERROR_NAME_CODE | 0x00000048)
 
 #define RET_UAPKI_CRL_STORE_LOAD_ERROR                                (UAPKI_ERROR_NAME_CODE | 0x00000050)
 #define RET_UAPKI_CRL_URL_NOT_PRESENT                                 (UAPKI_ERROR_NAME_CODE | 0x00000051)

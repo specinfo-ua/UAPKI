@@ -39,9 +39,10 @@ int private_key_generate(const char* alg, const char* param, ByteArray** key);
 int private_key_get_info(const ByteArray* key, char** alg, char** param);
 int private_key_get_spki(const ByteArray* key, ByteArray** spki);
 
-int spki_get_key_id(const ByteArray* spki, ByteArray** key_id);
+int spki_get_key_id(const ByteArray* baSpki, ByteArray** baKeyId);
 int spki_get_algo_param(const ByteArray* baSpki, char** algo, char** algoParam);
 int spki_get_pubkey(const ByteArray* baSpki, ByteArray** baPubkey);
+int spki_get_subject_publickey(const ByteArray* baSpki, ByteArray** baPubkey);
 int spki_get_dstu_dke(const ByteArray* baSpki, ByteArray** baDKE);
 
 int private_key_sign_check(const ByteArray* key, const char* signAlgo, const ByteArray* signAlgoParams, HashAlg* hashAlgo);

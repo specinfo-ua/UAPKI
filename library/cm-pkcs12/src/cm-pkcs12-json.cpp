@@ -59,15 +59,20 @@ const char* CmPkcs12::CM_SESSION_MODEL          = "PKCS#12";
 const char* CmPkcs12::FILENAME_ON_MEMORY        = "file://memory";
 
 
-static const size_t DSTU_ECNAMES_NUMBER = 7;
+static const size_t DSTU_ECNAMES_NUMBER = 5;
 static const char* DSTU_ECNAMES[DSTU_ECNAMES_NUMBER] = {
-    OID_DSTU4145_PARAM_M233_PB, OID_DSTU4145_PARAM_M257_PB, OID_DSTU4145_PARAM_M307_PB, OID_DSTU4145_PARAM_M367_PB, OID_DSTU4145_PARAM_M431_PB,
-    OID_DSTU4145_PARAM_M233_ONB, OID_DSTU4145_PARAM_M431_ONB
+    OID_DSTU4145_PARAM_M257_PB,
+    OID_DSTU4145_PARAM_M431_PB,
+    OID_DSTU4145_PARAM_M233_PB,
+    OID_DSTU4145_PARAM_M307_PB,
+    OID_DSTU4145_PARAM_M367_PB
 };
 
 static const size_t SIGN_ALGO_DSTU_NUMBER = 4;
 static const char* SIGN_ALGO_DSTU[SIGN_ALGO_DSTU_NUMBER] = {
-    OID_DSTU4145_WITH_DSTU7564_256_PB, OID_DSTU4145_WITH_DSTU7564_384_PB, OID_DSTU4145_WITH_DSTU7564_512_PB,
+    OID_DSTU4145_WITH_DSTU7564_256_PB,
+    OID_DSTU4145_WITH_DSTU7564_384_PB,
+    OID_DSTU4145_WITH_DSTU7564_512_PB,
     OID_DSTU4145_PARAM_PB_LE
 };
 
@@ -93,7 +98,9 @@ static const char* SIGN_ALGOS_RSA[SIGN_ALGO_RSA_NUMBER] = {
 };
 
 
-static CM_ERROR build_dstu_parameters (ParsonHelper& json)
+static CM_ERROR build_dstu_parameters (
+        ParsonHelper& json
+)
 {
     CM_ERROR cm_err = RET_OK;
     JSON_Array* ja = nullptr;
@@ -112,7 +119,9 @@ cleanup:
     return cm_err;
 }
 
-static CM_ERROR build_ecdsa_parameters (ParsonHelper& json)
+static CM_ERROR build_ecdsa_parameters (
+        ParsonHelper& json
+)
 {
     CM_ERROR cm_err = RET_OK;
     JSON_Array* ja = nullptr;
@@ -131,7 +140,9 @@ cleanup:
     return cm_err;
 }
 
-static CM_ERROR build_rsa_parameters (ParsonHelper& json)
+static CM_ERROR build_rsa_parameters (
+        ParsonHelper& json
+)
 {
     CM_ERROR cm_err = RET_OK;
     JSON_Array* ja = nullptr;
@@ -150,15 +161,18 @@ cleanup:
     return cm_err;
 }
 
-static CM_ERROR build_dstu_keywrap_parameters (const string& mechanismOid, ParsonHelper& json)
+static CM_ERROR build_dstu_keywrap_parameters (
+        const char* mechanismId,
+        ParsonHelper& json
+)
 {
     CM_ERROR cm_err = RET_OK;
     JSON_Array* ja = nullptr;
-    const bool is_dstu7624wrap = (mechanismOid == OID_DSTU7624_WRAP);
+    const bool is_dstu7624wrap = oid_is_equal(OID_DSTU7624_WRAP, mechanismId);
 
     CHECK_JSON(json.setString("name", (is_dstu7624wrap) ? "DSTU7624-WRAP" : "GOST28147-WRAP (DSTU)"));
     ja = json.setArray("keyAlgo");
-    DO_JSON(json_array_append_string(ja, (is_dstu7624wrap) ? OID_DSTU4145_WITH_DSTU7564 : OID_DSTU4145_WITH_GOST3411));
+    DO_JSON(json_array_append_string(ja, OID_DSTU4145_PARAM_PB_LE));
     ja = json.setArray("dhKdf");
     DO_JSON(json_array_append_string(ja, (is_dstu7624wrap) ? OID_COFACTOR_DH_DSTU7564_KDF : OID_COFACTOR_DH_GOST34311_KDF));
     DO_JSON(json_array_append_string(ja, (is_dstu7624wrap) ? OID_STD_DH_DSTU7564_KDF : OID_STD_DH_GOST34311_KDF));
@@ -183,6 +197,7 @@ CM_ERROR CmPkcs12::keyInfoToJson (
     cm_err = CmPkcs12::signAlgoByMechanismId(keyInfo.mechanismId.c_str(), json_object_get_array(joResult, "signAlgo"));
     if (cm_err != RET_OK) return cm_err;
 
+    DO_JSON(json_object_set_string(joResult, "publicKey", keyInfo.publicKey.c_str()));
     if (!keyInfo.label.empty()) {
         DO_JSON(json_object_set_string(joResult, "label", keyInfo.label.c_str()));
     }
@@ -196,12 +211,11 @@ CM_ERROR CmPkcs12::listMechanisms (
 )
 {
     CM_ERROR cm_err = RET_OK;
-    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU4145_WITH_GOST3411));
-    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU4145_WITH_DSTU7564));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU4145_PARAM_PB_LE));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU7624_WRAP));
+    DO_JSON(json_array_append_string(jaMechanisms, OID_GOST28147_WRAP));
     DO_JSON(json_array_append_string(jaMechanisms, OID_EC_KEY));
     DO_JSON(json_array_append_string(jaMechanisms, OID_RSA));
-    DO_JSON(json_array_append_string(jaMechanisms, OID_GOST28147_WRAP));
-    DO_JSON(json_array_append_string(jaMechanisms, OID_DSTU7624_WRAP));
 
 cleanup:
     return cm_err;
@@ -216,24 +230,17 @@ CM_ERROR CmPkcs12::mechanismParamsToJson (
     if (!json.create()) return RET_CM_GENERAL_ERROR;
 
     CM_ERROR cm_err = RET_CM_INVALID_MECHANISM;
-    const string mechanism_oid = string((char*)mechanismId);
-    if (mechanism_oid == OID_EC_KEY) {
-        cm_err = build_ecdsa_parameters(json);
-    }
-    else if (
-        oid_is_parent(OID_DSTU4145_WITH_GOST3411, mechanismId) ||
-        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, mechanismId)
-    ) {
+    if (oid_is_equal(OID_DSTU4145_PARAM_PB_LE, mechanismId)) {
         cm_err = build_dstu_parameters(json);
     }
-    else if (mechanism_oid == OID_RSA) {
+    else if (oid_is_equal(OID_EC_KEY, mechanismId)) {
+        cm_err = build_ecdsa_parameters(json);
+    }
+    else if (oid_is_equal(OID_RSA, mechanismId)) {
         cm_err = build_rsa_parameters(json);
     }
-    else if (
-        (mechanism_oid == OID_GOST28147_WRAP) ||
-        (mechanism_oid == OID_DSTU7624_WRAP)
-    ) {
-        cm_err = build_dstu_keywrap_parameters(mechanism_oid, json);
+    else if (oid_is_equal(OID_DSTU7624_WRAP, mechanismId) || oid_is_equal(OID_GOST28147_WRAP, mechanismId)) {
+        cm_err = build_dstu_keywrap_parameters(mechanismId, json);
     }
     if (cm_err != RET_OK) return cm_err;
 

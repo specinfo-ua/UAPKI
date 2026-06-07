@@ -55,7 +55,12 @@ static const char* SIGNATURE_FORMAT_STRINGS[COUNT_SIGNATURE_FORMATS] = {
 };
 
 
-UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
+namespace UapkiNS {
+
+
+SignatureFormat signatureFormatFromString (
+        const string& str
+)
 {
     SignatureFormat rv = SignatureFormat::UNDEFINED;
     if ((str == string(CADES_BES_STR)) || str.empty()) {
@@ -82,14 +87,21 @@ UapkiNS::SignatureFormat UapkiNS::signatureFormatFromString (const string& str)
     return rv;
 }
 
-const char* UapkiNS::signatureFormatToStr (const SignatureFormat signatureFormat)
+const char* signatureFormatToStr (
+        const SignatureFormat signatureFormat
+)
 {
     const uint32_t idx = ((uint32_t)signatureFormat < COUNT_SIGNATURE_FORMATS)
         ? (uint32_t)signatureFormat : (uint32_t)SignatureFormat::UNDEFINED;
     return SIGNATURE_FORMAT_STRINGS[idx];
 }
 
-string UapkiNS::signatureFormatToString (const SignatureFormat signatureFormat)
+string signatureFormatToString (
+        const SignatureFormat signatureFormat
+)
 {
     return string(signatureFormatToStr(signatureFormat));
 }
+
+
+}   //  end namespace UapkiNS

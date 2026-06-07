@@ -243,6 +243,7 @@ public:
     int setRevocationValuesForChain (
         const uint64_t validateTime
     );
+    int tspCertToStore ();
     void validateSignFormat (
         const uint64_t validateTime,
         const bool contentIsPresent

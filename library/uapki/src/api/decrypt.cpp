@@ -49,6 +49,21 @@ using namespace std;
 using namespace UapkiNS;
 
 
+struct DecryptOptions {
+    bool noDecrypt;
+    bool returnEncryptedContent;
+    bool returnEncryptionKey;
+
+    DecryptOptions(void)
+        : noDecrypt(false)
+        , returnEncryptedContent(false)
+        , returnEncryptionKey(false)
+    {
+    }
+
+};  //  end struct DecryptOptions
+
+
 class ExpectedCerts {
     vector<CertValidator::ExpectedCertItem*>
             m_ExpectedCertItems;
@@ -79,18 +94,18 @@ public:
     int add (
         const CertValidator::CertEntity certEntity,
         const ByteArray* baKeyIdOrSN,
-        const ByteArray* baName
+        const ByteArray* baIssuerName
     ) {
         m_IsExpectedOriginatorCert |= (certEntity == CertValidator::CertEntity::ORIGINATOR);
         m_IsExpectedRecipientCert |= (certEntity == CertValidator::CertEntity::RECIPIENT);
-        const bool is_keyid = (!baName);
+        const bool is_keyid = (!baIssuerName);
         for (const auto& it : m_ExpectedCertItems) {
             if (is_keyid) {
                 if (ba_cmp(baKeyIdOrSN, it->getKeyId()) == 0) return RET_OK;
             }
             else {
                 if (
-                    (ba_cmp(baName, it->getName()) == 0) &&
+                    (ba_cmp(baIssuerName, it->getIssuerName()) == 0) &&
                     (ba_cmp(baKeyIdOrSN, it->getSerialNumber()) == 0)
                 ) return RET_OK;
             }
@@ -100,7 +115,7 @@ public:
         if (!expcert_item) return RET_UAPKI_GENERAL_ERROR;
 
         m_ExpectedCertItems.push_back(expcert_item);
-        return expcert_item->setSignerIdentifier(baKeyIdOrSN, baName);
+        return expcert_item->setSignerIdentifier(baKeyIdOrSN, baIssuerName);
     }
 
     int toJson (
@@ -118,33 +133,8 @@ public:
         ja_items = json_object_get_array(joResult, keyName);
         for (const auto& it : m_ExpectedCertItems) {
             DO_JSON(json_array_append_value(ja_items, json_value_init_object()));
-            DO(itemToJson(json_array_get_object(ja_items, idx++), *it));
+            DO(CertValidator::expectedCertItemToJson(json_array_get_object(ja_items, idx++), *it));
         }
-    cleanup:
-        return ret;
-    }
-
-private:
-    static int itemToJson (
-        JSON_Object* joResult,
-        const CertValidator::ExpectedCertItem& expectedCertItem
-    )
-    {
-        int ret = RET_OK;
-
-        DO_JSON(json_object_set_string(joResult, "entity", CertValidator::certEntityToStr(expectedCertItem.getCertEntity())));
-        if (expectedCertItem.getIdType() == CertValidator::ExpectedCertItem::IdType::CER_IDTYPE) {
-            if (!expectedCertItem.getKeyId()) {
-                DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
-                DO(nameToJson(json_object_get_object(joResult, "issuer"), expectedCertItem.getName()));
-                DO(json_object_set_hex(joResult, "serialNumber", expectedCertItem.getSerialNumber()));
-                DO(json_object_set_base64(joResult, "issuerBytes", expectedCertItem.getName()));
-            }
-            else {
-                DO(json_object_set_hex(joResult, "keyId", expectedCertItem.getKeyId()));
-            }
-        }
-
     cleanup:
         return ret;
     }
@@ -182,6 +172,16 @@ static int decrypt_content (
 cleanup:
     return ret;
 }   //  decrypt_content
+
+static bool equal_recipekeyid (
+        const ByteArray* baRecipeKeyId,
+        const ByteArray* baKeyId,
+        const ByteArray* baKeyId2
+)
+{
+    //  Order: first check baKeyId2, next check baKeyId
+    return (ba_cmp(baRecipeKeyId, baKeyId2) == 0) || (ba_cmp(baRecipeKeyId, baKeyId) == 0);
+}   //  equal_recipekeyid
 
 static int get_originator_spki (
         Cert::CerStore& cerStore,
@@ -263,6 +263,17 @@ static int get_recipekeyid (
 
     return ret;
 }   //  get_recipekeyid
+
+static DecryptOptions options_from_json (
+        JSON_Object* joParams
+) {
+    DecryptOptions rv_options;
+    JSON_Object* jo_options = json_object_get_object(joParams, "options");
+    rv_options.noDecrypt = ParsonHelper::jsonObjectGetBoolean(jo_options, "noDecrypt", false) || ParsonHelper::jsonObjectGetBoolean(joParams, "noDecrypt", false);
+    rv_options.returnEncryptedContent = ParsonHelper::jsonObjectGetBoolean(jo_options, "returnEncryptedContent", false);
+    rv_options.returnEncryptionKey = ParsonHelper::jsonObjectGetBoolean(jo_options, "returnEncryptionKey", false);
+    return rv_options;
+}   //  options_from_json
 
 static int parse_keyencryption_algo (
         const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo,
@@ -368,31 +379,34 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
     int ret = RET_OK;
     Cert::CerStore* cer_store = get_cerstore();
     CmStorageProxy* storage = nullptr;
+    const ByteArray* rba_keyids[2] = { nullptr, nullptr };
     Pkcs7::EnvelopedDataParser envdata_parser;
     ExpectedCerts expected_certs;
-    SmartBA sba_data, sba_decrypted, sba_keyid, sba_sessionkey;
+    SmartBA sba_data, sba_decrypted, sba_sessionkey;
     vector<RecipientInfo_PR> recipinfo_types;
     JSON_Array* ja_recipkeys = nullptr;
     JSON_Object* jo_content = nullptr;
+    JSON_Object* jo_econtent = nullptr;
     size_t idx_recipkey = 0;
 
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
-    const bool no_decrypt = ParsonHelper::jsonObjectGetBoolean(joParams, "noDecrypt", false);
+    const DecryptOptions options = options_from_json(joParams);
     if (!sba_data.set(json_object_get_base64(joParams, "bytes"))) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    if (!no_decrypt) {
-        storage = CmProviders::openedStorage();
+    storage = CmProviders::openedStorage();
+    if (!options.noDecrypt) {
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
         if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
-        DO(storage->keyGetInfo(&sba_keyid));
+        rba_keyids[0] = storage->getSelectedKeyId();
+        rba_keyids[1] = storage->getSelectedKeyId2();
     }
     else {
-        storage = CmProviders::openedStorage();
         if (storage && storage->keyIsSelected()) {
-            DO(storage->keyGetInfo(&sba_keyid));
+            rba_keyids[0] = storage->getSelectedKeyId();
+            rba_keyids[1] = storage->getSelectedKeyId2();
         }
     }
 
@@ -401,6 +415,18 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(json_object_set_value(joResult, "content", json_value_init_object()));
     jo_content = json_object_get_object(joResult, "content");
     DO_JSON(json_object_set_string(jo_content, "type", envdata_parser.getEncryptedContentInfo().contentType.c_str()));
+    if (options.returnEncryptedContent) {
+        const Pkcs7::EncryptedContentInfo& econtent_info = envdata_parser.getEncryptedContentInfo();
+        DO_JSON(json_object_set_value(joResult, "encryptedContent", json_value_init_object()));
+        jo_econtent = json_object_get_object(joResult, "encryptedContent");
+        if (econtent_info.baEncryptedContent) {
+            DO(json_object_set_base64(jo_econtent, "bytes", econtent_info.baEncryptedContent));
+        }
+        DO_JSON(json_object_set_string(jo_econtent, "algorithm", econtent_info.contentEncryptionAlgo.algorithm.c_str()));
+        if (econtent_info.contentEncryptionAlgo.baParameters) {
+            DO(json_object_set_base64(jo_econtent, "parameters", econtent_info.contentEncryptionAlgo.baParameters));
+        }
+    }
     DO_JSON(json_object_set_value(joResult, "recipientKeys", json_value_init_array()));
     ja_recipkeys = json_object_get_array(joResult, "recipientKeys");
     if (!envdata_parser.getUnprotectedAttrs().empty()) {
@@ -475,11 +501,8 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
                     cer_recipient
                 ));
 
-                if (
-                    !sba_keyid.empty() &&
-                    (ba_cmp(sba_keyid.get(), sba_recipekeyid.get()) == 0)
-                ) {
-                    if (!no_decrypt) {
+                if (equal_recipekeyid(sba_recipekeyid.get(), rba_keyids[0], rba_keyids[1])) {
+                    if (!options.noDecrypt) {
                         if (sba_decrypted.empty() && rba_originatorspki) {
                             DO(storage->keyDhUnwrapKey(
                                 s_kdfalgo,
@@ -491,8 +514,18 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
                             ));
                             DEBUG_OUTCON(printf("storage->keyDhUnwrapKey(), vba_SessionKeys, hex: "); ba_print(stdout, sba_sessionkey.get()));
 
-                            DO(decrypt_content(envdata_parser.getEncryptedContentInfo(), sba_sessionkey.get(), &sba_decrypted));
-                            DO(json_object_set_base64(jo_content, "bytes", sba_decrypted.get()));
+                            if (options.returnEncryptionKey) {
+                                jo_econtent = json_object_get_object(joResult, "encryptedContent");
+                                if (!jo_econtent) {
+                                    DO_JSON(json_object_set_value(joResult, "encryptedContent", json_value_init_object()));
+                                    jo_econtent = json_object_get_object(joResult, "encryptedContent");
+                                }
+                                DO(json_object_set_base64(jo_econtent, "dataEncryptionKey", sba_sessionkey.get()));
+                            }
+                            if (envdata_parser.getEncryptedContentInfo().baEncryptedContent) {
+                                DO(decrypt_content(envdata_parser.getEncryptedContentInfo(), sba_sessionkey.get(), &sba_decrypted));
+                                DO(json_object_set_base64(jo_content, "bytes", sba_decrypted.get()));
+                            }
                         }
                     }
                     DO(json_object_set_hex(joResult, "recipientKeyId", sba_recipekeyid.get()));
@@ -503,8 +536,8 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
 
     DO(expected_certs.toJson(joResult, "expectedCerts"));
 
-    if (!no_decrypt) {
-        if (sba_decrypted.empty()) {
+    if (!options.noDecrypt) {
+        if (envdata_parser.getEncryptedContentInfo().baEncryptedContent && sba_decrypted.empty()) {
             ret = expected_certs.isPresent() ? RET_UAPKI_CERT_NOT_FOUND : RET_UAPKI_OTHER_RECIPIENT;
         }
     }

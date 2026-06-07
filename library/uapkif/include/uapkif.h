@@ -28,6 +28,7 @@
 #ifndef UAPKIF_H
 #define UAPKIF_H
 
+#define UAPKIF_VERSION 2002
 
 #include "uapkif-export.h"
 #include "AccessDescription.h"
@@ -129,6 +130,7 @@
 #include "DistributionPoint.h"
 #include "DistributionPointName.h"
 #include "DSTU4145Params.h"
+#include "DSTU7624Parameters.h"
 #include "DSTUEllipticCurve.h"
 #include "ECBinary.h"
 #include "ECDSA-Sig-Value.h"

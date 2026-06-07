@@ -323,7 +323,7 @@ bool CrlItem::setFileName (
 }
 
 int CrlItem::verify (
-        const Cert::CerItem* cerIssuer,
+        const Cert::CerItem* cerCrlSigner,
         const bool force
 )
 {
@@ -334,7 +334,7 @@ int CrlItem::verify (
     }
 
     m_StatusSign = Cert::VerifyStatus::INDETERMINATE;
-    if (!cerIssuer) return RET_OK;
+    if (!cerCrlSigner) return RET_OK;
 
     int ret = RET_OK;
     SmartBA sba_signvalue, sba_tbs;
@@ -359,7 +359,13 @@ int CrlItem::verify (
         DO(asn_BITSTRING2ba(&x509_tbs->signValue, &sba_signvalue));
     }
 
-    ret = Verify::verifySignature(s_signalgo.c_str(), sba_tbs.get(), false, cerIssuer->getSpki(), sba_signvalue.get());
+    ret = Verify::verifySignature(
+        s_signalgo.c_str(),
+        sba_tbs.get(),
+        false,
+        cerCrlSigner->getSpki(),
+        sba_signvalue.get()
+    );
     switch (ret) {
     case RET_OK:
         m_StatusSign = Cert::VerifyStatus::VALID;
@@ -369,6 +375,7 @@ int CrlItem::verify (
         break;
     default:
         m_StatusSign = Cert::VerifyStatus::FAILED;
+        break;
     }
 
 cleanup:
@@ -628,9 +635,12 @@ int parseRevokedCerts (
 
     while (vlen > 2) {
         ok = Util::decodeAsn1Header(bufEncoded, vlen, tag, hlen2, vlen2);
-        if (!ok || (tag != 0x30) || (vlen2 < 4)) return RET_UAPKI_INVALID_STRUCT;
+        if (!ok || (tag != 0x30) || (vlen2 < 4)) {
+            return RET_UAPKI_INVALID_STRUCT;
+        }
 
         Offsets.push_back(RevokedCertOffset(offset, offset + hlen2));
+        size2 = hlen2 + vlen2;
         bufEncoded += size2;
         offset += size2;
         vlen -= size2;

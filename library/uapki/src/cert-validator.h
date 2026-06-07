@@ -84,16 +84,14 @@ struct ResultValidationByOcsp : public Ocsp::ResponseInfo {
     Ocsp::OcspHelper::SingleResponseInfo
                 singleResponseInfo;
     SmartBA     basicOcspResponse;
-    const bool  needOcspIdentifier;
     SmartBA     ocspIdentifier;
     //  For sign
     SmartBA     ocspResponse;
     //  For verify
     DataSource  dataSource;
 
-    ResultValidationByOcsp (const bool iNeedOcspIdentifier = false)
-        : needOcspIdentifier(iNeedOcspIdentifier)
-        , dataSource(DataSource::UNDEFINED)
+    ResultValidationByOcsp (void)
+        : dataSource(DataSource::UNDEFINED)
     {}
 
 };  //  end struct ResultValidationByOcsp
@@ -107,7 +105,6 @@ class CertChainItem {
     Cert::CerItem*
                 m_CerIssuer;
     bool        m_Expired;
-    bool        m_SelfSigned;
     Cert::ValidationType
                 m_ValidationType;
     ResultValidationByCrl
@@ -117,8 +114,8 @@ class CertChainItem {
 
 public:
     CertChainItem (
-        const CertEntity iCertEntity,
-        Cert::CerItem* iCerSubject
+        const CertEntity iCertEntity = CertEntity::UNDEFINED,
+        Cert::CerItem* iCerSubject = nullptr
     );
     ~CertChainItem (void);
 
@@ -127,6 +124,10 @@ public:
         const uint64_t validateTime
     );
     int decodeName (void);
+    void setCerItem (
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem
+    );
     void setDataSource (
         const DataSource dataSource
     );
@@ -172,6 +173,9 @@ public:
     const ByteArray* getSubjectCertId (void) const {
         return (m_CerSubject) ? m_CerSubject->getCertId() : nullptr;
     }
+    const ByteArray* getSubjectKeyId (void) const {
+        return (m_CerSubject) ? m_CerSubject->getKeyId() : nullptr;
+    }
     Cert::ValidationType getValidationType (void) const {
         return m_ValidationType;
     }
@@ -182,7 +186,7 @@ public:
         return m_Expired;
     }
     bool isSelfSigned (void) const {
-        return m_SelfSigned;
+        return (m_CerSubject) ? m_CerSubject->isSelfSigned() : false;
     }
     bool isTrusted (void) const {
         return (m_CerSubject) ? m_CerSubject->isTrusted() : false;
@@ -200,11 +204,10 @@ public:
     };  //  end enum IdType
 
 private:
-    const CertEntity
-                m_CertEntity;
+    CertEntity  m_CertEntity;
     IdType      m_IdType;
     SmartBA     m_KeyId;
-    SmartBA     m_Name;
+    SmartBA     m_IssuerName;
     SmartBA     m_SerialNumber;
 
 public:
@@ -213,13 +216,16 @@ public:
     );
 
 public:
+    int copyFrom (
+        const ExpectedCertItem* item
+    );
     int setResponderId (
         const bool isKeyId,
         const ByteArray* baNameEncoded
     );
     int setSignerIdentifier (
         const ByteArray* baKeyIdOrSN,
-        const ByteArray* baName
+        const ByteArray* baIssuerName
     );
 
 public:
@@ -232,8 +238,8 @@ public:
     const ByteArray* getKeyId (void) const {
         return m_KeyId.get();
     }
-    const ByteArray* getName (void) const {
-        return m_Name.get();
+    const ByteArray* getIssuerName (void) const {
+        return m_IssuerName.get();
     }
     const ByteArray* getSerialNumber (void) const {
         return m_SerialNumber.get();
@@ -249,12 +255,15 @@ class ExpectedCrlItem {
     //  If present Full-CRL
     uint64_t    m_ThisUpdate;
     uint64_t    m_NextUpdate;
-    SmartBA     m_BaCrlNumber;
+    SmartBA     m_CrlNumber;
 
 public:
     ExpectedCrlItem (void);
 
 public:
+    int copyFrom (
+        const ExpectedCrlItem* item
+    );
     int set (
         const Cert::CerItem* cerSubject,
         const Crl::CrlItem* crlFull
@@ -265,7 +274,7 @@ public:
         return m_AuthorityKeyId.get();
     }
     const ByteArray* getCrlNumber (void) const {
-        return m_BaCrlNumber.get();
+        return m_CrlNumber.get();
     }
     const ByteArray* getName (void) const {
         return m_Name.get();
@@ -280,7 +289,7 @@ public:
         return m_Url;
     }
     bool isPresentFullCrl (void) const {
-        return !m_BaCrlNumber.empty();
+        return !m_CrlNumber.empty();
     }
 
 };  //  end class ExpectedCrlItem
@@ -293,21 +302,36 @@ class CertValidator {
                 m_CerStore;
     Crl::CrlStore*
                 m_CrlStore;
+    Cert::ValidationType
+                m_ValidationType;
+
+    std::vector<CertChainItem*>
+                m_CertChain;
+    std::vector<CertChainItem*>
+                m_ObtainedCerts;
+
     std::vector<ExpectedCertItem*>
-                m_ExpectedCertItems;
+                m_ExpectedCerts;
     std::vector<ExpectedCrlItem*>
-                m_ExpectedCrlItems;
-    SmartBA     m_OcspRequest;
-    SmartBA     m_OcspResponse;
+                m_ExpectedCrls;
 
 public:
     CertValidator (void);
     ~CertValidator (void);
 
     bool init (
+        CertValidator& iCertValidator
+    );
+    bool init (
+        CertValidator* iCertValidator
+    );
+    bool init (
         LibraryConfig* iLibConfig,
         Cert::CerStore* iCerStore,
         Crl::CrlStore* iCrlStore
+    );
+    void setValidationType (
+        const Cert::ValidationType validationType
     );
 
     LibraryConfig* getLibConfig (void) const {
@@ -319,52 +343,31 @@ public:
     Crl::CrlStore* getCrlStore (void) const {
         return m_CrlStore;
     }
-    bool isInitialized (void) const {
-        return m_LibConfig && m_CerStore && m_CrlStore;
-    }
 
-    const std::vector<ExpectedCertItem*> getExpectedCertItems (void) const {
-        return m_ExpectedCertItems;
+    size_t getCountAllCerts (void) const {
+        return m_CertChain.size() + m_ObtainedCerts.size();
     }
-    const std::vector<ExpectedCrlItem*> getExpectedCrlItems (void) const {
-        return m_ExpectedCrlItems;
+    const std::vector<CertChainItem*>& getCertChain (void) const {
+        return m_CertChain;
     }
-    const ByteArray* getOcspRequest (void) const {
-        return m_OcspRequest.get();
+    const std::vector<ExpectedCertItem*>& getExpectedCerts (void) const {
+        return m_ExpectedCerts;
     }
-    const ByteArray* getOcspResponse (void) const {
-        return m_OcspResponse.get();
+    const std::vector<ExpectedCrlItem*>& getExpectedCrls (void) const {
+        return m_ExpectedCrls;
+    }
+    const std::vector<CertChainItem*>& getObtainedCerts (void) const {
+        return m_ObtainedCerts;
+    }
+    Cert::ValidationType getValidationType (void) const {
+        return m_ValidationType;
     }
 
 public:
-    int addExpectedCertByIssuerAndSN (
+    int getStatus (
+        Cert::CerItem* cerItem,
         const CertEntity certEntity,
-        const ByteArray* baIssuerAndSN
-    );
-    int addExpectedCertByKeyId (
-        const CertEntity certEntity,
-        const ByteArray* baKeyId
-    );
-    int addExpectedCertBySID (
-        const CertEntity certEntity,
-        const ByteArray* baSID
-    );
-    int addExpectedCrl (
-        Cert::CerItem* cerSubject,
-        Crl::CrlItem* crlFull
-    );
-    int addExpectedOcspCert (
-        const bool isKeyId,
-        const ByteArray* baResponderId
-    );
-
-    int expectedCertItemsToJson (
-        JSON_Object* joResult,
-        const char* keyName
-    );
-    int expectedCrlItemsToJson (
-        JSON_Object* joResult,
-        const char* keyName
+        const uint64_t validateTime
     );
 
 public:
@@ -389,10 +392,8 @@ public:
         bool& isSelfSigned
     );
 
-public:
     int validateByCrl (
         Cert::CerItem* cerSubject,
-        Cert::CerItem* cerIssuer,
         const uint64_t validateTime,
         const bool needUpdateCert,
         ResultValidationByCrl& resultValidation,
@@ -404,13 +405,66 @@ public:
         ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult = nullptr
     );
+
+public:
+    int addExpectedCert (
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem
+    );
+    int addExpectedCertByIssuerAndSN (
+        const CertEntity certEntity,
+        const ByteArray* baIssuerAndSN
+    );
+    int addExpectedCertByKeyId (
+        const CertEntity certEntity,
+        const ByteArray* baKeyId
+    );
+    int addExpectedCertBySID (
+        const CertEntity certEntity,
+        const ByteArray* baSID
+    );
+    int addExpectedCerts (
+        const std::vector<ExpectedCertItem*>& expectedCerts
+    );
+    int addExpectedCrl (
+        Cert::CerItem* cerSubject,
+        Crl::CrlItem* crlFull
+    );
+    int addExpectedCrls (
+        const std::vector<ExpectedCrlItem*>& expectedCrls
+    );
+    int addExpectedOcspCert (
+        const bool isKeyId,
+        const ByteArray* baResponderId
+    );
+
+    int expectedCertsToJson (
+        JSON_Object* joResult,
+        const char* keyName
+    );
+    int expectedCrlsToJson (
+        JSON_Object* joResult,
+        const char* keyName
+    );
+
+    int getCrl (
+        Crl::CrlStore& crlStore,
+        Cert::CerStore& cerStore,
+        const Cert::CerItem* cerSubject,
+        const uint64_t validateTime,
+        const ByteArray** baCrlNumber,
+        Crl::CrlItem** crlItem,
+        Cert::CerItem** cerCrlSigner,
+        JSON_Object* joResult = nullptr
+    );
     int processResponseData (
         Ocsp::OcspHelper& ocspHelper,
-        Ocsp::OcspHelper::SingleResponseInfo& singleRespInfo,
+        ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult = nullptr
     );
     int verifyResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult = nullptr
     );
     int verifySignatureSignerInfo (
@@ -422,12 +476,43 @@ public:
 };  //  end class CertValidator
 
 
+int addUniqueItem (
+    std::vector<Cert::CerItem*>& chainItems,
+    Cert::CerItem* cerItem
+);
+
+int addUniqueItem (
+    std::vector<CertChainItem*>& chainItems,
+    const CertEntity certEntity,
+    Cert::CerItem* cerItem
+);
+
+bool checkCertUsage (
+    const CertEntity certEntity,
+    const Cert::CerItem* cerItem
+);
+
 const char* certEntityToStr (
     const CertEntity certEntity
 );
 
 const char* dataSourceToStr (
     const DataSource dataSource
+);
+
+bool findItemByCertId (
+    std::vector<Cert::CerItem*>& chainItems,
+    Cert::CerItem* cerItem
+);
+
+bool findItemByCertId (
+    std::vector<CertChainItem*>& chainItems,
+    Cert::CerItem* cerItem
+);
+
+bool findItemByKeyId (
+    std::vector<CertChainItem*>& chainItems,
+    const ByteArray* baKeyId
 );
 
 int expectedCertItemToJson (
@@ -439,20 +524,11 @@ int expectedCrlItemToJson (
     JSON_Object* joResult,
     const ExpectedCrlItem& expectedCrlItem
 );
+
 int responderIdToJson (
     JSON_Object* joResult,
     const Ocsp::ResponderIdType responderIdType,
     const ByteArray* baResponderId
-);
-
-int getCrl (
-    Crl::CrlStore& crlStore,
-    const Cert::CerItem* ceriSubject,
-    const Cert::CerItem* cerIssuer,
-    const uint64_t validateTime,
-    const ByteArray** baCrlNumber,
-    Crl::CrlItem** crlItem,
-    JSON_Object* joResult = nullptr
 );
 
 

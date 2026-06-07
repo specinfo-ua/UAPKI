@@ -237,7 +237,6 @@ int detailInfoToJson (
     int ret = RET_OK;
     const TBSCertificate_t& tbs_cert = cerItem->getCert()->tbsCertificate;
     long version = 0;
-    bool self_signed = false;
 
     if (tbs_cert.version != nullptr) {
         DO(asn_INTEGER2long(tbs_cert.version, &version));
@@ -256,9 +255,9 @@ int detailInfoToJson (
     DO(validityToJson(joResult, cerItem));
     DO(nameToJson(json_object_get_object(joResult, "subject"), tbs_cert.subject));
     DO(spkiToJson(json_object_get_object(joResult, "subjectPublicKeyInfo"), cerItem, true));
-    DO(extensionsToJson(json_object_get_array(joResult, "extensions"), cerItem, self_signed));
+    DO(extensionsToJson(json_object_get_array(joResult, "extensions"), cerItem));
     DO(signatureInfoToJson(json_object_get_object(joResult, "signatureInfo"), cerItem));
-    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", self_signed));
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", cerItem->isSelfSigned()));
 
 cleanup:
     return ret;
@@ -266,8 +265,7 @@ cleanup:
 
 int extensionsToJson (
         JSON_Array* jaResult,
-        const CerItem* cerItem,
-        bool& selfSigned
+        const CerItem* cerItem
 )
 {
     int ret = RET_OK;
@@ -337,10 +335,10 @@ int extensionsToJson (
         else if (oid_is_equal(s_extnid.c_str(), OID_X509v3_IssuerAlternativeName)) {
             DO(ExtensionHelper::DecodeToJsonObject::alternativeName(sba_value.get(), extn_json_add_decoded(jo_extn, "issuerAltName")));
         }
+        else if (oid_is_equal(s_extnid.c_str(), OID_PKIX_OcspNoCheck)) {
+            extn_json_add_decoded(jo_extn, "ocspNoCheck");
+        }
     }
-
-    //  Check selfSigned
-    selfSigned = (!sba_subjectkeyid.empty() && !sba_authoritykeyid.empty() && (ba_cmp(sba_subjectkeyid.get(), sba_authoritykeyid.get()) == 0));
 
 cleanup:
     return ret;

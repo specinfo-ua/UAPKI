@@ -119,6 +119,7 @@
     <ClInclude Include="include\DistributionPoint.h" />
     <ClInclude Include="include\DistributionPointName.h" />
     <ClInclude Include="include\DSTU4145Params.h" />
+    <ClInclude Include="include\DSTU7624Parameters.h" />
     <ClInclude Include="include\DSTUEllipticCurve.h" />
     <ClInclude Include="include\ECBinary.h" />
     <ClInclude Include="include\ECDSA-Sig-Value.h" />
@@ -473,6 +474,7 @@
     <ClCompile Include="src\struct\DistributionPoint.c" />
     <ClCompile Include="src\struct\DistributionPointName.c" />
     <ClCompile Include="src\struct\DSTU4145Params.c" />
+    <ClCompile Include="src\struct\DSTU7624Parameters.c" />
     <ClCompile Include="src\struct\DSTUEllipticCurve.c" />
     <ClCompile Include="src\struct\ECBinary.c" />
     <ClCompile Include="src\struct\ECDSA-Sig-Value.c" />

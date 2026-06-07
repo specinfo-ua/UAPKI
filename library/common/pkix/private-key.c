@@ -31,6 +31,7 @@
 #include "aid.h"
 #include "cm-errors.h"
 #include "dstu4145-params.h"
+#include "ecdsa-params.h"
 #include "macros-internal.h"
 #include "oids.h"
 #include "oid-utils.h"
@@ -309,17 +310,24 @@ cleanup:
 static int private_key_get_param_ec(ANY_t* params, char** param)
 {
     int ret = RET_OK;
-    ECParameters_t* ec_params = NULL;
+    uint32_t ecid;
+
+    CHECK_PARAM(params != NULL);
 
     *param = NULL;
 
-    CHECK_NOT_NULL(ec_params = asn_any2type(params, get_ECParameters_desc()));
-    if (ec_params->present == ECParameters_PR_namedCurve) {
-        DO(asn_oid_to_text(&ec_params->choice.namedCurve, param));
+    ecid = ecdsa_ecparams_get_ecid(params->buf, params->size);
+    if (ecid == EC_PARAMS_ID_UNDEFINED) {
+        SET_ERROR(RET_CM_UNSUPPORTED_ELLIPTIC_CURVE);
+    }
+    const char* s_oid = ecid_to_oid((EcParamsId)ecid);
+    if (!s_oid) {
+        SET_ERROR(RET_CM_UNSUPPORTED_ELLIPTIC_CURVE);
     }
 
+    *param = strdup(s_oid);
+
 cleanup:
-    asn_free(get_ECParameters_desc(), ec_params);
     return ret;
 }
 
@@ -576,19 +584,18 @@ cleanup:
     return ret;
 }
 
-int spki_get_key_id(const ByteArray* pub_key_info, ByteArray** key_id)
+int spki_get_key_id(const ByteArray* baSpki, ByteArray** baKeyId)
 {
     int ret = RET_OK;
     SubjectPublicKeyInfo_t* spki = NULL;
-    HashCtx* hash_ctx = NULL;
     ByteArray* pubkey = NULL;
     char* alg_oid = NULL;
     HashAlg hash_alg = HASH_ALG_SHA1;
 
-    CHECK_PARAM(pub_key_info != NULL);
-    CHECK_PARAM(key_id != NULL);
+    CHECK_PARAM(baSpki != NULL);
+    CHECK_PARAM(baKeyId != NULL);
 
-    CHECK_NOT_NULL(spki = asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), pub_key_info));
+    CHECK_NOT_NULL(spki = asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), baSpki));
 
     DO(asn_BITSTRING2ba(&spki->subjectPublicKey, &pubkey));
     DO(asn_oid_to_text(&spki->algorithm.algorithm, &alg_oid));
@@ -598,13 +605,10 @@ int spki_get_key_id(const ByteArray* pub_key_info, ByteArray** key_id)
         hash_alg = HASH_ALG_GOST34311;
     }
 
-    CHECK_NOT_NULL(hash_ctx = hash_alloc(hash_alg));
-    DO(hash_update(hash_ctx, pubkey));
-    DO(hash_final(hash_ctx, key_id));
+    DO(hash(hash_alg, pubkey, baKeyId));
 
 cleanup:
     asn_free(get_SubjectPublicKeyInfo_desc(), spki);
-    hash_free(hash_ctx);
     ba_free(pubkey);
     free(alg_oid);
     return ret;
@@ -688,6 +692,22 @@ cleanup:
     asn_free(get_OCTET_STRING_desc(), os_pubkey);
     free(s_algo);
     ba_free(ba_pubkey);
+    return ret;
+}
+
+int spki_get_subject_publickey(const ByteArray* baSpki, ByteArray** baPubkey)
+{
+    int ret = RET_OK;
+    SubjectPublicKeyInfo_t* spki = NULL;
+
+    CHECK_PARAM(baSpki != NULL);
+    CHECK_PARAM(baPubkey != NULL);
+
+    CHECK_NOT_NULL(spki = asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), baSpki));
+    DO(asn_BITSTRING2ba(&spki->subjectPublicKey, baPubkey));
+
+cleanup:
+    asn_free(get_SubjectPublicKeyInfo_desc(), spki);
     return ret;
 }
 

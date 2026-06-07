@@ -25,6 +25,7 @@
     <ClInclude Include="..\common\pkix\aid.h" />
     <ClInclude Include="..\common\pkix\ba-utils.h" />
     <ClInclude Include="..\common\pkix\dstu4145-params.h" />
+    <ClInclude Include="..\common\pkix\ecdsa-params.h" />
     <ClInclude Include="..\common\pkix\iconv-utils.h" />
     <ClInclude Include="..\common\pkix\iso15946.h" />
     <ClInclude Include="..\common\pkix\key-wrap.h" />
@@ -53,6 +54,7 @@
     <ClCompile Include="..\common\pkix\aid.c" />
     <ClCompile Include="..\common\pkix\ba-utils.c" />
     <ClCompile Include="..\common\pkix\dstu4145-params.c" />
+    <ClCompile Include="..\common\pkix\ecdsa-params.c" />
     <ClCompile Include="..\common\pkix\iconv-utils.c" />
     <ClCompile Include="..\common\pkix\iso15946.c" />
     <ClCompile Include="..\common\pkix\key-wrap.c" />
@@ -134,18 +136,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\build\</OutDir>
+    <TargetName>cm-pkcs12</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\build\</OutDir>
+    <TargetName>cm-pkcs12</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\build\</OutDir>
+    <TargetName>cm-pkcs12</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\build\</OutDir>
+    <TargetName>cm-pkcs12</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

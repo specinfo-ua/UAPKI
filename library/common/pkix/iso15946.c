@@ -80,7 +80,7 @@ int iso15946_encode_sharedinfo (
     ASN_ALLOC(shared_info);
 
     DO(asn_set_oid_from_text(oid, &shared_info->keyInfo.algorithm));
-    if (oid_is_equal(OID_GOST28147_WRAP, oid)) {
+    if (oid_is_equal(OID_GOST28147_WRAP, oid) || oid_is_equal(OID_DSTU7624_WRAP, oid)) {
         ASN_ALLOC(null_params);
         DO(asn_create_any(get_NULL_desc(), null_params, &shared_info->keyInfo.parameters));
     }

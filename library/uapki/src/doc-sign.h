@@ -30,12 +30,12 @@
 
 #include "archive-timestamp-helper.h"
 #include "attribute-helper.h"
-#include "cer-store.h"
+#include "cert-validator.h"
 #include "content-hasher.h"
-#include "crl-store.h"
 #include "library-config.h"
 #include "signature-format.h"
 #include "signeddata-helper.h"
+#include "tsp-helper.h"
 #include "uapki-ns.h"
 
 
@@ -46,92 +46,114 @@ namespace Doc {
 namespace Sign {
 
 
+static const size_t MAX_COUNT_DOCS = 100;
+static const size_t MAX_TIMESTAMPS = 3;
+
+enum class TsAttr : uint32_t {
+    CONTENT_TIMESTAMP   = 0,
+    TIMESTAMP_TOKEN     = 1,
+    ARCHIVE_TIMESTAMP   = 2
+};  //  end enum TsAttr
+
+struct Options {
+    bool ignoreCertStatus;
+
+    Options (void)
+        : ignoreCertStatus(false)
+    {
+    }
+
+};  //  end struct Options
+
+struct Params {
+    SignatureFormat
+                signatureFormat;
+    AlgorithmIdentifier
+                aidSignature;
+    AlgorithmIdentifier
+                aidDigest;      //  For digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
+    bool        detachedData;
+    HashAlg     hashDigest;
+    HashAlg     hashSignature;
+    bool        includeCert;
+    bool        includeTime;
+    bool        includeContentTS;
+    bool        includeSignatureTS;
+    bool        isCadesCXA;
+    bool        isCadesFormat;
+    bool        sidUseKeyId;
+
+    Params (void)
+        : signatureFormat(SignatureFormat::UNDEFINED)
+        , detachedData(true)
+        , hashDigest(HashAlg::HASH_ALG_UNDEFINED)
+        , hashSignature(HashAlg::HASH_ALG_UNDEFINED)
+        , includeCert(false)
+        , includeTime(false)
+        , includeContentTS(false)
+        , includeSignatureTS(false)
+        , isCadesCXA(false)
+        , isCadesFormat(false)
+        , sidUseKeyId(false)
+    {
+    }
+
+};  //  end struct Params
+
+struct SharedData : Params {
+    Options     options;
+    CertValidator::CertValidator
+                certValidator;
+    Cert::CerItem*
+                cerSigner;
+    SmartBA     keyId;
+    LibraryConfig::OcspParams
+                ocsp;
+    LibraryConfig::TspParams
+                tsp;
+    SmartBA     encodedSigningCert;
+    SmartBA     encodedSignPolicy;
+
+    SharedData (void);
+
+    int encodeSignaturePolicy (
+        const std::string& sigPolicyiId
+    );
+    int encodeSigningCertificate (void);
+    int paramsBySignatureFormat (void);
+    int setupTsp (
+        const LibraryConfig::TspParams& tspParams
+    );
+
+};  //  end struct SharedData
+
 class SigningDoc {
 public:
-    static const size_t MAX_COUNT_DOCS  = 100;
-
-    struct CerDataItem {
-        Cert::CerItem*
-                    pCerSubject;
-        Cert::CerItem*
-                    pCerIssuer;
-        bool        isSelfSigned;
-        SmartBA     basicOcspResponse;
-        SmartBA     ocspIdentifier;
-        SmartBA     ocspRespHash;
-        Crl::CrlItem*
-                    pCrl;
-        Cert::CerItem*
-                    pCerResponder;
-
-        CerDataItem (void);
-        ~CerDataItem (void);
-
-        int set (const CerDataItem& src);
-
-    };  //  end struct CerDataItem
-
-    struct SignParams {
-        SignatureFormat
-                    signatureFormat;
-        bool        isCadesCXA;
-        bool        isCadesFormat;
-        HashAlg     hashDigest;
-        HashAlg     hashSignature;
-        AlgorithmIdentifier
-                    aidDigest;      //  For digest-message, tsp, ess-cert; by default use digestAlgo from signAlgo
-        AlgorithmIdentifier
-                    aidSignature;
-        CerDataItem signer;
-        SmartBA     keyId;
-        bool        detachedData;
-        bool        includeCert;
-        bool        includeTime;
-        bool        includeContentTS;
-        bool        includeSignatureTS;
-        bool        sidUseKeyId;
-        LibraryConfig::OcspParams
-                    ocsp;
-        LibraryConfig::TspParams
-                    tsp;
-        Attribute   attrSigningCert;
-        Attribute   attrSignPolicy;
-        std::vector<CerDataItem*>
-                    chainCerts;
-
-        SignParams (void);
-        ~SignParams (void);
-
-        int addCert (
-            Cert::CerItem* cerItem
-        );
-        int setSignatureFormat (
-            const SignatureFormat signatureFormat
-        );
-
-    };  //  end struct SignParams
-
-    const SignParams*
-                signParams;
+    SharedData*
+                sharedData;
     Pkcs7::SignedDataBuilder
                 builder;
+    CertValidator::CertValidator
+                certValidatorTs[MAX_TIMESTAMPS];
     Pkcs7::SignedDataBuilder::SignerInfo*
                 signerInfo;
     std::string id;
-    std::string contentType;
     bool        isDigest;
     ContentHasher
                 contentHasher;
+    std::string contentType;
     SmartBA     messageDigest;
+    uint64_t    signingTime;
     SmartBA     hashSignedAttrs;
     SmartBA     signature;
     std::string tspUri;
+    uint64_t    contentTimeStamp;
+    uint64_t    signatureTimeStamp;
+    uint64_t    archiveTimeStamp;
 
 private:
     Pkcs7::ArchiveTs3Helper
                 m_ArchiveTsHelper;
-    std::vector<CerDataItem*>
-                m_Certs;
     std::vector<Attribute*>
                 m_SignedAttrs;
     std::vector<Attribute*>
@@ -142,10 +164,7 @@ public:
     ~SigningDoc (void);
 
     int init (
-        const SignParams* iSignParams
-    );
-    int addCert (
-        Cert::CerItem* cerItem
+        SharedData* iSharedData
     );
     int addArchiveAttribute (
         const std::string& type,
@@ -154,6 +173,9 @@ public:
     int addSignedAttribute (
         const std::string& type,
         const ByteArray* baValues
+    );
+    int addTimestamp (
+        const TsAttr tsAttr
     );
     int addUnsignedAttribute (
         const std::string& type,
@@ -167,6 +189,13 @@ public:
         ByteArray** baHash
     );
     int digestSignedAttributes (void);
+    int getTimestamp (
+        CertValidator::CertValidator& certValidator,
+        Tsp::TspHelper& tspHelper
+    );
+    int importSignedAttributes (
+        const ByteArray* baEncoded
+    );
     int setSignature (
         const ByteArray* baSignValue
     );
@@ -174,38 +203,40 @@ public:
 
     ByteArray* getEncoded (void);
 
-    std::vector<CerDataItem*> getCerts (void) {
-        return m_Certs;
-    }
+    int collectExpectedItems (
+        CertValidator::CertValidator& certValidator
+    ) const;
+
     const ByteArray* getAtsHash (void) const {
         return m_ArchiveTsHelper.getHashValue();
     }
 
-public:
-    static int encodeSignaturePolicy (
-        const std::string& sigPolicyiId,
-        Attribute& attr
-    );
-    static int encodeSigningCertificate (
-        const EssCertId& essCertId,
-        Attribute& attr
-    );
-
 private:
+    std::vector<CertValidator::CertChainItem*> collectCerts (void) const;
     int encodeCertValues (
-        Attribute& attr
+        const std::vector<CertValidator::CertChainItem*>& certs,
+        ByteArray** baEncoded
     );
     int encodeCertificateRefs (
-        Attribute& attr
+        const std::vector<CertValidator::CertChainItem*>& certs,
+        ByteArray** baEncoded
     );
     int encodeRevocationRefs (
-        Attribute& attr
+        const std::vector<CertValidator::CertChainItem*>& certs,
+        ByteArray** baEncoded
     );
     int encodeRevocationValues (    //  Note: supported OCSP-responses only
-        Attribute& attr
+        const std::vector<CertValidator::CertChainItem*>& certs,
+        ByteArray** baEncoded
     );
 
 };  //  end class SigningDoc
+
+int verifySignedData (
+        CertValidator::CertValidator& certValidator,
+        const ByteArray* baEncoded,
+        Cert::CerItem** cerSigner
+);
 
 
 }   //  end namespace Sign

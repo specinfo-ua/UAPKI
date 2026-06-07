@@ -110,12 +110,20 @@ namespace Pkcs7 {
                 const ByteArray* baSignValue
             );
             int addUnsignedAttr (
+                const char* type,
+                const ByteArray* baValues
+            );
+            int addUnsignedAttr (
                 const UapkiNS::Attribute& unsignedAttr
             );
             int setUnsignedAttrs (
                 const std::vector<UapkiNS::Attribute>& unsignedAttrs
             );
             int encodeUnsignedAttrs (void);
+
+            int fillFromEncoded (
+                const ByteArray* baEncoded
+            );
 
         public:
             const SignerInfo_t* getAsn1Data (void) const {
@@ -189,6 +197,7 @@ namespace Pkcs7 {
             const ByteArray* baCrlEncoded
         );
         int addSignerInfo (void);
+        size_t getCountSignerInfos (void) const;
         SignerInfo* getSignerInfo (
             const size_t index = 0
         ) const;
@@ -309,6 +318,10 @@ namespace Pkcs7 {
         int parseSignerInfo (
             const size_t index,
             SignerInfo& signerInfo
+        );
+        int encodeSignerInfo (
+            const size_t index,
+            ByteArray** baEncoded
         );
         bool isContainDigestAlgorithm (
             const AlgorithmIdentifier& digestAlgorithm

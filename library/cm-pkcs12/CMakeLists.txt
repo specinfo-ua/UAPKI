@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.05)
 
 project(cm-pkcs12 LANGUAGES C CXX)
-set(CM_PKCS12_VERSION 1.0.13)
+set(CM_PKCS12_VERSION 1.0.20)
 set(CM_PKCS12_SOVERSION 1)
 message(STATUS "Project: cm-pkcs12, version: " ${CM_PKCS12_VERSION})
 
@@ -25,7 +25,11 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
-set(CMAKE_SKIP_RPATH ON)
+
+set(CMAKE_SKIP_BUILD_RPATH OFF)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+set(CMAKE_INSTALL_RPATH "\$ORIGIN")
 
 #set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
@@ -55,6 +59,7 @@ set(COMMON_SOURCES
         ${PATH_COMMON_PKIX}/aid.c
         ${PATH_COMMON_PKIX}/ba-utils.c
         ${PATH_COMMON_PKIX}/dstu4145-params.c
+        ${PATH_COMMON_PKIX}/ecdsa-params.c
         ${PATH_COMMON_PKIX}/iconv-utils.c
         ${PATH_COMMON_PKIX}/iso15946.c
         ${PATH_COMMON_PKIX}/key-wrap.c

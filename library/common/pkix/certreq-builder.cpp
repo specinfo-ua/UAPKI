@@ -50,8 +50,6 @@ namespace UapkiNS {
 
 CertReqBuilder::CertReqBuilder (void)
     : m_TbsCsrInfo(nullptr)
-    , m_BaTbsEncoded(nullptr)
-    , m_BaCsrEncoded(nullptr)
 {
     DEBUG_OUTCON(puts("CertReqBuilder::CertReqBuilder()"));
 }
@@ -60,8 +58,6 @@ CertReqBuilder::~CertReqBuilder (void)
 {
     DEBUG_OUTCON(puts("CertReqBuilder::~CertReqBuilder()"));
     asn_free(get_CertificationRequestInfo_desc(), m_TbsCsrInfo);
-    ba_free(m_BaTbsEncoded);
-    ba_free(m_BaCsrEncoded);
 }
 
 int CertReqBuilder::init (
@@ -78,13 +74,23 @@ int CertReqBuilder::init (
     return ret;
 }
 
-int CertReqBuilder::setSubject (
-        const ByteArray* baNameEncoded
+int CertReqBuilder::init (
+    const ByteArray* tbsEncoded
 )
 {
-    if (!m_TbsCsrInfo || (ba_get_len(baNameEncoded) == 0)) return RET_UAPKI_INVALID_PARAMETER;
+    if (!tbsEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_decode_ba(get_Name_desc(), &m_TbsCsrInfo->subject, baNameEncoded);
+    m_TbsCsrInfo = (CertificationRequestInfo_t*)asn_decode_ba_with_alloc(get_CertificationRequestInfo_desc(), tbsEncoded);
+    return m_TbsCsrInfo ? RET_OK : RET_UAPKI_INVALID_STRUCT;
+}
+
+int CertReqBuilder::setSubject (
+        const ByteArray* nameEncoded
+)
+{
+    if (!m_TbsCsrInfo || (ba_get_len(nameEncoded) == 0)) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_decode_ba(get_Name_desc(), &m_TbsCsrInfo->subject, nameEncoded);
 }
 
 int CertReqBuilder::setSubject (
@@ -105,61 +111,53 @@ cleanup:
 }
 
 int CertReqBuilder::setSubjectPublicKeyInfo (
-        const ByteArray* baSpkiEncoded
+        const ByteArray* spkiEncoded
 )
 {
     int ret = RET_OK;
-    char* s_keyalgo = nullptr;
 
-    if (!m_TbsCsrInfo || !baSpkiEncoded) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_TbsCsrInfo || !spkiEncoded) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(asn_decode_ba(get_SubjectPublicKeyInfo_desc(), &m_TbsCsrInfo->subjectPKInfo, baSpkiEncoded));
-    DO(asn_oid_to_text(&m_TbsCsrInfo->subjectPKInfo.algorithm.algorithm, &s_keyalgo));
-
-    m_KeyAlgo = string(s_keyalgo);
+    DO(asn_decode_ba(get_SubjectPublicKeyInfo_desc(), &m_TbsCsrInfo->subjectPKInfo, spkiEncoded));
+    DO(Util::oidFromAsn1(&m_TbsCsrInfo->subjectPKInfo.algorithm.algorithm, m_KeyAlgo));
 
 cleanup:
-    ::free(s_keyalgo);
     return ret;
 }
 
 int CertReqBuilder::setSubjectPublicKeyInfo (
-        const ByteArray* baAlgoId,
-        const ByteArray* baSubjectPublicKey
+        const ByteArray* algoIdEncoded,
+        const ByteArray* publicKey
 )
 {
     int ret = RET_OK;
-    char* s_keyalgo = nullptr;
 
-    if (!m_TbsCsrInfo || !baAlgoId || !baSubjectPublicKey) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_TbsCsrInfo || !algoIdEncoded || !publicKey) return RET_UAPKI_INVALID_PARAMETER;
 
     //  Set algorithm(algorithm, parameters)
-    DO(asn_decode_ba(get_AlgorithmIdentifier_desc(), &m_TbsCsrInfo->subjectPKInfo.algorithm, baAlgoId));
-    DO(asn_oid_to_text(&m_TbsCsrInfo->subjectPKInfo.algorithm.algorithm, &s_keyalgo));
+    DO(asn_decode_ba(get_AlgorithmIdentifier_desc(), &m_TbsCsrInfo->subjectPKInfo.algorithm, algoIdEncoded));
+    DO(Util::oidFromAsn1(&m_TbsCsrInfo->subjectPKInfo.algorithm.algorithm, m_KeyAlgo));
 
     //  Set publickey
-    if (!DstuNS::isDstu4145family(s_keyalgo)) {
-        DO(asn_ba2BITSTRING(baSubjectPublicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
+    if (!DstuNS::isDstu4145family(m_KeyAlgo)) {
+        DO(asn_ba2BITSTRING(publicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
     }
     else {
-        DO(DstuNS::ba2BitStringEncapOctet(baSubjectPublicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
+        DO(DstuNS::ba2BitStringEncapOctet(publicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
     }
 
-    m_KeyAlgo = string(s_keyalgo);
-
 cleanup:
-    ::free(s_keyalgo);
     return ret;
 }
 
 int CertReqBuilder::setSubjectPublicKeyInfo (
         const UapkiNS::AlgorithmIdentifier& algorithm,
-        const ByteArray* baSubjectPublicKey
+        const ByteArray* publicKey
 )
 {
     int ret = RET_OK;
 
-    if (!m_TbsCsrInfo || !algorithm.isPresent() || !baSubjectPublicKey) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_TbsCsrInfo || !algorithm.isPresent() || !publicKey) return RET_UAPKI_INVALID_PARAMETER;
 
     //  Set algorithm(algorithm, parameters)
     DO(asn_set_oid_from_text(algorithm.algorithm.c_str(), &m_TbsCsrInfo->subjectPKInfo.algorithm.algorithm));
@@ -169,10 +167,10 @@ int CertReqBuilder::setSubjectPublicKeyInfo (
 
     //  Set publickey
     if (!DstuNS::isDstu4145family(algorithm.algorithm.c_str())) {
-        DO(asn_ba2BITSTRING(baSubjectPublicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
+        DO(asn_ba2BITSTRING(publicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
     }
     else {
-        DO(DstuNS::ba2BitStringEncapOctet(baSubjectPublicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
+        DO(DstuNS::ba2BitStringEncapOctet(publicKey, &m_TbsCsrInfo->subjectPKInfo.subjectPublicKey));
     }
 
     m_KeyAlgo = algorithm.algorithm;
@@ -182,7 +180,7 @@ cleanup:
 }
 
 int CertReqBuilder::addExtensions (
-        const ByteArray* baExtensionsEncoded
+        const ByteArray* extensionsEncoded
 )
 {
     int ret = RET_OK;
@@ -190,8 +188,8 @@ int CertReqBuilder::addExtensions (
 
     if (!m_TbsCsrInfo) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (baExtensionsEncoded) {
-        DO(Util::addToAttributes(&m_TbsCsrInfo->attributes, OID_PKCS9_EXTENSION_REQUEST, baExtensionsEncoded));
+    if (extensionsEncoded) {
+        DO(Util::addToAttributes(&m_TbsCsrInfo->attributes, OID_PKCS9_EXTENSION_REQUEST, extensionsEncoded));
     }
 
 cleanup:
@@ -234,42 +232,42 @@ int CertReqBuilder::encodeTbs (void)
 {
     if (!m_TbsCsrInfo) return RET_UAPKI_INVALID_PARAMETER;
 
-    return asn_encode_ba(get_CertificationRequestInfo_desc(), m_TbsCsrInfo, &m_BaTbsEncoded);
+    return asn_encode_ba(get_CertificationRequestInfo_desc(), m_TbsCsrInfo, &m_TbsEncoded);
 }
 
 int CertReqBuilder::encodeCertRequest (
         const char* signAlgo,
-        const ByteArray* baSignAlgoParam,
-        const ByteArray* baSignature
+        const ByteArray* signAlgoParam,
+        const ByteArray* signature
 )
 {
     int ret = RET_OK;
     X509Tbs_t* csr = nullptr;
 
-    if (!m_BaTbsEncoded || !signAlgo || !baSignature) return RET_UAPKI_INVALID_PARAMETER;
+    if (m_TbsEncoded.empty() || !signAlgo || !signature) return RET_UAPKI_INVALID_PARAMETER;
 
     ASN_ALLOC_TYPE(csr, X509Tbs);
 
     //  Set TBS-certReqInfo
-    DO(asn_decode_ba(get_ANY_desc(), &csr->tbsData, m_BaTbsEncoded));
+    DO(asn_decode_ba(get_ANY_desc(), &csr->tbsData, m_TbsEncoded.get()));
 
     //  Set signature(algorithm,parameters)
     DO(asn_set_oid_from_text(signAlgo, &csr->signAlgo.algorithm));
-    if (baSignAlgoParam) {
+    if (ba_get_len(signAlgoParam) > 0) {
         CHECK_NOT_NULL(csr->signAlgo.parameters =
-            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), baSignAlgoParam));
+            (ANY_t*)asn_decode_ba_with_alloc(get_ANY_desc(), signAlgoParam));
     }
 
     //  Set signature(value)
     if (DstuNS::isDstu4145family(signAlgo)) {
-        DO(DstuNS::ba2BitStringEncapOctet(baSignature, &csr->signValue));
+        DO(DstuNS::ba2BitStringEncapOctet(signature, &csr->signValue));
     }
     else {
-        DO(asn_ba2BITSTRING(baSignature, &csr->signValue));
+        DO(asn_ba2BITSTRING(signature, &csr->signValue));
     }
 
     //  Encode certificate
-    DO(asn_encode_ba(get_X509Tbs_desc(), csr, &m_BaCsrEncoded));
+    DO(asn_encode_ba(get_X509Tbs_desc(), csr, &m_CsrEncoded));
 
 cleanup:
     asn_free(get_X509Tbs_desc(), csr);
@@ -278,28 +276,24 @@ cleanup:
 
 int CertReqBuilder::encodeCertRequest (
         const UapkiNS::AlgorithmIdentifier& aidSignature,
-        const ByteArray* baSignature
+        const ByteArray* signature
 )
 {
     if (!aidSignature.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
-    return encodeCertRequest(aidSignature.algorithm.c_str(), aidSignature.baParameters, baSignature);
+    return encodeCertRequest(aidSignature.algorithm.c_str(), aidSignature.baParameters, signature);
 }
 
 ByteArray* CertReqBuilder::getCsrEncoded (
         const bool move
 )
 {
-    ByteArray* rv_ba = m_BaCsrEncoded;
-    if (move) {
-        m_BaCsrEncoded = nullptr;
-    }
-    return rv_ba;
+    return (move) ? m_CsrEncoded.pop() : m_CsrEncoded.get();
 }
 
 int CertReqBuilder::encodeExtensions (
         const vector<UapkiNS::Extension>& extensions,
-        ByteArray** baEncoded
+        ByteArray** encoded
 )
 {
     int ret = RET_OK;
@@ -311,7 +305,7 @@ int CertReqBuilder::encodeExtensions (
         DO(Util::addToExtensions(extns, it.extnId.c_str(), it.critical, it.baExtnValue));
     }
 
-    DO(asn_encode_ba(get_Extensions_desc(), extns, baEncoded));
+    DO(asn_encode_ba(get_Extensions_desc(), extns, encoded));
 
 cleanup:
     asn_free(get_Extensions_desc(), extns);
@@ -320,7 +314,7 @@ cleanup:
 
 int CertReqBuilder::encodeExtensions (
         const vector<ByteArray*>& vbaEncodedExtensions,
-        ByteArray** baEncoded
+        ByteArray** encoded
 )
 {
     int ret = RET_OK;
@@ -334,7 +328,7 @@ int CertReqBuilder::encodeExtensions (
         DO(Util::addToExtensions(extns, extn.extnId.c_str(), extn.critical, extn.baExtnValue));
     }
 
-    DO(asn_encode_ba(get_Extensions_desc(), extns, baEncoded));
+    DO(asn_encode_ba(get_Extensions_desc(), extns, encoded));
 
 cleanup:
     asn_free(get_Extensions_desc(), extns);

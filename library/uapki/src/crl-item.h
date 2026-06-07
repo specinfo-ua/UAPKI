@@ -212,7 +212,7 @@ public:
         const std::string& fileName
     );
     int verify (
-        const Cert::CerItem* cerIssuer,
+        const Cert::CerItem* cerCrlSigner,
         const bool force = false
     );
 
