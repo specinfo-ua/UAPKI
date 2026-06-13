@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 The UAPKI Project Authors.
+ * Copyright 2025-2026 The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -95,7 +95,7 @@ static bool rdrand(word_t *n)
 
 	if (rdseed_supported) {
 		for (int i = 10; i; i--) {
-			if (RDSEED_FUNC(&a)) {
+			if (RDSEED_FUNC(&a) && a && a != (word_t)-1) {
 				*n = a;
 				return true;
 			}
@@ -114,7 +114,7 @@ static bool rdrand(word_t *n)
 
 	if (rdrand_supported) {
 		for (int i = 10; i; i--) {
-			if (RDRAND_FUNC(&a)) {
+			if (RDRAND_FUNC(&a) && a && a != (word_t)-1) {
 				*n = a;
 				return true;
 			}
