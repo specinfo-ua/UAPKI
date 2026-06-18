@@ -43,10 +43,10 @@
 
 #ifdef _WIN32
  #include <windows.h>
- #define sleep_ms(ms) Sleep(ms)
+ #define SLEEP_MS(ms) Sleep((DWORD)ms)
 #else
  #include <unistd.h>
- #define sleep_ms(ms) usleep((ms)*1000)
+ #define SLEEP_MS(ms) usleep((ms)*1000)
 #endif
 
 
@@ -362,6 +362,7 @@ static bool run_task (
     const size_t cnt_tasks = (size_t)ParsonHelper::jsonObjectGetUint32(joTask, "times", 1);
     JSON_Object* jo_params = json_object_get_object(joTask, "parameters");
     actionByError = actionbyerr_from_str(ParsonHelper::jsonObjectGetString(joTask, "actionByError"));
+    const uint32_t sleep_ms = (size_t)ParsonHelper::jsonObjectGetUint32(joTask, "sleep", 0);
 
     for (size_t itest = 0; itest < cnt_tasks; itest++) {
         ParsonHelper json_req;
@@ -438,6 +439,10 @@ static bool run_task (
         }
         uapki.jsonFree(sjson_result);
     }
+
+    if (sleep_ms > 0) {
+        SLEEP_MS(sleep_ms);
+    }
     return true;
 }   //  run_task
 
@@ -507,9 +512,9 @@ void thread_proc (
             if (!run_task(*uapki, log, jo_task, s_completemsg, actionby_err)) break;
         }
         else if (s_method == string("_SLEEP_THREAD")) {
-            const uint32_t ms = ParsonHelper::jsonObjectGetUint32(jo_task, "sleep", 0);
-            if (ms > 0) {
-                this_thread::sleep_for(chrono::milliseconds(ms));
+            const uint32_t sleep_ms = ParsonHelper::jsonObjectGetUint32(jo_task, "sleep", 0);
+            if (sleep_ms > 0) {
+                this_thread::sleep_for(chrono::milliseconds(sleep_ms));
             }
         }
 
@@ -606,9 +611,9 @@ int main (int argc, char *argv[])
                 }
             }
             else if (s_method == string("_SLEEP_MAIN")) {
-                const uint32_t ms = ParsonHelper::jsonObjectGetUint32(jo_task, "sleep", 0);
-                if (ms > 0) {
-                    sleep_ms(ms);
+                const uint32_t sleep_ms = ParsonHelper::jsonObjectGetUint32(jo_task, "sleep", 0);
+                if (sleep_ms > 0) {
+                    SLEEP_MS(sleep_ms);
                 }
             }
             else if (s_method == string("_WAIT_THREAD")) {
@@ -718,3 +723,4 @@ int main (int argc, char *argv[])
 
     return 0;
 }
+
