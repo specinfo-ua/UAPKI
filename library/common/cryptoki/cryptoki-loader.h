@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include <string>
 #include "dl-macros.h"
-#include "pkcs11types.h"
+#include "pkcs11.h"
 
 
 namespace Cryptoki {

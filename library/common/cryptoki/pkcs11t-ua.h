@@ -1,0 +1,128 @@
+#ifndef _PKCS11T_UA_H_
+#define _PKCS11T_UA_H_ 1
+
+#ifndef CKD_VENDOR_DEFINED
+#define CKD_VENDOR_DEFINED       0x80000000UL
+#endif
+
+/* Механізми */
+#define CKM_DSTU9311_ECB                   (CKM_VENDOR_DEFINED + 0x00420011UL)
+#define CKM_DSTU9311_CNT                   (CKM_VENDOR_DEFINED + 0x00420012UL)
+#define CKM_DSTU9311_CFB                   (CKM_VENDOR_DEFINED + 0x00420013UL)
+#define CKM_DSTU9311_MAC                   (CKM_VENDOR_DEFINED + 0x00420014UL)
+#define CKM_DSTU9311_MAC_GENERAL           (CKM_VENDOR_DEFINED + 0x00420015UL)
+
+/* Застаріле, ГОСТ 28147 додано в офіціні заголовки, тому потрібно його перевизначити
+ * надалі замість *GOST28147* використовуйте аналогічні позначення *DSTU9311* */
+#undef CKM_GOST28147_ECB
+#undef CKM_GOST28147_MAC
+#undef CKM_GOST28147_KEY_GEN
+#undef CKK_GOST28147
+#define CKM_GOST28147_ECB                  CKM_DSTU9311_ECB
+#define CKM_GOST28147_CNT                  CKM_DSTU9311_CNT
+#define CKM_GOST28147_CFB                  CKM_DSTU9311_CFB
+#define CKM_GOST28147_MAC                  CKM_DSTU9311_MAC
+#define CKM_GOST28147_MAC_GENERAL          CKM_DSTU9311_MAC_GENERAL
+
+/* визначені ТЕХНІЧНИМИ СПЕЦИФІКАЦІЯМИ до RFC 5652 затвердженими наказом
+ * Адміністрації Держспецзв'язку від 27 жовтня 2020 року N 687 */
+#define CKM_DSTU9311_WRAP                   (CKM_VENDOR_DEFINED + 0x00420016UL)
+#define CKM_GOST28147_WRAP                  CKM_DSTU9311_WRAP
+#define CKM_KALYNA_WRAP                     (CKM_VENDOR_DEFINED + 0x00420017UL)
+
+#define CKM_GOST34311                       (CKM_VENDOR_DEFINED + 0x00420021UL)
+#define CKM_KUPYNA256                       (CKM_VENDOR_DEFINED + 0x00420022UL)
+#define CKM_KUPYNA384                       (CKM_VENDOR_DEFINED + 0x00420023UL)
+#define CKM_KUPYNA512                       (CKM_VENDOR_DEFINED + 0x00420024UL)
+
+#define CKM_DSTU4145                        (CKM_VENDOR_DEFINED + 0x00420031UL)
+#define CKM_DSTU4145_WITH_GOST34311         (CKM_VENDOR_DEFINED + 0x00420032UL)
+#define CKM_DSTU4145_WITH_KUPYNA256         (CKM_VENDOR_DEFINED + 0x00420033UL)
+#define CKM_DSTU4145_WITH_KUPYNA384         (CKM_VENDOR_DEFINED + 0x00420034UL)
+#define CKM_DSTU4145_WITH_KUPYNA512         (CKM_VENDOR_DEFINED + 0x00420035UL)
+
+#define CKM_DSTU9311_KEY_GEN                (CKM_VENDOR_DEFINED + 0x00420041UL)
+#define CKM_GOST28147_KEY_GEN               CKM_DSTU9311_KEY_GEN
+#define CKM_DSTU4145_KEY_PAIR_GEN           (CKM_VENDOR_DEFINED + 0x00420042UL)
+
+#define CKM_DSTU4145_ECDH_DERIVE            (CKM_VENDOR_DEFINED + 0x00420043UL)
+#define CKM_DSTU4145_ECDH_COFACTOR_DERIVE   (CKM_VENDOR_DEFINED + 0x00420044UL)
+
+#define CKM_KALYNA_BLOCK128_KEY_GEN         (CKM_VENDOR_DEFINED + 0x00420045UL)
+#define CKM_KALYNA_BLOCK256_KEY_GEN         (CKM_VENDOR_DEFINED + 0x00420046UL)
+#define CKM_KALYNA_BLOCK512_KEY_GEN         (CKM_VENDOR_DEFINED + 0x00420047UL)
+#define CKM_KALYNA_BLOCK128_XTS_KEY_GEN     (CKM_VENDOR_DEFINED + 0x00420048UL)
+#define CKM_KALYNA_BLOCK256_XTS_KEY_GEN     (CKM_VENDOR_DEFINED + 0x00420049UL)
+#define CKM_KALYNA_BLOCK512_XTS_KEY_GEN     (CKM_VENDOR_DEFINED + 0x0042004AUL)
+#define CKM_STRUMOK_KEY_GEN                 (CKM_VENDOR_DEFINED + 0x0042004BUL)
+
+#define CKM_KALYNA_ECB                      (CKM_VENDOR_DEFINED + 0x00420051UL)
+#define CKM_KALYNA_CTR                      (CKM_VENDOR_DEFINED + 0x00420052UL)
+#define CKM_KALYNA_CFB                      (CKM_VENDOR_DEFINED + 0x00420053UL)
+#define CKM_KALYNA_OFB                      (CKM_VENDOR_DEFINED + 0x00420054UL)
+#define CKM_KALYNA_CBC                      (CKM_VENDOR_DEFINED + 0x00420055UL)
+#define CKM_KALYNA_GCM                      (CKM_VENDOR_DEFINED + 0x00420056UL)
+#define CKM_KALYNA_CCM                      (CKM_VENDOR_DEFINED + 0x00420057UL)
+#define CKM_KALYNA_KW                       (CKM_VENDOR_DEFINED + 0x00420058UL)
+#define CKM_KALYNA_XTS                      (CKM_VENDOR_DEFINED + 0x00420059UL)
+#define CKM_KALYNA_CMAC                     (CKM_VENDOR_DEFINED + 0x0042005AUL)
+#define CKM_KALYNA_CMAC_GENERAL             (CKM_VENDOR_DEFINED + 0x0042005BUL)
+#define CKM_KALYNA_GMAC                     (CKM_VENDOR_DEFINED + 0x0042005CUL)
+
+#define CKM_SKELYA_KEM_KEY_PAIR_GEN         (CKM_VENDOR_DEFINED + 0x00420061UL)
+#define CKM_SKELYA_KEM                      (CKM_VENDOR_DEFINED + 0x00420062UL)
+
+#define CKM_VERSHYNA_KEY_PAIR_GEN           (CKM_VENDOR_DEFINED + 0x00420063UL)
+#define CKM_VERSHYNA                        (CKM_VENDOR_DEFINED + 0x00420064UL)
+
+/* Типи ключів */
+#define CKK_DSTU9311                        (CKK_VENDOR_DEFINED + 0x00420111UL)
+#define CKK_GOST28147                       CKK_DSTU9311
+#define CKK_KALYNA_BLOCK128                 (CKK_VENDOR_DEFINED + 0x00420112UL)
+#define CKK_KALYNA_BLOCK256                 (CKK_VENDOR_DEFINED + 0x00420113UL)
+#define CKK_KALYNA_BLOCK512                 (CKK_VENDOR_DEFINED + 0x00420114UL)
+#define CKK_KALYNA_BLOCK128_XTS             (CKK_VENDOR_DEFINED + 0x00420115UL)
+#define CKK_KALYNA_BLOCK256_XTS             (CKK_VENDOR_DEFINED + 0x00420116UL)
+#define CKK_KALYNA_BLOCK512_XTS             (CKK_VENDOR_DEFINED + 0x00420117UL)
+#define CKK_STRUMOK                         (CKK_VENDOR_DEFINED + 0x00420118UL)
+
+#define CKK_DSTU4145                        (CKK_VENDOR_DEFINED + 0x00420131UL)
+#define CKK_VERSHYNA                        (CKK_VENDOR_DEFINED + 0x00420132UL)
+#define CKK_SKELYA_KEM                      (CKK_VENDOR_DEFINED + 0x00420133UL)
+
+/* Функції вироблення ключів */
+#define CKD_GOST34311_KDF                   (CKD_VENDOR_DEFINED + 0x00420211UL)
+#define CKD_KUPYNA256_KDF                   (CKD_VENDOR_DEFINED + 0x00420212UL)
+#define CKD_KUPYNA384_KDF                   (CKD_VENDOR_DEFINED + 0x00420213UL)
+#define CKD_KUPYNA512_KDF                   (CKD_VENDOR_DEFINED + 0x00420214UL)
+
+/* Атрибути для ГОСТ 28147 та ГОСТ 34.311 */
+#define CKA_SBOX                            (CKA_VENDOR_DEFINED + 0x00420311UL)
+
+/* Параметри для генерації ключа алгоритму ВЕРШИНА для CKA_PARAMETER_SET */
+typedef CK_ULONG CK_VERSHYNA_PARAMETER_SET_TYPE;
+#define CKP_VERSHYNA_128_64    0x00000001UL
+#define CKP_VERSHYNA_256_128   0x00000002UL
+#define CKP_VERSHYNA_384_192   0x00000003UL
+#define CKP_VERSHYNA_512_256   0x00000004UL
+
+/* Параметри для генерації ключа алгоритму СКЕЛЯ для CKA_PARAMETER_SET */
+typedef CK_ULONG CK_SKELYA_KEM_PARAMETER_SET_TYPE;
+#define CKP_SKELYA_KEM_256_128 0x00000001UL
+#define CKP_SKELYA_KEM_384_192 0x00000002UL
+#define CKP_SKELYA_KEM_512_256 0x00000003UL
+
+/* Коди помилок для зворотньої сумісності, в нових реалізаціях рекомендується
+ * максимально використовувати з pkcs11t.h */
+#define CKR_SBOX_NOT_FOUND                  (CKR_VENDOR_DEFINED + 0x00420403UL)
+#define CKR_EC_PARAMS_NOT_FOUND             (CKR_VENDOR_DEFINED + 0x00420406UL)
+#define CKR_EC_PARAMS_INVALID               (CKR_VENDOR_DEFINED + 0x00420409UL)
+#define CKR_PRIVATE_KEY_NOT_FOUND           (CKR_VENDOR_DEFINED + 0x00420404UL)
+#define CKR_PUBLIC_KEY_NOT_FOUND            (CKR_VENDOR_DEFINED + 0x00420405UL)
+#define CKR_EC_POINT_INVALID                (CKR_VENDOR_DEFINED + 0x00420414UL)
+#define CKR_EC_KEY_INVALID                  (CKR_VENDOR_DEFINED + 0x00420413UL)
+#define CKR_ID_ALREADY_EXIST                (CKR_VENDOR_DEFINED + 0x00420416UL)
+#define CKR_OID_INCORRECT                   (CKR_VENDOR_DEFINED + 0x00420418UL)
+#define CKR_DIAGNOSTIC_ERROR                (CKR_VENDOR_DEFINED + 0x00420419UL)
+
+#endif /* _PKCS11T_UA_H_ */
