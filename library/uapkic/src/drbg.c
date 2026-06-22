@@ -46,6 +46,8 @@ pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Up to 64 KiB as per NIST.
 static const int drbg_max_number_of_bits_per_request = 1 << 19;
 
+static const uint_fast16_t drbg_reseed_interval = min(1LL << 48, (UINT_FAST16_MAX >> 1) + 1);
+
 static void drbg_free_internal(void)
 {
 	hmac_free(drbg_hmac_ctx);
@@ -202,7 +204,7 @@ static int drbg_random_internal(ByteArray* random)
 		DO(drbg_init());
 	}
 
-	if (drbg_reseed_counter > 32768 || drbg_prediction_resistance) {
+	if (drbg_reseed_counter > drbg_reseed_interval || drbg_prediction_resistance) {
 		DO(entropy_get(&entropy));
 		DO(drbg_reseed_internal(entropy));
 	}
