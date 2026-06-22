@@ -1,9 +1,14 @@
-cmake_minimum_required(VERSION 3.05)
+cmake_minimum_required(VERSION 3.17)
 
-project(cm-pkcs11 LANGUAGES C CXX)
-set(CM_PKCS11_VERSION 1.0.12)
-set(CM_PKCS11_SOVERSION 1)
-message(STATUS "Project: cm-pkcs11, version: " ${CM_PKCS11_VERSION})
+project(cm-pkcs11 VERSION 1.0.12 LANGUAGES C CXX)
+
+message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
+
+configure_file(
+    "${CMAKE_SOURCE_DIR}/version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    @ONLY
+)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -19,14 +24,21 @@ set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-set(CMAKE_SKIP_BUILD_RPATH OFF)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+if (NOT WIN32)
+    set(CMAKE_SKIP_BUILD_RPATH OFF)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+    
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH "@loader_path")
+    else()
+        set(CMAKE_INSTALL_RPATH "\${ORIGIN}")
+    endif()
+endif ()
 
 #set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
-if(${WIN32})
+if(WIN32)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
@@ -51,6 +63,7 @@ include_directories(
     ${PATH_COMMON_JSON}
     ${PATH_COMMON_MACROS}
     ${PATH_COMMON_PKIX}
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
@@ -72,31 +85,47 @@ set(COMMON_PKIX_SOURCES
     ${PATH_COMMON_PKIX}/uapki-ns-util.cpp
 )
 
-add_library(cm-pkcs11 SHARED
+if(WIN32)
+add_library(${PROJECT_NAME} SHARED
+    ${TOKEN_CRYPTOKI_SOURCES}
+    ${TOKEN_SRC_SOURCES}
+    ${TOKEN_STORAGE_SOURCES}
+    ${COMMON_JSON_SOURCES}
+    ${COMMON_PKIX_SOURCES}
+    resource.rc
+)
+else()
+add_library(${PROJECT_NAME} SHARED
     ${TOKEN_CRYPTOKI_SOURCES}
     ${TOKEN_SRC_SOURCES}
     ${TOKEN_STORAGE_SOURCES}
     ${COMMON_JSON_SOURCES}
     ${COMMON_PKIX_SOURCES}
 )
-
-set_target_properties(cm-pkcs11 PROPERTIES C_VISIBILITY_PRESET hidden)
-set_target_properties(cm-pkcs11 PROPERTIES CXX_VISIBILITY_PRESET hidden)
-set_target_properties(cm-pkcs11 PROPERTIES LINK_FLAGS_RELEASE -s)
-set_target_properties(cm-pkcs11 PROPERTIES VERSION ${CM_PKCS11_VERSION} SOVERSION ${CM_PKCS11_SOVERSION})
-
-if(${WIN32})
-    target_compile_definitions(cm-pkcs11 PRIVATE NOCRYPT)
-    target_compile_definitions(cm-pkcs11 PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
-target_link_libraries(cm-pkcs11 PRIVATE uapkic uapkif)
-if(${UNIX})
-    target_link_libraries(cm-pkcs11 PRIVATE dl)
+set_target_properties(${PROJECT_NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+if(NOT WIN32)
+    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VERSION   "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
+    SOVERSION "${PROJECT_VERSION_MAJOR}"
+)
 
-add_custom_command(TARGET cm-pkcs11 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs11> ../out/
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs11> ../../${OUT_DIR}/
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE uapkic uapkif)
+if(UNIX)
+    target_link_libraries(${PROJECT_NAME} PRIVATE dl)
+endif()
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ../out/
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ../../${OUT_DIR}/
 )

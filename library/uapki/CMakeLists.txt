@@ -1,9 +1,14 @@
 ﻿cmake_minimum_required(VERSION 3.17)
 
-project(uapki LANGUAGES C CXX)
-set(UAPKI_VERSION 2.0.16)
-set(UAPKI_SOVERSION 2)
-message(STATUS "Project: uapki, version: " ${UAPKI_VERSION})
+project(uapki VERSION 2.0.16 LANGUAGES C CXX)
+
+message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
+
+configure_file(
+    "${CMAKE_SOURCE_DIR}/version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    @ONLY
+)
 
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 option(UAPKI_PUBLIC_INTERNAL_INCLUDES "Exposes uapki library internal include files" OFF)
@@ -32,20 +37,29 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 
-set(CMAKE_SKIP_BUILD_RPATH OFF)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+if (NOT WIN32)
+    set(CMAKE_SKIP_BUILD_RPATH OFF)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+    
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH "@loader_path")
+    else()
+        set(CMAKE_INSTALL_RPATH "\${ORIGIN}")
+    endif()
+endif ()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-if (${WIN32})
+if (WIN32)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
-find_package(CURL REQUIRED)
+if(NOT WIN32)
+    find_package(CURL REQUIRED)
+endif()
 
 set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 set(PATH_UAPKIC ${PATH_PRJ}/../uapkic)
@@ -63,45 +77,78 @@ aux_source_directory(${PATH_PRJ}/src UAPKI_SOURCES)
 aux_source_directory(${PATH_COMMON_PKIX} COMMON_SOURCES)
 aux_source_directory(${PATH_COMMON_JSON} JSON_SOURCES)
 
-add_library(uapki ${UAPKI_LIBS_TYPE}
+if(WIN32)
+    add_library(uapki ${UAPKI_LIBS_TYPE}
         ${UAPKI_API_SOURCES}
         ${UAPKI_SOURCES}
         ${COMMON_SOURCES}
         ${PATH_COMMON_LOADERS}/cm-loader.cpp
         ${JSON_SOURCES}
-)
+        resource.rc
+    )
+
+    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
+    set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
+
+    target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
+
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_x86-64/libcurl.lib")
+    else()
+        target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_x86/libcurl.lib")
+    endif()
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Wldap32 Crypt32 Normaliz)
+
+    set(CURL_FOUND TRUE)
+else()
+    add_library(uapki ${UAPKI_LIBS_TYPE}
+        ${UAPKI_API_SOURCES}
+        ${UAPKI_SOURCES}
+        ${COMMON_SOURCES}
+        ${PATH_COMMON_LOADERS}/cm-loader.cpp
+        ${JSON_SOURCES}
+    )
+endif()
 
 target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
-        ${PATH_COMMON_CMAPI}
-        ${PATH_COMMON_JSON}
-        ${PATH_COMMON_MACROS}
-        ${PATH_COMMON_PKIX}
-        ${PATH_PRJ}
-        ${PATH_PRJ}/src
-        ${PATH_PRJ}/src/api
-        PUBLIC
-        ${PATH_COMMON_LOADERS}
-        ${PATH_PRJ}/include
+    ${PATH_COMMON_CMAPI}
+    ${PATH_COMMON_JSON}
+    ${PATH_COMMON_MACROS}
+    ${PATH_COMMON_PKIX}
+    ${PATH_PRJ}
+    ${PATH_PRJ}/src
+    ${PATH_PRJ}/src/api
+    PUBLIC
+    ${PATH_COMMON_LOADERS}
+    ${PATH_PRJ}/include
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 set_target_properties(uapki PROPERTIES C_VISIBILITY_PRESET hidden)
 set_target_properties(uapki PROPERTIES CXX_VISIBILITY_PRESET hidden)
-set_target_properties(uapki PROPERTIES LINK_FLAGS_RELEASE -s)
-set_target_properties(uapki PROPERTIES VERSION ${UAPKI_VERSION} SOVERSION ${UAPKI_SOVERSION})
+if(NOT WIN32)
+    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
+endif()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VERSION   "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
+    SOVERSION "${PROJECT_VERSION_MAJOR}"
+)
 
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
 target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
-if (${UNIX})
+if (UNIX)
     target_link_libraries(uapki PRIVATE dl curl)
 endif ()
-if (${APPLE})
+if (APPLE)
     target_link_libraries(uapki PRIVATE iconv)
 endif ()
 
 
 if (NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET uapki POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../out/
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../../${OUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../out/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../../${OUT_DIR}/
     )
 endif ()

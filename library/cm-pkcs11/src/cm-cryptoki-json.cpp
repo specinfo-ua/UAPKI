@@ -33,6 +33,7 @@
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
+#include "version.h"
 
 
 #define CHECK_CM_JSON(func)                 \
@@ -52,9 +53,6 @@
     }
 
 
-#define CM_PKCS11_LIBVERSION "1.0.12"
-
-
 using namespace std;
 using namespace UapkiNS;
 
@@ -62,7 +60,7 @@ using namespace UapkiNS;
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS11\","                               //  required
     "\"apiVersion\": \"1.0.0\","                        //  required
-    "\"libVersion\": \"" CM_PKCS11_LIBVERSION "\","     //  required
+    "\"libVersion\": \"" STR_FILEVERSION "\","          //  required
     "\"description\": \"CM-provider for PKCS11\","      //  required
     "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","        //  required
     "\"supportListStorages\": true,"                    //  optional

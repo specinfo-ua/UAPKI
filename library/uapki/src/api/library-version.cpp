@@ -30,11 +30,11 @@
 #include "api-json-internal.h"
 #include "uapkic.h"
 #include "uapkif.h"
+#include "version.h"
 #include <string>
 
 
 static const char* LIB_NAME     = "UAPKI";
-static const char* LIB_VERSION  = "2.0.16";
 
 
 using namespace std;
@@ -50,7 +50,7 @@ int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
     int ret = RET_OK;
 
     DO_JSON(json_object_set_string(joResult, "name", LIB_NAME));
-    DO_JSON(json_object_set_string(joResult, "version", LIB_VERSION));
+    DO_JSON(json_object_set_string(joResult, "version", STR_FILEVERSION));
     DO_JSON(json_object_set_string(joResult, "uapkicVersion", versionToStr(UAPKIC_VERSION).c_str()));
     DO_JSON(json_object_set_string(joResult, "uapkifVersion", versionToStr(UAPKIF_VERSION).c_str()));
 

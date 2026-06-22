@@ -34,6 +34,7 @@
 #include "parson.h"
 #include "uapkic.h"
 #include "cm-pkcs12-debug.h"
+#include "version.h"
 
 
 #define DEBUG_OUTPUT(msg)
@@ -46,8 +47,8 @@ DEBUG_OUTPUT_FUNC
 static const char* JSON_PROVIDER_INFO = "{"
     "\"id\": \"PKCS12\","                                   //  required
     "\"apiVersion\": \"1.0.0\","                            //  required
-    "\"libVersion\": \"1.0.20\","                           //  required
-    "\"description\": \"PKCS#12 (PFX) file key storage\","  //  required
+    "\"libVersion\": \"" STR_FILEVERSION "\","              //  required
+    "\"description\": \"PKCS#12 CM Provider\","             //  required
     "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","            //  required
     "\"supportListStorages\": false,"                       //  optional
     "\"flags\": 0"                                          //  optional
