@@ -141,9 +141,6 @@ target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 if (UNIX)
     target_link_libraries(uapki PRIVATE dl curl)
 endif ()
-if (APPLE)
-    target_link_libraries(uapki PRIVATE iconv)
-endif ()
 
 
 if (NOT UAPKI_DISABLE_COPY)

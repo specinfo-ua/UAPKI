@@ -73,7 +73,7 @@ target_include_directories(uapkic PUBLIC
 set_target_properties(uapkic PROPERTIES C_VISIBILITY_PRESET hidden)
 set_target_properties(uapkic PROPERTIES CXX_VISIBILITY_PRESET hidden)
 if(NOT WIN32)
-    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
+    set_target_properties(uapkic PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
