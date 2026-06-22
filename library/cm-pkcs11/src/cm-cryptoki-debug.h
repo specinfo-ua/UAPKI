@@ -25,65 +25,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CRYPTOKI_LOADER_H
-#define CRYPTOKI_LOADER_H
+#ifndef CM_CRYPTOKI_DEBUG_H
+#define CM_CRYPTOKI_DEBUG_H
 
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <stdio.h>
 #include <string>
-#include "dl-macros.h"
-#include "pkcs11.h"
 
 
-namespace Cryptoki {
+#ifndef DEBUG_OUTSTREAM_FILENAME
+#define DEBUG_OUTSTREAM_FILENAME "cm-cryptoki.log"
+#endif
+#define DEBUG_OUTSTREAM_FOPEN fopen(DEBUG_OUTSTREAM_FILENAME, "a")
+#define DEBUG_OUTSTREAM_STDOUT stdout
+#define DEBUG_OUTSTREAM_DEFAULT DEBUG_OUTSTREAM_FOPEN
 
-
-struct Version {
-    uint32_t    major;
-    uint32_t    minor;
-    Version (void);
-    std::string toString (void) const;
-};  //  end struct Version
-
-
-class Loader
-{
-    HANDLE_DLIB m_HandleDLib;
-    CK_FUNCTION_LIST_PTR
-                m_FunctionList;
-
-public:
-    Loader (void);
-    ~Loader (void);
-
-    HANDLE_DLIB getHandle (void) const {
-        return m_HandleDLib;
-    }
-    bool isLoaded (void) const {
-        return (m_HandleDLib);
-    }
-
-    bool load (
-        const std::string& libName
-    );
-    void unload (void);
-
-    Version getApiVersion (void) const;
-    CK_FUNCTION_LIST_PTR getApi (void) const {
-        return m_FunctionList;
-    }
-
-public:
-    static std::string getLibName (
-        const std::string& libName
-    );
-
-};  //  end class Loader
-
-
-}   //  end namespace Cryptoki
+#define DEBUG_OUTPUT_FUNC                                   \
+static void debug_output (FILE* f, const std::string& msg)  \
+{                                                           \
+    if (!f) return;                                         \
+    const std::string s_msg = msg + std::string("\n");      \
+    fputs(s_msg.c_str(), f);                                \
+    if (f != stdout) fclose(f);                             \
+}
 
 
 #endif

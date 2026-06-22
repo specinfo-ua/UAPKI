@@ -118,6 +118,7 @@ static int json_object_copy_storageinfo (
     DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "model"));
     DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "serial"));
     DO_JSON(json_object_copy_string(joDestStorageInfo,  joSrcStorageInfo, "label"));
+
     DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordCountLow"));
     DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordFinalTry"));
     DO_JSON(json_object_copy_boolean(joDestStorageInfo, joSrcStorageInfo, "passwordLocked"));
@@ -125,6 +126,19 @@ static int json_object_copy_storageinfo (
     DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordAttemptsLeft"));
     DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordMinLen"));
     DO_JSON(json_object_copy_number(joDestStorageInfo,  joSrcStorageInfo, "passwordMaxLen"));
+
+    DO_JSON(json_object_copy_string(joDestStorageInfo, joSrcStorageInfo, "flags"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "maxSessionCount"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "sessionCount"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "maxRwSessionCount"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "rwSessionCount"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "totalPublicMemory"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "freePublicMemory"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "totalPrivateMemory"));
+    DO_JSON(json_object_copy_number(joDestStorageInfo, joSrcStorageInfo, "freePrivateMemory"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo, joSrcStorageInfo, "hardwareVersion"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo, joSrcStorageInfo, "firmwareVersion"));
+    DO_JSON(json_object_copy_string(joDestStorageInfo, joSrcStorageInfo, "utcTime"));
 
 cleanup:
     return ret;

@@ -29,7 +29,7 @@
 #define CRYPTOKI_CONST_UKR_H
 
 
-#include "pkcs11types.h"
+#include "pkcs11.h"
 
 
 namespace Cryptoki {
@@ -37,8 +37,8 @@ namespace Cryptoki {
 
 namespace CKA {
     namespace UKR {
-        constexpr CK_ATTRIBUTE_TYPE GOST_SBOX       = CKA_GOST_SBOX;
-        constexpr CK_ATTRIBUTE_TYPE KEY_ATTESTATE   = CKA_KEY_ATTESTATE;
+        constexpr CK_ATTRIBUTE_TYPE GOST_SBOX       = CKA_SBOX;
+        constexpr CK_ATTRIBUTE_TYPE KEY_ATTESTATE   = CKA_SIS_KEY_ATTESTATE;
     }
 };  //  end namespace CKA::UKR
 
@@ -52,9 +52,9 @@ namespace CKD {
 namespace CKK {
     namespace UKR {
         constexpr CK_KEY_TYPE GOST28147     = CKK_GOST28147;
-        constexpr CK_KEY_TYPE KALYNA128     = CKK_KALYNA128;
-        constexpr CK_KEY_TYPE KALYNA256     = CKK_KALYNA256;
-        constexpr CK_KEY_TYPE KALYNA512     = CKK_KALYNA512;
+        constexpr CK_KEY_TYPE KALYNA128     = CKK_KALYNA_BLOCK128;
+        constexpr CK_KEY_TYPE KALYNA256     = CKK_KALYNA_BLOCK256;
+        constexpr CK_KEY_TYPE KALYNA512     = CKK_KALYNA_BLOCK512;
         constexpr CK_KEY_TYPE DSTU4145      = CKK_DSTU4145;
     }
 };  //  end namespace CKK::UKR
@@ -67,7 +67,7 @@ namespace CKM {
         constexpr CK_MECHANISM_TYPE GOST28147_MAC   = CKM_GOST28147_MAC;
         constexpr CK_MECHANISM_TYPE GOST28147_MAC_GENERAL   = CKM_GOST28147_MAC_GENERAL;
         constexpr CK_MECHANISM_TYPE GOST28147_WRAP          = CKM_GOST28147_WRAP;
-        constexpr CK_MECHANISM_TYPE KALYNA256_WRAP          = CKM_KALYNA256_WRAP;
+        constexpr CK_MECHANISM_TYPE KALYNA256_WRAP          = CKM_KALYNA_WRAP;
         constexpr CK_MECHANISM_TYPE GOST28147_KEY_GEN       = CKM_GOST28147_KEY_GEN;
         constexpr CK_MECHANISM_TYPE GOST34311       = CKM_GOST34311;
         constexpr CK_MECHANISM_TYPE KUPYNA256       = CKM_KUPYNA256;

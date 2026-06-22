@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.05)
+cmake_minimum_required(VERSION 3.17)
 
 project(uapki-hostapp LANGUAGES C CXX)
 
@@ -16,10 +16,17 @@ set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 #set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
-set(CMAKE_SKIP_BUILD_RPATH OFF)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+if (NOT WIN32)
+    set(CMAKE_SKIP_BUILD_RPATH OFF)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+    
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH "@loader_path")
+    else()
+        set(CMAKE_INSTALL_RPATH "\${ORIGIN}")
+    endif()
+endif ()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out)
@@ -41,7 +48,7 @@ add_executable (uapki-hostapp
 set_target_properties(uapki-hostapp PROPERTIES C_VISIBILITY_PRESET hidden)
 set_target_properties(uapki-hostapp PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
-if(${UNIX})
+if(UNIX)
     target_link_libraries(uapki-hostapp PRIVATE dl)
 endif()
 

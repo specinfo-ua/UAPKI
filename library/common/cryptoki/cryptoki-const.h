@@ -29,7 +29,7 @@
 #define CRYPTOKI_CONST_H
 
 
-#include "pkcs11types.h"
+#include "pkcs11.h"
 
 
 namespace Cryptoki {
@@ -373,11 +373,6 @@ namespace CKR {
     //  New to v3.0
     constexpr CK_RV TOKEN_RESOURCE_EXCEEDED     = CKR_TOKEN_RESOURCE_EXCEEDED;
     constexpr CK_RV OPERATION_CANCEL_FAILED     = CKR_OPERATION_CANCEL_FAILED;
-    //  Vendor specific
-    constexpr CK_RV VENDOR_DEFINED              = CKR_VENDOR_DEFINED;
-    //  Not really a return value, but stored in ulDeviceError of session info for policy violations.
-    constexpr CK_RV POLICY_VIOLATION            = CKR_POLICY_VIOLATION;
-
 };  //  end namespace CKR
 
 

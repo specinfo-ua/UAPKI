@@ -26,15 +26,13 @@
  */
 
 #include <stdio.h>
-#include <string.h>
+#include "byte-array.h"
 #include "cm-api.h"
-#include "cm-errors.h"
+#include "cm-cryptoki.h"
+#include "cm-cryptoki-debug.h"
+#include "parson-helper.h"
+#define CM_LIBRARY
 #include "cm-export.h"
-#include "cm-pkcs12.h"
-#include "parson.h"
-#include "uapkic.h"
-#include "cm-pkcs12-debug.h"
-#include "version.h"
 
 
 #define DEBUG_OUTPUT(msg)
@@ -44,18 +42,7 @@ DEBUG_OUTPUT_FUNC
 #endif
 
 
-static const char* JSON_PROVIDER_INFO = "{"
-    "\"id\": \"PKCS12\","                                   //  required
-    "\"apiVersion\": \"1.0.0\","                            //  required
-    "\"libVersion\": \"" STR_FILEVERSION "\","              //  required
-    "\"description\": \"PKCS#12 CM Provider\","             //  required
-    "\"manufacturer\": \"SPECINFOSYSTEMS LLC\","            //  required
-    "\"supportListStorages\": false,"                       //  optional
-    "\"flags\": 0"                                          //  optional
-"}";
-
-
-static CmPkcs12* cm_pkcs12 = nullptr;
+static CmCryptoki* cm_cryptoki = nullptr;
 
 
 #ifdef __cplusplus
@@ -68,10 +55,7 @@ CM_EXPORT CM_ERROR provider_info (
 )
 {
     DEBUG_OUTPUT("provider_info()");
-    if (!providerInfo) return RET_CM_INVALID_PARAMETER;
-
-    *providerInfo = (CM_JSON_PCHAR)strdup(JSON_PROVIDER_INFO);
-    return (*providerInfo != nullptr) ? RET_OK : RET_CM_GENERAL_ERROR;
+    return CmCryptoki::providerInfoToJson(providerInfo);
 }
 
 CM_EXPORT CM_ERROR provider_init (
@@ -80,13 +64,20 @@ CM_EXPORT CM_ERROR provider_init (
 {
     DEBUG_OUTPUT("provider_init()");
     CM_ERROR cm_err = RET_CM_GENERAL_ERROR;
-    if (!cm_pkcs12) {
-        cm_pkcs12 = new CmPkcs12();
-        if (cm_pkcs12) {
-            cm_err = cm_pkcs12->parseConfig(providerParams, cm_pkcs12->getDefaultParam());
+    if (!cm_cryptoki) {
+        ParsonHelper json;
+        JSON_Object* jo_params = nullptr;
+        if (providerParams) {
+            jo_params = json.parse((const char*)providerParams);
+            if (!jo_params) return RET_CM_INVALID_JSON;
+        }
+
+        cm_cryptoki = new CmCryptoki();
+        if (cm_cryptoki) {
+            cm_err = cm_cryptoki->init(jo_params);
             if (cm_err != RET_OK) {
-                delete cm_pkcs12;
-                cm_pkcs12 = nullptr;
+                delete cm_cryptoki;
+                cm_cryptoki = nullptr;
             }
         }
     }
@@ -100,9 +91,9 @@ CM_EXPORT CM_ERROR provider_deinit (void)
 {
     DEBUG_OUTPUT("provider_deinit()");
     CM_ERROR cm_err = RET_OK;
-    if (cm_pkcs12) {
-        delete cm_pkcs12;
-        cm_pkcs12 = nullptr;
+    if (cm_cryptoki) {
+        delete cm_cryptoki;
+        cm_cryptoki = nullptr;
     }
     else {
         cm_err = RET_CM_NOT_INITIALIZED;
@@ -110,20 +101,38 @@ CM_EXPORT CM_ERROR provider_deinit (void)
     return cm_err;
 }
 
+CM_EXPORT CM_ERROR provider_list_storages (
+        CM_JSON_PCHAR* jsonList
+)
+{
+    DEBUG_OUTPUT("provider_list_storages()");
+    return (cm_cryptoki) ? cm_cryptoki->listStorages(jsonList) : RET_CM_NOT_INITIALIZED;
+}
+
+CM_EXPORT CM_ERROR provider_storage_info (
+    const char* storageId,
+    CM_JSON_PCHAR* jsonInfo
+)
+{
+    DEBUG_OUTPUT("provider_storage_info()");
+    return (cm_cryptoki) ? cm_cryptoki->storageInfo(storageId, jsonInfo) : RET_CM_NOT_INITIALIZED;
+}
+
 CM_EXPORT CM_ERROR provider_open (
-        const char* fileName,
+        const char* storageId,
         uint32_t openMode,
         const CM_JSON_PCHAR openParams,
         CM_SESSION_API** session
 )
 {
     DEBUG_OUTPUT("provider_open()");
-    return (cm_pkcs12)
-        ? cm_pkcs12->open(
-            fileName,
+    return (cm_cryptoki)
+        ? cm_cryptoki->open(
+            storageId,
             openMode,
             openParams,
-            session)
+            session
+        )
         : RET_CM_NOT_INITIALIZED;
 }
 
@@ -132,7 +141,7 @@ CM_EXPORT CM_ERROR provider_close (
 )
 {
     DEBUG_OUTPUT("provider_close()");
-    return (cm_pkcs12) ? cm_pkcs12->close(session) : RET_CM_NOT_INITIALIZED;
+    return (cm_cryptoki) ? cm_cryptoki->close(session) : RET_CM_NOT_INITIALIZED;
 }
 
 CM_EXPORT void block_free (
@@ -147,7 +156,7 @@ CM_EXPORT void bytearray_free (
 )
 {
     if (ba) {
-        ba_free((ByteArray*) ba);
+        ba_free((ByteArray*)ba);
     }
 }
 
