@@ -28,6 +28,9 @@
 #define FILE_MARKER "uapkic/entropy.c"
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
+#   ifdef NOCRYPT
+#       undef NOCRYPT
+#   endif
 #   include <Windows.h>
 #   include <winternl.h>
 #   include <winioctl.h>

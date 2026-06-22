@@ -55,5 +55,5 @@ endif()
 
 add_custom_command(TARGET uapki-hostapp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki-hostapp> ../out/
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki-hostapp> ../../${OUT_DIR}/
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki-hostapp> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
 )

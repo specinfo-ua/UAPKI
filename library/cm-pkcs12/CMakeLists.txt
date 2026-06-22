@@ -133,6 +133,6 @@ target_link_libraries(cm-pkcs12 PUBLIC uapkic uapkif)
 if (NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET cm-pkcs12 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../out/
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../../${OUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
 endif ()
