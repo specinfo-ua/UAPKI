@@ -58,5 +58,5 @@ endif()
 
 add_custom_command(TARGET test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ../out/
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ../../${OUT_DIR}/
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
 )

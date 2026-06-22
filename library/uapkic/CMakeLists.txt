@@ -94,6 +94,6 @@ endif ()
 if (NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET uapkic POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../../${OUT_DIR}/
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
 endif ()

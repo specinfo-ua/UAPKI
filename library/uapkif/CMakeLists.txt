@@ -101,6 +101,6 @@ target_link_libraries(uapkif PUBLIC uapkic)
 if (NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET uapkif POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ../out/
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ../../${OUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
 endif ()
