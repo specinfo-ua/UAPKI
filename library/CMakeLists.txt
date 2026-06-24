@@ -19,49 +19,85 @@ string(REGEX MATCH "GNU" CMAKE_COMPILER_IS_GNU "${CMAKE_C_COMPILER_ID}")
 string(REGEX MATCH "MSVC" CMAKE_COMPILER_IS_MSVC "${CMAKE_C_COMPILER_ID}")
 
 if(CMAKE_COMPILER_IS_CLANG)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla -Wformat=2 -Wno-format-nonliteral")
-    set(CMAKE_C_FLAGS_RELEASE     "-O2")
-    set(CMAKE_C_FLAGS_DEBUG       "-O0 -g3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla -Wformat=2 -Wno-format-nonliteral")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla -Wformat=2 -Wno-format-nonliteral")
+    
+    set(CMAKE_C_FLAGS_RELEASE     "-O3 -fomit-frame-pointer -flto")
+    set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -fomit-frame-pointer -flto")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -flto")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto")
+
+    set(CMAKE_C_FLAGS_DEBUG       "-Og -g3")
+    set(CMAKE_CXX_FLAGS_DEBUG     "-Og -g3")
 endif(CMAKE_COMPILER_IS_CLANG)
 
 if(CMAKE_COMPILER_IS_GNU)
-    # some warnings we want are not available with old GCC versions
-    # note: starting with CMake 2.8 we could use CMAKE_C_COMPILER_VERSION
-    execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                    OUTPUT_VARIABLE GCC_VERSION)
+    execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+    
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wwrite-strings")
+
     if (GCC_VERSION VERSION_GREATER 3.0 OR GCC_VERSION VERSION_EQUAL 3.0)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat=2 -Wno-format-nonliteral")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat=2 -Wno-format-nonliteral")
     endif()
     if (GCC_VERSION VERSION_GREATER 4.3 OR GCC_VERSION VERSION_EQUAL 4.3)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wvla")
     endif()
     if (GCC_VERSION VERSION_GREATER 4.5 OR GCC_VERSION VERSION_EQUAL 4.5)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wlogical-op")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wlogical-op")
     endif()
     if (GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wshadow")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wshadow")
     endif()
     if (GCC_VERSION VERSION_GREATER 5.0)
         CHECK_C_COMPILER_FLAG("-Wformat-signedness" C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS)
         if(C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS)
             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat-signedness")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat-signedness")
         endif()
     endif()
     if (GCC_VERSION VERSION_GREATER 7.0 OR GCC_VERSION VERSION_EQUAL 7.0)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat-overflow=2 -Wformat-truncation")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat-overflow=2 -Wformat-truncation")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat-overflow=2 -Wformat-truncation")
     endif()
-    set(CMAKE_C_FLAGS_RELEASE     "-O2")
-    set(CMAKE_C_FLAGS_DEBUG       "-O0 -g3")
+    
+    set(CMAKE_C_FLAGS_RELEASE     "-O3 -fomit-frame-pointer -flto")
+    set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -fomit-frame-pointer -flto")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -flto")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto")
+
+    set(CMAKE_C_FLAGS_DEBUG       "-Og -g3")
+    set(CMAKE_CXX_FLAGS_DEBUG     "-Og -g3")
+    
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -C")
 endif(CMAKE_COMPILER_IS_GNU)
 
 if(CMAKE_COMPILER_IS_MSVC)
-    # Strictest warnings
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
-    message(STATUS "is CMAKE_COMPILER_IS_MSVC")
-    # Reproducible/deterministic-build, only clang-cl
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
+    
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2 /Oi /Ot /GL")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Oi /Ot /GL")
+    
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG /OPT:REF /OPT:ICF /NODEFAULTLIB:MSVCRT")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG /OPT:REF /OPT:ICF /NODEFAULTLIB:MSVCRT")
+
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /arch:SSE2")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:SSE2")
+    endif()
+
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /RTC1 /Zc:inline")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTC1 /Zc:inline")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /brepro")
+
+    add_compile_definitions(_CRT_NONSTDC_NO_DEPRECATE)
 endif(CMAKE_COMPILER_IS_MSVC)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
