@@ -107,18 +107,18 @@ void FileStorage::addBag (
 }
 
 int FileStorage::changePassword (
-        const char* password
+        const char* newPassword
 )
 {
     int ret = RET_OK;
     for (auto & it : m_SafeBags) {
         if (oid_is_equal(OID_PKCS12_P8_SHROUDED_KEY_BAG, it->bagId())) {
-            ret = it->encodeBag(password, m_StorageParam.iterations);
+            ret = it->encodeBag(newPassword, m_StorageParam.iterations);
             if (ret != RET_OK) return ret;
         }
     }
 
-    ret = store(password);
+    ret = store(newPassword);
     return ret;
 }
 
@@ -135,11 +135,11 @@ void FileStorage::create (
 }
 
 int FileStorage::decode (
-        const char* password
+        const char* aPassword
 )
 {
-    DEBUG_OUTCON(printf("FileStorage::decode(password = '%s')\n", password));
-    int ret = decodePkcs12(password);
+    DEBUG_OUTCON(printf("FileStorage::decode(password = '%s')\n", aPassword));
+    int ret = decodePkcs12(aPassword);
     DEBUG_OUTCON(printf("FileStorage::decodePkcs12(), ret: %d\n", ret));
     if (ret == RET_OK) {
         //nothing
@@ -148,7 +148,7 @@ int FileStorage::decode (
         return ret;
     }
     else if (ret == RET_CM_INVALID_MAC) {
-        char* pass_cp1251 = utf8_to_cp1251(password);
+        char* pass_cp1251 = utf8_to_cp1251(aPassword);
         ret = decodePkcs12(pass_cp1251);
         if (ret == RET_OK) {
             setOpen(pass_cp1251);
@@ -157,20 +157,20 @@ int FileStorage::decode (
         return ret;
     }
     else {
-        ret = decodeJks(password);
+        ret = decodeJks(aPassword);
         DEBUG_OUTCON(printf("FileStorage::decodeJks(), ret: %d\n", ret));
         if (ret != RET_OK) {
-            ret = decodeIit(password);
+            ret = decodeIit(aPassword);
             DEBUG_OUTCON(printf("FileStorage::decodeIit(), ret: %d\n", ret));
         }
         if (ret != RET_OK) {
-            ret = decodePkcs8e(password);
+            ret = decodePkcs8e(aPassword);
             DEBUG_OUTCON(printf("FileStorage::decodePkcs8(), ret: %d\n", ret));
         }
     }
 
     if (ret == RET_OK) {
-        setOpen(password);
+        setOpen(aPassword);
     }
     return ret;
 }
@@ -229,7 +229,7 @@ void FileStorage::selectKey (
 }
 
 int FileStorage::store (
-        const char* password
+        const char* aPassword
 )
 {
     DEBUG_OUTCON(puts("FileStorage::store()"));
@@ -241,8 +241,8 @@ int FileStorage::store (
         return saveBuffer();
     }
 
-    if (password) {
-        m_Password = string(password);
+    if (aPassword) {
+        m_Password = string(aPassword);
     }
 
     int ret = RET_OK;
@@ -257,15 +257,15 @@ cleanup:
 }
 
 int FileStorage::decodeIit (
-        const char* password
+        const char* aPassword
 )
 {
-    DEBUG_OUTCON(printf("FileStorage::decodeIit(password = '%s')\n", password));
+    DEBUG_OUTCON(printf("FileStorage::decodeIit(password = '%s')\n", aPassword));
     int ret = RET_OK;
     ByteArray* ba_privkeys[2] = { nullptr, nullptr };
     StoreBag* store_bag = nullptr;
 
-    DO(pkcs8_decrypt(m_Buffer, password, &ba_privkeys[0], nullptr, nullptr));
+    DO(pkcs8_decrypt(m_Buffer, aPassword, &ba_privkeys[0], nullptr, nullptr));
     DO(pkcs12_iit_read_kep_key(ba_privkeys[0], &ba_privkeys[1]));
 
     for (size_t i = 0; i < 2; i++) {
@@ -293,10 +293,10 @@ cleanup:
 }
 
 int FileStorage::decodeJks (
-        const char* password
+        const char* aPassword
 )
 {
-    DEBUG_OUTCON(printf("FileStorage::decodeJks(password = '%s')\n", password));
+    DEBUG_OUTCON(printf("FileStorage::decodeJks(password = '%s')\n", aPassword));
     int ret = RET_OK;
     StoreBag* store_bag = nullptr;
     JksBufferCtx* jks_buffer = nullptr;
@@ -318,7 +318,7 @@ int FileStorage::decodeJks (
         if (jks_entry->entry_type == PRIVATE_KEY_ENTRY) {
             // Private key for signing
             CHECK_NOT_NULL(store_bag = new StoreBag());
-            DO(jks_decrypt_key(jks_entry->entry.key, password, &ba_privkeys[0]));
+            DO(jks_decrypt_key(jks_entry->entry.key, aPassword, &ba_privkeys[0]));
             store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_privkeys[0]);
             if (jks_entry->alias) {
                 store_bag->setFriendlyName(jks_entry->alias);
@@ -343,8 +343,8 @@ int FileStorage::decodeJks (
 
             //  Add cert-bags
             if (jks_entry->entry_exts) {
-                for (uint32_t i = 0; i < jks_entry->entry_exts->count; i++) {
-                    JksCertificate* jks_cert = jks_entry->entry_exts->list[i];
+                for (uint32_t j = 0; j < jks_entry->entry_exts->count; j++) {
+                    JksCertificate* jks_cert = jks_entry->entry_exts->list[j];
                     if (jks_cert && (strcmp(jks_cert->type, "X.509") == 0) && (ba_get_len(jks_cert->encoded) > 0)) {
                         CHECK_NOT_NULL(ba_data = ba_copy_with_alloc(jks_cert->encoded, 0, 0));
                         CHECK_NOT_NULL(store_bag = new StoreBag());
@@ -363,7 +363,7 @@ int FileStorage::decodeJks (
 
     DO(jks_buffer_get_hash(jks_buffer, &sba_hashexp));
     DO(jks_buffer_get_body(jks_buffer, &ba_data));
-    DO(jks_hash_store(password, ba_data, &sba_hashact));
+    DO(jks_hash_store(aPassword, ba_data, &sba_hashact));
 
     if (ba_cmp(sba_hashexp.get(), sba_hashact.get())) {
         SET_ERROR(RET_CM_INVALID_PASSWORD);
@@ -379,10 +379,10 @@ cleanup:
     return ret;
 }
 int FileStorage::decodePkcs12 (
-        const char* password
+        const char* aPassword
 )
 {
-    DEBUG_OUTCON(printf("FileStorage::decodePkcs12(password = '%s')\n", password));
+    DEBUG_OUTCON(printf("FileStorage::decodePkcs12(password = '%s')\n", aPassword));
     int ret = RET_OK;
     SmartBA sba_authsafe, sba_mac_actual, sba_mac_calc;
 
@@ -395,7 +395,7 @@ int FileStorage::decodePkcs12 (
         SET_ERROR(RET_CM_WITHOUT_MAC);
     }
 
-    DO(pkcs12_get_data_and_calc_mac(pfx, password, &m_StorageParam.macAlgo, &m_StorageParam.iterations, &sba_authsafe, &sba_mac_calc));
+    DO(pkcs12_get_data_and_calc_mac(pfx, aPassword, &m_StorageParam.macAlgo, &m_StorageParam.iterations, &sba_authsafe, &sba_mac_calc));
     DO(asn_OCTSTRING2ba(&pfx->macData->mac.digest, &sba_mac_actual));
     DEBUG_OUTCON(printf("FileStorage::decodePkcs12(),\n ba_calc_mac: "); ba_print(stdout, sba_mac_calc.get()));
     DEBUG_OUTCON(printf(" ba_actual_mac: ");ba_print(stdout, sba_mac_actual.get()));
@@ -403,7 +403,7 @@ int FileStorage::decodePkcs12 (
         SET_ERROR(RET_CM_INVALID_MAC);
     }
 
-    DO(readContents(sba_authsafe.get(), password));
+    DO(readContents(sba_authsafe.get(), aPassword));
 
 cleanup:
     asn_free(get_PFX_desc(), pfx);
@@ -411,15 +411,15 @@ cleanup:
 }
 
 int FileStorage::decodePkcs8e (
-        const char* password
+        const char* aPassword
 )
 {
-    DEBUG_OUTCON(printf("FileStorage::decodePkcs8(password = '%s')\n", password));
+    DEBUG_OUTCON(printf("FileStorage::decodePkcs8(password = '%s')\n", aPassword));
     int ret = RET_OK;
     ByteArray* ba_privkey = nullptr;
     StoreBag* store_bag = nullptr;
 
-    DO(pkcs8_decrypt(m_Buffer, password, &ba_privkey, nullptr, nullptr));
+    DO(pkcs8_decrypt(m_Buffer, aPassword, &ba_privkey, nullptr, nullptr));
     DEBUG_OUTCON(printf("pkcs8_decrypt(), ba_privkey: ");ba_print(stdout, ba_privkey));
 
     CHECK_NOT_NULL(store_bag = new StoreBag());
@@ -439,7 +439,7 @@ cleanup:
 
 int FileStorage::readContents (
         const ByteArray* baAuthsafe,
-        const char* password
+        const char* aPassword
 )
 {
     int ret = RET_OK;
@@ -454,10 +454,10 @@ int FileStorage::readContents (
         DO(cinfo_get_type(content, &type));
         if (type == CONTENT_DATA) {
             DO(cinfo_get_data(content, &sba_data));
-            DO(readSafeContents(sba_data.get(), password));
+            DO(readSafeContents(sba_data.get(), aPassword));
         } else if (type == CONTENT_ENCRYPTED) {
-            DO(pkcs12_read_encrypted_content(content, password, &sba_data));
-            DO(readSafeContents(sba_data.get(), password));
+            DO(pkcs12_read_encrypted_content(content, aPassword, &sba_data));
+            DO(readSafeContents(sba_data.get(), aPassword));
         } else {
             SET_ERROR(RET_CM_UNSUPPORTED_CONTENT_INFO);
         }
@@ -511,7 +511,7 @@ cleanup:
 
 int FileStorage::readSafeContents (
         const ByteArray* baSafeContents,
-        const char* password
+        const char* aPassword
 )
 {
     int ret = RET_OK;
@@ -536,7 +536,7 @@ int FileStorage::readSafeContents (
         }
 
         if (oid_is_equal(OID_PKCS12_P8_SHROUDED_KEY_BAG, store_bag->bagId())) {
-            DO(pkcs12_read_shrouded_key_bag(&safe_bag->bagValue, password, &ba_data, &oid_kdf, &oid_cipher));
+            DO(pkcs12_read_shrouded_key_bag(&safe_bag->bagValue, aPassword, &ba_data, &oid_kdf, &oid_cipher));
             store_bag->setData(StoreBag::BAG_TYPE::KEY, ba_data);
             if (oid_kdf) {
                 //  PBES2
@@ -620,15 +620,15 @@ void FileStorage::setBuffer (
 }
 
 void FileStorage::setOpen (
-        const char* password
+        const char* aPassword
 )
 {
-    m_Password = string(password);
+    m_Password = string(aPassword);
     m_IsOpen = true;
 }
 
 int FileStorage::encodeAuthenticatedSafe (
-        const char* password,
+        const char* aPassword,
         ByteArray** baEncoded
 )
 {
@@ -653,7 +653,7 @@ int FileStorage::encodeAuthenticatedSafe (
     if (!bags_to_encrypt.empty()) {
         DO(pkcs12_write_safecontents(bags_to_encrypt.data(), bags_to_encrypt.size(), &sba_data));
         DEBUG_OUTCON(printf("pkcs12_write_safecontents(), ba_data: '\n"); ba_print(stdout, sba_data.get()));
-        DO(pkcs8_pbes2_encrypt(sba_data.get(), password, m_StorageParam.iterations,
+        DO(pkcs8_pbes2_encrypt(sba_data.get(), aPassword, m_StorageParam.iterations,
                 m_StorageParam.bagKdf, m_StorageParam.bagCipher, &sba_encrypted));
         DEBUG_OUTCON(printf("pkcs8_pbes2_encrypt(), ba_encrypted: '\n"); ba_print(stdout, sba_encrypted.get()));
         DO(pkcs12_add_p7encrypteddata(authenticated_safe, sba_encrypted.get()));
@@ -667,14 +667,14 @@ cleanup:
 }
 
 int FileStorage::encodePfx (
-        const char* password,
+        const char* aPassword,
         const ByteArray* baEncoded
 )
 {
     int ret = RET_OK;
     MacData_t* mac_data = nullptr;
 
-    DO(pkcs12_gen_macdata(password, m_StorageParam.macAlgo, m_StorageParam.iterations, baEncoded, &mac_data));
+    DO(pkcs12_gen_macdata(aPassword, m_StorageParam.macAlgo, m_StorageParam.iterations, baEncoded, &mac_data));
     DO(pkcs12_write_pfx(baEncoded, mac_data, &m_Buffer));
 
     DEBUG_OUTCON(printf("FileStorage::encodePfx(), this.m_Buffer: "); ba_print(stdout, m_Buffer));

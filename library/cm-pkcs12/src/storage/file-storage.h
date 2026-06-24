@@ -69,16 +69,16 @@ public:
     const std::string& filename (void) const {
         return m_Filename;
     }
-    const bool isCreate (void) const {
+    bool isCreate (void) const {
         return m_IsCreate;
     }
-    const bool isOpen (void) const {
+    bool isOpen (void) const {
         return m_IsOpen;
     }
     const char* password (void) const {
         return m_Password.c_str();
     }
-    const bool isReadOnly (void) const {
+    bool isReadOnly (void) const {
         return m_ReadOnly;
     }
     StoreBag* selectedKey (void) const {
@@ -92,7 +92,7 @@ public:
         const StoreBag* bag
     );
     int changePassword (
-        const char* password
+        const char* newPassword
     );
     void create (
         const std::string& fileName

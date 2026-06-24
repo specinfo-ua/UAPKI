@@ -256,38 +256,38 @@ StoreAttr* StoreBag::setBagAttr (
 }
 
 bool StoreBag::setBagId (
-        const string& bagId
+        const string& aBagId
 )
 {
-    m_BagId = bagId;
+    m_BagId = aBagId;
     return (!m_BagId.empty());
 }
 
 void StoreBag::setData (
-        const BAG_TYPE bagType,
-        ByteArray* bagValue
+        const BAG_TYPE aBagType,
+        ByteArray* aBagValue
 )
 {
-    DEBUG_OUTCON( printf("StoreBag::setData(), bagType: %d", bagType); ba_print(stdout, bagValue); )
-    m_BagType = bagType;
-    m_BagValue.set(bagValue);
-    if (bagType == BAG_TYPE::KEY) {
+    DEBUG_OUTCON( printf("StoreBag::setData(), bagType: %d", aBagType); ba_print(stdout, aBagValue); )
+    m_BagType = aBagType;
+    m_BagValue.set(aBagValue);
+    if (aBagType == BAG_TYPE::KEY) {
         m_BagType = BAG_TYPE::DATA;
         char* s_param1 = nullptr;
         char* s_param2 = nullptr;
-        if ((private_key_get_info(bagValue, &s_param1, &s_param2) == RET_OK) && s_param1 && s_param2) {
+        if ((private_key_get_info(aBagValue, &s_param1, &s_param2) == RET_OK) && s_param1 && s_param2) {
             m_MechanismId = string(s_param1);
             m_ParameterId = string(s_param2);
             free(s_param1);
             free(s_param2);
             s_param1 = nullptr;
             s_param2 = nullptr;
-            if (keyid_by_privkeyinfo(bagValue, &m_KeyId) == RET_OK) {
+            if (keyid_by_privkeyinfo(aBagValue, &m_KeyId) == RET_OK) {
                 m_BagType = BAG_TYPE::KEY;
                 if (oid_is_parent(OID_DSTU4145_WITH_DSTU7564, m_MechanismId.c_str()) ||
                     oid_is_parent(OID_DSTU4145_WITH_GOST3411, m_MechanismId.c_str())
                 ) {
-                    (void)StoreBag::keyIdFromPrivKeyInfo(HASH_ALG_DSTU7564_256, bagValue, &m_KeyId2);
+                    (void)StoreBag::keyIdFromPrivKeyInfo(HASH_ALG_DSTU7564_256, aBagValue, &m_KeyId2);
                 }
             }
         }

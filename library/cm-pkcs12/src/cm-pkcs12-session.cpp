@@ -457,7 +457,7 @@ static CM_ERROR cm_session_add_certificate (
 
     for (size_t i = 0; i < list_certs.size(); i++) {
         SmartBA sba_keyid2;
-        int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid2);
+        ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid2);
         if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), sba_keyid2.get()) == 0)) {
             return RET_OK;
         }
