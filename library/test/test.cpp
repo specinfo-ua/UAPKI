@@ -25,6 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include <stddef.h>
 #include <stdint.h>
 #include <locale.h>
@@ -234,7 +237,7 @@ static string contentptr_to_hexptr (
     uint64_t ptr64 = (uint64_t)(buf.data());
     rv_strptr.resize(2 * sizeof(void*));
     for (size_t i = 0, j = rv_strptr.size(); i < sizeof(void*); i++, j -= 2) {
-        sprintf(s_hex, "%02X", (uint8_t)(ptr64 >> (i * 8)));
+        snprintf(s_hex, sizeof(s_hex), "%02X", (uint8_t)(ptr64 >> (i * 8)));
         rv_strptr[j - 2] = s_hex[0];
         rv_strptr[j - 1] = s_hex[1];
     }
@@ -499,8 +502,8 @@ void thread_proc (
 
         string s_method = ParsonHelper::jsonObjectGetString(jo_task, "method");
         const bool skip_task = ParsonHelper::jsonObjectGetBoolean(jo_task, "skip", false);
-        const uint32_t cnt_tasks = ParsonHelper::jsonObjectGetUint32(jo_task, "times", 1);
-        if (s_method.empty() || skip_task || (cnt_tasks == 0)) {
+        const uint32_t cnt_times = ParsonHelper::jsonObjectGetUint32(jo_task, "times", 1);
+        if (s_method.empty() || skip_task || (cnt_times == 0)) {
             puts("Skipped task.");
             continue;
         }
@@ -598,15 +601,15 @@ int main (int argc, char *argv[])
         else {
             if (s_method == string("_NEW_THREAD")) {
                 const uint32_t thread_id = ParsonHelper::jsonObjectGetUint32(jo_task, "threadId", 0);
-                JSON_Array* ja_tasks = json_object_get_array(jo_task, "tasks");
+                JSON_Array* ja_newthrtasks = json_object_get_array(jo_task, "tasks");
                 if (thread_id > 0) {
                     thread thr(
                         thread_proc,
                         &uapki,
                         thread_id,
-                        ja_tasks
+                        ja_newthrtasks
                     );
-                    threads.emplace_back(move(thr));
+                    threads.emplace_back(std::move(thr));
                     threadIds.push_back(thread_id);
                 }
             }
@@ -618,10 +621,10 @@ int main (int argc, char *argv[])
             }
             else if (s_method == string("_WAIT_THREAD")) {
                 const uint32_t thread_id = ParsonHelper::jsonObjectGetUint32(jo_task, "threadId", 0);
-                for (size_t i = 0; i < threadIds.size(); i++) {
-                    if (threadIds[i] == thread_id) {
-                        threadIds[i] = 0;
-                        threads[i].join();
+                for (size_t j = 0; j < threadIds.size(); j++) {
+                    if (threadIds[j] == thread_id) {
+                        threadIds[j] = 0;
+                        threads[j].join();
                     }
                 }
             }
@@ -723,4 +726,3 @@ int main (int argc, char *argv[])
 
     return 0;
 }
-

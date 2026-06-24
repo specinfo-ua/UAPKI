@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.05)
+cmake_minimum_required(VERSION 3.17)
 
 project(test LANGUAGES C CXX)
 
@@ -21,7 +21,7 @@ if (NOT WIN32)
     set(CMAKE_SKIP_BUILD_RPATH OFF)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-    
+
     if(APPLE)
         set(CMAKE_INSTALL_RPATH "@loader_path")
     else()
