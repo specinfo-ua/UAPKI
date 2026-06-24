@@ -5,8 +5,8 @@ project(uapkic VERSION 2.0.2 LANGUAGES C)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/version.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
 
@@ -45,35 +45,40 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 if (WIN32)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
 set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 
 aux_source_directory(${PATH_PRJ}/src UAPKIC_SOURCES)
-
 if(WIN32)
-add_library(uapkic ${UAPKI_LIBS_TYPE}
-    ${UAPKIC_SOURCES}
-    resource.rc    
-)
+    set(RESOURCE_RC resource.rc)
 else()
-add_library(uapkic ${UAPKI_LIBS_TYPE}
-    ${UAPKIC_SOURCES}
-)
+    set(RESOURCE_RC "")
 endif()
 
-target_include_directories(uapkic PUBLIC
+add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
+    ${UAPKIC_SOURCES}
+    ${RESOURCE_RC}
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
     ${PATH_PRJ}
     ${PATH_PRJ}/include
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-set_target_properties(uapkic PROPERTIES C_VISIBILITY_PRESET hidden)
-set_target_properties(uapkic PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 if(NOT WIN32)
-    set_target_properties(uapkic PROPERTIES LINK_FLAGS_RELEASE -s)
+    if(APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+    endif()
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -81,18 +86,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     SOVERSION "${PROJECT_VERSION_MAJOR}"
 )
 
-target_compile_definitions(uapkic PRIVATE UAPKIC_LIBRARY)
-target_compile_definitions(uapkic PRIVATE UAPKIC_SELF_TEST)
-if (WIN32)
-    target_compile_definitions(uapkic PRIVATE NOCRYPT)
-    target_compile_definitions(uapkic PRIVATE _CRT_SECURE_NO_WARNINGS)
-else ()
-    target_link_libraries(uapkic PRIVATE pthread)
-endif ()
+target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_LIBRARY)
+target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_SELF_TEST)
 
+if(UNIX)
+    target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
+endif()
 
 if (NOT UAPKI_DISABLE_COPY)
-    add_custom_command(TARGET uapkic POST_BUILD
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
             COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
