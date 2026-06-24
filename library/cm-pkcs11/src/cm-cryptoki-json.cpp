@@ -33,7 +33,13 @@
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
-#include "version.h"
+
+#ifdef HAVE_RC_VERSION_H
+#include "rc-version.h"
+#else
+ //  See cm-pkcs11\CMakeLists.txt
+#define STR_FILEVERSION "1.0.12"
+#endif
 
 
 #define CHECK_CM_JSON(func)                 \

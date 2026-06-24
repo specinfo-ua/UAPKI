@@ -5,10 +5,12 @@ project(cm-pkcs11 VERSION 1.0.12 LANGUAGES C CXX)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/version.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
+
+option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -39,7 +41,6 @@ endif ()
 #set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 if(WIN32)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
@@ -84,30 +85,33 @@ set(COMMON_PKIX_SOURCES
     ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/uapki-ns-util.cpp
 )
-
 if(WIN32)
-add_library(${PROJECT_NAME} SHARED
-    ${TOKEN_CRYPTOKI_SOURCES}
-    ${TOKEN_SRC_SOURCES}
-    ${TOKEN_STORAGE_SOURCES}
-    ${COMMON_JSON_SOURCES}
-    ${COMMON_PKIX_SOURCES}
-    resource.rc
-)
+    set(RESOURCE_RC resource.rc)
 else()
+    set(RESOURCE_RC "")
+endif()
+
 add_library(${PROJECT_NAME} SHARED
     ${TOKEN_CRYPTOKI_SOURCES}
     ${TOKEN_SRC_SOURCES}
     ${TOKEN_STORAGE_SOURCES}
     ${COMMON_JSON_SOURCES}
     ${COMMON_PKIX_SOURCES}
+    ${RESOURCE_RC}
 )
-endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 if(NOT WIN32)
-    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
+    if(APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+    endif()
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_RC_VERSION_H)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -115,17 +119,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     SOVERSION "${PROJECT_VERSION_MAJOR}"
 )
 
-if(WIN32)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
-
 target_link_libraries(${PROJECT_NAME} PRIVATE uapkic uapkif)
+
 if(UNIX)
     target_link_libraries(${PROJECT_NAME} PRIVATE dl)
 endif()
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ../out/
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
-)
+if (NOT UAPKI_DISABLE_COPY)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs11> ../out/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs11> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
+    )
+endif()
