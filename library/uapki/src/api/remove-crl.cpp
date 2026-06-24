@@ -39,8 +39,12 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_remove_crl (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_remove_crl (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
+    (void)joResult;
     int ret = RET_OK;
     LibraryConfig* lib_config = get_config();
     Crl::CrlStore* crl_store = get_crlstore();

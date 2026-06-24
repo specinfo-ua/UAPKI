@@ -219,6 +219,7 @@ static int result_certchainitem_to_json (
         const Doc::Verify::VerifyOptions& verifyOptions
 )
 {
+    (void)verifyOptions;
     int ret = RET_OK;
     string s_statusvalidation;
 
@@ -659,6 +660,8 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             break;
+        default:
+            break;
         }
     }
 
@@ -709,7 +712,7 @@ static int verify_p7s (
         DO(verified_sinfo.parseAttributes());
         if (
             (verifyOptions.verifySignerInfoIndex < 0) ||
-            (verifyOptions.verifySignerInfoIndex == idx)
+            (verifyOptions.verifySignerInfoIndex == (int)idx)
         ) {
             DO(verified_sinfo.verifySignedAttribute());
             DO(verified_sinfo.verifyMessageDigest(*verify_sdoc.refContentHasher));
@@ -755,7 +758,6 @@ static int verify_raw (
     Cert::CerItem* cer_parsed = nullptr;
     SmartBA sba_pubdata;
     SignatureVerifyStatus status_sign = SignatureVerifyStatus::UNDEFINED;
-    bool is_digitalsign = true;
 
     const string s_signalgo = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
     if (s_signalgo.empty()) return RET_UAPKI_INVALID_PARAMETER;

@@ -31,8 +31,12 @@
 #include "cm-providers.h"
 
 
-int uapki_storage_change_password (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_storage_change_password (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
+    (void)joResult;
     const char* s_newpassword = json_object_get_string(joParams, "newPassword");
     if (!s_newpassword) return RET_UAPKI_INVALID_PARAMETER;
 

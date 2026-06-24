@@ -30,11 +30,17 @@
 #include "api-json-internal.h"
 #include "uapkic.h"
 #include "uapkif.h"
-#include "version.h"
 #include <string>
 
+#ifdef HAVE_RC_VERSION_H
+#include "rc-version.h"
+#else
+ //  See uapki\CMakeLists.txt
+#define STR_FILEVERSION "2.0.16"
+#endif
 
-static const char* LIB_NAME     = "UAPKI";
+
+static const char* LIB_NAME = "UAPKI";
 
 
 using namespace std;
