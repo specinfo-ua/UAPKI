@@ -122,7 +122,7 @@ public:
         const CM_KEY_API* getKeyApi (void) const {
             return &m_KeyApi;
         }
-        const CryptokiProviderId getProviderId (void) const {
+        CryptokiProviderId getProviderId (void) const {
             return m_ProviderId;
         }
         const ProviderParams getProviderParams (void) const {

@@ -911,6 +911,7 @@ CM_ERROR CryptokiStorage::signHash (
         CM_BYTEARRAY** baSignature
 )
 {
+    (void)baSignAlgoParams;
     //  Check support signAlgo
     bool is_found = false;
     for (const auto& it : keyInfo.signAlgo) {
@@ -1884,6 +1885,7 @@ HashAlg CryptokiStorage::hashAlgBySignAlgo (
         const string& signAlgo
 )
 {
+    (void)keyInfo;
     if (signAlgo.empty()) return HASH_ALG_UNDEFINED;
 
     HashAlg rv_hashalg = HASH_ALG_UNDEFINED;
