@@ -23,7 +23,6 @@
 #endif
 #include <ctype.h>
 #include <errno.h>
-//extern  int     errno;
 
 #ifndef __STDC__
 # ifdef __GNUC__
@@ -80,8 +79,8 @@ static double powersOf10[] = {	/* Table giving binary powers of 10.  Entry */
  */
 
 double
-strtod_no_locale(string, endPtr)
-	const char *string;		/* A decimal ASCII floating-point number,
+strtod_no_locale(
+	const char *string,	/* A decimal ASCII floating-point number,
 				 * optionally preceded by white space.
 				 * Must have form "-I.FE-X", where I is the
 				 * integer part of the mantissa, F is the
@@ -93,8 +92,9 @@ strtod_no_locale(string, endPtr)
 				 * The "E" may actually be an "e".  E and X
 				 * may both be omitted (but not just one).
 				 */
-	char **endPtr;		/* If non-NULL, store terminating character's
+	char **endPtr		/* If non-NULL, store terminating character's
 				 * address here. */
+)
 {
 	int sign, expSign = FALSE;
 	double fraction, dblExp, *d;

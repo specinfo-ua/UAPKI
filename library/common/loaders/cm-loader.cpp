@@ -106,10 +106,10 @@ void CmLoader::unload (void)
 }
 
 int CmLoader::info (
-        CM_JSON_PCHAR* providerInfo
+        CM_JSON_PCHAR* outInfo
 )
 {
-    return (m_Api.info) ? (int)m_Api.info(providerInfo) : RET_UAPKI_PROVIDER_NOT_LOADED;
+    return (m_Api.info) ? (int)m_Api.info(outInfo) : RET_UAPKI_PROVIDER_NOT_LOADED;
 }
 
 int CmLoader::init (
@@ -133,10 +133,10 @@ int CmLoader::listStorages (
 
 int CmLoader::storageInfo (
         const char* uri,
-        CM_JSON_PCHAR* storageInfo
+        CM_JSON_PCHAR* outInfo
 )
 {
-    return (m_Api.storage_info) ? (int)m_Api.storage_info(uri, storageInfo) : (isLoaded() ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
+    return (m_Api.storage_info) ? (int)m_Api.storage_info(uri, outInfo) : (isLoaded() ? RET_UAPKI_UNSUPPORTED_CMAPI : RET_UAPKI_PROVIDER_NOT_LOADED);
 }
 
 int CmLoader::open (

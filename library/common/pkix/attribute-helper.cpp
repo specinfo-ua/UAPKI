@@ -570,6 +570,57 @@ ByteArray* AtsHashIndexBuilder::getEncoded (
 }
 
 
+static int parse_certshashindex (
+        CertificatesHashIndex_t& asnHashIndex,
+        VectorBA& vbaResult
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_value;
+
+    for (int i = 0; i < asnHashIndex.list.count; i++) {
+        DO(asn_OCTSTRING2ba(asnHashIndex.list.array[i], &sba_value));
+        vbaResult.push_back(sba_value.pop());
+    }
+
+cleanup:
+    return ret;
+}   //  parse_certshashindex
+
+static int parse_crlshashindex (
+        CrlsHashIndex_t& asnHashIndex,
+        VectorBA& vbaResult
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_value;
+
+    for (int i = 0; i < asnHashIndex.list.count; i++) {
+        DO(asn_OCTSTRING2ba(asnHashIndex.list.array[i], &sba_value));
+        vbaResult.push_back(sba_value.pop());
+    }
+
+cleanup:
+    return ret;
+}   //  parse_crlshashindex
+
+static int parse_unsignedattrshashindex (
+        UnsignedAttrsHashIndex_t& asnHashIndex,
+        VectorBA& vbaResult
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_value;
+
+    for (int i = 0; i < asnHashIndex.list.count; i++) {
+        DO(asn_OCTSTRING2ba(asnHashIndex.list.array[i], &sba_value));
+        vbaResult.push_back(sba_value.pop());
+    }
+
+cleanup:
+    return ret;
+}   //  parse_unsignedattrshashindex
+
 AtsHashIndexParser::AtsHashIndexParser (void)
 {
     DEBUG_OUTCON(puts("AtsHashIndexParser::AtsHashIndexParser()"));
@@ -578,22 +629,6 @@ AtsHashIndexParser::AtsHashIndexParser (void)
 AtsHashIndexParser::~AtsHashIndexParser (void)
 {
     DEBUG_OUTCON(puts("AtsHashIndexParser::~AtsHashIndexParser()"));
-}
-
-static int parse_sequence_of_octet_string (CertificatesHashIndex_t& asnHashIndex, VectorBA& vbaResult)
-{
-    int ret = RET_OK;
-    ByteArray* ba_hash = nullptr;
-
-    for (int i = 0; i < asnHashIndex.list.count; i++) {
-        DO(asn_OCTSTRING2ba(asnHashIndex.list.array[i], &ba_hash));
-        vbaResult.push_back(ba_hash);
-        ba_hash = nullptr;
-    }
-
-cleanup:
-    ba_free(ba_hash);
-    return ret;
 }
 
 int AtsHashIndexParser::parse (const ByteArray* baEncoded)
@@ -605,9 +640,9 @@ int AtsHashIndexParser::parse (const ByteArray* baEncoded)
     ats_hashindfull = (ATSHashIndexFull_t*)asn_decode_ba_with_alloc(get_ATSHashIndexFull_desc(), baEncoded);
     if (ats_hashindfull) {
         DO(Util::algorithmIdentifierFromAsn1(ats_hashindfull->hashIndAlgorithm, m_HashIndAlgorithm));
-        DO(parse_sequence_of_octet_string(ats_hashindfull->certificatesHashIndex, m_CertsHashIndex));
-        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashindfull->crlsHashIndex, m_CrlsHashIndex));
-        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashindfull->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
+        DO(parse_certshashindex(ats_hashindfull->certificatesHashIndex, m_CertsHashIndex));
+        DO(parse_crlshashindex(ats_hashindfull->crlsHashIndex, m_CrlsHashIndex));
+        DO(parse_unsignedattrshashindex(ats_hashindfull->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
     }
     else {
         ats_hashinddef = (ATSHashIndexDefault_t*)asn_decode_ba_with_alloc(get_ATSHashIndexDefault_desc(), baEncoded);
@@ -615,9 +650,9 @@ int AtsHashIndexParser::parse (const ByteArray* baEncoded)
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
         m_HashIndAlgorithm.algorithm = string(OID_SHA256);
-        DO(parse_sequence_of_octet_string(ats_hashinddef->certificatesHashIndex, m_CertsHashIndex));
-        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashinddef->crlsHashIndex, m_CrlsHashIndex));
-        DO(parse_sequence_of_octet_string((CertificatesHashIndex_t&)ats_hashinddef->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
+        DO(parse_certshashindex(ats_hashinddef->certificatesHashIndex, m_CertsHashIndex));
+        DO(parse_crlshashindex(ats_hashinddef->crlsHashIndex, m_CrlsHashIndex));
+        DO(parse_unsignedattrshashindex(ats_hashinddef->unsignedAttrsHashIndex, m_UnsignedAttrsHashIndex));
     }
 
 cleanup:

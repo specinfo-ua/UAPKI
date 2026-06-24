@@ -349,7 +349,7 @@ namespace Pkcs7 {
         VectorBA& getCrls (void) {
             return m_Crls;
         }
-        const size_t getCountSignerInfos (void) const {
+        size_t getCountSignerInfos (void) const {
             return m_CountSignerInfos;
         }
 

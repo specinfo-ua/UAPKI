@@ -27,6 +27,9 @@
 
 #define FILE_MARKER "common/pkix/private-key.c"
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include "private-key.h"
 #include "aid.h"
 #include "cm-errors.h"
