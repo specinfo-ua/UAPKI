@@ -5,8 +5,8 @@ project(uapki VERSION 2.0.16 LANGUAGES C CXX)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/version.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
 
@@ -53,7 +53,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 if (WIN32)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
@@ -76,17 +75,23 @@ aux_source_directory(${PATH_PRJ}/src/api UAPKI_API_SOURCES)
 aux_source_directory(${PATH_PRJ}/src UAPKI_SOURCES)
 aux_source_directory(${PATH_COMMON_PKIX} COMMON_SOURCES)
 aux_source_directory(${PATH_COMMON_JSON} JSON_SOURCES)
+if(WIN32)
+    set(RESOURCE_RC resource.rc)
+else()
+    set(RESOURCE_RC "")
+endif()
+
+
+add_library(uapki ${UAPKI_LIBS_TYPE}
+    ${UAPKI_API_SOURCES}
+    ${UAPKI_SOURCES}
+    ${COMMON_SOURCES}
+    ${PATH_COMMON_LOADERS}/cm-loader.cpp
+    ${JSON_SOURCES}
+    ${RESOURCE_RC}
+)
 
 if(WIN32)
-    add_library(uapki ${UAPKI_LIBS_TYPE}
-        ${UAPKI_API_SOURCES}
-        ${UAPKI_SOURCES}
-        ${COMMON_SOURCES}
-        ${PATH_COMMON_LOADERS}/cm-loader.cpp
-        ${JSON_SOURCES}
-        resource.rc
-    )
-
     set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
     set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
 
@@ -101,14 +106,6 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Wldap32 Crypt32 Normaliz)
 
     set(CURL_FOUND TRUE)
-else()
-    add_library(uapki ${UAPKI_LIBS_TYPE}
-        ${UAPKI_API_SOURCES}
-        ${UAPKI_SOURCES}
-        ${COMMON_SOURCES}
-        ${PATH_COMMON_LOADERS}/cm-loader.cpp
-        ${JSON_SOURCES}
-    )
 endif()
 
 target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
@@ -127,8 +124,16 @@ target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
 
 set_target_properties(uapki PROPERTIES C_VISIBILITY_PRESET hidden)
 set_target_properties(uapki PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 if(NOT WIN32)
-    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
+    if(APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+    endif()
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_RC_VERSION_H)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -138,10 +143,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
 target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
-if (UNIX)
-    target_link_libraries(uapki PRIVATE dl curl)
-endif ()
 
+if(UNIX)
+    target_link_libraries(uapki PRIVATE dl curl)
+endif()
 
 if (NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET uapki POST_BUILD
