@@ -5,8 +5,8 @@ project(cm-pkcs12 VERSION 1.0.20 LANGUAGES C CXX)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/version.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
 
@@ -49,7 +49,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 if (WIN32)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
@@ -80,27 +79,22 @@ set(COMMON_SOURCES
     ${PATH_COMMON_PKIX}/private-key.c
     ${PATH_COMMON_PKIX}/uapki-ns-util.cpp
 )
-
 if(WIN32)
-add_library(cm-pkcs12 ${UAPKI_CM_PKCS12_LIB_TYPE}
-    ${CMP12_CRYPTO_SOURCES}
-    ${CMP12_SRC_SOURCES}
-    ${CMP12_STORAGE_SOURCES}
-    ${COMMON_SOURCES}
-    ${JSON_SOURCES}
-    resource.rc
-)
+    set(RESOURCE_RC resource.rc)
 else()
-add_library(cm-pkcs12 ${UAPKI_CM_PKCS12_LIB_TYPE}
-    ${CMP12_CRYPTO_SOURCES}
-    ${CMP12_SRC_SOURCES}
-    ${CMP12_STORAGE_SOURCES}
-    ${COMMON_SOURCES}
-    ${JSON_SOURCES}
-)
+    set(RESOURCE_RC "")
 endif()
 
-target_include_directories(cm-pkcs12 PUBLIC
+add_library(${PROJECT_NAME} ${UAPKI_CM_PKCS12_LIB_TYPE}
+    ${CMP12_CRYPTO_SOURCES}
+    ${CMP12_SRC_SOURCES}
+    ${CMP12_STORAGE_SOURCES}
+    ${COMMON_SOURCES}
+    ${JSON_SOURCES}
+    ${RESOURCE_RC}
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
     ${PATH_COMMON_CMAPI}
     ${PATH_COMMON_JSON}
     ${PATH_COMMON_MACROS}
@@ -111,10 +105,18 @@ target_include_directories(cm-pkcs12 PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-set_target_properties(cm-pkcs12 PROPERTIES C_VISIBILITY_PRESET hidden)
-set_target_properties(cm-pkcs12 PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 if(NOT WIN32)
-    set_target_properties(uapkif PROPERTIES LINK_FLAGS_RELEASE -s)
+    if(APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+    endif()
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_RC_VERSION_H)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOCRYPT)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -122,17 +124,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     SOVERSION "${PROJECT_VERSION_MAJOR}"
 )
 
-target_compile_definitions(cm-pkcs12 PRIVATE CM_LIBRARY)
-if(WIN32)
-    target_compile_definitions(cm-pkcs12 PRIVATE NOCRYPT)
-    target_compile_definitions(cm-pkcs12 PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
+target_compile_definitions(${PROJECT_NAME} PRIVATE CM_LIBRARY)
 
-target_link_libraries(cm-pkcs12 PUBLIC uapkic uapkif)
+target_link_libraries(${PROJECT_NAME} PUBLIC uapkic uapkif)
 
 if (NOT UAPKI_DISABLE_COPY)
-    add_custom_command(TARGET cm-pkcs12 POST_BUILD
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../out/
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
-endif ()
+endif()
