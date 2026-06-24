@@ -27,6 +27,7 @@
 
 #define FILE_MARKER "uapki/cer-store.cpp"
 
+#define _CRT_SECURE_NO_WARNINGS
 #include <string.h>
 #include "cer-store.h"
 #include "ba-utils.h"

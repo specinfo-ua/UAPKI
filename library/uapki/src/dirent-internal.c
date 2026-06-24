@@ -27,6 +27,7 @@
 
 #define FILE_MARKER "uapki/dirent-internal.c"
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "dirent-internal.h"
 #include "macros-internal.h"
 #include "ba-utils.h"

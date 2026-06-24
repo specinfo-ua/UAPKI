@@ -41,8 +41,8 @@ namespace UapkiNS {
 namespace Crl {
 
 
-static const char* CRL_EXT      = ".crl";
-static const size_t CRL_EXT_LEN = 4;
+const char* const CRL_EXT       = ".crl";
+constexpr size_t CRL_EXT_LEN    = 4;
 
 
 enum class Type : uint32_t {
@@ -180,7 +180,7 @@ public:
     Cert::VerifyStatus getStatusSign (void) const {
         return m_StatusSign;
     }
-    const TBSCertListAlt_t* const getTbsCrl (void) const {
+    const TBSCertListAlt_t* getTbsCrl (void) const {
         return m_TbsCrl;
     }
     uint64_t getThisUpdate (void) const {
@@ -264,7 +264,7 @@ bool findRevokedCert (
 int parseRevokedCerts (
     std::vector<RevokedCertOffset>& Offsets,
     const uint8_t* bufEncoded,
-    const int lenEncoded
+    const size_t lenEncoded
 );
 int parseCrl (
     const ByteArray* baEncoded,

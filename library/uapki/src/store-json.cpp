@@ -54,37 +54,6 @@ using namespace std;
 namespace UapkiNS {
 
 
-static int extns_encoded_to_json (
-        const Extensions_t* extns,
-        JSON_Object* joResult
-)
-{
-    int ret = RET_OK;
-
-    (void)json_object_set_value(joResult, "encoded", json_value_init_array());
-    JSON_Array* ja_extns = json_object_get_array(joResult, "encoded");
-    for (int i = 0; i < extns->list.count; i++) {
-        DO_JSON(json_array_append_value(ja_extns, json_value_init_object()));
-        JSON_Object* jo_extn = json_array_get_object(ja_extns, i);
-        const Extension_t* extn = extns->list.array[i];
-        SmartBA sba_value;
-        string s_extnid;
-
-        DO(Util::oidFromAsn1(&extn->extnID, s_extnid));
-        DO_JSON(json_object_set_string(jo_extn, "extnId", s_extnid.c_str()));
-
-        if (extn->critical) {
-            DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_extn, "critical", true));
-        }
-
-        DO(asn_OCTSTRING2ba(&extn->extnValue, &sba_value));
-        DO(json_object_set_base64(jo_extn, "extnValue", sba_value.get()));
-    }
-
-cleanup:
-    return ret;
-}   //  extns_encoded_to_json
-
 static JSON_Object* extn_json_add_decoded (
         JSON_Object* joResult,
         const char* extnIdName
@@ -94,11 +63,8 @@ static JSON_Object* extn_json_add_decoded (
     JSON_Object* jo_decoded = json_object_get_object(joResult, "decoded");
     if (!jo_decoded) return nullptr;
 
-    int ret = RET_OK;
-    DO_JSON(json_object_set_string(jo_decoded, "id", extnIdName));
-    DO_JSON(json_object_set_value(jo_decoded, "value", json_value_init_object()));
-
-cleanup:
+    (void)(json_object_set_string(jo_decoded, "id", extnIdName));
+    (void)(json_object_set_value(jo_decoded, "value", json_value_init_object()));
     return json_object_get_object(jo_decoded, "value");
 }   //  extn_json_add_decoded
 
@@ -271,7 +237,6 @@ int extensionsToJson (
     int ret = RET_OK;
     const Extensions_t* extns = cerItem->getCert()->tbsCertificate.extensions;
     SmartBA sba_authoritykeyid, sba_subjectkeyid;
-    JSON_Array* ja_extns = nullptr;
 
     if (!extns) return RET_UAPKI_INVALID_STRUCT;
 
@@ -504,7 +469,6 @@ int infoToJson (
 )
 {
     int ret = RET_OK;
-    uint32_t cnt_revcerts = 0;
     string s_time;
 
     if (!joResult || !crlItem) return RET_UAPKI_GENERAL_ERROR;

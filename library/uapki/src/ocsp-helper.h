@@ -172,7 +172,7 @@ namespace Ocsp {
         );
 
     public:
-        const size_t countSingleResponses (void) const {
+        size_t countSingleResponses (void) const {
             return m_SingleResponseInfos.size();
         };
         const ByteArray* getNonce (void) const {

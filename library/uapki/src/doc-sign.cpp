@@ -46,6 +46,17 @@ DEBUG_OUTPUT_OUTSTREAM_FUNC
 #define DEBUG_OUTPUT_OUTSTREAM(msg,baData) debug_output_stream(DEBUG_OUTSTREAM_FOPEN,"DOC-SIGN",msg,baData)
 #endif
 
+#if __cplusplus >= 201703L
+    #define UAPKI_FALLTHROUGH [[fallthrough]]
+#elif defined(__clang__)
+    #define UAPKI_FALLTHROUGH [[clang::fallthrough]]
+#elif defined(__GNUC__) && (__GNUC__ >= 7)
+    #define UAPKI_FALLTHROUGH [[gnu::fallthrough]]
+#elif defined(_MSC_VER)
+    #define UAPKI_FALLTHROUGH __fallthrough
+#else
+    #define UAPKI_FALLTHROUGH ((void)0)
+#endif
 
 using namespace std;
 
@@ -104,13 +115,17 @@ int SharedData::paramsBySignatureFormat (void)
 {
     switch (signatureFormat) {
     case SignatureFormat::CADES_A:      //  CADES_A  >  CADES_XL
+        UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_XL:     //  CADES_XL >  CADES_C
+        UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_C:      //  CADES_C  >  CADES_T
         includeCert = true;
         isCadesCXA = true;
+        UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_T:      //  CADES_T  >  CADES_BES
         includeContentTS = true;
         includeSignatureTS = true;
+        UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_BES:
         isCadesFormat = true;
         sidUseKeyId = false;
@@ -187,7 +202,7 @@ int SigningDoc::init (
 
     int ret = RET_OK;
     if (sharedData->signatureFormat != SignatureFormat::RAW) {
-        int ret = builder.init();
+        ret = builder.init();
         if (ret != RET_OK) return ret;
 
         for (size_t i = 0; i < MAX_TIMESTAMPS; i++) {
@@ -871,4 +886,3 @@ cleanup:
 }   //  end namespace Doc
 
 }   //  end namespace UapkiNS
-

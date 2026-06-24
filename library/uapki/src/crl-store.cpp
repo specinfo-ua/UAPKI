@@ -112,11 +112,11 @@ CrlStore::~CrlStore (void)
 
 void CrlStore::setParams (
         const string& path,
-        bool useDeltaCrl
+        bool useDelta
 )
 {
     m_Path = path;
-    m_UseDeltaCrl = useDeltaCrl;
+    m_UseDeltaCrl = useDelta;
 }
 
 int CrlStore::addCrl (

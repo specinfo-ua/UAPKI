@@ -601,7 +601,7 @@ bool findRevokedCert (
 int parseRevokedCerts (
         std::vector<RevokedCertOffset>& Offsets,
         const uint8_t* bufEncoded,
-        const int lenEncoded
+        const size_t lenEncoded
 )
 {
     Offsets.clear();
@@ -609,8 +609,8 @@ int parseRevokedCerts (
 
     uint32_t tag;
     size_t hlen, vlen, offset;
-    bool ok = Util::decodeAsn1Header(bufEncoded, (size_t) lenEncoded, tag, hlen, vlen);
-    if (!ok || (tag != 0x30) || (hlen + vlen > lenEncoded)) return RET_UAPKI_INVALID_STRUCT;
+    bool ok = Util::decodeAsn1Header(bufEncoded, lenEncoded, tag, hlen, vlen);
+    if (!ok || (tag != 0x30) || ((hlen + vlen) > lenEncoded)) return RET_UAPKI_INVALID_STRUCT;
     if (vlen == 0) return RET_OK;
 
     bufEncoded += hlen;
@@ -692,7 +692,7 @@ int parseCrl (
     DO(Util::pkixTimeFromAsn1(&tbs->thisUpdate, this_update));
     DO(Util::pkixTimeFromAsn1(&tbs->nextUpdate, next_update));
 
-    DO(parseRevokedCerts(revcert_offsets, tbs->revokedCertificates.buf, tbs->revokedCertificates.size));
+    DO(parseRevokedCerts(revcert_offsets, tbs->revokedCertificates.buf, (size_t)tbs->revokedCertificates.size));
 
     extns = tbs->crlExtensions;
     DO(ExtensionHelper::getAuthorityKeyId(extns, &sba_authoritykeyid));

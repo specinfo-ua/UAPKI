@@ -105,8 +105,8 @@ public:
         return m_IsInitialized;
     }
 
-    void setInitialized (bool isInitialized) {
-        m_IsInitialized = isInitialized;
+    void setInitialized (bool initialized) {
+        m_IsInitialized = initialized;
     }
     void setOcsp (const OcspParams& ocspParams) {
         m_OcspParams.nonceLen = ocspParams.nonceLen;

@@ -220,7 +220,7 @@ int CmProviders::getInfo (const size_t index, JSON_Object* joResult)
                                                              json.getBoolean("supportListStorages", false)));
     if (json.hasValue("flags", JSONNumber)) {
         const int flags = json.getInt("flags");
-        if ((flags >= 0) && (flags <= 0xFFFFFFFF)) ParsonHelper::jsonObjectSetUint32(joResult, "flags", (uint32_t)flags);
+        if (flags >= 0) ParsonHelper::jsonObjectSetUint32(joResult, "flags", (uint32_t)flags);
     }
 
 cleanup:
