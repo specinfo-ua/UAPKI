@@ -319,11 +319,10 @@ static int call_thread_method (
         DEBUG_OUTCON(printf("%c", serialmethod_is_running ? '+' : '-'));
     }
 
-    unsigned int cnt_methods = ++api_counter_methods;
-
+    api_counter_methods++;
     const int ret = fMethod(joParams, joResult);
-    DEBUG_OUTCON(printf("  ret=%d\n", ret));
-    cnt_methods = --api_counter_methods;
+    DEBUG_OUTCON(int cnt = (int)api_counter_methods; printf("  (api_counter_methods=%d) ret=%d\n", cnt, ret));
+    api_counter_methods--;
     return ret;
 }
 

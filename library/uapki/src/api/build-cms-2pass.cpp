@@ -83,7 +83,6 @@ cleanup:
 }   //  parse_docattr_from_json
 
 static int step1_encodesa (
-        CertValidator::CertValidator& certValidator,
         JSON_Object* joStep1Params,
         JSON_Object* joResult
 )
@@ -96,7 +95,7 @@ static int step1_encodesa (
     int ret = RET_OK;
     LibraryConfig& config = *cert_validator.getLibConfig();
     Doc::Sign::SigningDoc sdoc;
-    SmartBA sba_certid, sba_messagedigest;
+    SmartBA sba_messagedigest;
     uint64_t signing_time = 0;
 
     shared_data.aidDigest.algorithm = ParsonHelper::jsonObjectGetString(joStep1Params, "digestAlgo");
@@ -177,7 +176,6 @@ cleanup:
 }   //  step1_encodesa
 
 static int step2_encodesd (
-        CertValidator::CertValidator& certValidator,
         JSON_Object* joStep2Params,
         JSON_Object* joResult
 )
@@ -305,23 +303,17 @@ int uapki_build_cms_2pass (
     int ret = RET_OK;
     int cnt_steps = 0;
 
-    CertValidator::CertValidator cert_validator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
-    if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
-
     if (ParsonHelper::jsonObjectHasValue(joParams, "step1", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step1", json_value_init_object()));
         DO(step1_encodesa(
-            cert_validator,
             json_object_get_object(joParams, "step1"),
             json_object_get_object(joResult, "step1")
         ));
         cnt_steps++;
     }
-    else if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
+    if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step2", json_value_init_object()));
         DO(step2_encodesd(
-            cert_validator,
             json_object_get_object(joParams, "step2"),
             json_object_get_object(joResult, "step2"))
         );

@@ -77,7 +77,7 @@ public:
     );
 
     int providerInfo (
-        std::string& providerInfo
+        std::string& outInfo
     );
     int providerInit (
         const std::string& providerParams
@@ -85,11 +85,11 @@ public:
     int providerDeinit (void);
 
     int storageList (
-        std::string& storageList
+        std::string& outList
     );
     int storageInfo (
         const std::string& storageId,
-        std::string& storageInfo
+        std::string& outInfo
     );
     int storageOpen (
         const std::string& storageId,
@@ -104,7 +104,7 @@ public:
     );
 
     int sessionInfo (
-        std::string& sessionInfo
+        std::string& outInfo
     );
     int sessionMechanismParameters (
         const std::string& mechanismId,

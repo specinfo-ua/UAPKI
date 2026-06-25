@@ -308,7 +308,9 @@ namespace AttributeHelper {
             CrlOcspRef& crlOcspRef
         );
 
-        const size_t getCountCrlOcspRefs (void) const { return m_CountCrlOcspRefs; }
+        size_t getCountCrlOcspRefs (void) const {
+            return m_CountCrlOcspRefs;
+        }
 
     };  //  end class RevocationRefsParser
 

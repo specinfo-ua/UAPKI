@@ -44,8 +44,6 @@ using namespace UapkiNS;
 static int build_csr (
         CmStorageProxy& storage,
         const UapkiNS::AlgorithmIdentifier& aidSignAlgo,
-        const ByteArray* baSubject,
-        const ByteArray* baAttributes,
         ByteArray** baCsr
 )
 {
@@ -120,13 +118,23 @@ int uapki_key_get_csr (
     }
 
     ret = !ParsonHelper::jsonObjectGetBoolean(joParams, "ignoreProviderGetCsr", false)
-        ? storage->keyGetCsr(aid_signalgo.algorithm, aid_signalgo.baParameters, sba_subject.get(), sba_attrs.get(), &sba_csr)
+        ? storage->keyGetCsr(
+            aid_signalgo.algorithm,
+            aid_signalgo.baParameters,
+            sba_subject.get(),
+            sba_attrs.get(),
+            &sba_csr
+        )
         : RET_UAPKI_NOT_SUPPORTED;
     switch (ret) {
     case RET_OK:
         break;
     case RET_UAPKI_NOT_SUPPORTED:
-        DO(build_csr(*storage, aid_signalgo, sba_subject.get(), sba_attrs.get(), &sba_csr));
+        DO(build_csr(
+            *storage,
+            aid_signalgo,
+            &sba_csr
+        ));
         break;
     default:
         SET_ERROR(ret);

@@ -237,16 +237,16 @@ void CertStatusInfo::reset (void)
 }
 
 int CertStatusInfo::set (
-        const UapkiNS::CertStatus status,
-        const uint64_t validTime,
-        const ByteArray* baResult
+        const UapkiNS::CertStatus aStatus,
+        const uint64_t aValidTime,
+        const ByteArray* aResult
 )
 {
     reset();
     this->needUpdate = false;
-    this->status = status;
-    this->validTime = validTime;
-    this->baResult = ba_copy_with_alloc(baResult, 0, 0);
+    this->status = aStatus;
+    this->validTime = aValidTime;
+    this->baResult = ba_copy_with_alloc(aResult, 0, 0);
     return (this->baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
@@ -768,8 +768,8 @@ int parseCert (
         }
     }
     if (cert_extkeyusage.isOcsp()) {
-        SmartBA sba_encoded;
-        if (Util::extnValueFromExtensions(extns, OID_PKIX_OcspNoCheck, nullptr, &sba_encoded) == RET_OK) {
+        SmartBA sba_tmpvalue;
+        if (Util::extnValueFromExtensions(extns, OID_PKIX_OcspNoCheck, nullptr, &sba_tmpvalue) == RET_OK) {
             cert_extkeyusage.set(ExtKeyUsageMask::OCSP_NO_CHECK);
         }
     }

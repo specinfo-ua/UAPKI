@@ -112,7 +112,7 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
         }
 
-        lock_guard<mutex> lock(HttpHelper::lockUri(s_url));
+        lock_guard<mutex> lock1(HttpHelper::lockUri(s_url));
 
         DO(HttpHelper::post(
             s_url,
@@ -146,7 +146,7 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
                     ret = cer_store.getCertByIssuerAndSN(sba_issuerbytes.get(), sba_serialnumber.get(), &cer_subject);
                 }
                 if ((ret == RET_OK) && cer_subject) {
-                    lock_guard<mutex> lock(cer_subject->getMutex());
+                    lock_guard<mutex> lock2(cer_subject->getMutex());
                     DO(cer_subject->getCertStatusByOcsp().set(
                         result_validation.singleResponseInfo.certStatus,
                         result_validation.singleResponseInfo.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,

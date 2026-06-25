@@ -247,6 +247,7 @@ CM_ERROR CmCryptoki::open (
         CM_SESSION_API** session
 )
 {
+    (void)openParams;
     DEBUG_OUTCON(puts("CmCryptoki::open()"));
     if (!storageId || !session) return RET_CM_INVALID_PARAMETER;
 

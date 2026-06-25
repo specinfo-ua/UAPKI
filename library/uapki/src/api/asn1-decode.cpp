@@ -219,6 +219,7 @@ static int asn1_decode_null (
         JSON_Object* joResult
 )
 {
+    (void)joResult;
     int ret = RET_OK;
     NULL_t* prim_null = nullptr;
 
@@ -312,7 +313,10 @@ cleanup:
 }
 
 
-int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_asn1_decode (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
     int ret = RET_OK;
     JSON_Array* ja_items = json_object_get_array(joParams, "items");

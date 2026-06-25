@@ -39,8 +39,12 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_remove_cert (
+        JSON_Object* joParams,
+        JSON_Object* joResult
+)
 {
+    (void)joResult;
     int ret = RET_OK;
     LibraryConfig* lib_config = get_config();
     Cert::CerStore* cer_store = get_cerstore();

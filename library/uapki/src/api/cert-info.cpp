@@ -43,11 +43,11 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     SmartBA sba_certid, sba_encoded;
-    Cert::CerItem* cer_item = nullptr;
+    Cert::CerItem* parsed_ceritem = nullptr;
 
     if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-        DO(Cert::parseCert(sba_encoded.get(), &cer_item));
-        DO(Cert::detailInfoToJson(joResult, cer_item));
+        DO(Cert::parseCert(sba_encoded.get(), &parsed_ceritem));
+        DO(Cert::detailInfoToJson(joResult, parsed_ceritem));
     }
     else {
         LibraryConfig* lib_config = get_config();
@@ -57,9 +57,9 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
         if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
         if (sba_certid.set(json_object_get_base64(joParams, "certId"))) {
-            Cert::CerItem* cer_item = nullptr;
-            DO(cer_store->getCertByCertId(sba_certid.get(), &cer_item));
-            DO(Cert::detailInfoToJson(joResult, cer_item));
+            Cert::CerItem* found_ceritem = nullptr;
+            DO(cer_store->getCertByCertId(sba_certid.get(), &found_ceritem));
+            DO(Cert::detailInfoToJson(joResult, found_ceritem));
         }
         else {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
@@ -67,6 +67,6 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
     }
 
 cleanup:
-    delete cer_item;
+    delete parsed_ceritem;
     return ret;
 }

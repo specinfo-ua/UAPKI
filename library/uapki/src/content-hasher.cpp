@@ -72,7 +72,7 @@ int ContentHasher::digest (
     if (
         (hashAlgo == HASH_ALG_UNDEFINED) ||
         (m_SourceType == SourceType::UNDEFINED)
-    ) RET_UAPKI_INVALID_PARAMETER;
+    ) return RET_UAPKI_INVALID_PARAMETER;
 
     if (m_HashAlgo == hashAlgo) return RET_OK;
 

@@ -1248,6 +1248,8 @@ bool checkCertUsage (
     case CertEntity::ROOT:
         ok = cerItem->getCertExtKeyUsage().isCa();
         break;
+    default:
+        break;
     }
 
     return ok;

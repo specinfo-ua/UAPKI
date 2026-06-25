@@ -34,7 +34,13 @@
 #include "parson.h"
 #include "uapkic.h"
 #include "cm-pkcs12-debug.h"
-#include "version.h"
+
+#ifdef HAVE_RC_VERSION_H
+#include "rc-version.h"
+#else
+//  See cm-pkcs12\CMakeLists.txt
+#define STR_FILEVERSION "1.0.20"
+#endif
 
 
 #define DEBUG_OUTPUT(msg)

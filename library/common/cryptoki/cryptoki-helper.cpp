@@ -1302,7 +1302,7 @@ string uint32ToHex (
 {
     string rv_hex;
     rv_hex.resize(8);
-    sprintf((char*)rv_hex.data(), "%08X", value);
+    std::snprintf(&rv_hex[0], 9, "%08X", value);
     return rv_hex;
 }
 

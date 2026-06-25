@@ -99,17 +99,17 @@ void CmStorageProxy::arrayCmbaFree (
 }
 
 int CmStorageProxy::providerInfo (
-        string& providerInfo
+        string& outInfo
 )
 {
-    providerInfo.clear();
+    outInfo.clear();
 
     char* s_providerinfo = nullptr;
     const int ret = m_CmLoader.info((CM_JSON_PCHAR*)&s_providerinfo);
     if (ret != RET_OK) return ret;
 
     if (s_providerinfo) {
-        providerInfo = string(s_providerinfo);
+        outInfo = string(s_providerinfo);
         m_CmLoader.blockFree(s_providerinfo);
     }
     return RET_OK;
@@ -137,13 +137,13 @@ int CmStorageProxy::providerDeinit (void)
 }
 
 int CmStorageProxy::storageList (
-        string& storageList
+        string& outList
 )
 {
     CM_JSON_PCHAR json_listuris = nullptr;
     const int ret = m_CmLoader.listStorages(&json_listuris);
     if ((ret == RET_OK) && json_listuris) {
-        storageList = string((char*)json_listuris);
+        outList = string((char*)json_listuris);
         cmFree(json_listuris);
     }
     return ret;
@@ -151,13 +151,13 @@ int CmStorageProxy::storageList (
 
 int CmStorageProxy::storageInfo (
         const string& storageId,
-        string& storageInfo
+        string& outInfo
 )
 {
     CM_JSON_PCHAR json_storageinfo = nullptr;
     const int ret = m_CmLoader.storageInfo(storageId.c_str(), &json_storageinfo);
     if ((ret == RET_OK) && json_storageinfo) {
-        storageInfo = string((char*)json_storageinfo);
+        outInfo = string((char*)json_storageinfo);
         cmFree(json_storageinfo);
     }
     return ret;
@@ -204,13 +204,13 @@ int CmStorageProxy::storageFormat (
 }
 
 int CmStorageProxy::sessionInfo (
-        string& sessionInfo
+        string& outInfo
 )
 {
     CM_JSON_PCHAR json_sesinfo = nullptr;
     const int ret = (int)m_Session->info(m_Session, &json_sesinfo);
     if ((ret == RET_OK) && json_sesinfo) {
-        sessionInfo = string((char*)json_sesinfo);
+        outInfo = string((char*)json_sesinfo);
         cmFree(json_sesinfo);
     }
     return ret;

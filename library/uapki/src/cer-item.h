@@ -41,10 +41,12 @@ namespace UapkiNS {
 namespace Cert {
 
 
-static const char* CER_EXT      = ".cer";
-static const size_t CER_EXT_LEN = 4;
+const char* const CER_EXT       = ".cer";
+constexpr size_t CER_EXT_LEN    = 4;
+
 static const bool NOT_TRUSTED   = false;
 static const bool TRUSTED       = true;
+
 static const bool NOT_PERMANENT = false;
 static const bool PERMANENT     = true;
 
@@ -145,9 +147,9 @@ struct CertExtKeyUsage {
     void set (const ExtKeyUsageMask ekuMask) {
         value |= (uint32_t)ekuMask;
     }
-    void setPathLenConstraint (uint32_t pathLen) {
-        if (pathLen > 3) pathLen = 3;
-        value |= (uint32_t)ExtKeyUsageMask::CA_PATHLEN | pathLen;
+    void setPathLenConstraint (uint32_t pathLenConstraint) {
+        if (pathLenConstraint > 3) pathLenConstraint = 3;
+        value |= (uint32_t)ExtKeyUsageMask::CA_PATHLEN | pathLenConstraint;
     }
 };  //  end struct CertExtKeyUsage
 
@@ -229,7 +231,7 @@ public:
     const ByteArray* getAuthorityKeyId (void) const {
         return m_AuthorityKeyId;
     }
-    const Certificate_t* const getCert (void) const {
+    const Certificate_t* getCert (void) const {
         return m_Cert;
     }
     const CertExtKeyUsage& getCertExtKeyUsage (void) const {
@@ -277,7 +279,7 @@ public:
     uint64_t getNotBefore (void) const {
         return m_NotBefore;
     }
-    const size_t getPublicKeySize (void) const {
+    size_t getPublicKeySize (void) const {
         return m_PublicKeySize;
     }
     const ByteArray* getSerialNumber (void) const {
