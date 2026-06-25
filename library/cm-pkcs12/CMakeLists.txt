@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(cm-pkcs12 VERSION 1.0.20 LANGUAGES C CXX)
+project(cm-pkcs12 VERSION 1.0.22 LANGUAGES C CXX)
 
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 

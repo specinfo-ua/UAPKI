@@ -336,6 +336,41 @@ void StoreBag::setPbes2Param (
     m_Pbes2param.cipher = oidCipher;
 }
 
+bool StoreBag::certContainKeyId (
+        const ByteArray* baEncoded,
+        const ByteArray* baKeyId
+)
+{
+
+    int ret = RET_OK;
+    Certificate_t* cert = nullptr;
+    string s_keyalgo;
+    SmartBA sba_keyid, sba_keyid2, sba_pubkey;
+    HashAlg hash_alg = HASH_ALG_SHA1;
+    bool is_contain = false;
+
+    cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), baEncoded);
+    if (!cert) return false;
+
+    DO(Util::oidFromAsn1(&cert->tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm, s_keyalgo));
+    DO(asn_BITSTRING2ba(&cert->tbsCertificate.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
+
+    if (oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_keyalgo.c_str())) {
+        hash_alg = HASH_ALG_GOST34311;
+    }
+    DO(::hash(hash_alg, sba_pubkey.get(), &sba_keyid));
+
+    is_contain = (ba_cmp(sba_keyid.get(), baKeyId) == 0);
+    if (!is_contain && (hash_alg == HASH_ALG_GOST34311)) {
+        DO(::hash(HASH_ALG_DSTU7564_256, sba_pubkey.get(), &sba_keyid2));
+        is_contain = (ba_cmp(sba_keyid2.get(), baKeyId) == 0);
+    }
+
+cleanup:
+    asn_free(get_Certificate_desc(), cert);
+    return is_contain;
+}
+
 bool StoreBag::keyIdFromPrivKeyInfo (
         const HashAlg hashAlg,
         const ByteArray* baPrivKeyInfo,

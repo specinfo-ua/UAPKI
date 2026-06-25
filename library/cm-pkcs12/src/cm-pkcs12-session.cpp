@@ -340,7 +340,7 @@ static CM_ERROR cm_session_delete_key (
     DEBUG_OUTPUT(std::string("cm_session_delete_key(), count keys: ") + std::to_string(list_keys.size()));
 
     for (size_t i = 0; i < list_keys.size(); i++) {
-        if (ba_cmp(list_keys[i]->keyId(), (ByteArray*)baKeyId) == 0) {
+        if (list_keys[i]->equalKeyId((ByteArray*)baKeyId)) {
             bag_to_del = list_keys[i];
             break;
         }
@@ -358,9 +358,7 @@ static CM_ERROR cm_session_delete_key (
         DEBUG_OUTPUT(std::string("cm_session_delete_key(), count certs: ") + std::to_string(list_certs.size()));
 
         for (size_t i = 0; i < list_certs.size(); i++) {
-            SmartBA sba_keyid;
-            int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid);
-            if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), (ByteArray*)baKeyId) == 0)) {
+            if (StoreBag::certContainKeyId(list_certs[i]->bagValue(), (ByteArray*)baKeyId)) {
                 storage.deleteBag(list_certs[i]);
             }
         }
@@ -456,9 +454,7 @@ static CM_ERROR cm_session_add_certificate (
     DEBUG_OUTPUT(std::string("cm_session_add_certificate(), count certs: ") + std::to_string(list_certs.size()));
 
     for (size_t i = 0; i < list_certs.size(); i++) {
-        SmartBA sba_keyid2;
-        ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid2);
-        if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), sba_keyid2.get()) == 0)) {
+        if (StoreBag::certContainKeyId(list_certs[i]->bagValue(), sba_keyid.get())) {
             return RET_OK;
         }
     }
@@ -508,9 +504,7 @@ static CM_ERROR cm_session_delete_certificate (
     DEBUG_OUTPUT(std::string("cm_session_delete_certificate(), count certs: ") + std::to_string(list_certs.size()));
 
     for (size_t i = 0; i < list_certs.size(); i++) {
-        SmartBA sba_keyid;
-        int ret = keyid_by_cert(list_certs[i]->bagValue(), &sba_keyid);
-        if ((ret == RET_OK) && (ba_cmp(sba_keyid.get(), (ByteArray*)baKeyId) == 0)) {
+        if (StoreBag::certContainKeyId(list_certs[i]->bagValue(), (ByteArray*)baKeyId)) {
             storage.deleteBag(list_certs[i]);
             flag_found = true;
         }

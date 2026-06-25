@@ -167,6 +167,10 @@ class StoreBag {
         );
 
     public:
+        static bool certContainKeyId (
+            const ByteArray* baEncoded,
+            const ByteArray* baKeyId
+        );
         static bool keyIdFromPrivKeyInfo (
             const HashAlg hashAlg,
             const ByteArray* baPrivKeyInfo,
