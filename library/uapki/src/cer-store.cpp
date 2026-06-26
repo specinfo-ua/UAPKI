@@ -25,9 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FILE_MARKER "uapki/cer-store.cpp"
+#define FILE_MARKER "uapki/src/cer-store.cpp"
 
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #include <string.h>
 #include "cer-store.h"
 #include "ba-utils.h"

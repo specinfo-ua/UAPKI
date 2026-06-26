@@ -25,9 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FILE_MARKER "uapki/dirent-internal.c"
+#define FILE_MARKER "uapki/src/dirent-internal.c"
 
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #include "dirent-internal.h"
 #include "macros-internal.h"
 #include "ba-utils.h"
