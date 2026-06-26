@@ -52,14 +52,12 @@ using namespace UapkiNS;
 
 static int get_info_signalgo_and_keyid (
         CmStorageProxy& storage,
-        string& signAlgo,
-        ByteArray** baKeyId
+        Doc::Sign::SharedData& sharedData
 )
 {
     string s_keyinfo;
-    SmartBA sba_keyid;
 
-    int ret = storage.keyGetInfo(s_keyinfo, &sba_keyid);
+    int ret = storage.keyGetInfo(s_keyinfo, nullptr);
     if (ret != RET_OK) return ret;
 
     ParsonHelper json;
@@ -70,26 +68,24 @@ static int get_info_signalgo_and_keyid (
     ja_signalgos = json.getArray("signAlgo");
     if (json_array_get_count(ja_signalgos) == 0) return RET_UAPKI_UNSUPPORTED_ALG;
 
-    if (signAlgo.empty()) {
+    if (sharedData.aidSignature.algorithm.empty()) {
         //  Set first signAlgo from list
-        signAlgo = ParsonHelper::jsonArrayGetString(ja_signalgos, 0);
-        is_found = (!signAlgo.empty());
+        sharedData.aidSignature.algorithm = ParsonHelper::jsonArrayGetString(ja_signalgos, 0);
+        is_found = (!sharedData.aidSignature.algorithm.empty());
     }
     else {
         //  Check signAlgo in list
         for (size_t i = 0; i < json_array_get_count(ja_signalgos); i++) {
             const string s = ParsonHelper::jsonArrayGetString(ja_signalgos, i);
-            is_found = (s == signAlgo);
+            is_found = (s == sharedData.aidSignature.algorithm);
             if (is_found) break;
         }
     }
     if (!is_found) return RET_UAPKI_UNSUPPORTED_ALG;
 
-    *baKeyId = sba_keyid.get();
-    sba_keyid.set(nullptr);
+    if (!sharedData.keyId.set(ba_copy_with_alloc(storage.getSelectedKeyId(), 0, 0))) return RET_UAPKI_GENERAL_ERROR;
 
-    ret = (*baKeyId) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
-    return ret;
+    return RET_OK;
 }   //  get_info_signalgo_and_keyid
 
 static int parse_sign_params (
@@ -286,7 +282,7 @@ int uapki_sign (
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO(get_info_signalgo_and_keyid(*storage, shared_data.aidSignature.algorithm, &shared_data.keyId));
+    DO(get_info_signalgo_and_keyid(*storage, shared_data));
 
     shared_data.hashSignature = hash_from_oid(shared_data.aidSignature.algorithm.c_str());
     if (shared_data.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
@@ -310,7 +306,7 @@ int uapki_sign (
             DO(cer_store.getCertByCertId(storage->getPairedCertId(), &shared_data.cerSigner));
         }
         else {
-            DO(cer_store.getCertByKeyId(shared_data.keyId.get(), &shared_data.cerSigner));
+            DO(cer_store.getCertByKeyId(storage->getSelectedKeyId(), &shared_data.cerSigner));
         }
         DO(json_object_set_base64(joResult, "signerCertId", shared_data.cerSigner->getCertId()));
         if (!shared_data.cerSigner->keyUsageByBit(KeyUsage_digitalSignature)) {

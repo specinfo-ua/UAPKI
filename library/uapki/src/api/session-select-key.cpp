@@ -138,13 +138,14 @@ int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
 
         //  Get cert from cert-store
         if (!sba_certid.empty()) {
-            DO(storage->setPairedCertId(sba_certid.get()));
             ret = cer_store->getCertByCertId(sba_certid.get(), &cer_selectedkey);
         }
         else {
             ret = cer_store->getCertByKeyId(sba_keyid.get(), &cer_selectedkey);
         }
         if (ret == RET_OK) {
+            DO(storage->setPairedCertId(cer_selectedkey->getCertId()));
+
             DO_JSON(json_object_set_base64(joResult, "certId", cer_selectedkey->getCertId()));
             DO_JSON(json_object_set_base64(joResult, "certificate", cer_selectedkey->getEncoded()));
         }
