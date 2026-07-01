@@ -59,7 +59,7 @@ UAPKIC_EXPORT Sha1Ctx *sha1_copy_with_alloc(const Sha1Ctx *ctx);
 UAPKIC_EXPORT int sha1_update(Sha1Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку геша і повертає його значення.
+ * Завершує вироблення гешу й повертає його значення.
  *
  * @param ctx контекст SHA1
  * @param out геш від даних

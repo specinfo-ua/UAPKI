@@ -447,9 +447,9 @@ void base_cycle32(Gost28147Ctx *ctx, uint32_t src[8], const uint32_t k[32])
 }
 
 /**
- * Инкрементирует значення feed.
+ * Інкрементує значення feed.
  *
- * @param feed указатель на 32-байтный feed
+ * @param feed указівник на feed розміром у 32 байти
  */
 static __inline void ctr_next_feed(uint32_t *feed)
 {
@@ -469,8 +469,7 @@ static __inline void ctr_next_feed(uint32_t *feed)
     }
 }
 
-/*Используется в ДСТУ4145 и ГОСТ28147.*/
-int  gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool is_encrypt, uint8_t *dst)
+static int gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool is_encrypt, uint8_t *dst)
 {
     uint32_t block24[6] = {0};
     int part_block24_len;
@@ -481,7 +480,7 @@ int  gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool 
     CHECK_PARAM(src != NULL);
     CHECK_PARAM(dst != NULL);
 
-    /* Шифруем фрагментами по 24 байта. */
+    /* Шифруємо блоками по 24 байти. */
     for (i = len / 24; i > 0; i--) {
         DO(uint8_to_uint32(src, 24, block24, 6));
         base_cycle24(block24, ctx->key, is_encrypt ? ENCRYPT_KEY_ORDER : DECRYPT_KEY_ORDER, ctx->sbox);
@@ -490,10 +489,10 @@ int  gost28147_ecb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len, bool 
         dst += 24;
     }
 
-    /* Шифруем оставшиеся 8 або 16 байт. */
+    /* Шифруємо останні 8 або 16 байтів. */
     part_block24_len = len % 24;
 
-    if (part_block24_len != 0) {
+    if (part_block24_len) {
         DO(uint8_to_uint32(src, part_block24_len, block24, part_block24_len / 4));
         base_cycle24(block24, ctx->key, is_encrypt ? ENCRYPT_KEY_ORDER : DECRYPT_KEY_ORDER, ctx->sbox);
         DO(uint32_to_uint8(block24, part_block24_len / 4, dst, part_block24_len));
@@ -515,7 +514,7 @@ static int gost28147_ctr_crypt(Gost28147Ctx *ctx, const uint8_t *src, uint8_t *d
     CHECK_PARAM(src != NULL);
     CHECK_PARAM(dst != NULL);
 
-    /* Если осталась не использованная часть гаммы. */
+    /* Якщо залишилася невикористана частина гами. */
     if (ctx_off != 0) {
         while (ctx_off < 24 && data_off < len) {
             dst[data_off] = src[data_off] ^ ctr_ctx->gamma[ctx_off++];
@@ -532,7 +531,7 @@ static int gost28147_ctr_crypt(Gost28147Ctx *ctx, const uint8_t *src, uint8_t *d
     }
 
     if (data_off < len) {
-        /* Шифрование блоками по 24 байта. */
+        /* Шифрування блоками по 24 байти. */
         for (; data_off + 24 <= len; data_off += 24) {
             FAST_XOR4N(&src[data_off], ctr_ctx->gamma, 24, &dst[data_off]);
             ctr_next_feed(ctr_ctx->feed);
@@ -541,7 +540,7 @@ static int gost28147_ctr_crypt(Gost28147Ctx *ctx, const uint8_t *src, uint8_t *d
             DO(uint32_to_uint8(feed, 6, ctr_ctx->gamma, 24));
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < len; data_off++) {
             dst[data_off] = src[data_off] ^ ctr_ctx->gamma[ctx_off++];
         }
@@ -569,7 +568,7 @@ static int gost28147_cfb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len,
     CHECK_PARAM(dst != NULL);
 
     if (is_encrypt) {
-        /* Использование оставшейся гаммы. */
+        /* Шифрування гами, що залишилась. */
         if (ctx_off != 0) {
             while (ctx_off < 8 && data_off < len) {
                 dst[data_off] = src[data_off] ^ gamma[ctx_off];
@@ -585,7 +584,7 @@ static int gost28147_cfb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len,
         }
 
         if (data_off < len) {
-            /* Шифрование блоками по 8 байт. */
+            /* Шифрування блоками по 8 байтів. */
             for (; data_off + 8 <= len; data_off += 8) {
                 FAST_XOR4N(&src[data_off], gamma, 8, &dst[data_off]);
                 memcpy(feed, &dst[data_off], 8);
@@ -594,14 +593,14 @@ static int gost28147_cfb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len,
                 base_cycle8(gamma32, ctx->key, ENCRYPT_KEY_ORDER, 32, ctx->sbox);
                 DO(uint32_to_uint8(gamma32, 2, gamma, 8));
             }
-            /* Шифрование последнего неполного блока. */
+            /* Шифрування останнього неповного блока. */
             for (; data_off < len; data_off++) {
                 dst[data_off] = src[data_off] ^ gamma[ctx_off];
                 feed[ctx_off++] = dst[data_off];
             }
         }
     } else {
-        /* Использование оставшейся гаммы. */
+        /* Використання гами, що залишилась. */
         if (ctx_off != 0) {
             while (ctx_off < 8 && data_off < len) {
                 feed[ctx_off] = src[data_off];
@@ -619,7 +618,7 @@ static int gost28147_cfb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len,
         }
 
         if (data_off < len) {
-            /* Расшифрование блоками по 8 байт. */
+            /* Розшифрування блоками по 8 байтів. */
             for (; data_off + 8 <= len; data_off += 8) {
                 memcpy(feed, &src[data_off], 8);
                 FAST_XOR4N(&src[data_off], gamma, 8, &dst[data_off]);
@@ -629,7 +628,7 @@ static int gost28147_cfb_core(Gost28147Ctx *ctx, const uint8_t *src, size_t len,
                 DO(uint32_to_uint8(gamma32, 2, gamma, 8));
             }
 
-            /* Расшифрование последнего неполного блока. */
+            /* Розшифрування останнього неповного блока. */
             for (; data_off < len; data_off++) {
                 feed[ctx_off] = src[data_off];
                 dst[data_off] = src[data_off] ^ gamma[ctx_off++];
@@ -992,7 +991,7 @@ int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *in, ByteArray **out)
 
     switch (ctx->mode_id) {
     case GOST28147_MODE_ECB:
-        CHECK_PARAM((len & 0x7) == 0);
+        CHECK_PARAM(!(len & 7));
 
         MALLOC_CHECKED(out_buf, len);
         DO(gost28147_ecb_core(ctx, ba_get_buf_const(in), len, false, out_buf));

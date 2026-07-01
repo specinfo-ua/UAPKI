@@ -56,7 +56,7 @@ typedef struct EcCache_st {
 } EcCache;
 
 static EcCache *ec_cache = NULL;
-static pthread_mutex_t ec_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t ec_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 OptLevelId default_opt_level = 0;
 
@@ -472,11 +472,11 @@ void ec_cache_free(void)
 {
     pthread_mutex_lock(&ec_cache_mutex);
 
-#if defined(_WIN32)
-    Sleep(1000);
-#else
-    sleep(1);
-#endif
+//#if defined(_WIN32)
+//    Sleep(1000);
+//#else
+//    sleep(1);
+//#endif
 
     if (ec_cache) {
         EcCache* ec_cache_next = ec_cache;

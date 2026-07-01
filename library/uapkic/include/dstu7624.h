@@ -36,16 +36,16 @@ extern "C" {
 #endif
 
 /**
- * Контекст для dstu7624.
+ * Контекст ДСТУ 7624.
  */
 typedef struct Dstu7624Ctx_st Dstu7624Ctx;
 
 typedef enum {
-    DSTU7624_SBOX_1 = 0 /*Стандартний sbox ДСТУ7624 */
+    DSTU7624_SBOX_1 = 0 // Стандартний sbox ДСТУ 7624
 } Dstu7624SboxId;
 
 /**
- * Створює контекст ДСТУ 7624 зі стандартним sbox.
+ * Створює контекст блокового шифру ДСТУ 7624:2014 «Калина» зі стандартним sbox.
  *
  * @param sbox_id ідентифікатор стандартної таблиці замін
  * @return контекст ДСТУ 7624
@@ -61,20 +61,20 @@ UAPKIC_EXPORT Dstu7624Ctx *dstu7624_alloc(Dstu7624SboxId sbox_id);
 UAPKIC_EXPORT Dstu7624Ctx *dstu7624_alloc_user_sbox(ByteArray *sbox);
 
 /**
- * Генерує секретний ключ.
+ * Генерує ключ шифрування.
  *
- * @param key_len розмір ключа 16, 32 или 64
- * @param key секретний ключ
+ * @param key_len розмір ключа; повинен становити 16, 32 або 64 байти
+ * @param key ключ шифрування
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_generate_key(size_t key_len, ByteArray **key);
 
 /**
- * Ініціалізує контекст для шифрування у режимі простої заміни.
+ * Ініціалізує контекст для шифрування в режимі простої заміни.
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param block_size розмір блока, 16, 32, 64 байт
+ * @param block_size розмір блока; повинен становити 16, 32 або 64 байти
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_init_ecb(Dstu7624Ctx *ctx, const ByteArray *key, const size_t block_size);
@@ -84,7 +84,7 @@ UAPKIC_EXPORT int dstu7624_init_ecb(Dstu7624Ctx *ctx, const ByteArray *key, cons
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка, розміром блоку
+ * @param iv ініціалізаційний вектор, розміром блоку
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_init_ctr(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -94,7 +94,7 @@ UAPKIC_EXPORT int dstu7624_init_ctr(Dstu7624Ctx *ctx, const ByteArray *key, cons
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @param q кількість байт, які будуть шифруватися за один цикл, 1 <= q <= block_size
  * @return код помилки
  */
@@ -105,7 +105,7 @@ UAPKIC_EXPORT int dstu7624_init_cfb(Dstu7624Ctx *ctx, const ByteArray *key, cons
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_init_cbc(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -115,17 +115,17 @@ UAPKIC_EXPORT int dstu7624_init_cbc(Dstu7624Ctx *ctx, const ByteArray *key, cons
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_init_ofb(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *iv);
 
 /**
- * Ініціалізує контекст для шифрування у режимі вибіркового гамування з прискореною виробкою імітовставки.
+ * Ініціалізує контекст для шифрування у режимі вибіркового гамування з прискореним виробленням імітовставки.
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @param q розмір імітовставки, 1 <= q <= block_size
  * @return код помилки
  */
@@ -144,7 +144,7 @@ UAPKIC_EXPORT int dstu7624_init_cmac(Dstu7624Ctx *ctx, const ByteArray *key, con
         const size_t q);
 
 /**
- * Ініціалізує контекст для шифрування у режимі вибіркового гамування з прискореною виробкою імітовставки.
+ * Ініціалізує контекст для шифрування у режимі вибіркового гамування з прискореним виробленням імітовставки.
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
@@ -156,11 +156,11 @@ UAPKIC_EXPORT int dstu7624_init_gmac(Dstu7624Ctx *ctx, const ByteArray *key, con
         const size_t q);
 
 /**
- * Ініціалізує контекст для шифрування у режимі виробки імітовставки і гамування.
+ * Ініціалізує контекст для шифрування у режимі вироблення імітовставки і гамування.
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @param q розмір імітовставки, 1 <= q <= block_size
  * @param n_max найбільша можлива довжина відкритої або конфіденційної частини повідомлення (в бітах)
  * @return код помилки
@@ -173,7 +173,7 @@ UAPKIC_EXPORT int dstu7624_init_ccm(Dstu7624Ctx *ctx, const ByteArray *key, cons
  *
  * @param ctx контекст ДСТУ 7624
  * @param key ключ шифрування
- * @param iv синхропосилка розміром блоку, 16, 32, 64 байт
+ * @param iv ініціалізаційний вектор розміром блоку, 16, 32, 64 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7624_init_xts(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -247,7 +247,7 @@ UAPKIC_EXPORT int dstu7624_decrypt(Dstu7624Ctx *ctx, const ByteArray *encrypted_
 UAPKIC_EXPORT int dstu7624_update_mac(Dstu7624Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку імітовставки і повертає її значення.
+ * Завершує утворення імітовставки й повертає її значення.
  *
  * @param ctx контекст ДСТУ 7624
  * @param mac імітовставка

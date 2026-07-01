@@ -1,18 +1,18 @@
 /*
  * Copyright 2021 The UAPKI Project Authors.
  * Copyright 2016 PrivatBank IT <acsk@privatbank.ua>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
  * met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright 
  * notice, this list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright 
  * notice, this list of conditions and the following disclaimer in the 
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS 
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED 
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A 
@@ -38,16 +38,15 @@
 
 void base_cycle32(Gost28147Ctx *ctx, uint32_t src[8], const uint32_t k[32]);
 
-/** Контекст выработки хэш-вектора. */
-
+/** Контекст вироблення геш-вектору. */
 struct Gost34311Ctx_st {
-    Gost28147Ctx *gost;
-    uint8_t m32[32];          /* Часть сообщения, не прошедшая процедуру хэширования на предыдущих итерациях. */
-    size_t m32_ind;           /* Смещенее первого свободного байта в буфере m32. */
-    uint32_t m_bit_len[8];    /* Размер обработаных данных в битах. */
-    uint8_t sync[32];         /* Cинхропосылка. */
-    uint32_t sigma[8];        /* Текущее значение контрольной суммы. */
-    uint8_t H[32];         /* Текущее значение хэш-функции. */
+    Gost28147Ctx *gost;     /* Контекст шифрування за ГОСТ 28147. */
+    uint8_t m32[32];        /* Частина повідомлення, що не пройшла процедуру гешування на попередніх ітераціях. */
+    size_t m32_ind;         /* Зсув першого вільного байту в буфері m32. */
+    uint32_t m_bit_len[8];  /* Розмір оброблених даних у бітах. */
+    uint8_t sync[32];       /* Вектор ініціалізації. */
+    uint32_t sigma[8];      /* Поточне значення контрольної суми. */
+    uint8_t H[32];          /* Поточне значення геш-функції. */
 };
 
 static __inline void reset(Gost34311Ctx *ctx)
@@ -66,15 +65,15 @@ static __inline void reset(Gost34311Ctx *ctx)
         (y4) = ((x1) & 0xff000000) >> 24 ^ ((x2) & 0xff000000) >> 16 ^ ((x3) & 0xff000000) >> 8  ^ ((x4) & 0xff000000);
 
 /**
- * Перемешивающее преобразование.
+ * Перетворення перемішуванням.
  */
 static __inline void mix_transform(const uint8_t *a8_buf, const uint8_t *b8_buf, const uint8_t *c8_buf, uint8_t *out8)
 {
-    /* Можно привести тип, поскольку на результат функции не влияет переворачивание порядка байт. */
-    uint16_t *a = (uint16_t *)a8_buf;
-    uint16_t *b = (uint16_t *)b8_buf;
-    uint16_t *c = (uint16_t *)c8_buf;
-    uint16_t *out = (uint16_t *)out8;
+    /* Можна звести тип, оскільки на результат функції не впливає перевертання порядку байтів. */
+    uint16_t *a = (uint16_t*)a8_buf;
+    uint16_t *b = (uint16_t*)b8_buf;
+    uint16_t *c = (uint16_t*)c8_buf;
+    uint16_t *out = (uint16_t*)out8;
     uint16_t p1, p2, p3, p4, p5, p6, p7, p8;
     uint16_t a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3], a4 = a[4], a5 = a[5], a6 = a[6], a7 = a[7];
     uint16_t a8 = a[8], a9 = a[9], a10 = a[10], a11 = a[11], a12 = a[12], a13 = a[13], a14 = a[14], a15 = a[15];
@@ -113,11 +112,11 @@ static __inline void mix_transform(const uint8_t *a8_buf, const uint8_t *b8_buf,
 }
 
 /**
- * Генерирует ключи шифрования.
+ * Генерує ключі шифрування.
  *
- * @param h текущее значение хэш-вектора
- * @param m блок сообщения
- * @param k сгенерированные ключи
+ * @param h поточне значення геш-вектору
+ * @param m блок повідомлення
+ * @param k згенеровані ключі
  */
 static __inline void generate_keys(const uint32_t *h32, const uint32_t *m32, uint32_t *k)
 {
@@ -183,10 +182,10 @@ static __inline void generate_keys(const uint32_t *h32, const uint32_t *m32, uin
 }
 
 /**
- * Выполняет итерацию хэширования.
+ * Виконує ітерацію гешування.
  *
- * @param ctx контекст выработки хэш-вектора
- * @param m 32 байтный блок сообщения
+ * @param ctx контекст вироблення геш-вектору
+ * @param m 32-байтний блок повідомлення
  */
 static int hash_step(Gost34311Ctx *ctx, const uint8_t *m)
 {
@@ -203,10 +202,10 @@ static int hash_step(Gost34311Ctx *ctx, const uint8_t *m)
     DO(uint8_to_uint32(ctx->H, 32, hash32, 8));
     DO(uint8_to_uint32(m, 32, m32, 8));
 
-    /* Генерация ключей для шифрующего преобразования. */
+    /* Генерація ключів для перетворення шифруванням. */
     generate_keys(hash32, m32, keys);
 
-    /* Шифрующее преобразование. */
+    /* Перетворення шифруванням. */
     base_cycle32(ctx->gost, hash32, keys);
 
     DO(uint32_to_uint8(hash32, 8, s, 32));
@@ -221,10 +220,10 @@ cleanup:
 }
 
 /**
- * Выполняет сложение двух 32 байтных чисел.
+ * Виконує додавання двох 32-байтних чисел.
  *
- * @param a первое слагаемое, замещаемое суммой
- * @param b второе слагаемое
+ * @param a перший доданок, що замінюється сумою
+ * @param b другий доданок
  */
 static void add(uint32_t *a, const uint32_t *b)
 {
@@ -238,9 +237,9 @@ static void add(uint32_t *a, const uint32_t *b)
 }
 
 /**
- * Обновляет текущее значение хэш-функции очередными 32 байтами сообщения.
+ * Оновлює поточний стан геш-вектору наступними 32 байтами повідомлення.
  *
- * @param ctx контекст выработки хэш-вектора
+ * @param ctx контекст вироблення геш-вектору
  */
 static int update(Gost34311Ctx *ctx)
 {
@@ -250,16 +249,16 @@ static int update(Gost34311Ctx *ctx)
 
     CHECK_PARAM(ctx != NULL);
 
-    /* Базовый шаг. */
+    /* Основний крок. */
     DO(hash_step(ctx, ctx->m32));
 
-    /* Вычисление длины сообщения. */
+    /* Обчислення довжини повідомлення. */
     ctx->m_bit_len[0] += 256;
     if (ctx->m_bit_len[0] < 256) {
         for (i = 1; (i < 8) && (++ctx->m_bit_len[i] == 0); i++);
     }
 
-    /* Вычисление контрольной суммы. */
+    /* Обчислення контрольної суми. */
     DO(uint8_to_uint32(ctx->m32, 32, m32, 8));
     add(ctx->sigma, m32);
 
@@ -278,8 +277,7 @@ Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteArray *sync)
     if (sync) {
         CHECK_PARAM(sync->len == 32);
         DO(ba_to_uint8(sync, ctx->sync, sizeof(ctx->sync)));
-    }
-    else {
+    } else {
         memset(ctx->sync, 0, sizeof(ctx->sync));
     }
 
@@ -353,14 +351,14 @@ int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data)
 
     buf = data->buf;
 
-    while (1) {
-        size = 32 - ctx->m32_ind > len ? len : 32 - ctx->m32_ind;
+    for (;;) {
+        size = min(32 - ctx->m32_ind, len);
         memcpy(ctx->m32 + ctx->m32_ind, buf, size);
-        len -= size;
         ctx->m32_ind += size;
         buf += size;
+        len -= size;
 
-        if (len == 0) {
+        if (!len) {
             break;
         }
 
@@ -385,7 +383,7 @@ int gost34311_final(Gost34311Ctx *ctx, ByteArray **out)
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(out != NULL);
 
-    /* Вычисление длины сообщения. */
+    /* Обчислення довжини повідомлення. */
     bit = (uint32_t)(ctx->m32_ind << 3);
     ctx->m_bit_len[0] += bit;
     if (ctx->m_bit_len[0] < bit) {
@@ -394,7 +392,7 @@ int gost34311_final(Gost34311Ctx *ctx, ByteArray **out)
 
     memset(ctx->m32 + ctx->m32_ind, 0, 32 - ctx->m32_ind);
 
-    /* Итерация вычисления контрольной суммы для оставшихся у m32 даних. */
+    /* Ітерація обчислення контрольної суми для даних, що залишились у m32. */
     DO(uint8_to_uint32(ctx->m32, 32, m32, 8));
     add(ctx->sigma, m32);
     memset(m32, 0, sizeof(m32));
@@ -404,13 +402,13 @@ int gost34311_final(Gost34311Ctx *ctx, ByteArray **out)
     DO(uint32_to_uint8(ctx->m_bit_len, 8, m_bit_len, 32));
     DO(hash_step(ctx, m_bit_len));
 
-    /* Обрабатываем буфер sigma. */
+    /* Оброблюємо буфер sigma. */
     DO(uint32_to_uint8(ctx->sigma, 8, sigma8, 32));
     DO(hash_step(ctx, sigma8));
 
     CHECK_NOT_NULL(*out = ba_alloc_from_uint8(ctx->H, 32));
 
-    /* Переинициализируем контекст хэш-вектора. */
+    /* Повторно ініціалізуємо контекст геш-вектору. */
     reset(ctx);
 
 cleanup:
@@ -461,7 +459,8 @@ int gost34311_self_test(void)
     DO(gost34311_update(ctx, &ba_M1));
     DO(gost34311_final(ctx, &H));
     if (H->len != sizeof(H1) ||
-        memcmp(H->buf, H1, sizeof(H1)) != 0) {
+        memcmp(H->buf, H1, sizeof(H1)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -470,7 +469,8 @@ int gost34311_self_test(void)
     DO(gost34311_update(ctx, &ba_M2));
     DO(gost34311_final(ctx, &H));
     if (H->len != sizeof(H2) ||
-        memcmp(H->buf, H2, sizeof(H2)) != 0) {
+        memcmp(H->buf, H2, sizeof(H2)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
 

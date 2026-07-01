@@ -49,7 +49,7 @@ int dstu4145_generate_privkey(const EcCtx *ctx, ByteArray **d)
 
     CHECK_NOT_NULL(*d = ba_alloc_by_len((n_bit_len + 7) / 8));
 
-    /* Генерация закрытого ключа. */
+    /* Генерація приватного ключа. */
     do {
         DO(drbg_random(*d));
         DO(ba_truncate(*d, n_bit_len - 1));
@@ -58,7 +58,6 @@ int dstu4145_generate_privkey(const EcCtx *ctx, ByteArray **d)
 cleanup:
 
     return ret;
-
 }
 
 int dstu4145_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, ByteArray **qy)
@@ -86,7 +85,7 @@ int dstu4145_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, By
 
     wa_change_len(d_wa, ctx->params->ec2m->len);
 
-    /* Получение открытого ключа. */
+    /* Отримання публічного ключа. */
     CHECK_NOT_NULL(Q = ec_point_alloc(params->ec2m->len));
     if (ctx->params->precomp_p == NULL) {
         int sign_win_opt_level = (default_opt_level >> 8) & 0x0f;
@@ -98,7 +97,7 @@ int dstu4145_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, By
     }
     DO(ec2m_dual_mul_opt(params->ec2m, params->precomp_p, d_wa, NULL, NULL, Q));
 
-    /* Инвертируем точку эллиптической кривой. */
+    /* Інвертування точки еліптичної кривої. */
     gf2m_mod_add(Q->x, Q->y, Q->y);
 
     if (params->is_onb) {
@@ -279,7 +278,7 @@ int dstu4145_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(H != NULL);
-    CHECK_PARAM((H->len == 32) || (H->len == 48) || (H->len == 64));
+    CHECK_PARAM(H->len);
     CHECK_PARAM(r != NULL);
     CHECK_PARAM(s != NULL);
     CHECK_PARAM(ctx->params->ec_field == EC_FIELD_BINARY);
@@ -315,7 +314,7 @@ int dstu4145_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, co
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(H != NULL);
-    CHECK_PARAM((H->len == 32) || (H->len == 48) || (H->len == 64));
+    CHECK_PARAM(H->len);
     CHECK_PARAM(r != NULL);
     CHECK_PARAM(s != NULL);
     CHECK_PARAM(ctx->params->ec_field == EC_FIELD_BINARY);
@@ -328,7 +327,7 @@ int dstu4145_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, co
 
     ec2m = params->ec2m;
 
-    /* Проверка ЭЦП. */
+    /* Перевірка підпису. */
     n_bit_len = int_bit_len(ctx->params->n);
 
     if (((ba_get_len(s) + ba_get_len(r)) & 1) == 1) {
@@ -338,7 +337,7 @@ int dstu4145_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, co
     CHECK_NOT_NULL(wr = wa_alloc_from_ba(r));
     CHECK_NOT_NULL(ws = wa_alloc_from_ba(s));
 
-    /* 0 < wr < n і 0 < ws < n, иначе подпись неверная. */
+    /* (0 < wr < n) & (0 < ws < n), інакше підпис недійсний. */
     if ((int_cmp(wr, ctx->params->n) >= 0) || (int_cmp(ws, ctx->params->n) >= 0)
             || int_is_zero(wr) || int_is_zero(ws)) {
         SET_ERROR(RET_VERIFY_FAILED);

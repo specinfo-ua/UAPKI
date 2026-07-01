@@ -194,7 +194,7 @@ int ba_cmp(const ByteArray *a, const ByteArray *b)
 {
     if (a && b) {
         if (a->len != b->len) {
-            return (int)(a->len - b->len);
+            return a->len > b->len ? 1 : -1;
         }
 
         return memcmp(a->buf, b->buf, a->len);
@@ -336,8 +336,8 @@ void ba_free(ByteArray *ba)
 {
     if (ba) {
         free(ba->buf);
+        free(ba);
     }
-    free(ba);
 }
 
 
@@ -365,8 +365,8 @@ void ba_free_private(ByteArray *ba)
     if (ba) {
         secure_zero(ba->buf, ba->len);
         free(ba->buf);
+        free(ba);
     }
-    free(ba);
 }
 
 int ba_trim_leading_zeros_le(ByteArray* ba)

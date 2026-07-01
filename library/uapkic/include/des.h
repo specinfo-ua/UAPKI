@@ -70,7 +70,7 @@ UAPKIC_EXPORT int des_init_ecb(DesCtx *ctx, const ByteArray *key);
  *
  * @param ctx контекст DES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int des_init_cbc(DesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -80,7 +80,7 @@ UAPKIC_EXPORT int des_init_cbc(DesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст DES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int des_init_cfb(DesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -90,7 +90,7 @@ UAPKIC_EXPORT int des_init_cfb(DesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст DES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int des_init_ofb(DesCtx *ctx, const ByteArray *key, const ByteArray *iv);
@@ -100,7 +100,7 @@ UAPKIC_EXPORT int des_init_ofb(DesCtx *ctx, const ByteArray *key, const ByteArra
  *
  * @param ctx контекст DES
  * @param key ключ шифрування
- * @param iv синхропосилка
+ * @param iv ініціалізаційний вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int des_init_ctr(DesCtx *ctx, const ByteArray *key, const ByteArray *iv);

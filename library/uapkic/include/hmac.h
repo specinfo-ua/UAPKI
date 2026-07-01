@@ -67,7 +67,7 @@ UAPKIC_EXPORT HmacCtx* hmac_alloc_gost34311_with_sbox_id(Gost28147SboxId sbox_id
 UAPKIC_EXPORT HmacCtx* hmac_alloc_gost34311_with_sbox(const ByteArray* sbox);
 
 /**
- * Ініціалізує контекст для виробки HMAC ключем.
+ * Ініціалізує контекст для вироблення HMAC ключем.
  *
  * @param ctx контекст
  * @param key секретний ключ
@@ -85,7 +85,7 @@ UAPKIC_EXPORT int hmac_init(HmacCtx *ctx, const ByteArray *key);
 UAPKIC_EXPORT int hmac_update(HmacCtx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку HMAC і повертає його значення.
+ * Завершує вироблення HMAC і повертає його значення.
  *
  * @param ctx контекст HMAC
  * @param H геш вектор
@@ -94,7 +94,7 @@ UAPKIC_EXPORT int hmac_update(HmacCtx *ctx, const ByteArray *data);
 UAPKIC_EXPORT int hmac_final(HmacCtx *ctx, ByteArray **H);
 
 /**
- * Ініціалізує контекст для виробки HMAC з попередньо встановленим ключем.
+ * Ініціалізує контекст для вироблення HMAC з попередньо встановленим ключем.
  *
  * @param ctx контекст HMAC
  * @return код помилки

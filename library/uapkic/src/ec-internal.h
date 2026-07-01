@@ -109,7 +109,7 @@ int ec2m_decompress_point_core(const EcParamsCtx* params, const ByteArray* x, in
 int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const ByteArray* qy, ECPoint** q);
 
 /**
- * Генерує особистий ключ для будь якого алгоритму підпису або Д-Х на ЕК.
+ * Генерує особистий ключ для будь-якого алгоритму підпису або Д-Х на ЕК.
  *
  * @param ctx контекст ЕК
  * @param d особистий ключ

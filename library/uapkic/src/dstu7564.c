@@ -63,7 +63,7 @@ extern const uint64_t subrowcol_default[8][256];
                                                   (uint64_t) ( subrowcol_default[6][v7 >> 48 & 0xFF])^\
                                                   (uint64_t) ( subrowcol_default[7][v8 >> 56 & 0xFF]);
 
-/*Константа для P раунда*/
+/* Константа для P раунду */
 static uint64_t p_pconst[NR_1024][NB_1024] = {
     {
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
@@ -109,7 +109,7 @@ static uint64_t p_pconst[NR_1024][NB_1024] = {
     }
 };
 
-/*Константа для Q раунда, блок 64 байти*/
+/* Константа для Q раунду, блок 64 байти */
 static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     {
         8138269444283625715ULL, 6985347939676778739ULL, 5832426435069931763ULL, 4679504930463084787ULL, 
@@ -153,7 +153,7 @@ static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     }
 };
 
-/*Константа для Q раунда, блок 128 байт*/
+/* Константа для Q раунду, блок 128 байтів */
 static uint64_t p_qconst_NB_1024[NR_1024][NB_1024] = {
     {
         17361641481138401523ULL, 16208719976531554547ULL, 15055798471924707571ULL, 13902876967317860595ULL, 
@@ -511,9 +511,9 @@ static __inline void Q(Dstu7564Ctx *ctx, uint8_t *state_)
 
 static __inline void dstu7564_xor(void *arg1, void *arg2, void *out, size_t columns)
 {
-    uint64_t *a1 = (uint64_t *) arg1;
-    uint64_t *a2 = (uint64_t *) arg2;
-    uint64_t *o = (uint64_t *) out;
+    uint64_t *a1 = (uint64_t*)arg1;
+    uint64_t *a2 = (uint64_t*)arg2;
+    uint64_t *o = (uint64_t*)out;
 
     o[0] = a1[0] ^ a2[0];
     o[1] = a1[1] ^ a2[1];
@@ -621,7 +621,7 @@ int dstu7564_init(Dstu7564Ctx *ctx, size_t hash_nbytes)
     int ret = RET_OK;
 
     CHECK_PARAM(ctx);
-    CHECK_PARAM((hash_nbytes > 0) & (hash_nbytes <= 64));
+    CHECK_PARAM(hash_nbytes && hash_nbytes <= 64);
 
     if (hash_nbytes <= 32) {
         ctx->rounds = NR_512;
@@ -717,7 +717,7 @@ int dstu7564_final(Dstu7564Ctx *ctx, ByteArray **hash_code)
 
     padding(ctx->last_block, ctx->last_block_el, ctx->msg_tot_len, ctx->nbytes);
     digest(ctx, ctx->last_block);
-    /*Якщо доповнуння призвело до утворення додаткового блоку - гешуємо його*/
+    /* Якщо доповнення призвело до утворення додаткового блоку — гешуємо його */
     if (ctx->last_block_el > ctx->nbytes - 13) {
         digest(ctx, ctx->last_block + ctx->nbytes);
     }
@@ -843,10 +843,7 @@ cleanup:
 
 size_t dstu7564_get_block_size(const Dstu7564Ctx* ctx)
 {
-    if (ctx != NULL) {
-        return ctx->nbytes;
-    }
-    return 0;
+    return ctx != NULL ? ctx->nbytes : 0;
 }
 
 static int dstu7564_self_test_hash(void)
@@ -935,7 +932,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_init(ctx, 32));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_NULL) ||
-        memcmp(H->buf, H256_NULL, sizeof(H256_NULL)) != 0) {
+        memcmp(H->buf, H256_NULL, sizeof(H256_NULL)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -944,7 +942,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, &ba_M1));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_8bit) ||
-        memcmp(H->buf, H256_8bit, sizeof(H256_8bit)) != 0) {
+        memcmp(H->buf, H256_8bit, sizeof(H256_8bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -954,7 +953,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_512bit) ||
-        memcmp(H->buf, H256_512bit, sizeof(H256_512bit)) != 0) {
+        memcmp(H->buf, H256_512bit, sizeof(H256_512bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -964,7 +964,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_760bit) ||
-        memcmp(H->buf, H256_760bit, sizeof(H256_760bit)) != 0) {
+        memcmp(H->buf, H256_760bit, sizeof(H256_760bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -974,7 +975,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_1024bit) ||
-        memcmp(H->buf, H256_1024bit, sizeof(H256_1024bit)) != 0) {
+        memcmp(H->buf, H256_1024bit, sizeof(H256_1024bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -984,7 +986,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H256_2048bit) ||
-        memcmp(H->buf, H256_2048bit, sizeof(H256_2048bit)) != 0) {
+        memcmp(H->buf, H256_2048bit, sizeof(H256_2048bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -994,7 +997,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_init(ctx, 64));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_NULL) ||
-        memcmp(H->buf, H512_NULL, sizeof(H512_NULL)) != 0) {
+        memcmp(H->buf, H512_NULL, sizeof(H512_NULL)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -1003,7 +1007,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, &ba_M1));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_8bit) ||
-        memcmp(H->buf, H512_8bit, sizeof(H512_8bit)) != 0) {
+        memcmp(H->buf, H512_8bit, sizeof(H512_8bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -1013,7 +1018,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_512bit) ||
-        memcmp(H->buf, H512_512bit, sizeof(H512_512bit)) != 0) {
+        memcmp(H->buf, H512_512bit, sizeof(H512_512bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -1023,7 +1029,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_1024bit) ||
-        memcmp(H->buf, H512_1024bit, sizeof(H512_1024bit)) != 0) {
+        memcmp(H->buf, H512_1024bit, sizeof(H512_1024bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -1033,7 +1040,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_1536bit) ||
-        memcmp(H->buf, H512_1536bit, sizeof(H512_1536bit)) != 0) {
+        memcmp(H->buf, H512_1536bit, sizeof(H512_1536bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(H);
@@ -1043,7 +1051,8 @@ static int dstu7564_self_test_hash(void)
     DO(dstu7564_update(ctx, ba_M2));
     DO(dstu7564_final(ctx, &H));
     if (H->len != sizeof(H512_2048bit) ||
-        memcmp(H->buf, H512_2048bit, sizeof(H512_2048bit)) != 0) {
+        memcmp(H->buf, H512_2048bit, sizeof(H512_2048bit)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
 
@@ -1102,7 +1111,8 @@ static int dstu7564_self_test_kmac(void)
     DO(dstu7564_update_kmac(ctx, &ba_M));
     DO(dstu7564_final_kmac(ctx, &kmac));
     if (kmac->len != sizeof(KMAC256) ||
-        memcmp(kmac->buf, KMAC256, sizeof(KMAC256)) != 0) {
+        memcmp(kmac->buf, KMAC256, sizeof(KMAC256)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(kmac);
@@ -1112,7 +1122,8 @@ static int dstu7564_self_test_kmac(void)
     DO(dstu7564_update_kmac(ctx, &ba_M));
     DO(dstu7564_final_kmac(ctx, &kmac));
     if (kmac->len != sizeof(KMAC384) ||
-        memcmp(kmac->buf, KMAC384, sizeof(KMAC384)) != 0) {
+        memcmp(kmac->buf, KMAC384, sizeof(KMAC384)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
     ba_free(kmac);
@@ -1122,7 +1133,8 @@ static int dstu7564_self_test_kmac(void)
     DO(dstu7564_update_kmac(ctx, &ba_M));
     DO(dstu7564_final_kmac(ctx, &kmac));
     if (kmac->len != sizeof(KMAC512) ||
-        memcmp(kmac->buf, KMAC512, sizeof(KMAC512)) != 0) {
+        memcmp(kmac->buf, KMAC512, sizeof(KMAC512)) != 0)
+    {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
 

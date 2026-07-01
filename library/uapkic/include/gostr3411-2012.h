@@ -58,6 +58,7 @@ UAPKIC_EXPORT GostR3411Ctx *gostr3411_copy_with_alloc(const GostR3411Ctx *ctx);
  *
  * @param ctx контекст GOSTR3411_2012
  * @param data дані
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gostr3411_update(GostR3411Ctx *ctx, const ByteArray *data);
@@ -67,6 +68,7 @@ UAPKIC_EXPORT int gostr3411_update(GostR3411Ctx *ctx, const ByteArray *data);
  *
  * @param ctx контекст GOSTR3411_2012
  * @param out геш від даних
+ *
  * @return код помилки
  */
 UAPKIC_EXPORT int gostr3411_final(GostR3411Ctx *ctx, ByteArray **out);
@@ -75,6 +77,7 @@ UAPKIC_EXPORT int gostr3411_final(GostR3411Ctx *ctx, ByteArray **out);
  * Повертає розмір блоку геш-функції.
  *
  * @param ctx контекст GOSTR3411_2012
+ *
  * @return розмір блоку, 0 у разі помилки
  */
 UAPKIC_EXPORT size_t gostr3411_get_block_size(const GostR3411Ctx* ctx);

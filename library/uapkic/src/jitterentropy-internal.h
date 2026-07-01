@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2021 The UAPKI Project Authors.
  * Copyright Stephan Mueller <smueller@chronox.de>, 2014 - 2020
  *
@@ -48,7 +48,7 @@
  * must offer POSIX threads. If this option is disabled, no linking
  * with the POSIX threads library is needed.
  */
-#define JENT_CONF_ENABLE_INTERNAL_TIMER
+//#define JENT_CONF_ENABLE_INTERNAL_TIMER
 
 /***************************************************************************
  * Jitter RNG State Definition Section

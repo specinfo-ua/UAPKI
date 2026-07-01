@@ -147,13 +147,9 @@ static inline int jent_fips_enabled(void)
 
 static inline void* jent_zalloc(size_t len)
 {
-	void* tmp = NULL;
 	/* we have no secure memory allocation! Hence
 	 * we do not set CONFIG_CRYPTO_CPU_JITTERENTROPY_SECURE_MEMORY */
-	tmp = malloc(len);
-	if (NULL != tmp)
-		memset(tmp, 0, len);
-	return tmp;
+	return calloc(len, 1);
 }
 
 static inline void jent_zfree(void* ptr, unsigned int len)
@@ -422,6 +418,7 @@ static inline void jent_notime_unsettick(JitentCtx *ec)
 {
 	ec->notime_interrupt = 1;
 	pthread_join(ec->notime_thread_id, NULL);
+	pthread_detach(ec->notime_thread_id);
 }
 
 static inline void jent_get_nstime_internal(JitentCtx *ec, uint64_t *out)
@@ -762,7 +759,7 @@ static void jent_random_data(struct rand_data *ec)
  */
 int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 {
-	unsigned char *p = data;
+	uint8_t *p = data;
 	int ret = 0;
 
 	if (NULL == ec)
@@ -771,7 +768,7 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 	if (jent_notime_settick(ec))
 		return -4;
 
-	while (len > 0) {
+	while (len) {
 		size_t tocopy;
 
 		jent_random_data(ec);
@@ -785,14 +782,11 @@ int jent_read_entropy(JitentCtx *ec, unsigned char *data, size_t len)
 			goto err;
 		}
 
-		if ((DATA_SIZE_BITS / 8) < len)
-			tocopy = (DATA_SIZE_BITS / 8);
-		else
-			tocopy = len;
+		tocopy = min(DATA_SIZE_BITS >> 3, len);
 		memcpy(p, ba_get_buf_const(ec->data), tocopy);
 
-		len -= tocopy;
 		p += tocopy;
+		len -= tocopy;
 	}
 
 	/*
