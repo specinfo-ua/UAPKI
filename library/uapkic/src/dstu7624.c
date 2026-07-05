@@ -3276,6 +3276,7 @@ static int dstu7624_encrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *plain_data, c
 
     DO(ba_to_uint8(auth_data, auth_buf, auth_len));
     DO(ba_to_uint8(plain_data, plain_buf, plain_len));
+    memset(auth_buf + auth_len, 0, block_len);
 
     /*Шифрування і обеспечение целостности.*/
     for (i = 0; i < plain_len; i += block_len) {
@@ -3374,6 +3375,7 @@ static int dstu7624_decrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *cipher_data, 
 
     DO(ba_to_uint8(auth_data, auth_buf, auth_len));
     DO(ba_to_uint8(cipher_data, plain_buf, plain_len));
+    memset(auth_buf + auth_len, 0, block_len);
 
     /*Выработка імітовставки.*/
     padding(ctx, plain_buf, &plain_len, plain_buf);
