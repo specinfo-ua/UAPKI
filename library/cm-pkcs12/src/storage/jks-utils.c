@@ -75,10 +75,11 @@ static int jks_pass_to_ba(const char* pass, ByteArray** pass_ba)
     CHECK_PARAM(pass != NULL);
     CHECK_PARAM(pass_ba != NULL);
 
+    //  utf8_to_utf16be() already reports the length without the UTF-16
+    //  terminator, so pass_utf16be_len must NOT be decremented again here
+    //  (doing so truncated the password by one code unit and made every JKS
+    //  fail the MAC/key-integrity check with RET_CM_INVALID_PASSWORD).
     DO(utf8_to_utf16be(pass, &pass_utf16be, &pass_utf16be_len));
-
-    //  without end symbol
-    pass_utf16be_len -= 2;
 
     CHECK_NOT_NULL(*pass_ba = ba_alloc_from_uint8(pass_utf16be, pass_utf16be_len));
 
