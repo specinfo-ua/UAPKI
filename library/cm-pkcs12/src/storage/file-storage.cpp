@@ -475,16 +475,17 @@ static int readBagAttributes (
     if (!bagAttributes) return RET_OK;
 
     int ret = RET_OK;
-    char* oid = nullptr;
     StoreAttr* store_attr = nullptr;
     for (int i = 0; i < bagAttributes->list.count; i++) {
         const Attribute_t* attr = bagAttributes->list.array[i];
-        CHECK_NOT_NULL(attr);
-        DO(asn_oid_to_text(&attr->type, &oid));
-        if (oid) {
-            store_attr = new StoreAttr(oid);
-            free(oid);
-            oid = nullptr;
+        if (!attr) {
+            SET_ERROR(RET_CM_INVALID_SAFE_BAG);
+        }
+
+        string s_oid;
+        DO(Util::oidFromAsn1(&attr->type, s_oid));
+        if (!s_oid.empty()) {
+            store_attr = new StoreAttr(s_oid.c_str());
         }
         else {
             SET_ERROR(RET_CM_INVALID_SAFE_BAG);
@@ -498,7 +499,6 @@ static int readBagAttributes (
     }
 
 cleanup:
-    free(oid);
     delete store_attr;
     if (ret != RET_OK) {
         for (size_t i = 0; i < attrs.size(); i++) {
@@ -583,14 +583,6 @@ int FileStorage::readSafeContents (
         ba_data = nullptr;
 
         store_bag->scanStdAttrs();
-        if ((store_bag->bagType() == StoreBag::BAG_TYPE::KEY) && store_bag->localKeyId()) {
-            SmartBA sba_bagattrvalue;
-            if ((Util::decodeOctetString(store_bag->localKeyId(), &sba_bagattrvalue) != RET_OK) ||
-                !store_bag->setKeyId(sba_bagattrvalue.get())
-            ) {
-                SET_ERROR(RET_CM_INVALID_SAFE_BAG);
-            }
-        }
         addBag(store_bag);
         store_bag = nullptr;
     }

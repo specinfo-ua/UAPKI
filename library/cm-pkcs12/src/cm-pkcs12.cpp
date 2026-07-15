@@ -89,32 +89,45 @@ CM_ERROR CmPkcs12::open (
     CM_ERROR cm_err = RET_CM_INVALID_PARAMETER;
     UapkiNS::SmartBA sba_pfx;
 
-    switch (openMode) {
-    case OPEN_MODE_RW:
-    case OPEN_MODE_RO:
-        if (strcmp(fileName, FILENAME_ON_MEMORY) == 0) {
+    if (strcmp(fileName, FILENAME_ON_MEMORY) != 0) {
+        switch (openMode) {
+        case OPEN_MODE_RW:
+        case OPEN_MODE_RO:
+            cm_err = err_to_cmerror(ba_alloc_from_file(fileName, &sba_pfx));
+            if (cm_err == RET_OK) {
+                if (sba_pfx.size() >= MIN_FILESIZE) {
+                    ss_ctx->fileStorage.setBuffer(sba_pfx.pop(), fileName, (openMode == OPEN_MODE_RO));
+                }
+                else {
+                    cm_err = RET_CM_UNSUPPORTED_FORMAT;
+                }
+            }
+            break;
+        case OPEN_MODE_CREATE:
+            cm_err = CmPkcs12::parseConfig(openParams, ss_ctx->fileStorage.storageParam());
+            if (cm_err == RET_OK) {
+                ss_ctx->fileStorage.create(fileName);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    else {
+        if (openMode == OPEN_MODE_RO) {
             cm_err = CmPkcs12::parseBytes(openParams, &sba_pfx);
+            if (cm_err == RET_OK) {
+                if (sba_pfx.size() >= MIN_FILESIZE) {
+                    ss_ctx->fileStorage.setBuffer(sba_pfx.pop(), fileName, true);
+                }
+                else {
+                    cm_err = RET_CM_UNSUPPORTED_FORMAT;
+                }
+            }
         }
         else {
-            cm_err = err_to_cmerror(ba_alloc_from_file(fileName, &sba_pfx));
+            cm_err = RET_CM_INVALID_PARAMETER;
         }
-        if (cm_err == RET_OK) {
-            if (sba_pfx.size() >= MIN_FILESIZE) {
-                ss_ctx->fileStorage.setBuffer(sba_pfx.pop(), fileName, (openMode == OPEN_MODE_RO));
-            }
-            else {
-                cm_err = RET_CM_UNSUPPORTED_FORMAT;
-            }
-        }
-        break;
-    case OPEN_MODE_CREATE:
-        cm_err = CmPkcs12::parseConfig(openParams, ss_ctx->fileStorage.storageParam());
-        if (cm_err == RET_OK) {
-            ss_ctx->fileStorage.create(fileName);
-        }
-        break;
-    default:
-        break;
     }
 
     if (cm_err != RET_OK) {
