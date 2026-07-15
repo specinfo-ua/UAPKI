@@ -1,0 +1,61 @@
+{
+  "comment": "Library re-initialization - regression test for drbg_self_test on a live DRBG (uapkic/src/drbg.c)",
+  "commentUsage": "uapki reinit.json",
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Перша ініціалізація: self-тест виконується до drbg_init(), тому завжди проходив",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "",
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12"
+            }
+          ]
+        },
+        "certCache": {
+          "path": "certs/",
+          "trustedCerts": []
+        },
+        "crlCache": {
+          "path": "crls/"
+        },
+        "offline": true
+      },
+      "actionByError": "STOP"
+    },
+    {
+      "method": "DEINIT"
+    },
+    {
+      "comment": "Повторна ініціалізація: до виправлення drbg_self_test відмовлявся працювати з живим DRBG (RET_SELF_TEST_NOT_ALLOWED), і INIT падав із SELF_TEST_FAIL",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "",
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12"
+            }
+          ]
+        },
+        "certCache": {
+          "path": "certs/",
+          "trustedCerts": []
+        },
+        "crlCache": {
+          "path": "crls/"
+        },
+        "offline": true
+      },
+      "actionByError": "STOP"
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}

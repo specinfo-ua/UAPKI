@@ -277,12 +277,23 @@ int drbg_self_test(void)
 
 	int ret = RET_OK;
 	ByteArray *test_drbg_out = NULL;
-	
-	if (drbg_Key || drbg_V || drbg_hmac_ctx) {
-		return RET_SELF_TEST_NOT_ALLOWED;
-	}
+	ByteArray *saved_key, *saved_V;
+	HmacCtx *saved_hmac_ctx;
+	size_t saved_reseed_counter;
 
 	pthread_mutex_lock(&drbg_mutex);
+
+	/* The test drives the global DRBG state with known vectors. Preserve the
+	 * live state (if the DRBG is already initialized) and restore it at the
+	 * end, so the self-test can run repeatedly - e.g. on library re-init. */
+	saved_key = drbg_Key;
+	saved_V = drbg_V;
+	saved_hmac_ctx = drbg_hmac_ctx;
+	saved_reseed_counter = drbg_reseed_counter;
+	drbg_Key = NULL;
+	drbg_V = NULL;
+	drbg_hmac_ctx = NULL;
+	drbg_reseed_counter = 0;
 
 	DO(drbg_init_internal(&ba_test_drbg_init_entropy));
 	DO(drbg_reseed_internal(&ba_test_reseed_entropy));
@@ -297,6 +308,10 @@ int drbg_self_test(void)
 
 cleanup:
 	drbg_free_internal();
+	drbg_Key = saved_key;
+	drbg_V = saved_V;
+	drbg_hmac_ctx = saved_hmac_ctx;
+	drbg_reseed_counter = saved_reseed_counter;
 	pthread_mutex_unlock(&drbg_mutex);
 	ba_free(test_drbg_out);
 	return ret;
