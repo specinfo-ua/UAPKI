@@ -1,0 +1,63 @@
+{
+  "comment": "Open JKS key container - regression test for password truncation in jks_pass_to_ba (cm-pkcs12/storage/jks-utils.c)",
+  "commentUsage": "uapki open-jks.json",
+  "tasks": [
+    {
+      "method": "VERSION"
+    },
+    {
+      "comment": "Ініціалізація бібліотеки",
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": {
+          "dir": "", // full path
+          "allowedProviders": [
+            {
+              "lib": "cm-pkcs12"
+            }
+          ]
+        },
+        "certCache": {
+          "path": "certs/", // full path
+          "trustedCerts": []
+        },
+        "crlCache": {
+          "path": "crls/" // full path
+        },
+        "offline": true
+      }
+    },
+    {
+      "comment": "Відкриття JKS-контейнера. До виправлення jks_pass_to_ba пароль втрачав останній UTF-16 code unit, і OPEN завершувався з INVALID_PASSWORD попри вірний пароль",
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12",
+        "storage": "test-jks.jks", // JKS: 1 запис PrivateKeyEntry (RSA-2048, key protector 1.3.6.1.4.1.42.2.17.1.1)
+        "password": "testpassword",
+        "mode": "RO"
+      },
+      "actionByError": "STOP"
+    },
+    {
+      "comment": "Перелік ключів: очікується один RSA-ключ (mechanismId 1.2.840.113549.1.1.1)",
+      "method": "KEYS"
+    },
+    {
+      "method": "CLOSE"
+    },
+    {
+      "comment": "Негативний тест: невірний пароль має давати INVALID_PASSWORD (вмикати вручну - тест-раннер реєструє будь-яку помилку як збій)",
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12",
+        "storage": "test-jks.jks",
+        "password": "wrongpassword",
+        "mode": "RO"
+      },
+      "skip": true
+    },
+    {
+      "method": "DEINIT"
+    }
+  ]
+}
