@@ -25,8 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __EMSCRIPTEN__
 #define CURL_STATICLIB
 #include "curl/curl.h"
+#endif
 #include "ba-utils.h"
 #include "http-helper.h"
 #include "uapkic.h"
@@ -76,6 +78,185 @@ struct HTTP_HELPER {
 
 static HTTP_HELPER http_helper;
 
+
+#ifdef __EMSCRIPTEN__
+//  WASM build: libcurl is not available in the browser sandbox, so HTTP goes
+//  through the browser's fetch(). The library expects synchronous requests -
+//  the gap is bridged by Asyncify (-sASYNCIFY, see library/wasm/CMakeLists.txt):
+//  EM_ASYNC_JS suspends the WASM stack until the fetch promise settles.
+//  Note: target servers (TSP/OCSP/CRL) must allow CORS, otherwise the browser
+//  blocks the request and RET_UAPKI_CONNECTION_ERROR is reported.
+
+#include <emscripten.h>
+
+//  Performs one HTTP request via fetch(). Returns a malloc'ed response body
+//  (caller frees), *outLen = body size, *outStatus = HTTP status
+//  (0 = network/CORS failure).
+EM_ASYNC_JS(uint8_t*, em_fetch_request, (
+        const char* url,
+        const char* method,
+        const char* contentType,
+        const char* authorization,
+        const uint8_t* body,
+        int bodyLen,
+        int* outLen,
+        int* outStatus
+), {
+    HEAP32[outLen >> 2] = 0;
+    HEAP32[outStatus >> 2] = 0;
+    try {
+        const opts = { method: UTF8ToString(method), headers: {} };
+        const contentTypeStr = UTF8ToString(contentType);
+        const authorizationStr = UTF8ToString(authorization);
+        if (contentTypeStr) opts.headers["Content-Type"] = contentTypeStr;
+        if (authorizationStr) opts.headers["Authorization"] = authorizationStr;
+        if (bodyLen > 0) opts.body = HEAPU8.slice(body, body + bodyLen);
+        const resp = await fetch(UTF8ToString(url), opts);
+        HEAP32[outStatus >> 2] = resp.status;
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (buf.length === 0) return 0;
+        const ptr = _malloc(buf.length);
+        HEAPU8.set(buf, ptr);
+        HEAP32[outLen >> 2] = buf.length;
+        return ptr;
+    } catch (e) {
+        return 0;
+    }
+});
+
+//  "Content-Type:application/json" (curl header line) -> "application/json"
+static string header_value (
+        const char* headerLine
+)
+{
+    if (!headerLine) return string();
+    const char* p = strchr(headerLine, ':');
+    p = (p) ? p + 1 : headerLine;
+    while (*p == ' ') p++;
+    return string(p);
+}   //  header_value
+
+static int em_http_request (
+        const string& uri,
+        const char* method,
+        const string& contentType,
+        const string& authorization,
+        const void* body,
+        const size_t bodyLen,
+        ByteArray** baResponse
+)
+{
+    if (http_helper.offlineMode) return RET_UAPKI_OFFLINE_MODE;
+
+    int out_len = 0, out_status = 0;
+    uint8_t* buf = em_fetch_request(
+        uri.c_str(),
+        method,
+        contentType.c_str(),
+        authorization.c_str(),
+        (const uint8_t*)body,
+        (int)bodyLen,
+        &out_len,
+        &out_status
+    );
+    if (out_status == 0) {
+        free(buf);
+        return RET_UAPKI_CONNECTION_ERROR;
+    }
+
+    *baResponse = (buf && (out_len > 0)) ? ba_alloc_from_uint8(buf, (size_t)out_len) : ba_alloc();
+    free(buf);
+    if (!*baResponse) return RET_UAPKI_GENERAL_ERROR;
+
+    return (out_status == 200) ? RET_OK : RET_UAPKI_HTTP_STATUS_NOT_OK;
+}   //  em_http_request
+
+int HttpHelper::init (
+        const bool offlineMode,
+        const char* proxyUrl,
+        const char* proxyCredentials
+)
+{
+    (void)proxyCredentials;
+    http_helper.offlineMode = offlineMode;
+    if (!http_helper.isInitialized) {
+        http_helper.isInitialized = true;
+        //  fetch() cannot use an explicit proxy; kept for diagnostics only
+        if (proxyUrl) {
+            http_helper.proxyUrl = string(proxyUrl);
+        }
+    }
+    return RET_OK;
+}
+
+void HttpHelper::deinit (void)
+{
+    if (http_helper.isInitialized) {
+        http_helper.reset();
+    }
+}
+
+bool HttpHelper::isOfflineMode (void)
+{
+    return http_helper.offlineMode;
+}
+
+const string& HttpHelper::getProxyUrl (void)
+{
+    return http_helper.proxyUrl;
+}
+
+int HttpHelper::get (
+        const string& uri,
+        ByteArray** baResponse
+)
+{
+    DEBUG_OUTCON(printf("HttpHelper::get(uri='%s'), fetch\n", uri.c_str()));
+    return em_http_request(uri, "GET", string(), string(), nullptr, 0, baResponse);
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const ByteArray* baRequest,
+        ByteArray** baResponse
+)
+{
+    DEBUG_OUTCON(printf("HttpHelper::post(uri='%s', contentType='%s'), fetch\n", uri.c_str(), contentType));
+    return em_http_request(
+        uri,
+        "POST",
+        header_value(contentType),
+        string(),
+        ba_get_buf_const(baRequest),
+        ba_get_len(baRequest),
+        baResponse
+    );
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const char* userPwd,
+        const string& authorizationBearer,
+        const string& request,
+        ByteArray** baResponse
+)
+{
+    //  basic-auth (userPwd) is not supported in the browser build
+    (void)userPwd;
+    return em_http_request(
+        uri,
+        "POST",
+        header_value(contentType),
+        header_value(authorizationBearer.c_str()),
+        request.data(),
+        request.length(),
+        baResponse
+    );
+}
+
+#else   //  __EMSCRIPTEN__
 
 static size_t cb_curlwrite (
         void* dataIn,
@@ -363,6 +544,8 @@ int HttpHelper::post (
 
     return ret;
 }
+
+#endif  //  __EMSCRIPTEN__
 
 mutex& HttpHelper::lockUri (
         const string& uri

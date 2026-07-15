@@ -74,7 +74,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 if(NOT WIN32)
     if(APPLE)
         target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
-    else()
+    elseif(NOT EMSCRIPTEN)
         set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
     endif()
 else()
@@ -89,7 +89,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_LIBRARY)
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_SELF_TEST)
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
     target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 endif()
 

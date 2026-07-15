@@ -26,7 +26,7 @@ Fork of [Cryptonite](https://github.com/privat-it/cryptonite).
 + Asymmetric ciphers: RSA
 + Key agreement: ECDH
 
-## Supported palforms
+## Supported platforms
 
 + Microsoft Windows x86 and x86-64
 + Linux x86-64, armv7 (32 bit), armv8 (64 bit)
@@ -34,6 +34,7 @@ Fork of [Cryptonite](https://github.com/privat-it/cryptonite).
 + Apple macOS x86-64, armv8 (Apple M1)
 + Apple iOS, iPadOS armv8
 + Google Android armv8, x86-64
++ Web browsers, JavaScript via WebAssembly (see [library/wasm](library/wasm) and [integration/WebAssembly](integration/WebAssembly))
 
 ## Telegram group for developers
 https://t.me/joinchat/UTjOABGHYxEqUYDp

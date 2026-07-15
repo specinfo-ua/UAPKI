@@ -34,7 +34,17 @@ extern "C" {
 #endif
 
 
-#if defined(_WIN32) || defined(__WINDOWS__)
+#if defined(__EMSCRIPTEN__)
+//  WASM: dynamic loading is not available, CM-providers are linked statically
+//  (see cm-loader.cpp). The macros below are inert placeholders.
+typedef void* HANDLE_DLIB;
+#define LIBNAME_PREFIX "lib"
+#define LIBNAME_EXT "so"
+#define DL_LOAD_LIBRARY(fn) ((HANDLE_DLIB)0)
+#define DL_GET_PROC_ADDRESS(h, fname) ((void*)0)
+#define DL_FREE_LIBRARY(h) ((void)0);
+
+#elif defined(_WIN32) || defined(__WINDOWS__)
 #include <windows.h>
 typedef HMODULE HANDLE_DLIB;
 #define LIBNAME_PREFIX ""

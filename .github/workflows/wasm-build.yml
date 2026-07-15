@@ -1,0 +1,87 @@
+name: WASM build
+
+on:
+  push:
+    #  every branch: tests must run after each commit pushed
+    paths:
+      - 'library/**'
+      - 'integration/WebAssembly/**'
+      - '.github/workflows/wasm-build.yml'
+  pull_request:
+    paths:
+      - 'library/**'
+      - 'integration/WebAssembly/**'
+      - '.github/workflows/wasm-build.yml'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: emscripten/emsdk:3.1.61
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (emcmake)
+        run: |
+          emcmake cmake -S library -B build-wasm \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DUAPKI_LIBS_TYPE=STATIC \
+            -DUAPKI_CM_PKCS12_LIB_TYPE=STATIC \
+            -DUAPKI_DISABLE_COPY=ON
+
+      - name: Build
+        run: cmake --build build-wasm -j"$(nproc)"
+
+      - name: Verify artifacts
+        run: |
+          ls -la build-wasm/wasm/uapki.js build-wasm/wasm/uapki.wasm
+          # the JS loader must export the module factory
+          grep -q "createUapkiModule" build-wasm/wasm/uapki.js
+
+      - name: Smoke test (Node.js)
+        run: node integration/WebAssembly/test-node.mjs build-wasm/wasm/uapki.js
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: uapki-wasm
+          path: |
+            build-wasm/wasm/uapki.js
+            build-wasm/wasm/uapki.wasm
+          if-no-files-found: error
+
+  #  When a release is published (the maintainer's usual manual flow), build
+  #  the WASM module from the tagged sources and attach it as a release asset
+  #  next to the hand-built platform archives. Releases stay immutable and
+  #  human-initiated; dev builds are available as workflow artifacts instead.
+  release-asset:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: uapki-wasm
+          path: dist
+
+      - name: Attach WASM asset to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          #  asset naming follows the repo's release convention:
+          #  uapki-v<ver>-<platform>.<ext> (see v2.0.12 and earlier releases)
+          zipname="uapki-$tag-wasm.zip"
+          #  console.html - ready-to-use JSON console (serve the archive dir
+          #  over HTTP and open console.html to try the module immediately);
+          #  LICENSE: BSD requires reproducing the notice in binary distributions
+          cp integration/WebAssembly/README.md integration/WebAssembly/console.html LICENSE dist/
+          (cd dist && zip -q "../$zipname" uapki.js uapki.wasm console.html README.md LICENSE)
+          echo "release: $tag, asset: $zipname ($(stat -c%s "$zipname") bytes)"
+          gh release upload "$tag" "$zipname" --repo "$GITHUB_REPOSITORY" --clobber

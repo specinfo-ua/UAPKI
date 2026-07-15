@@ -1,0 +1,11 @@
+# Build artifacts copied here by the WASM build
+uapki.js
+uapki.wasm
+# Temp test material (keys/certs) must never be committed
+*.p12
+*.pfx
+*.jks
+*.cer
+*.crt
+*.p7s
+*.p7e

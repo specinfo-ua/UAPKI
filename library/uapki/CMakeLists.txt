@@ -56,7 +56,7 @@ if (WIN32)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
     find_package(CURL REQUIRED)
 endif()
 
@@ -128,7 +128,7 @@ set_target_properties(uapki PROPERTIES CXX_VISIBILITY_PRESET hidden)
 if(NOT WIN32)
     if(APPLE)
         target_link_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:-Wl,-S>")
-    else()
+    elseif(NOT EMSCRIPTEN)
         set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
     endif()
 else()
@@ -144,7 +144,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
 target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
     target_link_libraries(uapki PRIVATE dl curl)
 endif()
 
