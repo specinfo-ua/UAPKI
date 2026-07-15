@@ -139,6 +139,22 @@ int FileStorage::decode (
 )
 {
     DEBUG_OUTCON(printf("FileStorage::decode(password = '%s')\n", aPassword));
+
+    //  JKS is unambiguously identified by its magic (0xFEEDFEED). When it is
+    //  present, report decodeJks()'s real error instead of letting the PKCS8
+    //  fallback mask it with a misleading RET_INVALID_PARAM.
+    if (m_Buffer && (ba_get_len(m_Buffer) >= 4)) {
+        const uint8_t* p_hdr = ba_get_buf_const(m_Buffer);
+        if ((p_hdr[0] == 0xFE) && (p_hdr[1] == 0xED) && (p_hdr[2] == 0xFE) && (p_hdr[3] == 0xED)) {
+            const int ret_jks = decodeJks(aPassword);
+            DEBUG_OUTCON(printf("FileStorage::decodeJks(), ret: %d\n", ret_jks));
+            if (ret_jks == RET_OK) {
+                setOpen(aPassword);
+            }
+            return ret_jks;
+        }
+    }
+
     int ret = decodePkcs12(aPassword);
     DEBUG_OUTCON(printf("FileStorage::decodePkcs12(), ret: %d\n", ret));
     if (ret == RET_OK) {
