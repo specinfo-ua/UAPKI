@@ -198,7 +198,6 @@ static int asn1_encode_string (
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
         break;
-        break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         break;
