@@ -89,7 +89,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_LIBRARY)
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_SELF_TEST)
 
-if(UNIX)
+#  Android: pthread is part of bionic libc, NDK has no separate libpthread
+if(UNIX AND NOT ANDROID)
     target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 endif()
 

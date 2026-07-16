@@ -13,6 +13,11 @@ configure_file(
 option(UAPKI_DISABLE_COPY "Disable copying into out dir" OFF)
 option(UAPKI_PUBLIC_INTERNAL_INCLUDES "Exposes uapki library internal include files" OFF)
 
+#  Disables HTTP entirely: every network request reports an error
+#  (on Android HTTP normally goes through a JNI bridge to
+#  java.net.HttpURLConnection, elsewhere through libcurl)
+option(UAPKI_NO_HTTP "Build without HTTP transport" OFF)
+
 if (DEFINED UAPKI_LIBS_TYPE)
     if (NOT UAPKI_LIBS_TYPE STREQUAL SHARED AND NOT UAPKI_LIBS_TYPE STREQUAL STATIC)
         message(FATAL_ERROR "Bad UAPKI_LIBS_TYPE")
@@ -56,7 +61,7 @@ if (WIN32)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT ANDROID AND NOT UAPKI_NO_HTTP)
     find_package(CURL REQUIRED)
 endif()
 
@@ -145,7 +150,15 @@ target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
 target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 
 if(UNIX)
-    target_link_libraries(uapki PRIVATE dl curl)
+    if(UAPKI_NO_HTTP)
+        target_compile_definitions(uapki PRIVATE UAPKI_NO_HTTP)
+        target_link_libraries(uapki PRIVATE dl)
+    elseif(ANDROID)
+        #  HTTP via the JNI bridge to java.net.HttpURLConnection - no libcurl
+        target_link_libraries(uapki PRIVATE dl)
+    else()
+        target_link_libraries(uapki PRIVATE dl curl)
+    endif()
 endif()
 
 if (NOT UAPKI_DISABLE_COPY)

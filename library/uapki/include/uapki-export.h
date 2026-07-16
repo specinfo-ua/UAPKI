@@ -54,6 +54,14 @@ extern "C" {
 UAPKI_EXPORT char* process(const char* request);
 UAPKI_EXPORT void json_free(char* buf);
 
+#if defined(__ANDROID__)
+//  Android: HTTP requests go through java.net.HttpURLConnection via JNI,
+//  which needs a JavaVM* (pass the pointer received in JNI_OnLoad).
+//  Required when the library is loaded with plain dlopen(); not needed
+//  after System.loadLibrary("uapki") - JNI_OnLoad stores the VM itself.
+UAPKI_EXPORT void uapki_set_java_vm(void* vm);
+#endif
+
 
 #ifdef  __cplusplus
 }
