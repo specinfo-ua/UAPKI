@@ -42,7 +42,7 @@ uint32_t uapkic_self_test(void)
 
 	// HASHES
 	if (dstu7564_self_test() != RET_OK) test_status |= SELF_TEST_DSTU7564_FAIL;
-	if (gost34311_self_test() != RET_OK) test_status |= SELF_TEST_DSTU7564_FAIL;
+	if (gost34311_self_test() != RET_OK) test_status |= SELF_TEST_GOST34311_FAIL;
 	if (sha1_self_test() != RET_OK) test_status |= SELF_TEST_SHA1_FAIL;
 	if (sha2_self_test() != RET_OK) test_status |= SELF_TEST_SHA2_FAIL;
 	if (sha3_self_test() != RET_OK) test_status |= SELF_TEST_SHA3_FAIL;
