@@ -161,6 +161,13 @@ UAPKIC_EXPORT int ba_set(ByteArray* a, uint8_t value);
  */
 UAPKIC_EXPORT ByteArray* ba_join(const ByteArray* a, const ByteArray* b);
 
+/**
+ * Порівнює два контексти масивів байтів.
+ *
+ * @param a контекст масиву байтів
+ * @param b контекст масиву байтів
+ * @return 0, якщо масиви мають однаковий розмір і містять однакові дані, інакше -1 або 1.
+ */
 UAPKIC_EXPORT int ba_cmp(const ByteArray* a, const ByteArray* b);
 
 
