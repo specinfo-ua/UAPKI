@@ -724,5 +724,7 @@ int main (int argc, char *argv[])
         }
     }
 
-    return 0;
+    //  non-zero exit code when any task registered an error - lets CI and
+    //  scripts detect failures instead of parsing the output
+    return (log_errors.empty()) ? 0 : 1;
 }

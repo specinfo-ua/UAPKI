@@ -1,0 +1,52 @@
+name: Native build & test
+
+on:
+  push:
+    #  every branch: tests must run after each commit pushed
+    paths:
+      - 'library/**'
+      - '.github/workflows/native-test.yml'
+  pull_request:
+    paths:
+      - 'library/**'
+      - '.github/workflows/native-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -S library -B build-native
+
+      - name: Build
+        run: cmake --build build-native -j"$(nproc)"
+
+      #  Deterministic offline scenarios only: no TSP/OCSP/CRL endpoints are
+      #  contacted, so the run does not depend on external services.
+      #  (reinit.json joins the list once PR #16 - drbg_self_test fix - lands.)
+      - name: Run test scenarios
+        working-directory: library/test/data
+        env:
+          #  unversioned lib*.so symlinks live in the per-target build dirs
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-native/uapki:${{ github.workspace }}/build-native/uapkic:${{ github.workspace }}/build-native/uapkif:${{ github.workspace }}/build-native/cm-pkcs12
+        run: |
+          failed=0
+          for scenario in digest.json open-jks.json; do
+            echo "=== $scenario ==="
+            if "$GITHUB_WORKSPACE/build-native/out/test" uapki "$scenario" > "/tmp/$scenario.log" 2>&1; then
+              tail -1 "/tmp/$scenario.log"
+            else
+              failed=1
+              echo "FAILED ($scenario):"
+              cat "/tmp/$scenario.log"
+            fi
+          done
+          exit $failed
