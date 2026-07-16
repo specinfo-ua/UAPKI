@@ -54,5 +54,8 @@ dkms.conf
 # Native CI build output
 /build-native/
 
+# Android build output (library/build-android.ps1|sh)
+/build-android/
+
 # Per-platform build outputs (library/out/<platform>)
 /library/out/

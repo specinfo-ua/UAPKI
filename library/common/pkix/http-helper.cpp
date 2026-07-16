@@ -25,8 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef UAPKI_NO_HTTP
 #define CURL_STATICLIB
 #include "curl/curl.h"
+#endif
 #include "ba-utils.h"
 #include "http-helper.h"
 #include "uapkic.h"
@@ -76,6 +78,84 @@ struct HTTP_HELPER {
 
 static HTTP_HELPER http_helper;
 
+
+#ifdef UAPKI_NO_HTTP
+//  Build without libcurl (e.g. Android NDK has no system libcurl).
+//  The library keeps its full API, but network requests are not performed:
+//  every GET/POST reports RET_UAPKI_OFFLINE_MODE in offline mode and
+//  RET_UAPKI_CONNECTION_ERROR otherwise. TSP/OCSP/CRL/LDAP fetching must be
+//  done by the host application.
+
+int HttpHelper::init (
+        const bool offlineMode,
+        const char* proxyUrl,
+        const char* proxyCredentials
+)
+{
+    http_helper.offlineMode = offlineMode;
+    if (!http_helper.isInitialized) {
+        http_helper.isInitialized = true;
+        //  no transport - proxy settings are kept for diagnostics only
+        if (proxyUrl) {
+            http_helper.proxyUrl = string(proxyUrl);
+            if (proxyCredentials && !http_helper.proxyUrl.empty()) {
+                http_helper.proxyCredentials = string(proxyCredentials);
+            }
+        }
+    }
+    return RET_OK;
+}
+
+void HttpHelper::deinit (void)
+{
+    if (http_helper.isInitialized) {
+        http_helper.reset();
+    }
+}
+
+int HttpHelper::get (
+        const string& uri,
+        ByteArray** baResponse
+)
+{
+    (void)uri;
+    (void)baResponse;
+    return (http_helper.offlineMode) ? RET_UAPKI_OFFLINE_MODE : RET_UAPKI_CONNECTION_ERROR;
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const ByteArray* baRequest,
+        ByteArray** baResponse
+)
+{
+    (void)uri;
+    (void)contentType;
+    (void)baRequest;
+    (void)baResponse;
+    return (http_helper.offlineMode) ? RET_UAPKI_OFFLINE_MODE : RET_UAPKI_CONNECTION_ERROR;
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const char* userPwd,
+        const string& authorizationBearer,
+        const string& request,
+        ByteArray** baResponse
+)
+{
+    (void)uri;
+    (void)contentType;
+    (void)userPwd;
+    (void)authorizationBearer;
+    (void)request;
+    (void)baResponse;
+    return (http_helper.offlineMode) ? RET_UAPKI_OFFLINE_MODE : RET_UAPKI_CONNECTION_ERROR;
+}
+
+#else  //  UAPKI_NO_HTTP
 
 static size_t cb_curlwrite (
         void* dataIn,
@@ -150,6 +230,8 @@ void HttpHelper::deinit (void)
     }
 }
 
+#endif  //  UAPKI_NO_HTTP
+
 bool HttpHelper::isOfflineMode (void)
 {
     return http_helper.offlineMode;
@@ -159,6 +241,8 @@ const string& HttpHelper::getProxyUrl (void)
 {
     return http_helper.proxyUrl;
 }
+
+#ifndef UAPKI_NO_HTTP
 
 int HttpHelper::get (
         const string& uri,
@@ -363,6 +447,8 @@ int HttpHelper::post (
 
     return ret;
 }
+
+#endif  //  UAPKI_NO_HTTP
 
 mutex& HttpHelper::lockUri (
         const string& uri

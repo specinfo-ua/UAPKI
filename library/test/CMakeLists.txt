@@ -51,7 +51,9 @@ add_executable (test
     ${PATH_COMMON_JSON}/strtod-no-locale.c
 )
 
-if (UNIX)
+if (ANDROID)
+    target_link_libraries(test PRIVATE dl)
+elseif (UNIX)
     target_link_libraries(test PRIVATE dl pthread)
 endif()
 
