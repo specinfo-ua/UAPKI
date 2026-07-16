@@ -1066,7 +1066,7 @@ int Util::pbufToStr (
     if (len > 0) {
         *str = (char*)calloc(1, len + 1);
         if (*str == NULL) {
-            ret = RET_MEMORY_ALLOC_ERROR;
+            SET_ERROR(RET_MEMORY_ALLOC_ERROR);
         }
         memcpy(*str, buf, len);
     }
