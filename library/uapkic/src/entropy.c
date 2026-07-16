@@ -27,16 +27,16 @@
 
 #define FILE_MARKER "uapkic/entropy.c"
 
-#include <time.h>
-#include <string.h>
-
 #ifdef _WIN32
 #   include <windows.h>
 #   if !defined(_WIN32_WCE)
 #       include <wincrypt.h>
 #   endif
 #else
-#   include <sys/time.h>
+#   include <sys/random.h>
+#   include <fcntl.h>
+#   include <unistd.h>
+#   include <errno.h>
 #endif
 
 #include "entropy.h"
@@ -66,19 +66,44 @@ static int os_prng(void *rnd, size_t size)
             SET_ERROR(RET_OS_PRNG_ERROR);
         }
 #else
-    /* Пытаемся использовать /dev/urandom */
-        size_t readed;
-        FILE *fos = fopen("/dev/urandom", "rb");
+    uint8_t* b = rnd;
 
-        if (fos == NULL) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
+    // Use a system call.
+    do {
+        ssize_t r = getrandom(b, size, 0);
+        if (r != -1) {
+            // Advance by the number of random bytes we have just got.
+            b += r;
+            size -= r;
+        } else if (errno != EINTR) {
+            // We’ve got an error!
+            break;
         }
+    } while (size);
+    if (!size) {
+        return RET_OK;
+    }
 
-        readed = fread(rnd, 1, size, fos);
-        fclose(fos);
-        if (readed != size) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
+    // If the system call fails, fall back to reading /dev/urandom.
+    int f = open("/dev/urandom", O_RDONLY);
+    if (f == -1) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
+    do {
+        ssize_t r = read(f, b, size);
+        if (r != -1) {
+            // Advance by the number of random bytes we have just got.
+            b += r;
+            size -= r;
+        } else if (errno != EINTR) {
+            // We’ve got an error!
+            break;
         }
+    } while (size);
+    close(f);
+    if (size) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
 #endif
 
 cleanup:
