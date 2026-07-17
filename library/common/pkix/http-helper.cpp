@@ -25,8 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define CURL_STATICLIB
-#include "curl/curl.h"
+#if !defined(ANDROID) && !defined(__ANDROID__)
+  #define CURL_STATICLIB
+  #include "curl/curl.h"
+#else
+  #include <jni.h>
+  #include <unistd.h>
+  #include "uapki-export.h"
+#endif
+
 #include "ba-utils.h"
 #include "http-helper.h"
 #include "uapkic.h"
@@ -77,6 +84,7 @@ struct HTTP_HELPER {
 static HTTP_HELPER http_helper;
 
 
+#if !defined(ANDROID) && !defined(__ANDROID__)
 static size_t cb_curlwrite (
         void* dataIn,
         size_t size,
@@ -118,6 +126,132 @@ static bool curl_set_url_and_proxy (
 
     return true;
 }   //  curl_set_url_and_proxy
+#else
+struct JniHelper {
+    JNIEnv*     env;
+    time_t      sleepMs;
+    //  assigned class
+    jclass      clazz;
+    //  assigned methods
+    jmethodID   midDoGet;
+    jmethodID   midDoPost;
+    jmethodID   midIsBusy;
+    jmethodID   midGetStatusCode;
+    jmethodID   midResponseBytes;
+//    jmethodID   midGetMessage;
+//    jmethodID   midClear;
+
+public:
+    JniHelper ()
+        : env(nullptr)
+        , sleepMs(0)
+        , clazz(nullptr)
+        , midDoGet(nullptr)
+        , midDoPost(nullptr)
+        , midIsBusy(nullptr)
+        , midGetStatusCode(nullptr)
+        , midResponseBytes(nullptr)
+        //, midGetMessage(nullptr)
+        //, midClear(nullptr)
+    {}
+
+    void Init (const char* className) {
+        // if class not found to throw exception
+        clazz = env->FindClass(className);
+
+        // if method not found to throw exception
+        midDoGet = env->GetStaticMethodID(clazz, "doGet", "(Ljava/lang/String;)Z");
+        midDoPost = env->GetStaticMethodID(clazz, "doPost", "(Ljava/lang/String;Ljava/lang/String;[B)Z");
+        midIsBusy = env->GetStaticMethodID(clazz, "isBusy", "()Z");
+        midGetStatusCode = env->GetStaticMethodID(clazz, "getStatusCode", "()I");
+        midResponseBytes = env->GetStaticMethodID(clazz, "getResponseBytes", "()[B");
+//        midGetMessage = env->GetStaticMethodID(clazz, "getMessage", "()Ljava/lang/String;");
+//        midClear = env->GetStaticMethodID(clazz, "clear", "()V");
+    }
+
+    bool DoGet (const std::string& uri) const {
+        if (uri.empty()) return false;
+        jstring jUri = env->NewStringUTF(uri.c_str());
+        return env->CallStaticBooleanMethod(clazz, midDoGet, jUri);
+    }
+
+    bool DoPost (const std::string& uri, const char* contentType, const ByteArray* baBody) const {
+        if (uri.empty()) return false;
+        jstring jUri = env->NewStringUTF(uri.c_str());
+        jstring jContentType = env->NewStringUTF((contentType) ? contentType : "");
+        jsize len_body = (jsize)ba_get_len(baBody);
+        jbyteArray jBody = env->NewByteArray(len_body);
+        if ((len_body > 0) && baBody) {
+            env->SetByteArrayRegion(jBody, 0, len_body, (const jbyte*)ba_get_buf_const(baBody));
+        }
+        return env->CallStaticBooleanMethod(clazz, midDoPost, jUri, jContentType, jBody);
+    }
+
+    bool IsBusy () const {
+        return (env->CallStaticBooleanMethod(clazz, midIsBusy) == JNI_TRUE);
+    }
+
+    void Sleep () const {
+        if (sleepMs > 0) {
+            (void)usleep(sleepMs);
+        }
+    }
+
+    int StatusCode () const {
+        return env->CallStaticIntMethod(clazz, midGetStatusCode);
+    }
+
+    size_t ResponseBytes (ByteArray** baBody) const {
+        jbyteArray jba_value = (jbyteArray)env->CallStaticObjectMethod(clazz, midResponseBytes);
+        jsize len_data = env->GetArrayLength(jba_value);
+        jbyte* buf_data = env->GetByteArrayElements(jba_value, nullptr);
+        ByteArray* ba_out = ba_alloc_by_len((size_t)len_data);
+        if (ba_out && buf_data) {
+            memcpy((void* const)ba_get_buf(ba_out), buf_data, ba_get_len(ba_out));
+        }
+        *baBody = ba_out;
+        env->ReleaseByteArrayElements(jba_value, buf_data, 0);
+        return ba_get_len(ba_out);
+    }
+
+//    std::string Message () const {
+//        std::string rv_s;
+//        auto js_value = (jstring)env->CallStaticObjectMethod(clazz, midGetMessage);
+//        const char* s_message = env->GetStringUTFChars(js_value, nullptr);
+//        if (s_message) {
+//            rv_s.resize(strlen(s_message) + 1);
+//            memcpy((void* const)rv_s.data(), s_message, rv_s.size());
+//            rv_s.resize(rv_s.size() - 1);
+//        }
+//        env->ReleaseStringUTFChars(js_value, s_message);
+//        return rv_s;
+//    }
+
+//    void Clear () const {
+//        env->CallStaticVoidMethod(clazz, midClear);
+//    }
+
+};
+
+static JniHelper g_JniHelper = JniHelper();
+
+extern "C" UAPKI_EXPORT int set_jni (
+        JNIEnv* env,
+        const char* className,
+        int sleepMs,
+        void* paramPtr
+)
+{
+    (void)paramPtr;
+    if (!env) return RET_UAPKI_INVALID_PARAMETER;
+
+    g_JniHelper.env = env;
+    g_JniHelper.sleepMs = (sleepMs > 0) ? (time_t)sleepMs : 0;
+    g_JniHelper.Init(className);
+
+    return RET_OK;
+}
+#endif
 
 
 int HttpHelper::init (
@@ -129,6 +263,7 @@ int HttpHelper::init (
     int ret = RET_OK;
     http_helper.offlineMode = offlineMode;
     if (!http_helper.isInitialized) {
+#if !defined(ANDROID) && !defined(__ANDROID__)
         const CURLcode curl_code = curl_global_init(CURL_GLOBAL_ALL);
         http_helper.isInitialized = (curl_code == CURLE_OK);
         if (proxyUrl && http_helper.isInitialized) {
@@ -138,6 +273,11 @@ int HttpHelper::init (
             }
         }
         ret = (http_helper.isInitialized) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+#else
+        (void)proxyUrl;
+        (void)proxyCredentials;
+        http_helper.isInitialized = true;
+#endif
     }
     return ret;
 }
@@ -146,7 +286,9 @@ void HttpHelper::deinit (void)
 {
     if (http_helper.isInitialized) {
         http_helper.reset();
+#if !defined(ANDROID) && !defined(__ANDROID__)
         curl_global_cleanup();
+#endif
     }
 }
 
@@ -166,16 +308,17 @@ int HttpHelper::get (
 )
 {
     DEBUG_OUTCON(printf("HttpHelper::get(uri='%s')\n", uri.c_str()));
-    CURL* curl;
-    CURLcode curl_code;
-    int ret;
 
     if (http_helper.offlineMode) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
+    int ret;
+
+#if !defined(ANDROID) && !defined(__ANDROID__)
     // get a curl handle 
-    if ((curl = curl_easy_init()) == NULL) {
+    CURL* curl = nullptr;
+    if ((curl = curl_easy_init()) == nullptr) {
         return RET_UAPKI_CONNECTION_ERROR;
     }
 
@@ -193,7 +336,7 @@ int HttpHelper::get (
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, *baResponse);
 
     // Perform the request, res will get the return code
-    curl_code = curl_easy_perform(curl);
+    CURLcode curl_code = curl_easy_perform(curl);
     if (curl_code == CURLE_OK) {
         long http_code = 0;
         curl_code = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
@@ -205,6 +348,24 @@ int HttpHelper::get (
 
     // always cleanup
     curl_easy_cleanup(curl);
+#else
+    if (!g_JniHelper.env) return RET_UAPKI_NOT_INITIALIZED;
+
+    if (!g_JniHelper.DoGet(uri)) return RET_UAPKI_INVALID_PARAMETER;
+
+    while (g_JniHelper.IsBusy()) {
+        g_JniHelper.Sleep();
+    }
+
+    const int http_code = g_JniHelper.StatusCode();
+    if (http_code == 200) {
+        (void)g_JniHelper.ResponseBytes(baResponse);
+        ret = (*baResponse) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    }
+    else {
+        ret = (http_code < 0) ? RET_UAPKI_CONNECTION_ERROR : RET_UAPKI_HTTP_STATUS_NOT_OK;
+    }
+#endif
 
     return ret;
 }
@@ -220,17 +381,18 @@ int HttpHelper::post (
         printf("HttpHelper::post(uri='%s', contentType='%s'), Request:\n", uri.c_str(), contentType);
         ba_print(stdout, baRequest);
     )
-    CURL* curl;
-    CURLcode curl_code;
-    int ret;
 
     if (http_helper.offlineMode) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
+    int ret;
+
+#if !defined(ANDROID) && !defined(__ANDROID__)
     // get a curl handle 
-    if ((curl = curl_easy_init()) == NULL) {
-        return RET_UAPKI_GENERAL_ERROR;
+    CURL* curl = nullptr;
+    if ((curl = curl_easy_init()) == nullptr) {
+        return RET_UAPKI_CONNECTION_ERROR;
     }
 
     struct curl_slist* chunk = NULL;
@@ -262,7 +424,7 @@ int HttpHelper::post (
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, *baResponse);
 
     // Perform the request, res will get the return code
-    curl_code = curl_easy_perform(curl);
+    CURLcode curl_code = curl_easy_perform(curl);
     if (curl_code == CURLE_OK) {
         long http_code = 0;
         curl_code = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
@@ -275,6 +437,24 @@ int HttpHelper::post (
     // always cleanup
     curl_easy_cleanup(curl);
     curl_slist_free_all(chunk);
+#else
+    if (!g_JniHelper.env) return RET_UAPKI_NOT_INITIALIZED;
+
+    if (!g_JniHelper.DoPost(uri, contentType, baRequest)) return RET_UAPKI_INVALID_PARAMETER;
+
+    while (g_JniHelper.IsBusy()) {
+        g_JniHelper.Sleep();
+    }
+
+    const int http_code = g_JniHelper.StatusCode();
+    if (http_code == 200) {
+        (void)g_JniHelper.ResponseBytes(baResponse);
+        ret = (*baResponse) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    }
+    else {
+        ret = (http_code < 0) ? RET_UAPKI_CONNECTION_ERROR : RET_UAPKI_HTTP_STATUS_NOT_OK;
+    }
+#endif
 
     return ret;
 }
@@ -292,17 +472,18 @@ int HttpHelper::post (
         printf("HttpHelper::post(uri='%s', contentType='%s', userPwd='%s', authorizationBearer='%s', request='%s')\n",
                 uri.c_str(), contentType, userPwd, authorizationBearer.c_str(), request.c_str());
     )
-    CURL* curl;
-    CURLcode curl_code;
-    int ret;
 
     if (http_helper.offlineMode) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
+    int ret;
+
+#if !defined(ANDROID) && !defined(__ANDROID__)
     // get a curl handle 
-    if ((curl = curl_easy_init()) == NULL) {
-        return RET_UAPKI_GENERAL_ERROR;
+    CURL* curl = nullptr;
+    if ((curl = curl_easy_init()) == nullptr) {
+        return RET_UAPKI_CONNECTION_ERROR;
     }
 
     if (userPwd) {
@@ -348,7 +529,7 @@ int HttpHelper::post (
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, *baResponse);
 
     // Perform the request, res will get the return code
-    curl_code = curl_easy_perform(curl);
+    CURLcode curl_code = curl_easy_perform(curl);
     if (curl_code == CURLE_OK) {
         long http_code = 0;
         curl_code = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
@@ -360,6 +541,29 @@ int HttpHelper::post (
 
     // always cleanup
     curl_easy_cleanup(curl);
+#else
+    (void)userPwd;
+    (void)authorizationBearer;
+    if (!g_JniHelper.env) return RET_UAPKI_NOT_INITIALIZED;
+
+    UapkiNS::SmartBA sba_request;
+    if (!sba_request.set(ba_alloc_from_str(request.c_str()))) return RET_UAPKI_GENERAL_ERROR;
+
+    if (!g_JniHelper.DoPost(uri, contentType, sba_request.get())) return RET_UAPKI_INVALID_PARAMETER;
+
+    while (g_JniHelper.IsBusy()) {
+        g_JniHelper.Sleep();
+    }
+
+    const int http_code = g_JniHelper.StatusCode();
+    if (http_code == 200) {
+        (void)g_JniHelper.ResponseBytes(baResponse);
+        ret = (*baResponse) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+    }
+    else {
+        ret = (http_code < 0) ? RET_UAPKI_CONNECTION_ERROR : RET_UAPKI_HTTP_STATUS_NOT_OK;
+    }
+#endif
 
     return ret;
 }
