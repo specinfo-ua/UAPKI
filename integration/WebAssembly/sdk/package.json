@@ -1,0 +1,37 @@
+{
+  "name": "@uapki/wasm",
+  "version": "0.1.0",
+  "description": "UAPKI cryptographic library (Ukrainian and international PKI standards) compiled to WebAssembly — thin ES-module wrapper over its JSON protocol, for browsers",
+  "type": "module",
+  "main": "./index.mjs",
+  "module": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs"
+    },
+    "./uapki.mjs": "./uapki.mjs",
+    "./uapki.wasm": "./uapki.wasm"
+  },
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "uapki.mjs",
+    "uapki.wasm",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "uapki",
+    "wasm",
+    "webassembly",
+    "cades",
+    "dstu",
+    "pkcs12",
+    "digital-signature",
+    "pki",
+    "crypto"
+  ],
+  "license": "BSD-2-Clause"
+}

@@ -6,19 +6,49 @@
 шифрування/розшифрування CMS EnvelopedData — повністю на стороні клієнта,
 ключ і пароль не покидають машину користувача.
 
-Збірка модуля описана в `library/wasm/README.md`; після збірки тут
-з'являються `uapki.js` + `uapki.wasm`. Готовий модуль також публікує
+Збірка модуля описана в `library/wasm/README.md`; після збірки `uapki.mjs` +
+`uapki.wasm` з'являються в `sdk/`. Готовий модуль також публікує
 GitHub Actions workflow `wasm-build` (artifact `uapki-wasm`).
 
 WASM-модуль експонує той самий **JSON-протокол** (`process`/`json_free`),
 що й нативна бібліотека — див. `doc/UAPKI-PM-*.pdf` і приклади задач у
 `library/test/data/*.json`.
 
+## Що тут є
+
+| | |
+|---|---|
+| `sdk/` | Тонка ES-обгортка над протоколом (`index.mjs`, типи `index.d.ts`) і домівка зібраного модуля. Рекомендований спосіб інтеграції. |
+| `INTEGRATION.md` | **Інструкція з інтеграції у веб-застосунок**: React, Vue, Angular, vanilla, складальники, CSP, мережа, діагностика. |
+| `examples/` | Готові приклади: `vanilla.html` (зокрема міст до неESM-коду), `react-useUapki.jsx`, `vue-useUapki.js`, `angular-uapki.service.ts`. |
+| `console.html` | JSON-консоль: довільний запит до `process()` без написання коду. |
+| `test-node.mjs` | Смок-тест протоколу (виконується в CI). |
+
+## Швидкий старт
+
+Пакета в npm немає: скопіюйте файли модуля (`sdk/`) у свій проєкт — з асета
+релізу `uapki-vX.Y.Z-wasm.zip` або з власної збірки.
+
+```js
+import { createUapki, toBase64 } from './lib/uapki/index.mjs';
+
+//  звичайний імпорт: ні <script>-тегів, ні глобальних змінних
+const uapki = await createUapki({ wasmUrl: '/uapki.wasm' });
+
+//  об'єкт запиту -> об'єкт відповіді { errorCode, method, result?, error? }
+const version = await uapki.process({ method: 'VERSION' });
+```
+
+Контейнер ключа відкривається з пам'яті (`storage: "file://memory"` +
+`openParams.bytes`), усі дані — base64, файлова система не потрібна.
+Повний цикл підпису/перевірки і решта деталей — в **`INTEGRATION.md`**.
+
 ## JSON-консоль (`console.html`)
 
 Універсальний інструмент для тестування протоколу і вивчення API — довільний
-запит до `process()` без написання коду. Файли треба віддавати по HTTP
-(через `file://` браузер не завантажить .wasm):
+запит до `process()` без написання коду (сама консоль побудована на тому ж
+`sdk/index.mjs`). Файли треба віддавати по HTTP (через `file://` браузер не
+завантажить .wasm):
 
 ```sh
 python -m http.server 8000 --directory integration/WebAssembly
@@ -44,53 +74,9 @@ python -m http.server 8000 --directory integration/WebAssembly
 «Зчитати ключ» або «Підписати і перевірити», виправте `storage`/`password`,
 Ctrl+Enter.
 
-## JSON-протокол із JavaScript
-
-`process()` може призупинятись на мережевих запитах (Asyncify + `fetch`),
-тому викликається асинхронно (`cwrap` з `{ async: true }` повертає Promise):
-
-```js
-const module = await createUapkiModule();
-const proc = module.cwrap("process", "number", ["number"], { async: true });
-
-async function uapki(method, parameters) {
-    const req = module.stringToNewUTF8(JSON.stringify({ method, parameters }));
-    const resPtr = await proc(req);
-    const res = JSON.parse(module.UTF8ToString(resPtr));
-    module._free(req);
-    module._json_free(resPtr);
-    if (res.errorCode !== 0) throw new Error(`${method}: ${res.error} (${res.errorCode})`);
-    return res.result;
-}
-
-//  мінімальний цикл підпису
-module.FS.mkdir("/storage");
-module.FS.writeFile("/storage/key.p12", keyFileBytes /* Uint8Array */);
-
-await uapki("INIT", {
-    cmProviders: { dir: "", allowedProviders: [{ lib: "cm-pkcs12" }] },
-    certCache: { path: "/certs/", trustedCerts: [] },
-    crlCache: { path: "/crls/" },
-    offline: true    //  false вмикає TSP/OCSP/CRL через fetch (потрібен CORS)
-});
-await uapki("OPEN", { provider: "PKCS12", storage: "/storage/key.p12", password: "…", mode: "RO" });
-const { keys } = await uapki("KEYS");
-await uapki("SELECT_KEY", { id: keys[0].id });
-const { signatures } = await uapki("SIGN", {
-    signParams: { signatureFormat: "CAdES-BES", detachedData: false, includeCert: true, includeTime: true },
-    options: { ignoreCertStatus: true },
-    dataTbs: [{ id: "doc-0", bytes: btoa("data to sign") }]
-});
-//  signatures[0].bytes — base64 CMS-підпису (.p7s)
-const verified = await uapki("VERIFY", { signature: { bytes: signatures[0].bytes } });
-await uapki("CLOSE");
-```
-
-Мережевий режим (`offline: false`): TSP/OCSP/CRL-запити йдуть через браузерний
-`fetch()`, тож цільові сервери мають дозволяти CORS (для публічних TSP без
-CORS — reverse-proxy на своєму домені; свій URL вмикається через
-`tsp: { url: "…", forced: true }`). Деталі та інші обмеження платформи
-(MEMFS, статичний cm-pkcs12) — див. `library/wasm/README.md`.
+Консоль лишає доступними обидва режими протоколу: файловий (`/storage/…`
+у MEMFS — зручніше для ручних експериментів) і той, що використовують
+застосунки (`file://memory` + base64, пресет «OPEN (з пам'яті)»).
 
 Повний перелік методів і параметрів — у `doc/UAPKI-PM-*.pdf`; робочі приклади
 запитів для кожного методу — у `library/test/data/*.json` (їх можна вставляти
@@ -108,9 +94,12 @@ CORS — reverse-proxy на своєму домені; свій URL вмикає
 JKS-контейнера (включно з негативним кейсом невірного пароля), повний цикл
 підпису/перевірки CAdES-BES на ключі ДСТУ-4145:
 
+Тест ходить через `sdk/index.mjs` — ту саму точку входу, що й застосунки,
+тож зламана обгортка так само валить збірку.
+
 ```sh
-node integration/WebAssembly/test-node.mjs            # використовує uapki.js поруч
-node integration/WebAssembly/test-node.mjs build-wasm/wasm/uapki.js
+node integration/WebAssembly/test-node.mjs            # модуль із sdk/
+node integration/WebAssembly/test-node.mjs build-wasm/wasm/uapki.mjs
 ```
 
 Цей самий тест виконується в CI (workflow `wasm-build`) після кожної збірки.

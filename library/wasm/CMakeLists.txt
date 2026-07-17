@@ -15,13 +15,19 @@ add_executable(${PROJECT_NAME} main-wasm.c)
 #  cm-pkcs12 is linked statically (see common/loaders/cm-loader.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE uapki cm-pkcs12)
 
+#  .mjs: the loader is generated as an ES module (-sEXPORT_ES6), which
+#  Emscripten only allows for that extension
 set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "uapki"
-    SUFFIX ".js"
+    SUFFIX ".mjs"
 )
 
 target_link_options(${PROJECT_NAME} PRIVATE
     "-sMODULARIZE=1"
+    #  the loader is an ES module exporting the factory as its default export:
+    #  'import createUapkiModule from "./uapki.mjs"'. No global, no <script>
+    #  tag - bundlers and browsers resolve it like any other module.
+    "-sEXPORT_ES6=1"
     "-sEXPORT_NAME=createUapkiModule"
     "-sEXPORTED_FUNCTIONS=_process,_json_free,_malloc,_free"
     "-sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToNewUTF8,lengthBytesUTF8,FS"
@@ -42,15 +48,17 @@ set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/pre.js
 )
 
-#  Platform output dir (library/out/wasm, see the root CMakeLists) and the
-#  WebAssembly integration dir (JSON console) receive the built module.
+#  Copy the built module to the platform output dir (library/out/wasm, like
+#  out/windows-amd64 for native builds) and into the SDK package, which is the
+#  module's single home for integrators: the SDK imports ./uapki.mjs next to
+#  itself, and the JSON console loads the SDK.
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.js
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.mjs
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.wasm
         ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.js
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.mjs
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/uapki.wasm
-        ${CMAKE_SOURCE_DIR}/../integration/WebAssembly/
+        ${CMAKE_SOURCE_DIR}/../integration/WebAssembly/sdk/
 )

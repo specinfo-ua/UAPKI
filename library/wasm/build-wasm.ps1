@@ -1,9 +1,9 @@
-# Builds the browser WASM bundle (uapki.js + uapki.wasm) via Docker + Emscripten.
+# Builds the browser WASM bundle (uapki.mjs + uapki.wasm) via Docker + Emscripten.
 # Requires Docker Desktop. Run from anywhere:
 #   powershell -File library\wasm\build-wasm.ps1
 #
-# Output: build-wasm\wasm\uapki.js|uapki.wasm
-# (also copied to library\out\wasm\ and integration\WebAssembly\)
+# Output: build-wasm\wasm\uapki.mjs|uapki.wasm
+# (also copied to library\out\wasm\ and integration\WebAssembly\sdk\)
 
 $ErrorActionPreference = "Stop"
 

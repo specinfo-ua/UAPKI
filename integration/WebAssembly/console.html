@@ -115,7 +115,7 @@
       <div class="bar">
         <b>Запит</b>
         <span class="hint">один метод <code>{"method":…}</code> або сценарій <code>{"tasks":[…]}</code>; коментарі // дозволені; підстановки <code>{{METHOD:шлях.до.поля}}</code></span>
-        <button class="run" id="btn-run">Виконати (Ctrl+Enter)</button>
+        <button class="run" id="btn-run" disabled>Виконати (Ctrl+Enter)</button>
       </div>
       <textarea id="editor" spellcheck="false">{
   "method": "VERSION"
@@ -138,28 +138,20 @@
   </section>
 </main>
 
-<script src="uapki.js"></script>
-<script>
+<script type="module">
 "use strict";
 
-let Module = null, procFn = null;
+//  The console talks to the library through the same SDK that applications use
+//  (sdk/uapki.mjs) — it is only a UI over uapki.process(request) -> response.
+import { createUapki, toBase64, fromBase64 } from "./sdk/index.mjs";
+
+let uapki = null;             //  the SDK instance
 let lastResponse = null;
 const scenarioResults = {};   //  METHOD -> last result (for {{...}} placeholders)
 
 const $ = (id) => document.getElementById(id);
 
 //  ---- helpers ----
-function bytesToB64 (u8) {
-    let s = "";
-    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-    return btoa(s);
-}
-function b64ToBytes (b64) {
-    const s = atob(b64.replace(/\s/g, ""));
-    const u8 = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
-    return u8;
-}
 function downloadBytes (u8, name) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([u8]));
@@ -218,23 +210,6 @@ function resolvePlaceholders (value) {
     return value;
 }
 
-//  ---- core call ----
-//  process() may suspend on network I/O (Asyncify + fetch), so the call is
-//  asynchronous: procFn returns a Promise.
-async function uapkiRaw (requestObj) {
-    const request = JSON.stringify(requestObj);
-    const reqPtr = Module.stringToNewUTF8(request);
-    let resPtr = 0, response;
-    try {
-        resPtr = await procFn(reqPtr);
-        response = Module.UTF8ToString(resPtr);
-    } finally {
-        Module._free(reqPtr);
-        if (resPtr) Module._json_free(resPtr);
-    }
-    return JSON.parse(response);
-}
-
 //  ---- run (single request or scenario) ----
 let running = false;
 async function runEditor () {
@@ -268,7 +243,7 @@ async function runEditor () {
 
         let resp;
         try {
-            resp = await uapkiRaw(reqObj);
+            resp = await uapki.process(reqObj);
         } catch (e) {
             blocks.push({ title: `#${i + 1} ${method} — збій виклику`, ok: false, body: String(e) });
             break;
@@ -281,6 +256,10 @@ async function runEditor () {
         //  the page session - INIT/OPEN/SELECT_KEY must be re-run after reload)
         const HINTS = {
             33:   "повторний INIT після DEINIT — додайте \"skipSelfTest\": true (самотестування за дизайном виконується один раз, при старті)",
+            4120: "метод потребує мережі, а INIT виконано з \"offline\": true",
+            4178: "CRL не завантажився: сервер недоступний або не дозволяє CORS (браузер не розрізняє ці випадки)",
+            4193: "OCSP не відповідає: сервер недоступний або не дозволяє CORS — потрібен reverse-proxy на своєму домені",
+            4209: "TSP не відповідає: сервер недоступний або не дозволяє CORS — потрібен reverse-proxy на своєму домені; свій URL вмикається через tsp: { url, forced: true }",
             4105: "бібліотека не ініціалізована — виконайте INIT (пресет «INIT (offline)»); стан скидається після перезавантаження сторінки",
             4106: "INIT уже виконано в цій сесії сторінки — повторний не потрібен (або спершу DEINIT)",
             4108: "ключ не обрано — виконайте SELECT_KEY після OPEN/KEYS",
@@ -296,7 +275,7 @@ async function runEditor () {
         });
 
         if (!ok && (task.actionByError === "STOP" || task.actionByError === "CLOSE")) {
-            if (task.actionByError === "CLOSE") { try { await uapkiRaw({ method: "CLOSE" }); } catch (e) {} }
+            if (task.actionByError === "CLOSE") { try { await uapki.process({ method: "CLOSE" }); } catch (e) {} }
             blocks.push({ title: "зупинено (actionByError)", ok: false, body: "" });
             break;
         }
@@ -354,7 +333,7 @@ function refreshFs () {
     const el = $("fs-list");
     el.innerHTML = "";
     let names = [];
-    try { names = Module.FS.readdir("/storage").filter(n => n !== "." && n !== ".."); } catch (e) {}
+    try { names = uapki.module.FS.readdir("/storage").filter(n => n !== "." && n !== ".."); } catch (e) {}
     if (!names.length) {
         el.innerHTML = '<div class="fs-item" style="color:var(--muted)">порожньо</div>';
         return;
@@ -372,12 +351,12 @@ function refreshFs () {
         const dl = document.createElement("button");
         dl.textContent = "↓";
         dl.title = "Завантажити";
-        dl.addEventListener("click", () => downloadBytes(Module.FS.readFile("/storage/" + name), name));
+        dl.addEventListener("click", () => downloadBytes(uapki.module.FS.readFile("/storage/" + name), name));
         const del = document.createElement("button");
         del.className = "del";
         del.textContent = "×";
         del.title = "Видалити";
-        del.addEventListener("click", () => { Module.FS.unlink("/storage/" + name); refreshFs(); });
+        del.addEventListener("click", () => { uapki.module.FS.unlink("/storage/" + name); refreshFs(); });
         item.append(span, ins, dl, del);
         el.appendChild(item);
     }
@@ -408,7 +387,7 @@ const PRESETS = [
     crlCache: { path: "/crls/" },
     offline: false,
     //  HTTP іде через браузерний fetch: сервер TSP/OCSP має дозволяти CORS,
-    //  інакше запит заблокує браузер (CONNECTION_ERROR)
+    //  інакше браузер заблокує запит і це виглядатиме як TSP_NOT_RESPONDING
     tsp: { url: "<URL TSP-сервера>", nonceLen: 8 }
 } }],
 ["PROVIDERS", { method: "PROVIDERS" }],
@@ -416,7 +395,13 @@ const PRESETS = [
 ]],
 ["Сховище ключів", [
 ["STORAGE_INFO", { method: "STORAGE_INFO", parameters: { provider: "PKCS12", storage: "/storage/<ваш файл>" } }],
-["OPEN", { method: "OPEN", parameters: { provider: "PKCS12", storage: "/storage/<ваш файл>", password: "<пароль>", mode: "RO" } }],
+["OPEN (файл у MEMFS)", { method: "OPEN", parameters: { provider: "PKCS12", storage: "/storage/<ваш файл>", password: "<пароль>", mode: "RO" } }],
+//  режим, який використовують застосунки: контейнер передається байтами,
+//  файлова система не потрібна (base64 вставляється кнопкою «Файл → base64»)
+["OPEN (з пам'яті)", { method: "OPEN", parameters: {
+    provider: "PKCS12", storage: "file://memory", password: "<пароль>", mode: "RO",
+    openParams: { bytes: "<base64 контейнера>" }
+} }],
 ["KEYS", { method: "KEYS" }],
 ["SELECT_KEY", { method: "SELECT_KEY", parameters: { id: "{{KEYS:keys.0.id}}" } }],
 ["GET_CSR", { method: "GET_CSR", parameters: {} }],
@@ -577,15 +562,18 @@ function buildPresets () {
 }
 
 //  ---- wiring ----
-createUapkiModule().then(async (mod) => {
-    Module = mod;
-    procFn = Module.cwrap("process", "number", ["number"], { async: true });
+//  the SDK imports the loader and finds uapki.wasm next to it, in sdk/
+createUapki().then(async (instance) => {
+    uapki = instance;
+    //  MEMFS dirs for the file panel: the console keeps the filesystem mode of
+    //  the protocol available (applications normally use "file://memory")
     for (const dir of ["/certs", "/crls", "/storage"]) {
-        try { Module.FS.mkdir(dir); } catch (e) {}
+        try { uapki.module.FS.mkdir(dir); } catch (e) {}
     }
-    const v = await uapkiRaw({ method: "VERSION" });
+    const v = await uapki.process({ method: "VERSION" });
     $("status").textContent = `модуль готовий · UAPKI ${v.result ? v.result.version : "?"}`;
     $("status").className = "st ok";
+    $("btn-run").disabled = false;
     refreshFs();
 }).catch((e) => {
     $("status").textContent = "помилка завантаження: " + e.message;
@@ -600,7 +588,7 @@ $("editor").addEventListener("keydown", (ev) => {
 $("btn-upload").addEventListener("click", () => $("fs-file").click());
 $("fs-file").addEventListener("change", async () => {
     for (const f of $("fs-file").files) {
-        Module.FS.writeFile("/storage/" + f.name, new Uint8Array(await f.arrayBuffer()));
+        uapki.module.FS.writeFile("/storage/" + f.name, new Uint8Array(await f.arrayBuffer()));
     }
     $("fs-file").value = "";
     refreshFs();
@@ -609,7 +597,7 @@ $("fs-file").addEventListener("change", async () => {
 $("btn-ins-b64").addEventListener("click", () => $("b64-file").click());
 $("b64-file").addEventListener("change", async () => {
     const f = $("b64-file").files[0];
-    if (f) insertAtCursor('"' + bytesToB64(new Uint8Array(await f.arrayBuffer())) + '"');
+    if (f) insertAtCursor('"' + toBase64(await f.arrayBuffer()) + '"');
     $("b64-file").value = "";
 });
 
@@ -627,7 +615,7 @@ $("btn-save-bytes").addEventListener("click", () => {
             const b64 = r.bytes
                 || (r.signatures && r.signatures[0] && r.signatures[0].bytes)
                 || (r.content && r.content.bytes);
-            if (b64) { downloadBytes(b64ToBytes(b64), (j.method || "result").toLowerCase() + ".bin"); return; }
+            if (b64) { downloadBytes(fromBase64(b64), (j.method || "result").toLowerCase() + ".bin"); return; }
         }
     } catch (e) {}
     alert("У відповіді немає поля bytes.");

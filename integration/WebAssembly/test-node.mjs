@@ -7,17 +7,20 @@
 //  integration/Node.js (N-API addon).
 //
 //  Usage (from the repository root, after the WASM build):
-//      node integration/WebAssembly/test-node.mjs [path/to/uapki.js]
+//      node integration/WebAssembly/test-node.mjs [path/to/uapki.mjs]
+//
+//  Runs through the SDK (sdk/index.mjs) - the same entry point applications
+//  use - so a broken wrapper fails the build too.
 //
 //  Exercises the JSON protocol end to end on the committed test data:
 //  DIGEST with a known answer, JKS container open (regression for the
 //  jks_pass_to_ba password fix), and a full CAdES-BES sign/verify cycle
 //  with a DSTU-4145 key. Exits non-zero on the first failure.
 
-import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createUapki } from "./sdk/index.mjs";
 
 //  pre.js expects the Web Crypto API; make it global on older Node (< 19)
 if (typeof globalThis.crypto === "undefined") {
@@ -26,12 +29,9 @@ if (typeof globalThis.crypto === "undefined") {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..", "..");
-const uapkiJsPath = path.resolve(process.argv[2] ?? path.join(scriptDir, "uapki.js"));
+const uapkiJsPath = path.resolve(process.argv[2] ?? path.join(scriptDir, "sdk", "uapki.mjs"));
 const uapkiWasmPath = path.join(path.dirname(uapkiJsPath), "uapki.wasm");
 const testData = (name) => path.join(repoRoot, "library", "test", "data", name);
-
-const require = createRequire(import.meta.url);
-const createUapkiModule = require(uapkiJsPath);
 
 //  One test suite - one summary line. Individual checks are listed only on
 //  failure (everything passed so far + the failing one) or with VERBOSE=1.
@@ -47,23 +47,17 @@ function check (name, cond, details) {
     if (verbose) console.log(`ok: ${name}`);
 }
 
-const module_ = await createUapkiModule({ wasmBinary: readFileSync(uapkiWasmPath) });
-//  process() may suspend on network I/O (Asyncify + fetch) - call it async
-const proc = module_.cwrap("process", "number", ["number"], { async: true });
+//  the loader is browser-only, so hand it the wasm bytes instead of a URL;
+//  moduleFactory lets the test point at a freshly built module (CI) rather
+//  than the copy inside sdk/
+const uapkiSdk = await createUapki({
+    moduleFactory: (await import(pathToFileURL(uapkiJsPath).href)).default,
+    wasmBinary: readFileSync(uapkiWasmPath)
+});
+const module_ = uapkiSdk.module;
 
 async function uapki (method, parameters) {
-    const req = module_.stringToNewUTF8(
-        JSON.stringify(parameters !== undefined ? { method, parameters } : { method })
-    );
-    let resPtr = 0, res;
-    try {
-        resPtr = await proc(req);
-        res = JSON.parse(module_.UTF8ToString(resPtr));
-    } finally {
-        module_._free(req);
-        if (resPtr) module_._json_free(resPtr);
-    }
-    return res;
+    return uapkiSdk.process(parameters !== undefined ? { method, parameters } : { method });
 }
 async function uapkiOk (method, parameters) {
     const res = await uapki(method, parameters);

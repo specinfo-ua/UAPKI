@@ -1,6 +1,4 @@
-# Build artifacts copied here by the WASM build
-uapki.js
-uapki.wasm
+# The built module is copied into sdk/ (see sdk/.gitignore)
 # Temp test material (keys/certs) must never be committed
 *.p12
 *.pfx
