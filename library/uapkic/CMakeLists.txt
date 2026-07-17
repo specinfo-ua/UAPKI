@@ -89,13 +89,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_LIBRARY)
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIC_SELF_TEST)
 
-if(UNIX)
+if(UNIX AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
     target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 endif()
 
-if (NOT UAPKI_DISABLE_COPY)
+if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
-endif ()
+endif()

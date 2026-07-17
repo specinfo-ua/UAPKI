@@ -128,7 +128,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE CM_LIBRARY)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC uapkic uapkif)
 
-if (NOT UAPKI_DISABLE_COPY)
+if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ../out/
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cm-pkcs12> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/

@@ -56,7 +56,7 @@ if (WIN32)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
-if(NOT WIN32)
+if(NOT WIN32 AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
     find_package(CURL REQUIRED)
 endif()
 
@@ -82,7 +82,7 @@ else()
 endif()
 
 
-add_library(uapki ${UAPKI_LIBS_TYPE}
+add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
     ${UAPKI_API_SOURCES}
     ${UAPKI_SOURCES}
     ${COMMON_SOURCES}
@@ -122,8 +122,8 @@ target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-set_target_properties(uapki PROPERTIES C_VISIBILITY_PRESET hidden)
-set_target_properties(uapki PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
 if(NOT WIN32)
     if(APPLE)
@@ -141,16 +141,19 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     SOVERSION "${PROJECT_VERSION_MAJOR}"
 )
 
-target_compile_definitions(uapki PRIVATE UAPKI_LIBRARY)
-target_link_libraries(uapki ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
+target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKI_LIBRARY)
+target_link_libraries(${PROJECT_NAME} ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 
 if(UNIX)
-    target_link_libraries(uapki PRIVATE dl curl)
+    target_link_libraries(${PROJECT_NAME} PRIVATE dl)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+        target_link_libraries(${PROJECT_NAME} PRIVATE curl)
+    endif()
 endif()
 
-if (NOT UAPKI_DISABLE_COPY)
-    add_custom_command(TARGET uapki POST_BUILD
+if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ../out/
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapki> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
-endif ()
+endif()

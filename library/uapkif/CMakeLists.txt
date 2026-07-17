@@ -50,7 +50,6 @@ endif ()
 
 set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 set(PATH_PRJ_SOURCES ${PATH_PRJ}/src)
-set(PATH_UAPKIC ${PATH_PRJ}/../uapkic)
 
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
 
@@ -99,9 +98,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIF_LIBRARY)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC uapkic)
 
-if (NOT UAPKI_DISABLE_COPY)
+if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ../out/
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
-endif ()
+endif()
