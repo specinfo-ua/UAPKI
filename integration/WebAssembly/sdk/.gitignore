@@ -1,0 +1,3 @@
+# Built module artifacts (produced by the wasm build, copied here on build)
+uapki.mjs
+uapki.wasm

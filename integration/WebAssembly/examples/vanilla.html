@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>UAPKI WASM SDK — vanilla</title>
+</head>
+<body>
+<h1>UAPKI · vanilla</h1>
+<p>Serve over HTTP and open the console:
+<code>python -m http.server 8000 --directory integration/WebAssembly</code>,
+then <code>http://localhost:8000/examples/vanilla.html</code>.</p>
+
+<label>Файл ключа (PKCS#12/JKS/…): <input type="file" id="key"></label>
+<label>Пароль: <input type="password" id="pass"></label>
+<label>Сертифікат (опційно, якщо не в контейнері): <input type="file" id="cert"></label>
+<button id="sign">Підписати "hello" і перевірити</button>
+<pre id="out"></pre>
+
+<!-- Loading is the module script's only job: import the SDK and hand the page
+     a promise of the instance. In your app the import path would point at
+     wherever you put the module files.
+     No top-level await here on purpose - it would delay DOMContentLoaded. -->
+<script type="module">
+import { createUapki, toBase64, fromBase64 } from '../sdk/index.mjs';
+window.UAPKI = { ready: createUapki(), toBase64, fromBase64 };
+</script>
+
+<!-- Everything below is a plain script: no import, no type="module".
+     Module scripts are deferred, so this runs FIRST - window.UAPKI does not
+     exist yet. Hence the work starts on DOMContentLoaded (deferred scripts,
+     including modules, run before it) and awaits UAPKI.ready. -->
+<script>
+"use strict";
+
+var out = document.getElementById('out');
+function log (x) { out.textContent += x + '\n'; }
+
+window.addEventListener('DOMContentLoaded', function () {
+    var toBase64 = window.UAPKI.toBase64;
+    var fromBase64 = window.UAPKI.fromBase64;
+
+    window.UAPKI.ready.then(async function (uapki) {
+        log('module ready: ' + JSON.stringify((await uapki.process({ method: 'VERSION' })).result));
+
+        document.getElementById('sign').addEventListener('click', async function () {
+            out.textContent = '';
+            const file = document.getElementById('key').files[0];
+            const password = document.getElementById('pass').value;
+            if (!file) { log('оберіть файл ключа'); return; }
+
+            //  Everything is the JSON protocol: request object -> response object.
+            await uapki.process({
+                method: 'INIT',
+                parameters: {
+                    cmProviders: { dir: '', allowedProviders: [{ lib: 'cm-pkcs12' }] },
+                    certCache: { path: '', trustedCerts: [] },   //  empty path -> no filesystem
+                    crlCache: { path: '' },
+                    offline: true
+                }
+            });
+
+            //  optional external certificate (some containers, e.g. the test key,
+            //  don't embed one) — add it to the in-memory cache before selecting a key
+            const certFile = document.getElementById('cert').files[0];
+            if (certFile) {
+                await uapki.process({
+                    method: 'ADD_CERT',
+                    parameters: { certificates: [toBase64(await certFile.arrayBuffer())] }
+                });
+            }
+
+            const open = await uapki.process({
+                method: 'OPEN',
+                parameters: {
+                    provider: 'PKCS12',
+                    storage: 'file://memory',                    //  open the container from memory…
+                    password,
+                    mode: 'RO',
+                    openParams: { bytes: toBase64(await file.arrayBuffer()) }  //  …these bytes
+                }
+            });
+            if (open.errorCode !== 0) { log('OPEN: ' + open.error); return; }
+
+            //  pick a key that has a certificate (needed for includeCert / verification)
+            const keys = (await uapki.process({ method: 'KEYS' })).result.keys;
+            let selected = null;
+            for (const k of keys) {
+                const r = await uapki.process({ method: 'SELECT_KEY', parameters: { id: k.id } });
+                if (r.errorCode === 0 && r.result.certId) { selected = k.id; break; }
+            }
+            if (!selected) { log('жоден ключ не має сертифіката — додайте файл сертифіката'); return; }
+
+            const signed = await uapki.process({
+                method: 'SIGN',
+                parameters: {
+                    signParams: { signatureFormat: 'CAdES-BES', detachedData: false, includeCert: true },
+                    options: { ignoreCertStatus: true },
+                    dataTbs: [{ id: 'doc-0', bytes: toBase64('hello') }]
+                }
+            });
+            if (signed.errorCode !== 0) { log('SIGN: ' + signed.error); return; }
+            log('signature bytes: ' + fromBase64(signed.result.signatures[0].bytes).length);
+
+            const verified = await uapki.process({
+                method: 'VERIFY',
+                parameters: { signature: { bytes: signed.result.signatures[0].bytes } }
+            });
+            const si = verified.result.signatureInfos[0];
+            log('verify: ' + si.status);
+            log('content: "' + new TextDecoder().decode(fromBase64(verified.result.content.bytes)) + '"');
+
+            await uapki.process({ method: 'CLOSE' });
+            await uapki.process({ method: 'DEINIT' });
+        });
+    }).catch(function (e) {
+        log('UAPKI не завантажився: ' + e.message);
+    });
+});
+</script>
+</body>
+</html>

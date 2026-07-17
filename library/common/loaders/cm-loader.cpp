@@ -40,6 +40,23 @@
 using namespace std;
 
 
+#ifdef __EMSCRIPTEN__
+//  WASM build has no dynamic loading - the cm-pkcs12 provider is linked
+//  statically and its exported API is referenced directly.
+extern "C" {
+CM_ERROR provider_info (CM_JSON_PCHAR* providerInfo);
+CM_ERROR provider_init (CM_JSON_PCHAR providerParams);
+CM_ERROR provider_deinit (void);
+CM_ERROR provider_open (const char* uri, uint32_t mode, const CM_JSON_PCHAR openParams, CM_SESSION_API** session);
+CM_ERROR provider_close (CM_SESSION_API* session);
+void block_free (void* ptr);
+void bytearray_free (CM_BYTEARRAY* ba);
+}   //  extern "C"
+
+static const char* STATIC_PROVIDER_NAME = "cm-pkcs12";
+#endif
+
+
 CmLoader::CmLoader (void)
 {
     DEBUG_OUTCON(puts("CmLoader::CmLoader"));
@@ -65,6 +82,25 @@ bool CmLoader::load (
 )
 {
     unload();
+
+#ifdef __EMSCRIPTEN__
+    (void)dir;
+    if (libName == STATIC_PROVIDER_NAME) {
+        m_Api.hlib          = (void*)1; //  fake non-null handle, see isLoaded()
+        m_Api.info          = provider_info;
+        m_Api.init          = provider_init;
+        m_Api.deinit        = provider_deinit;
+        m_Api.list_storages = nullptr;
+        m_Api.storage_info  = nullptr;
+        m_Api.open          = (cm_provider_open_f)provider_open;
+        m_Api.close         = provider_close;
+        m_Api.format        = nullptr;
+        m_Api.block_free    = block_free;
+        m_Api.bytearray_free = bytearray_free;
+        return true;
+    }
+    return false;
+#endif
 
     bool ok = false;
     const string lib_name = dir + getLibName(libName);
