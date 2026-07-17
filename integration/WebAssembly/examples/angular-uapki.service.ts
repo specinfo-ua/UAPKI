@@ -16,7 +16,7 @@
  * "moduleResolution": "bundler" (or "node16") in tsconfig.json.
  */
 import { Injectable } from '@angular/core';
-import { createUapki, toBase64, fromBase64, type Uapki } from '../lib/uapki/index.mjs';
+import { createUapki, toBase64, type Uapki } from '../lib/uapki/index.mjs';
 
 @Injectable({ providedIn: 'root' })
 export class UapkiService {
@@ -24,7 +24,8 @@ export class UapkiService {
     private instance?: Promise<Uapki>;
 
     load(): Promise<Uapki> {
-        return (this.instance ??= createUapki({ wasmUrl: '/uapki.wasm' }));
+        this.instance ??= createUapki({ wasmUrl: '/uapki.wasm' });
+        return this.instance;
     }
 
     /**
@@ -108,7 +109,7 @@ export class UapkiService {
  *           if (!file) return;
  *           try {
  *               const p7s = await this.uapki.signAndVerify(file, password, 'hello');
- *               this.status = `signed, ${fromBase64(p7s).length} bytes`;
+ *               this.status = `signed, ${p7s.length} base64 chars`;
  *           } catch (e) {
  *               this.status = String((e as Error).message);
  *           }

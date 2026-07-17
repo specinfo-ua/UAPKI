@@ -23,9 +23,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createUapki } from "./sdk/index.mjs";
 
 //  pre.js expects the Web Crypto API; make it global on older Node (< 19)
-if (typeof globalThis.crypto === "undefined") {
+if (globalThis.crypto === undefined) {
     globalThis.crypto = (await import("node:crypto")).webcrypto;
 }
+
+//  fixture passwords of the committed test containers (library/test/data),
+//  the same ones the native test tasks use - not secrets
+const FIXTURE_KEY_PASS = "testpassword";
+const FIXTURE_WRONG_PASS = "wrongpassword";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..", "..");
@@ -93,13 +98,13 @@ check("RANDOM_BYTES returns 32 bytes", Buffer.from(random.bytes, "base64").lengt
 
 //  ---- JKS container (regression: password truncation in jks_pass_to_ba) ----
 module_.FS.writeFile("/storage/test-jks.jks", readFileSync(testData("test-jks.jks")));
-await uapkiOk("OPEN", { provider: "PKCS12", storage: "/storage/test-jks.jks", password: "testpassword", mode: "RO" });
+await uapkiOk("OPEN", { provider: "PKCS12", storage: "/storage/test-jks.jks", password: FIXTURE_KEY_PASS, mode: "RO" });
 const jksKeys = await uapkiOk("KEYS");
 check("JKS lists one RSA key",
     jksKeys.keys?.length === 1 && jksKeys.keys[0].mechanismId === "1.2.840.113549.1.1.1",
     JSON.stringify(jksKeys));
 await uapkiOk("CLOSE");
-const jksWrongPass = await uapki("OPEN", { provider: "PKCS12", storage: "/storage/test-jks.jks", password: "wrongpassword", mode: "RO" });
+const jksWrongPass = await uapki("OPEN", { provider: "PKCS12", storage: "/storage/test-jks.jks", password: FIXTURE_WRONG_PASS, mode: "RO" });
 check("JKS wrong password reports INVALID_PASSWORD", jksWrongPass.error === "INVALID_PASSWORD",
     `errorCode=${jksWrongPass.errorCode} ${jksWrongPass.error ?? ""}`);
 
@@ -108,7 +113,7 @@ await uapkiOk("ADD_CERT", {
     certificates: [ readFileSync(testData("certs/diia-test-sign-7775603.cer")).toString("base64") ]
 });
 module_.FS.writeFile("/storage/test-diia.p12", readFileSync(testData("test-diia.p12")));
-await uapkiOk("OPEN", { provider: "PKCS12", storage: "/storage/test-diia.p12", password: "testpassword", mode: "RO" });
+await uapkiOk("OPEN", { provider: "PKCS12", storage: "/storage/test-diia.p12", password: FIXTURE_KEY_PASS, mode: "RO" });
 
 //  pick the key that pairs with the added certificate
 let selected = null;

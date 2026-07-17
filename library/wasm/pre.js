@@ -2,8 +2,8 @@
 //  os_prng() pulls single random bytes via Module.getRandomValue().
 //  A pooled Web Crypto implementation keeps that reasonably fast.
 Module['getRandomValue'] = (function () {
-    var pool = new Uint8Array(4096);
-    var pos = pool.length;
+    const pool = new Uint8Array(4096);
+    let pos = pool.length;
     return function () {
         if (pos >= pool.length) {
             crypto.getRandomValues(pool);

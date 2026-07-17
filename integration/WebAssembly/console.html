@@ -100,11 +100,11 @@
     <h3>Файли (MEMFS /storage)</h3>
     <div id="fs-list"></div>
     <button class="sbtn" id="btn-upload">+ Завантажити файл</button>
-    <input type="file" id="fs-file" multiple hidden>
+    <input type="file" id="fs-file" multiple hidden aria-label="Завантажити файли у MEMFS /storage">
 
     <h3>Вставити в запит</h3>
     <button class="sbtn" id="btn-ins-b64">Файл → base64</button>
-    <input type="file" id="b64-file" hidden>
+    <input type="file" id="b64-file" hidden aria-label="Обрати файл для вставки як base64">
 
     <h3>Пресети</h3>
     <div id="presets"></div>
@@ -117,7 +117,7 @@
         <span class="hint">один метод <code>{"method":…}</code> або сценарій <code>{"tasks":[…]}</code>; коментарі // дозволені; підстановки <code>{{METHOD:шлях.до.поля}}</code></span>
         <button class="run" id="btn-run" disabled>Виконати (Ctrl+Enter)</button>
       </div>
-      <textarea id="editor" spellcheck="false">{
+      <textarea id="editor" spellcheck="false" aria-label="JSON-запит або сценарій">{
   "method": "VERSION"
 }</textarea>
     </div>
@@ -172,8 +172,19 @@ function stripJsonComments (s) {
             continue;
         }
         if (c === '"') { inStr = true; out += c; continue; }
-        if (c === "/" && n === "/") { while (i < s.length && s[i] !== "\n") i++; out += "\n"; continue; }
-        if (c === "/" && n === "*") { i += 2; while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) i++; i++; continue; }
+        if (c === "/" && n === "/") {
+            //  line comment: skip to the newline, keep it (line numbers stay put)
+            while (i < s.length && s[i] !== "\n") { i++; }
+            out += "\n";
+            continue;
+        }
+        if (c === "/" && n === "*") {
+            //  block comment: skip past the closing */
+            i += 2;
+            while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) { i++; }
+            i++;
+            continue;
+        }
         out += c;
     }
     return out;
@@ -562,24 +573,6 @@ function buildPresets () {
 }
 
 //  ---- wiring ----
-//  the SDK imports the loader and finds uapki.wasm next to it, in sdk/
-createUapki().then(async (instance) => {
-    uapki = instance;
-    //  MEMFS dirs for the file panel: the console keeps the filesystem mode of
-    //  the protocol available (applications normally use "file://memory")
-    for (const dir of ["/certs", "/crls", "/storage"]) {
-        try { uapki.module.FS.mkdir(dir); } catch (e) {}
-    }
-    const v = await uapki.process({ method: "VERSION" });
-    $("status").textContent = `модуль готовий · UAPKI ${v.result ? v.result.version : "?"}`;
-    $("status").className = "st ok";
-    $("btn-run").disabled = false;
-    refreshFs();
-}).catch((e) => {
-    $("status").textContent = "помилка завантаження: " + e.message;
-    $("status").className = "st err";
-});
-
 $("btn-run").addEventListener("click", runEditor);
 $("editor").addEventListener("keydown", (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); runEditor(); }
@@ -622,6 +615,27 @@ $("btn-save-bytes").addEventListener("click", () => {
 });
 
 buildPresets();
+
+//  ---- load the module ----
+//  last: the UI above is wired up first, so nothing is inert while the ~1.4 MB
+//  module loads (the run button stays disabled until it is ready)
+try {
+    //  the SDK imports the loader and finds uapki.wasm next to it, in sdk/
+    uapki = await createUapki();
+    //  MEMFS dirs for the file panel: the console keeps the filesystem mode of
+    //  the protocol available (applications normally use "file://memory")
+    for (const dir of ["/certs", "/crls", "/storage"]) {
+        try { uapki.module.FS.mkdir(dir); } catch (e) { /* already exists */ }
+    }
+    const v = await uapki.process({ method: "VERSION" });
+    $("status").textContent = `модуль готовий · UAPKI ${v.result ? v.result.version : "?"}`;
+    $("status").className = "st ok";
+    $("btn-run").disabled = false;
+    refreshFs();
+} catch (e) {
+    $("status").textContent = "помилка завантаження: " + e.message;
+    $("status").className = "st err";
+}
 </script>
 </body>
 </html>
