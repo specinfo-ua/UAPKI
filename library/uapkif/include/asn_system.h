@@ -67,7 +67,9 @@
 #ifndef ssize_t
 #define ssize_t SSIZE_T
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <float.h>
 #define finite   _finite
