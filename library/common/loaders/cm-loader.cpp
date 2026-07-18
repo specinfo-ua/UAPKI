@@ -70,7 +70,7 @@ bool CmLoader::load (
     const string lib_name = dir + getLibName(libName);
     DEBUG_OUTCON(printf("CmLoader.load('%s'), lib_name: '%s'\n", libName.c_str(), lib_name.c_str()));
 
-    m_Api.hlib = DL_LOAD_LIBRARY(lib_name.c_str());
+    m_Api.hlib = dl_load_library_utf8(lib_name.c_str());
     DEBUG_OUTCON(printf("CmLoader.load(), m_Api.hlib: %p\n", m_Api.hlib));
 
     if (isLoaded()) {
