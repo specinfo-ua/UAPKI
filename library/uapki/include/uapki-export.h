@@ -31,6 +31,9 @@
 #define UAPKI_VERSION 1000
 
 
+#ifdef UAPKI_STATIC
+    #define UAPKI_EXPORT
+#else
 #ifdef UAPKI_LIBRARY
     #if defined(_MSC_VER)
         #define UAPKI_EXPORT __declspec(dllexport)
@@ -43,6 +46,7 @@
     #else
         #define UAPKI_EXPORT extern
     #endif
+#endif
 #endif
 
 

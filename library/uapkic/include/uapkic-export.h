@@ -28,6 +28,9 @@
 #ifndef UAPKIC_EXPORT_H
 #define UAPKIC_EXPORT_H
 
+#ifdef UAPKIC_STATIC
+    #define UAPKIC_EXPORT
+#else
 #ifdef UAPKIC_LIBRARY
     #if defined(_MSC_VER)
         #define UAPKIC_EXPORT __declspec(dllexport)
@@ -40,6 +43,7 @@
     #else
         #define UAPKIC_EXPORT extern
     #endif
+#endif
 #endif
 
 #endif
