@@ -114,7 +114,9 @@ int ArchiveTs3Helper::setSignerInfo (
     DO(asn_encode_ba(get_SignerInfo_desc(), signer_info, &m_Parts.signerInfo));
 
 cleanup:
-    signer_info->unsignedAttrs = any_unsignedattrs;
+    if (signer_info) {
+        signer_info->unsignedAttrs = any_unsignedattrs;
+    }
     asn_free(get_SignerInfo_desc(), signer_info);
     return ret;
 }

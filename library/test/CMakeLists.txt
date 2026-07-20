@@ -51,12 +51,17 @@ add_executable (test
     ${PATH_COMMON_JSON}/strtod-no-locale.c
 )
 
-if (UNIX)
-    target_link_libraries(test PRIVATE dl pthread)
+if(UNIX)
+    target_link_libraries(${PROJECT_NAME} PRIVATE dl)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+        target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
+    endif()
 endif()
 
 
-add_custom_command(TARGET test POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ../out/
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
-)
+if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ../out/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
+    )
+endif()

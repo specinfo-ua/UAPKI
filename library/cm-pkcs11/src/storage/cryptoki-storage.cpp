@@ -1651,7 +1651,7 @@ bool CryptokiStorage::strToUint32 (
         value = (uint32_t)ul_value;
         ok = true;
     }
-    catch (exception e) {}
+    catch (const exception&) {}
     return ok;
 }
 
