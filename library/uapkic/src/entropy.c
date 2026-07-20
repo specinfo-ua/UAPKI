@@ -30,7 +30,9 @@
 #ifdef _WIN32
 #   include <windows.h>
 #   if !defined(_WIN32_WCE)
-#       include <wincrypt.h>
+#       include <bcrypt.h>
+#       include <ntstatus.h>
+#       pragma comment(lib, "bcrypt.lib")
 #   endif
 #else
 #   include <sys/random.h>
@@ -52,19 +54,25 @@ static int os_prng(void *rnd, size_t size)
     int ret = RET_OK;
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-    /* Пытаемся использовать CryptGenRandom */
-        HCRYPTPROV hProv;
+    BCRYPT_ALG_HANDLE alg;
+    NTSTATUS status;
+    uint8_t* b = rnd;
 
-        if (CryptAcquireContextA(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) == 0) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
+    if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_RNG_ALGORITHM, NULL, 0) != STATUS_SUCCESS) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
+    do {
+        ULONG blocksize = min(ULONG_MAX, size);
+        if (BCryptGenRandom(alg, b, blocksize, 0) != STATUS_SUCCESS) {
+            break;
         }
-
-        if (CryptGenRandom(hProv, (DWORD)size, rnd) == TRUE) {
-            CryptReleaseContext(hProv, 0);
-        } else {
-            CryptReleaseContext(hProv, 0);
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
+        b += blocksize;
+        size -= blocksize;
+    } while (size);
+    BCryptCloseAlgorithmProvider(alg, 0);
+    if (size) {
+        SET_ERROR(RET_OS_PRNG_ERROR);
+    }
 #else
     uint8_t* b = rnd;
 
