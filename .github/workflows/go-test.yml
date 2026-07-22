@@ -31,7 +31,7 @@ jobs:
           sudo apt-get install -y cmake g++ make libcurl4-openssl-dev
 
       - name: Configure
-        run: cmake -S library -B build-native
+        run: cmake -S library -B build-native -DUAPKI_DISABLE_COPY=ON
 
       - name: Build native libraries
         run: cmake --build build-native --target uapki cm-pkcs12 -j"$(nproc)"
@@ -59,7 +59,7 @@ jobs:
           cache: false   #  module has no dependencies, nothing to cache
 
       - name: Configure
-        run: cmake -S library -B build-native
+        run: cmake -S library -B build-native -DUAPKI_DISABLE_COPY=ON
 
       - name: Build native libraries
         run: cmake --build build-native --config Release --target uapki cm-pkcs12
