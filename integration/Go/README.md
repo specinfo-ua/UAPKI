@@ -26,6 +26,32 @@ providers such as `cm-pkcs12`) are built from this repository with CMake, with
 any compiler — MSVC-built DLLs work fine, since no compile-time linking against
 the library is performed.
 
+## Building the native libraries
+
+Windows (MSVC; the bundled `libcurl.lib` import library is MSVC-only):
+
+```powershell
+cmake -S library -B build-native
+cmake --build build-native --config Release --target uapki cm-pkcs12
+# -> build-native\Release\{uapki,uapkic,uapkif,cm-pkcs12}.dll
+```
+
+Linux (needs `cmake`, `g++`, `make` and `libcurl4-openssl-dev` or the distro
+equivalent):
+
+```sh
+cmake -S library -B build-native
+cmake --build build-native --target uapki cm-pkcs12 -j"$(nproc)"
+# -> build-native/uapki/libuapki.so, build-native/cm-pkcs12/libcm-pkcs12.so, ...
+```
+
+At runtime `libuapki.so` must be able to find `libuapkic.so.2`/`libuapkif.so.2`
+(install them, or point `LD_LIBRARY_PATH` at `build-native/uapkic` and
+`build-native/uapkif`).
+
+Both platforms are exercised by the
+[go-test.yml](../../.github/workflows/go-test.yml) CI workflow.
+
 ## Quick start
 
 ```go

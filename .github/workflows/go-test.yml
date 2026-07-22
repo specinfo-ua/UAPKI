@@ -1,0 +1,76 @@
+name: Go bindings build & test
+
+on:
+  push:
+    #  every branch: tests must run after each commit pushed
+    paths:
+      - 'library/**'
+      - 'integration/Go/**'
+      - '.github/workflows/go-test.yml'
+  pull_request:
+    paths:
+      - 'library/**'
+      - 'integration/Go/**'
+      - '.github/workflows/go-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: false   #  module has no dependencies, nothing to cache
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -S library -B build-native
+
+      - name: Build native libraries
+        run: cmake --build build-native --target uapki cm-pkcs12 -j"$(nproc)"
+
+      - name: Vet
+        working-directory: integration/Go
+        run: go vet ./...
+
+      - name: Test
+        working-directory: integration/Go
+        env:
+          UAPKI_LIBRARY: ${{ github.workspace }}/build-native/uapki/libuapki.so
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}/build-native/cm-pkcs12
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-native/uapkic:${{ github.workspace }}/build-native/uapkif
+        run: go test -v ./...
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: false   #  module has no dependencies, nothing to cache
+
+      - name: Configure
+        run: cmake -S library -B build-native
+
+      - name: Build native libraries
+        run: cmake --build build-native --config Release --target uapki cm-pkcs12
+
+      - name: Vet
+        working-directory: integration/Go
+        run: go vet ./...
+
+      - name: Test
+        working-directory: integration/Go
+        env:
+          UAPKI_LIBRARY: ${{ github.workspace }}\build-native\Release\uapki.dll
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}\build-native\Release
+        run: go test -v ./...
