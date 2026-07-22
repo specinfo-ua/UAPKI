@@ -68,6 +68,9 @@ else
   "macos-x64")
           DEFINE_PARAMS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
           ;;
+  "macos-universal")
+          DEFINE_PARAMS="-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+          ;;
   "iOS")
           DEFINE_PARAMS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_SYSTEM_NAME=iOS"
           ;;

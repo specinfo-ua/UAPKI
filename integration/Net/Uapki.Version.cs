@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2025, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -25,37 +25,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Newtonsoft.Json;
+using System.Text.Json;
 
-namespace UapkiLibrary
+namespace UapkiNet;
+
+public static partial class Uapki
 {
-    public partial class Uapki
+    private class VersionInfo
     {
-        public static dynamic StorageKeysList()
-        {
-            var KEYS = new { method = "KEYS" };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(KEYS)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
+        public string Name { get; init; } = string.Empty;
+        public string Version { get; init; } = string.Empty;
+    }
 
-            return ret.result;
-        }
+    private class VersionResult
+    {
+        public int ErrorCode { get; init; }
+        public string? Method { get; init; }
+        public VersionInfo? Result { get; init; }
+    }
 
-        public static dynamic StorageSelectKey(string keyId)
-        {
-            var SELECT_KEY = new
-            {
-                method = "SELECT_KEY",
-                parameters = new
-                {
-                    id = keyId
-                }
-            };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(SELECT_KEY)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
+    private class MethodOnlyRequest
+    {
+        public string? Method { get; init; }
+    }
 
-            return ret.result;
-        }
+    public static string GetVersion()
+    {
+        string version_cmd = "{\"method\":\"VERSION\"}";
+
+        var ret = JsonSerializer.Deserialize(Process(version_cmd), jsonCtx.VersionResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        return ret.Result!.Version;
     }
 }

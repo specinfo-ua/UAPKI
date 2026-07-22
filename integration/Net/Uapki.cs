@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2025, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -25,144 +25,166 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Text;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
-using Newtonsoft.Json;
-using System.Collections.Generic;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace UapkiLibrary
+namespace UapkiNet;
+public static partial class Uapki
 {
-    public static partial class Uapki
+    public static UapkiLibraryInfo? UapkiInfo { get; set; }
+    public static OpenedKeyStorageInfo? OpenedKeyStorage { get; set; }
+    public static SelectedKeyInfo? SelectedKey { get; set; }
+
+
+    [DllImport("uapki", EntryPoint = "process", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr _Process(
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.I1)] byte[] requestUtf8Z);
+
+    [DllImport("uapki", EntryPoint = "json_free", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void _JsonFree(IntPtr response);
+
+    private static unsafe string Process(string request)
     {
-        [DllImport("uapki", EntryPoint = "process", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr _Process([MarshalAs(UnmanagedType.LPUTF8Str)] string request);
+        LogMessage("REQ: " + request);
+        
+        var req = ConvertToUtf8Z(request ?? string.Empty);
+        var p = _Process(req);
+        var result = "{\"ErrorCode\":-1}";
 
-        [DllImport("uapki", EntryPoint = "json_free", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void _JsonFree(IntPtr response);
-
-        private static unsafe string Process(string request)
+        if (p != IntPtr.Zero)
         {
-            string result = "{\"errorCode\":-1}";
-            byte* resultPtr = (byte*)_Process(request);
-            if (resultPtr != null)
-            {
-                int length = 0;
-                for (byte* i = resultPtr; *i != 0; i++, length++) ;
-                result = Encoding.UTF8.GetString(resultPtr, length);
-                _JsonFree((IntPtr)resultPtr);
-            }
-            return result;
+            try { result = ConvertFromUtf8Z(p); }
+            finally { _JsonFree(p); }
         }
 
-        public static string Version()
-        {
-            var VERSION = new { method = "VERSION" };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERSION)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
+        LogMessage("RESP: " + result);
+        return result;
+    }
 
-            return ret.result.version;
+    public static string Do(string request)
+    {
+        return Process(request);
+    }
+
+    private static string defaultConfig 
+    {
+        get 
+        {
+            return "{}";
         }
+    }
 
-        public static dynamic Init(string certCachePath, string crlCachePath, string defaultTspUrl, List<byte[]> trustedCerts)
+    public class UapkiLibraryInfo
+    {
+        public string Version { get; }
+        public uint CertsCount { get; }
+        public uint TrustedCertsCount { get; }
+        public uint CrlsCount { get; }
+        public List<CmProvider> Providers { get; }
+
+        public UapkiLibraryInfo(string response)
         {
-            List<string> tCerts = null;
+            var ret = JsonSerializer.Deserialize(response, jsonCtx.InitResult) ?? throw new UapkiException(0x2001);
+            if (ret.ErrorCode != 0)
+                throw new UapkiException(ret.ErrorCode);
 
-            if (trustedCerts != null)
+            CertsCount = ret.Result!.CertCache.CountCerts;
+            TrustedCertsCount = ret.Result!.CertCache.CountTrustedCerts;
+            CrlsCount = ret.Result!.CrlCache.CountCrls;
+            Version = GetVersion();
+            Providers = GetProviders();
+        }
+    }
+
+    public class MechanismInfo
+    {
+        private List<string> _keyParamRaw = new();
+        private List<string> _signAlgoRaw = new();
+
+        public string Id { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+
+        [JsonPropertyName("keyParam")]
+        public List<string> KeyParamRaw
+        {
+            get { return _keyParamRaw; }
+            init
             {
-                tCerts = new List<string>();
-                foreach (var trustedCert in trustedCerts)
+                _keyParamRaw = value;
+                KeyParams = new();
+                if (_keyParamRaw is not null)
                 {
-                    tCerts.Add(Convert.ToBase64String(trustedCert));
+                    foreach (var param in _keyParamRaw)
+                        try { KeyParams.Add(param.ToKeyParameter()); } catch { /*!*/ }
                 }
             }
+        }
 
-            var INIT = new
+        [JsonPropertyName("signAlgo")]
+        public List<string> SignAlgoRaw
+        {
+            get { return _signAlgoRaw; }
+            init
             {
-                method = "INIT",
-                parameters = new
+                _signAlgoRaw = value;
+                SignAlgos = new();
+                if (_signAlgoRaw is not null)
                 {
-                    cmProviders = new
-                    {
-                        dir = "",
-                        allowedProviders = new object[] {
-                            new {
-                                lib = "cm-pkcs12"
-                            },
-                            new {
-                                lib = "cm-diamond"
-                            },
-                            new {
-                                lib = "cm-almaz1c"
-                            },
-                            new {
-                                lib = "cm-crystal1"
-                            },
-                            new {
-                                lib = "cm-stoken"
-                            }
-                        }
-                    },
-                    certCache = new
-                    {
-                        path = certCachePath,
-                        trustedCerts = tCerts
-                    },
-                    crlCache = new
-                    {
-                        path = crlCachePath
-                    },
-                    tsp = new
-                    {
-                        url = defaultTspUrl
-                    },
-                    offline = false
+                    foreach (var alg in _signAlgoRaw)
+                        try { SignAlgos.Add(alg.ToSignAlgo()); } catch { /*!*/ }
                 }
-            };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(INIT)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
-
-            return ret.result;
+            }
         }
 
-        public static void Deinit()
+        [JsonIgnore]
+        public KeyAlgo Algo { get { return Id.ToKeyAlgo(); } }
+
+        [JsonIgnore]
+        public List<KeyParameter> KeyParams { get; private set; } = new();
+
+        [JsonIgnore]
+        public List<SignAlgo> SignAlgos { get; private set; } = new();
+    }
+    
+    public static DateTime ConvertUtcTimeToDateTime(string time)
+    {
+        string[] formats = { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm" };
+        return DateTime.ParseExact(time, formats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+    }
+
+    [Conditional("DEBUG")]
+    public static void LogMessage(string message)
+    {
+        try
         {
-            var DEINIT = new { method = "DEINIT" };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(DEINIT)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
+#if DEBUG
+            File.AppendAllLines(Path.Combine(Path.GetTempPath(), "uapki.log"), new List<string>() { message });
+#endif
         }
+        catch { /*do nothing*/ }
+    }
+    
+    private static byte[] ConvertToUtf8Z(string s)
+    {
+        var b = Encoding.UTF8.GetBytes(s);
+        var z = new byte[b.Length + 1];
+        Buffer.BlockCopy(b, 0, z, 0, b.Length);
+        return z;
+    }
 
-        public static dynamic Providers()
+    private static string ConvertFromUtf8Z(IntPtr p)
+    {
+        var bytes = new List<byte>(256);
+        for (int i = 0; ; i++)
         {
-            var PROVIDERS = new { method = "PROVIDERS" };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(PROVIDERS)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
-
-            return ret.result;
+            byte b = Marshal.ReadByte(p, i);
+            if (b == 0) break;
+            bytes.Add(b);
         }
-
-        public static dynamic VerifyCms(byte[] signature, byte[] content = null)
-        {
-            var VERIFY = new
-            {
-                method = "VERIFY",
-                parameters = new
-                {
-                    signature = new {
-                        bytes = signature,
-                        content = content
-                    }
-                }
-            };
-            dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(VERIFY)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
-
-            return ret.result;
-        }
+        return Encoding.UTF8.GetString(bytes.ToArray());
     }
 }

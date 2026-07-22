@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2025, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -25,85 +25,307 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Newtonsoft.Json;
-using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace UapkiLibrary
+namespace UapkiNet;
+
+public static partial class Uapki
 {
-    public partial class Uapki
+    public class Key
     {
-        public static dynamic KeyGetCsr(string signAlgo = null)
-        {
-            var GET_CSR = new
-            {
-                method = "GET_CSR",
-                parameters = new
-                {
-                    signAlgo = signAlgo
-                }
-            };
-            var ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(GET_CSR)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
+        public string Id { get; init; } = string.Empty;
+        public string? KeyId2 { get; init; }
+        public string MechanismId { get; init; } = string.Empty;
+        public string ParameterId { get; init; } = string.Empty;
+        public string? Label { get; init; }
+        public string? Application { get; init; }
+        public string? CertId { get; init; }
 
-            return ret.result;
+        [JsonIgnore]
+        public  KeyAlgo KeyAlgo { get { return MechanismId.ToKeyAlgo(); } }
+        [JsonIgnore]
+        public  KeyParameter KeyParam { get { return ParameterId.ToKeyParameter(); } }
+
+        [JsonIgnore]
+        public string KeyAlgoAndParamDisplay
+        {
+            get
+            {
+                string s1 = "", s2 = "";
+                try { s1 = KeyAlgo.DisplayName(); } catch { /*do nothing*/ }
+                try { s2 = KeyParam.DisplayName(); } catch { /*do nothing*/ }
+                if (s1.Length > 0 && s2.Length > 0)
+                    return s1 + " (" + s2 + ")";
+                return s1;
+            }
         }
 
-        public static byte[] SignCms(byte[] data, bool detachedData = true, bool includeCert = true, bool useTSP = false)
-        {
-            var SIGN = new
+        [JsonIgnore]
+        public  string KeyAlgoDisplay { get { return KeyAlgo.DisplayName(); } }
+
+        [JsonIgnore]
+        public  string KeyParamDisplay { get { return KeyParam.DisplayName(); } }
+
+        [JsonIgnore]
+        public List<CertificateShortInfo>? Certs { get; internal set; }
+
+        
+        [JsonIgnore]
+        public string UsageDisplay { get { return Usage.DisplayName(); } }
+        
+        [JsonIgnore]
+        public DateTime? DateTime
+        { 
+            get 
             {
-                method = "SIGN",
-                parameters = new
+                if (Certs is not null && Certs.Count > 0)
                 {
-                    signParams = new
+                    return Certs.Max(item => item.Validity.NotAfter);
+                }
+                return null;
+            }
+        }
+
+        [JsonIgnore]
+        public string DateTimeDisplay { get { return DateTime != null ? ((DateTime)DateTime).ToString("yyyy-MM-dd hh:mm") : ""; } }
+
+        [JsonIgnore]
+        public string Name 
+        { 
+            get 
+            {
+                if (Certs is not null && Certs.Count > 0)
+                {
+                    return Certs[0].Subject.CN + "\n" + Certs[0].Subject.O;
+                }
+                else
+                {
+                    var name = "Сертифікат відсутній";
+                    if (Label is not null)
                     {
-                        signatureFormat = useTSP ? "CAdES-T" : "CAdES-BES",
-                        detachedData = detachedData,
-                        includeCert = includeCert,
-                        includeTime = true,
-                        includeContentTS = useTSP,
-                        signAlgo = "1.2.804.2.1.1.1.1.3.1.1",
-                        signaturePolicy = new 
-                        {
-                            sigPolicyId = "1.2.804.2.1.1.1.2.1" // Політики сертифікації: Ознака відповідності Закону України <Про електронний цифровий підпис>
-                        }
-                    },
-                    dataTbs = new object[]
+                        if (Label.StartsWith("SIG:"))
+                            return name + "\nЗгенеровано: " + ConvertUtcTimeToDateTime(Label.Substring(4)).ToString("yyyy-MM-dd hh:mm");
+                        if (Label.StartsWith("KEP:"))
+                            return name + "\nЗгенеровано: " + ConvertUtcTimeToDateTime(Label.Substring(4)).ToString("yyyy-MM-dd hh:mm");
+                        // Almaz
+                        if (Label.StartsWith("SIGN-")) 
+                            return name + "\nКонтекст: " + Label.Substring(5);
+                        if (Label.StartsWith("KEP-")) 
+                            return name + "\nКонтекст: " + Label.Substring(4);
+                    }
+                    return name;
+                }
+            }
+        }
+
+        [JsonIgnore]
+        public KeyUsage Usage
+        {
+            get
+            {
+                if (Certs is not null && Certs.Count > 0)
+                {
+                    var cert = Certs[0];
+                    if (cert.KeyUsage.KeyAgreement)
+                        return KeyUsage.KeyAgreement;
+                    if (cert.KeyUsage.KeyEncipherment)
+                        return KeyUsage.KeyEncipherment;
+                    if (cert.KeyUsage.DigitalSignature)
+                        return KeyUsage.Signature;
+                }
+                else
+                {
+                    if ((Label?.StartsWith("SIG") == true) || (Label?.Equals("KM AFD1") == true))
+                        return KeyUsage.Signature;
+                    if ((Label?.StartsWith("KEP") == true) || (Label?.Equals("KM AFD2") == true))
                     {
-                        new
-                        {
-                            id = "doc-0",
-                            bytes = Convert.ToBase64String(data)
-                        }
+                        if (KeyAlgo != KeyAlgo.Rsa) return KeyUsage.KeyAgreement;
+                        else return KeyUsage.KeyEncipherment;
                     }
                 }
-            };
 
-            dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(SIGN)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
-
-            return Convert.FromBase64String((string)ret.result.signatures[0].bytes);
+                return KeyUsage.Any;
+            }
         }
+    }
 
-        public static string KeyGenerate(string label)
+    public class SelectedKeyInfo
+    {
+        public Key? Key { get; internal set; }
+        public Certificate? Cert { get; internal set; }
+    }
+
+    private class KeysList
+    {
+        public List<Key>? Keys { get; init; }
+    }
+
+    private class KeysResult
+    {
+        public int ErrorCode { get; init; }
+        public string? Method { get; init; }
+        public KeysList? Result { get; init; }
+    }
+
+    public static void UpdateKeysInOpenedStorage(bool withCerts = false)
+    {
+        CheckInit();
+        CheckStorage();
+
+        string keys_cmd = "{\"method\":\"KEYS\"}";
+
+        var ret = JsonSerializer.Deserialize(Process(keys_cmd), jsonCtx.KeysResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        if (ret.Result!.Keys is null)
         {
-            var NEW_DSTU_KEY = new
-            {
-                method = "CREATE_KEY",
-                parameters = new
-                {
-                    mechanismId = "1.2.804.2.1.1.1.1.3.1",
-                    parameterId = "1.2.804.2.1.1.1.1.3.1.1.2.6",
-                    label = label
-                }
-            };
-            dynamic ret = JsonConvert.DeserializeObject<dynamic>(Process(JsonConvert.SerializeObject(NEW_DSTU_KEY)));
-            if (ret.errorCode != 0)
-                throw new UapkiException((int)ret.errorCode);
-
-            return ret.result.id;
+            OpenedKeyStorage!.Storage.Keys = new List<Key>();
+            return;
         }
+
+        var keys = ret.Result!.Keys;
+
+        if (withCerts)
+        {
+            for (int i = 0; i < keys.Count; i++)
+            {
+                var key = keys[i];
+                var ids = new List<string> { key.Id };
+                if (key.KeyId2 is not null) ids.Add(key.KeyId2!);
+                key.Certs = GetCertsShortInfoList(keyIds: ids);
+                keys[i] = key;
+            }
+        }
+
+        OpenedKeyStorage!.Storage.Keys = keys;
+    }
+
+    private class SelectKeyResult
+    {
+        public int ErrorCode { get; init; }
+        public string? Method { get; init; }
+        public Key? Result { get; init; }
+    }
+
+    public class ParametersId
+    {
+        public string Id { get; init; } = string.Empty;
+    }
+
+    public class IdRequest
+    {
+        public string? Method { get; init; }
+        public ParametersId Parameters { get; init; } = new ParametersId();
+    }
+
+    public static void SelectKeyByCert(string certId)
+    {
+        CheckInit();
+        CheckStorage();
+
+        string select_cmd = "{\"method\":\"SELECT_KEY\",\"parameters\":{\"certId\":\"" + certId + "\"}}";
+
+        var ret = JsonSerializer.Deserialize(Process(select_cmd), jsonCtx.SelectKeyResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        SelectedKey = new SelectedKeyInfo()
+        {
+            Key = ret.Result,
+            Cert = ret.Result?.CertId is not null ? GetCertInfo(ret.Result.CertId) : null
+        };
+    }
+
+    public static void SelectKey(string keyId)
+    {
+        CheckInit();
+        CheckStorage();
+
+        string select_cmd = "{\"method\":\"SELECT_KEY\",\"parameters\":{\"id\":\"" + keyId + "\"}}";
+
+        var ret = JsonSerializer.Deserialize(Process(select_cmd), jsonCtx.SelectKeyResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        SelectedKey = new SelectedKeyInfo()
+        {
+            Key = ret.Result,
+            Cert = ret.Result?.CertId is not null ? GetCertInfo(ret.Result.CertId) : null
+        };
+    }
+
+    public static void SelectKey(Key key)
+    {
+        SelectKey(key.Id);
+    }
+        
+    public static string SelectKeyCmd(string select_cmd)
+    {
+        CheckInit();
+        CheckStorage();
+
+        var res = Process(select_cmd);
+
+        var ret = JsonSerializer.Deserialize(res, jsonCtx.SelectKeyResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode == 0)
+        {
+            SelectedKey = new SelectedKeyInfo()
+            {
+                Key = ret.Result,
+                Cert = ret.Result?.CertId is not null ? GetCertInfo(ret.Result.CertId) : null
+            };
+        }
+
+        return res;
+    }
+
+    public static void DeleteKey(Key key)
+    {
+        CheckInit();
+        CheckStorage(KeyStorageOpenMode.RW);
+
+        string delete_key_cmd = "{\"method\":\"DELETE_KEY\",\"parameters\":{\"id\":\"" + key.Id + "\"}}";
+
+        var ret = JsonSerializer.Deserialize(Process(delete_key_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        if (SelectedKey?.Key?.Id == key.Id)
+            SelectedKey = null;
+    }
+
+    private class KeyId
+    {
+        public string? Id { get; init; }
+    }
+
+    private class KeyIdResult
+    {
+        public int ErrorCode { get; init; }
+        public string? Method { get; init; }
+        public KeyId? Result { get; init; }
+    }
+
+    public static string GenerateKey(string label, string application, string mechanism, string parameter, bool isKep)
+    {
+        CheckStorage(KeyStorageOpenMode.RW);
+
+        string gen_key_cmd = "{\"method\":\"CREATE_KEY\",\"parameters\":{" +
+            "\"mechanismId\":\"" + mechanism + "\"," +
+            "\"parameterId\":\"" + parameter + "\"," +
+            "\"label\":\"" + label + "\"," +
+            "\"application\":\"" + application + "\"," +
+            "\"flags\":{\"keyAgreement\":" + (isKep ? "true" : "false") + "}}}";
+
+        var ret = JsonSerializer.Deserialize(Process(gen_key_cmd), jsonCtx.KeyIdResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        if (ret.Result?.Id is null)
+            throw new UapkiException(0x2001);
+
+        return ret.Result.Id;
     }
 }
