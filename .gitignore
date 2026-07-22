@@ -44,6 +44,9 @@
 
 # Kernel Module Compile Results
 *.mod*
+# ...but Go module files are not kernel-module artifacts (integration/Go)
+!go.mod
+!go.sum
 *.cmd
 .tmp_versions/
 modules.order
