@@ -142,13 +142,16 @@ int iso15946_generate_secretc (
     DO(iso15946_encode_sharedinfo(oidWrapAlgo, baEntityInfo, KEY_LENGTH, &ba_sharedinfo));
     DEBUG_OUTCON( printf("iso15946_generate_secretc(), ba_sharedinfo: ");ba_print(stdout, ba_sharedinfo); )
 
-    CHECK_NOT_NULL(ba_hashdata = iso15946_get_not_zero(baZx));
-    //CHECK_NOT_NULL(ba_hashdata = ba_copy_with_alloc(baZx, 0, 0));
-    DEBUG_OUTCON( printf("iso15946_generate_secretc(), ba_hashdata: ");ba_print(stdout, ba_hashdata); )
-
     CHECK_NOT_NULL(ctx = hash_alloc(hashAlgo));
-    DO(hash_update(ctx, ba_hashdata));
-    ba_free(ba_hashdata);
+
+    if (hashAlgo != HASH_ALG_GOST34311) {
+        DO(hash_update(ctx, baZx));
+    }
+    else {
+        CHECK_NOT_NULL(ba_hashdata = iso15946_get_not_zero(baZx));
+        DO(hash_update(ctx, ba_hashdata));
+        ba_free(ba_hashdata);
+    }
 
     // Про затвердження Технічних специфікацій форматів криптографічних повідомлень. Захищені дані
     //
