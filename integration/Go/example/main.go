@@ -43,60 +43,65 @@ func main() {
 		fmt.Println("No -p12 given; nothing to sign. Done.")
 		return
 	}
+	if err := signFile(lib, *providersDir, *p12Path, *password, *inPath, *outPath); err != nil {
+		log.Fatal(err)
+	}
+}
 
-	dir := *providersDir
-	if dir == "" {
-		dir = "./"
+// signFile initializes the library with the PKCS#12 provider, opens the key
+// storage, selects the first key and writes a CAdES-BES signature of inPath.
+func signFile(lib *uapki.Library, providersDir, p12Path, password, inPath, outPath string) error {
+	if providersDir == "" {
+		providersDir = "./"
 	}
-	if !os.IsPathSeparator(dir[len(dir)-1]) {
-		dir += string(os.PathSeparator)
+	if !os.IsPathSeparator(providersDir[len(providersDir)-1]) {
+		providersDir += string(os.PathSeparator)
 	}
-	cfg := &uapki.Config{
+	if _, err := lib.Init(&uapki.Config{
 		Offline: true,
 		CmProviders: &uapki.CmProvidersConfig{
-			Dir:              dir,
+			Dir:              providersDir,
 			AllowedProviders: []uapki.CmProviderConfig{{Lib: "cm-pkcs12"}},
 		},
-	}
-	if _, err := lib.Init(cfg); err != nil {
-		log.Fatal(err)
+	}); err != nil {
+		return err
 	}
 	defer lib.Deinit()
 
 	providers, err := lib.Providers()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if len(providers) == 0 {
-		log.Fatal("no CM providers found; pass -providers pointing to cm-pkcs12")
+		return fmt.Errorf("no CM providers found; pass -providers pointing to cm-pkcs12")
 	}
 
 	if _, err := lib.Open(uapki.OpenParams{
 		Provider: providers[0].ID,
-		Storage:  *p12Path,
-		Password: *password,
+		Storage:  p12Path,
+		Password: password,
 	}); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer lib.CloseStorage()
 
 	keys, err := lib.Keys()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if len(keys) == 0 {
-		log.Fatal("storage contains no keys")
+		return fmt.Errorf("storage contains no keys")
 	}
 	selected, err := lib.SelectKey(keys[0].ID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	info, _ := json.Marshal(selected)
 	fmt.Printf("Selected key: %s\n", info)
 
-	data, err := os.ReadFile(*inPath)
+	data, err := os.ReadFile(inPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	includeCert := true
 	signatures, err := lib.Sign(uapki.SignParams{
@@ -104,15 +109,15 @@ func main() {
 		IncludeCert:     &includeCert,
 	}, []uapki.DataToSign{{ID: "doc-1", Bytes: data}})
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	out := *outPath
-	if out == "" {
-		out = *inPath + ".p7s"
+	if outPath == "" {
+		outPath = inPath + ".p7s"
 	}
-	if err := os.WriteFile(out, signatures[0].Bytes, 0o644); err != nil {
-		log.Fatal(err)
+	if err := os.WriteFile(outPath, signatures[0].Bytes, 0o644); err != nil {
+		return err
 	}
-	fmt.Printf("Signature written to %s (%d bytes)\n", out, len(signatures[0].Bytes))
+	fmt.Printf("Signature written to %s (%d bytes)\n", outPath, len(signatures[0].Bytes))
+	return nil
 }

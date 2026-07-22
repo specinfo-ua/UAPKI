@@ -62,8 +62,8 @@ func TestDigestSha256(t *testing.T) {
 
 func TestDigestDstu7564(t *testing.T) {
 	lib := loadTestLibrary(t)
-	const oidDstu7564_256 = "1.2.804.2.1.1.1.1.2.2.1"
-	digest, err := lib.Digest(oidDstu7564_256, []byte("abc"))
+	const oidKupyna256 = "1.2.804.2.1.1.1.1.2.2.1" // DSTU 7564 ("Kupyna"), 256 bit
+	digest, err := lib.Digest(oidKupyna256, []byte("abc"))
 	if err != nil {
 		t.Fatalf("DIGEST failed: %v", err)
 	}
