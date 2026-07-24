@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string>
-#include "dl-macros.h"
+#include "../loaders/dl-macros.h"
 #include "pkcs11.h"
 
 

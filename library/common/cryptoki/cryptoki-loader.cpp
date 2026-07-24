@@ -77,7 +77,7 @@ bool Loader::load (
     const string lib_name = getLibName(libName);
     DEBUG_OUTCON(printf("Loader.load('%s'), lib_name: '%s'\n", libName.c_str(), lib_name.c_str()));
 
-    m_HandleDLib = DL_LOAD_LIBRARY(lib_name.c_str());
+    m_HandleDLib = dl_load_library_utf8(lib_name.c_str());
     DEBUG_OUTCON(printf("Loader.load(), m_HandleDLib: %p\n", m_HandleDLib));
 
     if (m_HandleDLib) {
