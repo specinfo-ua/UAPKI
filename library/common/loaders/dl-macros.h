@@ -56,6 +56,11 @@ typedef void* HANDLE_DLIB;
 #define DL_GET_PROC_ADDRESS(h, fname) dlsym((HANDLE_DLIB)h, fname)
 #define DL_FREE_LIBRARY(h) dlclose((HANDLE_DLIB)h);
 
+#elif defined(__EMSCRIPTEN__)
+//  WASM: dynamic loading is not available, CM-providers are linked statically
+//  (see cm-loader.cpp). The macros below are inert placeholders.
+typedef void* HANDLE_DLIB;
+
 #else
 #error "Target platform undefined"
 #endif

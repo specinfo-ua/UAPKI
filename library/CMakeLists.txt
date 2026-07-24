@@ -21,7 +21,7 @@ string(REGEX MATCH "MSVC" CMAKE_COMPILER_IS_MSVC "${CMAKE_C_COMPILER_ID}")
 if(CMAKE_COMPILER_IS_CLANG)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla -Wformat=2 -Wno-format-nonliteral")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla -Wformat=2 -Wno-format-nonliteral")
-    
+
     set(CMAKE_C_FLAGS_RELEASE     "-O3 -fomit-frame-pointer -flto")
     set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -fomit-frame-pointer -flto")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -flto")
@@ -33,7 +33,7 @@ endif(CMAKE_COMPILER_IS_CLANG)
 
 if(CMAKE_COMPILER_IS_GNU)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-    
+
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wwrite-strings")
 
@@ -64,7 +64,7 @@ if(CMAKE_COMPILER_IS_GNU)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat-overflow=2 -Wformat-truncation")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat-overflow=2 -Wformat-truncation")
     endif()
-    
+
     set(CMAKE_C_FLAGS_RELEASE     "-O3 -fomit-frame-pointer -flto")
     set(CMAKE_CXX_FLAGS_RELEASE   "-O3 -fomit-frame-pointer -flto")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -flto")
@@ -72,17 +72,17 @@ if(CMAKE_COMPILER_IS_GNU)
 
     set(CMAKE_C_FLAGS_DEBUG       "-Og -g3")
     set(CMAKE_CXX_FLAGS_DEBUG     "-Og -g3")
-    
+
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -C")
 endif(CMAKE_COMPILER_IS_GNU)
 
 if(CMAKE_COMPILER_IS_MSVC)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
-    
+
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2 /Oi /Ot /GL")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Oi /Ot /GL")
-    
+
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG /OPT:REF /OPT:ICF /NODEFAULTLIB:MSVCRT")
@@ -164,22 +164,35 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     message(STATUS "is Android")
     string(APPEND OUT_DIR "android")
 endif()
+if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+    message(STATUS "is Emscripten (wasm)")
+    string(APPEND OUT_DIR "wasm")
+endif()
 
 message(STATUS "OUT_DIR:" ${OUT_DIR})
 file(MAKE_DIRECTORY ${OUT_DIR})
 
-add_subdirectory (uapkic)
-add_subdirectory (uapkif)
-add_subdirectory (uapki)
-if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/cm-pkcs12)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+  add_subdirectory (uapkic)
+  add_subdirectory (uapkif)
+  add_subdirectory (uapki)
+  if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/cm-pkcs12)
+    add_subdirectory (cm-pkcs12)
+  endif()
+  if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/cm-pkcs11)
+    add_subdirectory (cm-pkcs11)
+  endif()
+  if((IS_DIRECTORY ${PROJECT_SOURCE_DIR}/hostapp) AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    add_subdirectory (hostapp)
+  endif()
+  if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/test)
+    add_subdirectory (test)
+  endif()
+else()
+  add_subdirectory (uapkic)
+  add_subdirectory (uapkif)
+  add_subdirectory (uapki)
   add_subdirectory (cm-pkcs12)
-endif()
-if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/cm-pkcs11)
-  add_subdirectory (cm-pkcs11)
-endif()
-if((IS_DIRECTORY ${PROJECT_SOURCE_DIR}/hostapp) AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
-  add_subdirectory (hostapp)
-endif()
-if(IS_DIRECTORY ${PROJECT_SOURCE_DIR}/test)
-  add_subdirectory (test)
+  #cm-pkcs11, hostapp and test are not applicable
+  add_subdirectory (wasm)
 endif()

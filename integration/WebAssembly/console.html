@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UAPKI WASM — JSON-консоль</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --border: #d9dee3;
+    --text: #1c2733; --muted: #5b6b7b; --accent: #0057b7;
+    --ok: #1e7e34; --err: #b02a37;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, "Segoe UI", Roboto, sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  header .st { font-size: 13px; color: var(--muted); }
+  header .st.ok { color: var(--ok); }
+  header .st.err { color: var(--err); }
+  header a { color: var(--accent); font-size: 13px; margin-left: auto; }
+  main { flex: 1; display: flex; min-height: 0; }
+
+  /* sidebar */
+  aside {
+    width: 300px; min-width: 240px; overflow-y: auto; background: var(--card);
+    border-right: 1px solid var(--border); padding: 10px;
+  }
+  aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--muted); margin: 14px 0 6px; }
+  aside h3:first-child { margin-top: 2px; }
+  .preset {
+    display: block; width: 100%; text-align: left; background: none; border: 0;
+    padding: 4px 8px; border-radius: 5px; font: inherit; color: var(--text); cursor: pointer;
+  }
+  .preset:hover { background: #eaf1f9; color: var(--accent); }
+  .fs-item { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 13px; }
+  .fs-item span { flex: 1; word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  .fs-item button { border: 0; background: none; cursor: pointer; color: var(--accent); font-size: 12px; padding: 1px 4px; }
+  .fs-item button.del { color: var(--err); }
+  .sbtn {
+    margin: 4px 4px 0 0; padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px;
+    background: #fff; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .sbtn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* main area */
+  section { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 10px; gap: 10px; }
+  .pane { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    display: flex; flex-direction: column; min-height: 0; }
+  .pane .bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    border-bottom: 1px solid var(--border); }
+  .pane .bar b { font-size: 13px; }
+  .pane .bar .hint { font-size: 12px; color: var(--muted); }
+  #req-pane { flex: 4; }
+  #resp-pane { flex: 5; }
+  textarea#editor {
+    flex: 1; border: 0; resize: none; outline: none; padding: 10px; border-radius: 0 0 8px 8px;
+    font: 13px/1.5 ui-monospace, Consolas, "Cascadia Mono", monospace; white-space: pre; overflow: auto;
+  }
+  #resp {
+    flex: 1; overflow: auto; margin: 0; padding: 10px;
+    font: 12.5px/1.5 ui-monospace, Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; word-break: break-all;
+  }
+  #resp .blk { border-bottom: 1px dashed var(--border); padding: 6px 0; }
+  #resp .h { font-weight: 700; }
+  #resp .h.ok { color: var(--ok); }
+  #resp .h.err { color: var(--err); }
+  button.run {
+    margin-left: auto; padding: 5px 22px; border: 0; border-radius: 6px;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.run:hover { filter: brightness(1.1); }
+  button.run:disabled { background: #9db4cc; }
+  .mini { border: 1px solid var(--border); background: #fff; border-radius: 5px;
+    font: inherit; font-size: 12px; padding: 3px 9px; cursor: pointer; }
+  .mini:hover { border-color: var(--accent); color: var(--accent); }
+  #history { max-height: 130px; overflow-y: auto; }
+  #history .hitem { display: flex; gap: 8px; padding: 3px 10px; font-size: 12.5px;
+    font-family: ui-monospace, Consolas, monospace; cursor: pointer; border-bottom: 1px solid #eef1f4; }
+  #history .hitem:hover { background: #eaf1f9; }
+  #history .hitem .m { color: var(--accent); min-width: 130px; }
+  #history .hitem .r { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #history .hitem .r.err { color: var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <h1>UAPKI · JSON-консоль</h1>
+  <span id="status" class="st">завантаження модуля…</span>
+</header>
+<main>
+  <aside>
+    <h3>Файли (MEMFS /storage)</h3>
+    <div id="fs-list"></div>
+    <button class="sbtn" id="btn-upload">+ Завантажити файл</button>
+    <input type="file" id="fs-file" multiple hidden>
+
+    <h3>Вставити в запит</h3>
+    <button class="sbtn" id="btn-ins-b64">Файл → base64</button>
+    <input type="file" id="b64-file" hidden>
+
+    <h3>Пресети</h3>
+    <div id="presets"></div>
+  </aside>
+
+  <section>
+    <div class="pane" id="req-pane">
+      <div class="bar">
+        <b>Запит</b>
+        <span class="hint">один метод <code>{"method":…}</code> або сценарій <code>{"tasks":[…]}</code>; коментарі // дозволені; підстановки <code>{{METHOD:шлях.до.поля}}</code></span>
+        <button class="run" id="btn-run">Виконати (Ctrl+Enter)</button>
+      </div>
+      <textarea id="editor" spellcheck="false">{
+  "method": "VERSION"
+}</textarea>
+    </div>
+
+    <div class="pane" id="resp-pane">
+      <div class="bar">
+        <b>Відповідь</b>
+        <button class="mini" id="btn-copy">Копіювати</button>
+        <button class="mini" id="btn-save-bytes" title="Зберегти файлом перше поле result.bytes / signatures[0].bytes / content.bytes">Зберегти bytes → файл</button>
+      </div>
+      <pre id="resp">—</pre>
+    </div>
+
+    <div class="pane" style="flex:0 0 auto">
+      <div class="bar"><b>Історія</b> <span class="hint">клік — повернути запит у редактор</span></div>
+      <div id="history"></div>
+    </div>
+  </section>
+</main>
+
+<script src="uapki.js"></script>
+<script>
+"use strict";
+
+let Module = null, procFn = null;
+let lastResponse = null;
+const scenarioResults = {};   //  METHOD -> last result (for {{...}} placeholders)
+
+const $ = (id) => document.getElementById(id);
+
+//  ---- helpers ----
+function bytesToB64 (u8) {
+    let s = "";
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s);
+}
+function b64ToBytes (b64) {
+    const s = atob(b64.replace(/\s/g, ""));
+    const u8 = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+    return u8;
+}
+function downloadBytes (u8, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([u8]));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+//  strip // and /* */ comments outside of strings (test-runner compatible)
+function stripJsonComments (s) {
+    let out = "", inStr = false;
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i], n = s[i + 1];
+        if (inStr) {
+            out += c;
+            if (c === "\\") { out += n ?? ""; i++; }
+            else if (c === '"') inStr = false;
+            continue;
+        }
+        if (c === '"') { inStr = true; out += c; continue; }
+        if (c === "/" && n === "/") { while (i < s.length && s[i] !== "\n") i++; out += "\n"; continue; }
+        if (c === "/" && n === "*") { i += 2; while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) i++; i++; continue; }
+        out += c;
+    }
+    return out;
+}
+
+//  {{METHOD:path.to.field}} -> value from an earlier result in this run
+function lookupPath (obj, path) {
+    let v = obj;
+    for (const part of path.split(".")) {
+        if (v === null || v === undefined) return undefined;
+        v = v[part];
+    }
+    return v;
+}
+function resolvePlaceholders (value) {
+    const RX = /\{\{([A-Z_0-9]+):([^}]+)\}\}/g;
+    if (typeof value === "string") {
+        const single = value.match(/^\{\{([A-Z_0-9]+):([^}]+)\}\}$/);
+        if (single) {
+            const v = lookupPath(scenarioResults[single[1]], single[2]);
+            return (v === undefined) ? value : v;
+        }
+        return value.replace(RX, (m, method, path) => {
+            const v = lookupPath(scenarioResults[method], path);
+            return (v === undefined) ? m : String(v);
+        });
+    }
+    if (Array.isArray(value)) return value.map(resolvePlaceholders);
+    if (value && typeof value === "object") {
+        const out = {};
+        for (const k of Object.keys(value)) out[k] = resolvePlaceholders(value[k]);
+        return out;
+    }
+    return value;
+}
+
+//  ---- core call ----
+//  process() may suspend on network I/O (Asyncify + fetch), so the call is
+//  asynchronous: procFn returns a Promise.
+async function uapkiRaw (requestObj) {
+    const request = JSON.stringify(requestObj);
+    const reqPtr = Module.stringToNewUTF8(request);
+    let resPtr = 0, response;
+    try {
+        resPtr = await procFn(reqPtr);
+        response = Module.UTF8ToString(resPtr);
+    } finally {
+        Module._free(reqPtr);
+        if (resPtr) Module._json_free(resPtr);
+    }
+    return JSON.parse(response);
+}
+
+//  ---- run (single request or scenario) ----
+let running = false;
+async function runEditor () {
+    if (running) return;    //  serialize runs: process() may be suspended on fetch
+    const raw = $("editor").value;
+    let root;
+    try {
+        root = JSON.parse(stripJsonComments(raw));
+    } catch (e) {
+        renderBlocks([{ title: "JSON-помилка", ok: false, body: e.message }]);
+        return;
+    }
+    running = true;
+    $("btn-run").disabled = true;
+
+    const blocks = [];
+    const tasks = Array.isArray(root.tasks)
+        ? root.tasks
+        : [root];
+
+    for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        const method = task.method;
+        if (!method || task.skip === true || method.startsWith("_")) {
+            if (method) blocks.push({ title: `#${i + 1} ${method} — пропущено (skip)`, ok: true, body: "" });
+            continue;
+        }
+
+        const reqObj = { method };
+        if (task.parameters !== undefined) reqObj.parameters = resolvePlaceholders(task.parameters);
+
+        let resp;
+        try {
+            resp = await uapkiRaw(reqObj);
+        } catch (e) {
+            blocks.push({ title: `#${i + 1} ${method} — збій виклику`, ok: false, body: String(e) });
+            break;
+        }
+
+        const ok = (resp.errorCode === 0);
+        if (ok && resp.result) scenarioResults[method] = resp.result;
+
+        //  hints for typical state errors (the module state lives only within
+        //  the page session - INIT/OPEN/SELECT_KEY must be re-run after reload)
+        const HINTS = {
+            4105: "бібліотека не ініціалізована — виконайте INIT (пресет «INIT (offline)»); стан скидається після перезавантаження сторінки",
+            4106: "INIT уже виконано в цій сесії сторінки — повторний не потрібен (або спершу DEINIT)",
+            4108: "ключ не обрано — виконайте SELECT_KEY після OPEN/KEYS",
+            4121: "сховище не відкрито — виконайте OPEN (файл контейнера має бути на панелі «Файли»)"
+        };
+        const hint = (!ok && HINTS[resp.errorCode]) ? `\n💡 ${HINTS[resp.errorCode]}` : "";
+
+        blocks.push({
+            title: (tasks.length > 1 ? `#${i + 1} ` : "") + method + (ok ? " ✓" : ` ✗ (errorCode=${resp.errorCode} ${resp.error || ""})`),
+            ok,
+            body: JSON.stringify(resp, null, 2) + hint,
+            comment: task.comment
+        });
+
+        if (!ok && (task.actionByError === "STOP" || task.actionByError === "CLOSE")) {
+            if (task.actionByError === "CLOSE") { try { await uapkiRaw({ method: "CLOSE" }); } catch (e) {} }
+            blocks.push({ title: "зупинено (actionByError)", ok: false, body: "" });
+            break;
+        }
+    }
+
+    running = false;
+    $("btn-run").disabled = false;
+    lastResponse = blocks.map(b => b.body).filter(Boolean).join("\n\n");
+    renderBlocks(blocks);
+    addHistory(root, blocks.every(b => b.ok));
+    refreshFs();
+}
+
+function renderBlocks (blocks) {
+    const el = $("resp");
+    el.innerHTML = "";
+    for (const b of blocks) {
+        const div = document.createElement("div");
+        div.className = "blk";
+        const h = document.createElement("div");
+        h.className = "h " + (b.ok ? "ok" : "err");
+        h.textContent = b.title + (b.comment ? `  — ${b.comment}` : "");
+        div.appendChild(h);
+        if (b.body) {
+            const pre = document.createElement("div");
+            pre.textContent = b.body;
+            div.appendChild(pre);
+        }
+        el.appendChild(div);
+    }
+}
+
+//  ---- history ----
+const history = [];
+function addHistory (rootObj, ok) {
+    const text = $("editor").value;
+    const method = Array.isArray(rootObj.tasks)
+        ? `сценарій (${rootObj.tasks.length})`
+        : rootObj.method || "?";
+    history.unshift({ text, method, ok, at: new Date().toLocaleTimeString() });
+    if (history.length > 50) history.pop();
+    const el = $("history");
+    el.innerHTML = "";
+    for (const h of history) {
+        const div = document.createElement("div");
+        div.className = "hitem";
+        div.innerHTML = `<span class="m">${h.at} ${h.method}</span><span class="r ${h.ok ? "" : "err"}">${h.ok ? "OK" : "помилка"}</span>`;
+        div.addEventListener("click", () => { $("editor").value = h.text; });
+        el.appendChild(div);
+    }
+}
+
+//  ---- MEMFS panel ----
+function refreshFs () {
+    const el = $("fs-list");
+    el.innerHTML = "";
+    let names = [];
+    try { names = Module.FS.readdir("/storage").filter(n => n !== "." && n !== ".."); } catch (e) {}
+    if (!names.length) {
+        el.innerHTML = '<div class="fs-item" style="color:var(--muted)">порожньо</div>';
+        return;
+    }
+    for (const name of names) {
+        const item = document.createElement("div");
+        item.className = "fs-item";
+        const span = document.createElement("span");
+        span.textContent = name;
+        span.title = "/storage/" + name;
+        const ins = document.createElement("button");
+        ins.textContent = "шлях";
+        ins.title = "Вставити /storage/" + name + " у редактор";
+        ins.addEventListener("click", () => insertAtCursor('"/storage/' + name + '"'));
+        const dl = document.createElement("button");
+        dl.textContent = "↓";
+        dl.title = "Завантажити";
+        dl.addEventListener("click", () => downloadBytes(Module.FS.readFile("/storage/" + name), name));
+        const del = document.createElement("button");
+        del.className = "del";
+        del.textContent = "×";
+        del.title = "Видалити";
+        del.addEventListener("click", () => { Module.FS.unlink("/storage/" + name); refreshFs(); });
+        item.append(span, ins, dl, del);
+        el.appendChild(item);
+    }
+}
+
+function insertAtCursor (text) {
+    const ed = $("editor");
+    const s = ed.selectionStart, e = ed.selectionEnd;
+    ed.value = ed.value.slice(0, s) + text + ed.value.slice(e);
+    ed.selectionStart = ed.selectionEnd = s + text.length;
+    ed.focus();
+}
+
+//  ---- presets ----
+const FOX_B64 = "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==";
+const PRESETS = [
+["Система", [
+["VERSION", { method: "VERSION" }],
+["INIT (offline)", { method: "INIT", parameters: {
+    cmProviders: { dir: "", allowedProviders: [ { lib: "cm-pkcs12" } ] },
+    certCache: { path: "/certs/", trustedCerts: [] },
+    crlCache: { path: "/crls/" },
+    offline: true
+} }],
+["INIT (online: TSP/OCSP)", { method: "INIT", parameters: {
+    cmProviders: { dir: "", allowedProviders: [ { lib: "cm-pkcs12" } ] },
+    certCache: { path: "/certs/", trustedCerts: [] },
+    crlCache: { path: "/crls/" },
+    offline: false,
+    //  HTTP іде через браузерний fetch: сервер TSP/OCSP має дозволяти CORS,
+    //  інакше запит заблокує браузер (CONNECTION_ERROR)
+    tsp: { url: "<URL TSP-сервера>", nonceLen: 8 }
+} }],
+["PROVIDERS", { method: "PROVIDERS" }],
+["DEINIT", { method: "DEINIT" }],
+]],
+["Сховище ключів", [
+["STORAGE_INFO", { method: "STORAGE_INFO", parameters: { provider: "PKCS12", storage: "/storage/<ваш файл>" } }],
+["OPEN", { method: "OPEN", parameters: { provider: "PKCS12", storage: "/storage/<ваш файл>", password: "<пароль>", mode: "RO" } }],
+["KEYS", { method: "KEYS" }],
+["SELECT_KEY", { method: "SELECT_KEY", parameters: { id: "{{KEYS:keys.0.id}}" } }],
+["GET_CSR", { method: "GET_CSR", parameters: {} }],
+["CLOSE", { method: "CLOSE" }],
+]],
+["Сертифікати", [
+["ADD_CERT", { method: "ADD_CERT", parameters: { certificates: [ "<base64 сертифіката (DER)>" ] } }],
+["LIST_CERTS", { method: "LIST_CERTS", parameters: {} }],
+["CERT_INFO", { method: "CERT_INFO", parameters: { bytes: "<base64 сертифіката (DER)>" } }],
+]],
+["Підпис", [
+["SIGN (CAdES-BES, attached)", { method: "SIGN", parameters: {
+    signParams: { signatureFormat: "CAdES-BES", detachedData: false, includeCert: true, includeTime: true },
+    options: { ignoreCertStatus: true },
+    dataTbs: [ { id: "doc-0", bytes: FOX_B64 } ]
+} }],
+["SIGN (CAdES-BES, detached)", { method: "SIGN", parameters: {
+    signParams: { signatureFormat: "CAdES-BES", detachedData: true, includeCert: true },
+    options: { ignoreCertStatus: true },
+    dataTbs: [ { id: "doc-0", bytes: FOX_B64 } ]
+} }],
+["VERIFY (attached)", { method: "VERIFY", parameters: { signature: { bytes: "{{SIGN:signatures.0.bytes}}" } } }],
+["VERIFY (detached)", { method: "VERIFY", parameters: { signature: { bytes: "{{SIGN:signatures.0.bytes}}", content: FOX_B64 } } }],
+]],
+["Шифрування", [
+["ENCRYPT (ДСТУ, ephemeral)", { method: "ENCRYPT", parameters: {
+    content: { bytes: FOX_B64, encryptionAlgo: "1.2.804.2.1.1.1.1.1.3.3.2" },
+    recipientInfos: [ { certId: "<base64 certId одержувача>", kdfAlgo: "1.2.804.2.1.1.1.1.3.7" } ]
+} }],
+["DECRYPT", { method: "DECRYPT", parameters: { bytes: "<base64 EnvelopedData (.p7e)>" } }],
+]],
+["Утиліти", [
+["DIGEST (SHA-256)", { method: "DIGEST", parameters: { hashAlgo: "2.16.840.1.101.3.4.2.1", bytes: FOX_B64 } }],
+["DIGEST (ГОСТ 34311)", { method: "DIGEST", parameters: { hashAlgo: "1.2.804.2.1.1.1.1.2.1", bytes: FOX_B64 } }],
+["RANDOM_BYTES", { method: "RANDOM_BYTES", parameters: { length: 32 } }],
+["ASN1_DECODE", { method: "ASN1_DECODE", parameters: { bytes: "<base64 DER-структури>" } }],
+]],
+];
+
+const SCENARIO_READ_KEY = `{
+  // Сценарій: зчитати контейнер ключа.
+  // 1) Завантажте файл контейнера на панелі "Файли" зліва,
+  // 2) виправте "storage" і "password",
+  // 3) натисніть Виконати.
+  "tasks": [
+    { "method": "VERSION" },
+    {
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": { "dir": "", "allowedProviders": [ { "lib": "cm-pkcs12" } ] },
+        "certCache": { "path": "/certs/", "trustedCerts": [] },
+        "crlCache": { "path": "/crls/" },
+        "offline": true
+      }
+    },
+    {
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12",
+        "storage": "/storage/<ваш файл>", // PKCS#12 / PFX / JKS / PKCS#8 / key-6.dat
+        "password": "<пароль>",
+        "mode": "RO"
+      },
+      "actionByError": "STOP"
+    },
+    { "method": "KEYS" },
+    {
+      // беремо перший ключ зі списку KEYS автоматично
+      "method": "SELECT_KEY",
+      "parameters": { "id": "{{KEYS:keys.0.id}}" }
+    },
+    { "method": "CLOSE" }
+  ]
+}`;
+
+const SCENARIO_SIGN = `{
+  // Сценарій: повний цикл — відкрити ключ, підписати, перевірити.
+  // Потребує контейнер із сертифікатом усередині (або додайте ADD_CERT після OPEN).
+  "tasks": [
+    {
+      "method": "INIT",
+      "parameters": {
+        "cmProviders": { "dir": "", "allowedProviders": [ { "lib": "cm-pkcs12" } ] },
+        "certCache": { "path": "/certs/", "trustedCerts": [] },
+        "crlCache": { "path": "/crls/" },
+        "offline": true
+      }
+    },
+    {
+      "method": "OPEN",
+      "parameters": {
+        "provider": "PKCS12",
+        "storage": "/storage/<ваш файл>",
+        "password": "<пароль>",
+        "mode": "RO"
+      },
+      "actionByError": "STOP"
+    },
+    { "method": "KEYS" },
+    {
+      "method": "SELECT_KEY",
+      "parameters": { "id": "{{KEYS:keys.0.id}}" },
+      "actionByError": "STOP"
+    },
+    {
+      // якщо сертифіката немає в контейнері - зніміть skip і вставте base64
+      "method": "ADD_CERT",
+      "parameters": { "certificates": [ "<base64 сертифіката>" ] },
+      "skip": true
+    },
+    {
+      "method": "SIGN",
+      "parameters": {
+        "signParams": {
+          "signatureFormat": "CAdES-BES",
+          "detachedData": false,
+          "includeCert": true,
+          "includeTime": true
+        },
+        "options": { "ignoreCertStatus": true },
+        "dataTbs": [ { "id": "doc-0", "bytes": "${FOX_B64}" } ]
+      },
+      "actionByError": "STOP"
+    },
+    {
+      // перевіряємо щойно створений підпис (підстановка з результату SIGN)
+      "method": "VERIFY",
+      "parameters": { "signature": { "bytes": "{{SIGN:signatures.0.bytes}}" } }
+    },
+    { "method": "CLOSE" }
+  ]
+}`;
+
+function buildPresets () {
+    const root = $("presets");
+    for (const [group, items] of PRESETS) {
+        const h = document.createElement("h3");
+        h.textContent = group;
+        root.appendChild(h);
+        for (const [name, obj] of items) {
+            const b = document.createElement("button");
+            b.className = "preset";
+            b.textContent = name;
+            b.addEventListener("click", () => { $("editor").value = JSON.stringify(obj, null, 2); });
+            root.appendChild(b);
+        }
+    }
+    const h = document.createElement("h3");
+    h.textContent = "Сценарії";
+    root.appendChild(h);
+    for (const [name, text] of [["Зчитати ключ", SCENARIO_READ_KEY], ["Підписати і перевірити", SCENARIO_SIGN]]) {
+        const b = document.createElement("button");
+        b.className = "preset";
+        b.textContent = name;
+        b.addEventListener("click", () => { $("editor").value = text; });
+        root.appendChild(b);
+    }
+}
+
+//  ---- wiring ----
+createUapkiModule().then(async (mod) => {
+    Module = mod;
+    procFn = Module.cwrap("process", "number", ["number"], { async: true });
+    for (const dir of ["/certs", "/crls", "/storage"]) {
+        try { Module.FS.mkdir(dir); } catch (e) {}
+    }
+    const v = await uapkiRaw({ method: "VERSION" });
+    $("status").textContent = `модуль готовий · UAPKI ${v.result ? v.result.version : "?"}`;
+    $("status").className = "st ok";
+    refreshFs();
+}).catch((e) => {
+    $("status").textContent = "помилка завантаження: " + e.message;
+    $("status").className = "st err";
+});
+
+$("btn-run").addEventListener("click", runEditor);
+$("editor").addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") { ev.preventDefault(); runEditor(); }
+});
+
+$("btn-upload").addEventListener("click", () => $("fs-file").click());
+$("fs-file").addEventListener("change", async () => {
+    for (const f of $("fs-file").files) {
+        Module.FS.writeFile("/storage/" + f.name, new Uint8Array(await f.arrayBuffer()));
+    }
+    $("fs-file").value = "";
+    refreshFs();
+});
+
+$("btn-ins-b64").addEventListener("click", () => $("b64-file").click());
+$("b64-file").addEventListener("change", async () => {
+    const f = $("b64-file").files[0];
+    if (f) insertAtCursor('"' + bytesToB64(new Uint8Array(await f.arrayBuffer())) + '"');
+    $("b64-file").value = "";
+});
+
+$("btn-copy").addEventListener("click", () => {
+    if (lastResponse) navigator.clipboard.writeText(lastResponse);
+});
+
+$("btn-save-bytes").addEventListener("click", () => {
+    if (!lastResponse) return;
+    //  find the first meaningful "bytes" in the last response(s)
+    try {
+        for (const part of lastResponse.split("\n\n").reverse()) {
+            const j = JSON.parse(part);
+            const r = j.result || {};
+            const b64 = r.bytes
+                || (r.signatures && r.signatures[0] && r.signatures[0].bytes)
+                || (r.content && r.content.bytes);
+            if (b64) { downloadBytes(b64ToBytes(b64), (j.method || "result").toLowerCase() + ".bin"); return; }
+        }
+    } catch (e) {}
+    alert("У відповіді немає поля bytes.");
+});
+
+buildPresets();
+</script>
+</body>
+</html>
