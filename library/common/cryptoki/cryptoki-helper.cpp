@@ -43,6 +43,11 @@ using namespace std;
 namespace Cryptoki {
 
 
+//  Upper bound for scanning NUL-terminated PIN arguments:
+//  keeps strnlen() within a sane limit even if a non-terminated buffer is passed
+static const size_t MAX_PIN_SCAN_LENGTH = 65535;
+
+
 Helper::Helper (void)
     : m_IsInitialized(false)
     , m_LastResult(CKR_OK)
@@ -268,7 +273,7 @@ CK_RV Helper::initToken (
         const string& label
 )
 {
-    const CK_ULONG pin_len = (pin) ? (CK_ULONG)strlen((const char*)pin) : 0;
+    const CK_ULONG pin_len = pin ? (CK_ULONG)strnlen((const char*)pin, MAX_PIN_SCAN_LENGTH) : 0;
     return initToken(slotId, pin, pin_len, label);
 }
 
@@ -357,7 +362,7 @@ CK_RV Session::login (
         const CK_CHAR_PTR pin
 )
 {
-    const CK_ULONG pin_len = pin ? (CK_ULONG)strlen((const char*)pin) : 0;
+    const CK_ULONG pin_len = pin ? (CK_ULONG)strnlen((const char*)pin, MAX_PIN_SCAN_LENGTH) : 0;
     return login(userType, pin, pin_len);
 }
 
@@ -406,8 +411,8 @@ CK_RV Session::setPin (
         const CK_CHAR_PTR newPin
 )
 {
-    const CK_ULONG oldpin_len = oldPin ? (CK_ULONG)strlen((const char*)oldPin) : 0;
-    const CK_ULONG newpin_len = newPin ? (CK_ULONG)strlen((const char*)newPin) : 0;
+    const CK_ULONG oldpin_len = oldPin ? (CK_ULONG)strnlen((const char*)oldPin, MAX_PIN_SCAN_LENGTH) : 0;
+    const CK_ULONG newpin_len = newPin ? (CK_ULONG)strnlen((const char*)newPin, MAX_PIN_SCAN_LENGTH) : 0;
     return setPin(
         oldPin,
         oldpin_len,
@@ -433,7 +438,7 @@ CK_RV Session::initPin (
         const CK_CHAR_PTR pin
 )
 {
-    const CK_ULONG pin_len = pin ? (CK_ULONG)strlen((const char*)pin) : 0;
+    const CK_ULONG pin_len = pin ? (CK_ULONG)strnlen((const char*)pin, MAX_PIN_SCAN_LENGTH) : 0;
     return initPin(pin, pin_len);
 }
 
