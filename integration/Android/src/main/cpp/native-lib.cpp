@@ -2,24 +2,26 @@
 #include "uapki-bridge.h"
 
 
-static UapkiBridge uapki_bridge;
-
+static UapkiBridge& uapki_bridge() {
+    static UapkiBridge instance;
+    return instance;
+}
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_uapki_Bridge_nativeLoad(
         JNIEnv* env,
-        jobject unused,
+        jobject /*unused*/,
         jstring className,
         jint sleepMs)
 {
-    return uapki_bridge.load(env, className, sleepMs);
+    return uapki_bridge().load(env, className, sleepMs);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_uapki_Bridge_nativeProcess(
         JNIEnv* env,
-        jobject unused,
+        jobject /*unused*/,
         jstring jsonRequest)
 {
-    return uapki_bridge.process(env, jsonRequest);
+    return uapki_bridge().process(env, jsonRequest);
 }

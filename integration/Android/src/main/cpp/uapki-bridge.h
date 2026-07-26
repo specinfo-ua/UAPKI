@@ -5,15 +5,13 @@
 #include <jni.h>
 #include "common/loaders/uapki-loader.h"
 
-
-typedef int (*f_uapki_bridge_setjni) (JNIEnv* env, const char* className, int sleepMs, void* paramPtr);
+using f_uapki_bridge_setjni = int (*)(JNIEnv* env, const char* className, int sleepMs, void* paramPtr);
 
 class UapkiBridge {
     UapkiLoader     m_LibUapki;
-    f_uapki_bridge_setjni
-                    m_SetJni;
-    std::string     m_ClassName;
-    int             m_SleepMs;
+    f_uapki_bridge_setjni m_SetJni = nullptr;
+    std::string     m_ClassName = "com/uapki/HttpClient";
+    int             m_SleepMs = 20;
 
 public:
     UapkiBridge ();
