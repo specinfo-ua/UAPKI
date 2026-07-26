@@ -30,6 +30,7 @@
 
 
 #ifdef __cplusplus
+#include <string>   /* std::wstring for the Windows UTF-8 path loader below */
 extern "C" {
 #endif
 
@@ -43,6 +44,21 @@ typedef HMODULE HANDLE_DLIB;
 #define DL_GET_PROC_ADDRESS(h, fname) GetProcAddress((HANDLE_DLIB)h, fname)
 #define DL_FREE_LIBRARY(h) FreeLibrary((HANDLE_DLIB)h);
 
+/* Load a library from a UTF-8 path: convert to UTF-16 and use LoadLibraryW so
+ * paths with non-ASCII (e.g. Cyrillic) characters resolve correctly regardless
+ * of the active ANSI code page. */
+static HANDLE_DLIB dl_load_library_utf8(const char* fn_utf8) {
+    const int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, fn_utf8, -1, nullptr, 0);
+    if (wlen <= 0) {
+        return static_cast<HANDLE_DLIB>(nullptr);
+    }
+
+    std::wstring wbuf(static_cast<size_t>(wlen), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, fn_utf8, -1, &wbuf[0], wlen);
+
+    return static_cast<HANDLE_DLIB>(LoadLibraryW(wbuf.c_str()));
+}
+
 #elif defined(__linux__) || defined(__APPLE__) || defined(__unix__)
 #include <dlfcn.h>
 typedef void* HANDLE_DLIB;
@@ -53,6 +69,7 @@ typedef void* HANDLE_DLIB;
 #define LIBNAME_EXT "so"
 #endif
 #define DL_LOAD_LIBRARY(fn) dlopen(fn, RTLD_NOW)
+#define dl_load_library_utf8(fn) DL_LOAD_LIBRARY(fn)
 #define DL_GET_PROC_ADDRESS(h, fname) dlsym((HANDLE_DLIB)h, fname)
 #define DL_FREE_LIBRARY(h) dlclose((HANDLE_DLIB)h);
 
