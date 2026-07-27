@@ -3000,6 +3000,57 @@ cleanup:
     return ret;
 }
 
+/*
+ * T-137 investigation (local draft only, not yet proposed upstream): encrypt_xts/decrypt_xts's
+ * per-block tweak update is always "multiply by the fixed generator x (denoted `2`)", not a
+ * general variable*variable multiply - gf2m_mul's 3 heap-allocated WordArrays and full O(m^2)
+ * gf2m_mod_mul are unneeded work for this fixed-constant case. Multiplying by x in a
+ * polynomial-basis GF(2^m) element is a single left-shift of the whole bit-vector (O(m/64) word
+ * ops), with one conditional XOR of the reduction polynomial's low-degree terms substituted for
+ * the x^m term that shifts out of range, only when the pre-shift top bit was set - the identical
+ * technique and identical field/reduction-polynomial constants (ctx->f == {m,7,2,1}/{m,10,5,2}/
+ * {m,8,5,2} for block_len 16/32/64) already implemented, tested, and shipped in dstu-core's own
+ * hazmat::gf2m_wide.rs Gf2m128/256/512::double() (cross-checked against dstu7624_init_gmac's own
+ * f[] triples there, confirmed identical to XTS's own f[] below). Does not touch gf2m_mul itself
+ * or any GCM/GMAC call site - those still need the general variable*variable path.
+ */
+static int gf2m_double(Gf2mCtx *ctx, size_t block_len, uint8_t *arg, uint8_t *out)
+{
+    uint64_t words[8];
+    size_t n = block_len / 8;
+    size_t i;
+    uint64_t carry, next_carry, top_bit;
+    int ret = RET_OK;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(arg != NULL);
+    CHECK_PARAM(out != NULL);
+    CHECK_PARAM(n <= 8);
+
+    DO(uint8_to_uint64(arg, block_len, words, n));
+
+    top_bit = (words[n - 1] >> 63) & 1;
+    carry = 0;
+    for (i = 0; i < n; i++) {
+        next_carry = words[i] >> 63;
+        words[i] = (words[i] << 1) | carry;
+        carry = next_carry;
+    }
+    if (top_bit) {
+        words[0] ^= 1;
+        for (i = 1; i <= 3; i++) {
+            int term = ctx->f[i];
+            words[term / 64] ^= ((uint64_t)1) << (term % 64);
+        }
+    }
+
+    DO(uint64_to_uint8(words, n, out, block_len));
+
+cleanup:
+
+    return ret;
+}
+
 static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
 {
     uint8_t *plain_data = NULL;
@@ -3034,7 +3085,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_len; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3047,7 +3098,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         i -= plain_size % block_len;
 
         //Конвертируем а для бе машин.
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3102,7 +3153,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_num; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3111,8 +3162,8 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     if (padded_len != block_len) {
         //Если было дополнение, на вход приходят последний и предпоследний блок
         //Так как при дополнении в шифровании меняются местами последний и предпоследний блоки, расшифровуем последний блок, как предпоследний
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, two));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, two));
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
