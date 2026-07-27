@@ -1035,7 +1035,19 @@ int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray *inout)
      * real `uint64_t[16]` struct field, not a byte buffer, so no alignment concern the way a
      * `uint8_t*`-only representation would have) while a full aligned word remains in the current
      * buffer, falling back to the original byte-at-a-time loop for whatever's left over.
+     *
+     * gamma_cntr is only ever set by next_gamma() (to 0) or advanced here (by 1 or 8, always
+     * followed by a check that regenerates once it reaches 128), so it never actually leaves
+     * 0..127 across any call sequence - but nothing in this function proves that fact locally
+     * from ctx alone, which is exactly what a symbolic-execution-based analyzer needs to see
+     * before trusting every gamma[gamma_cntr]/ctx->gamma[gamma_cntr / 8] access below. Clamp
+     * explicitly, once, so the invariant is established here rather than assumed from call
+     * history.
      */
+    if (ctx->gamma_cntr >= 128) {
+        ctx->gamma_cntr = 0;
+    }
+
     while (in_len && (ctx->gamma_cntr % 8) != 0) {
         *in++ ^= gamma[ctx->gamma_cntr++];
         in_len--;
