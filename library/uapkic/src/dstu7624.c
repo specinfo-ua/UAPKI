@@ -3014,12 +3014,14 @@ cleanup:
  * f[] triples there, confirmed identical to XTS's own f[] below). Does not touch gf2m_mul itself
  * or any GCM/GMAC call site - those still need the general variable*variable path.
  */
-static int gf2m_double(Gf2mCtx *ctx, size_t block_len, uint8_t *arg, uint8_t *out)
+static int gf2m_double(const Gf2mCtx *ctx, size_t block_len, const uint8_t *arg, uint8_t *out)
 {
     uint64_t words[8];
     size_t n = block_len / 8;
     size_t i;
-    uint64_t carry, next_carry, top_bit;
+    uint64_t carry;
+    uint64_t next_carry;
+    uint64_t top_bit;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
@@ -3054,7 +3056,6 @@ cleanup:
 static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
 {
     uint8_t *plain_data = NULL;
-    uint8_t two[64] = {0};
     uint8_t gamma[64] = {0};
     size_t plain_size;
     size_t i;
@@ -3068,7 +3069,6 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_PARAM(out != NULL);
 
     block_len = ctx->block_len;
-    two[0] = 2;
 
     plain_size = ba_get_len(in);
 
@@ -3132,8 +3132,6 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(in != NULL);
     CHECK_PARAM(out != NULL);
-
-    two[0] = 2;
 
     block_len = ctx->block_len;
 

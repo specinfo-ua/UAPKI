@@ -1039,7 +1039,7 @@ int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray *inout)
     while (in_len && (ctx->gamma_cntr % 8) != 0) {
         *in++ ^= gamma[ctx->gamma_cntr++];
         in_len--;
-        if (ctx->gamma_cntr == 128) {
+        if (ctx->gamma_cntr >= 128) {
             next_gamma(ctx);
         }
     }
@@ -1052,14 +1052,14 @@ int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray *inout)
         in += 8;
         in_len -= 8;
         ctx->gamma_cntr += 8;
-        if (ctx->gamma_cntr == 128) {
+        if (ctx->gamma_cntr >= 128) {
             next_gamma(ctx);
         }
     }
 
     while (in_len--) {
         *in++ ^= gamma[ctx->gamma_cntr++];
-        if (ctx->gamma_cntr == 128) {
+        if (ctx->gamma_cntr >= 128) {
             next_gamma(ctx);
         }
     }
