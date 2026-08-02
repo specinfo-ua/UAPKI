@@ -666,7 +666,7 @@ cleanup:
     return ret;
 }
 
-int Util::decodeAsn1Header (
+bool Util::decodeAsn1Header (
         const ByteArray* baEncoded,
         uint32_t& tag,
         size_t& hlen,
@@ -682,7 +682,7 @@ int Util::decodeAsn1Header (
     );
 }
 
-int Util::decodeAsn1Header (
+bool Util::decodeAsn1Header (
         const uint8_t* bufEncoded,
         const size_t lenEncoded,
         uint32_t& tag,
