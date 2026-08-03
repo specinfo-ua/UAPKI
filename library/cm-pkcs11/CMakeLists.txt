@@ -81,6 +81,7 @@ set(COMMON_PKIX_SOURCES
     ${PATH_COMMON_PKIX}/ecdsa-params.c
     ${PATH_COMMON_PKIX}/extnreq-helper.cpp
     ${PATH_COMMON_PKIX}/iconv-utils.c
+    ${PATH_COMMON_PKIX}/iso15946.c
     ${PATH_COMMON_PKIX}/oids.c
     ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/uapki-ns-util.cpp

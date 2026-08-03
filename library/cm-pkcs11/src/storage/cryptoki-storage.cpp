@@ -33,6 +33,7 @@
 #include "cryptoki-storage.h"
 #include "dstu4145-params.h"
 #include "ecdsa-params.h"
+#include "iso15946.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapki-ns-util.h"
@@ -1082,7 +1083,7 @@ CM_ERROR CryptokiStorage::dhUnwrapKey (
         const CM_BYTEARRAY** abaSpkis,
         const CM_BYTEARRAY** abaSalts,
         const CM_BYTEARRAY** abaWrappedKeys,
-    CM_BYTEARRAY*** abaSessionKeys
+        CM_BYTEARRAY*** abaSessionKeys
 )
 {
     DeriveWrapKeyParams dwk_params = { 0, 0, 0, 0, 0 };
@@ -1121,24 +1122,29 @@ CM_ERROR CryptokiStorage::dhUnwrapKey (
     for (size_t i = 0; i < count; i++) {
         DEBUG_OUTCON(printf("CryptokiStorage::dhUnwrapKey(), unwrap key [%zu]\n", i));
 
-        DO((int)getDerivedKey(
+        Buffer buf_sessionkey;
+        CM_ERROR cm_err = unwrapKeyDstuRaw(
             keyInfo,
             dwk_params,
             abaSpkis[i],
-            (abaSalts) ? abaSalts[i] : nullptr,
-            h_derivedkey
-        ));
-
-        Buffer buf_sessionkey;
-        DO((int)getUnwrappedKey(
-            h_derivedkey,
-            dwk_params,
+            hash_algo,
+            oidWrapAlgo,
             abaWrappedKeys[i],
             buf_sessionkey
-        ));
-
-        (void)m_Session.destroyObject(h_derivedkey);
-        h_derivedkey = (CK_OBJECT_HANDLE)-1;
+        );
+        if (cm_err != 0) {
+            cm_err = unwrapKeyOnToken(
+                keyInfo,
+                dwk_params,
+                abaSpkis[i],
+                (abaSalts) ? abaSalts[i] : nullptr,
+                abaWrappedKeys[i],
+                buf_sessionkey
+            );
+            if (cm_err != 0) {
+                SET_ERROR(RET_CM_TOKEN_ERROR);
+            }
+        }
 
         aba_sessionkeys[i] = bufferToBa(buf_sessionkey);
         if (aba_sessionkeys[i] == nullptr) {
@@ -1173,8 +1179,7 @@ CM_ERROR CryptokiStorage::getDerivedKey (
 )
 {
     SmartBA sba_ecpoint;
-    CM_ERROR cm_err = (CM_ERROR)spki_get_encappubkey((const ByteArray*)baSpki, &sba_ecpoint);
-    if (cm_err != RET_OK) return cm_err;
+    if (spki_get_encappubkey((const ByteArray*)baSpki, &sba_ecpoint) != RET_OK) return RET_CM_DECODE_ASN1_ERROR;
 
     CK_ECDH1_DERIVE_PARAMS derive_params = { 
         dwkParams.kdf,
@@ -1209,6 +1214,59 @@ CM_ERROR CryptokiStorage::getDerivedKey (
         //      then an error CKR_ENCRYPTED_DATA_INVALID (non-specified for it API) may appear in C_DeriveKey()
         ck_err = CKR_DEVICE_MEMORY;
     }
+    return toCmError(ck_err);
+}
+
+CM_ERROR CryptokiStorage::getDerivedKeyDstuRaw (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        Buffer& bufSharedSecret
+)
+{
+    SmartBA sba_ecpoint;
+    if (spki_get_encappubkey((const ByteArray*)baSpki, &sba_ecpoint) != RET_OK) return RET_CM_DECODE_ASN1_ERROR;
+
+    uint32_t tag;
+    size_t hlen, vlen;
+    if (!Util::decodeAsn1Header(sba_ecpoint.get(), tag, hlen, vlen)) return RET_CM_DECODE_ASN1_ERROR;
+    const CK_ULONG len_sharedsecret = (CK_ULONG)vlen;
+
+    CK_ECDH1_DERIVE_PARAMS derive_params = {
+        CKD_NULL,
+        NULL_PTR,
+        0,
+        (CK_ULONG)sba_ecpoint.size(),
+        (CK_BYTE_PTR)sba_ecpoint.buf()
+    };
+    const CK_MECHANISM mech_param = {
+        CKM_DSTU4145_ECDH_COFACTOR_DERIVE,
+        (CK_VOID_PTR)&derive_params,
+        sizeof(derive_params)
+    };
+    const CK_OBJECT_CLASS obj_type = CKO::SECRET_KEY;
+    const CK_KEY_TYPE keyType = (CK_KEY_TYPE)CKK::GENERIC_SECRET;
+    const vector<CK_ATTRIBUTE> derivekey_attrs = {
+        { CKA::CLASS,       (CK_VOID_PTR)&obj_type,         sizeof(obj_type) },
+        { CKA::KEY_TYPE,    (CK_VOID_PTR)&keyType,          sizeof(keyType)  },
+        { CKA::SENSITIVE,   (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) },
+        { CKA::EXTRACTABLE, (CK_VOID_PTR)&ATTRIBUTE_TRUE,   sizeof(ATTRIBUTE_TRUE) },
+        { CKA::VALUE_LEN,   (CK_VOID_PTR)&len_sharedsecret, sizeof(len_sharedsecret) },
+        { CKA::TOKEN,       (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) }
+    };
+
+    CK_OBJECT_HANDLE hobj_derivedkey = (CK_OBJECT_HANDLE)-1;
+    CK_RV ck_err = m_Session.deriveKey(
+        (const CK_MECHANISM_PTR)&mech_param,
+        keyInfo.hPrivateKey,
+        derivekey_attrs,
+        hobj_derivedkey
+    );
+    if (ck_err == CKR_OK) {
+        ck_err = m_Session.getAttributeBuffer(hobj_derivedkey, CKA::VALUE, bufSharedSecret);
+        (void)m_Session.destroyObject(hobj_derivedkey);
+    }
+
     return toCmError(ck_err);
 }
 
@@ -1590,6 +1648,91 @@ CM_ERROR CryptokiStorage::getWrappedKey (
     );
     (void)m_Session.destroyObject(h_sessionkey);
     return toCmError(ck_err);
+}
+
+CM_ERROR CryptokiStorage::unwrapKeyDstuRaw (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const CM_BYTEARRAY* baWrappedKey,
+        Buffer& bufSessionKey
+)
+{
+    Buffer buf_sharedsecret;
+    CM_ERROR cm_err = getDerivedKeyDstuRaw(
+        keyInfo,
+        dwkParams,
+        baSpki,
+        buf_sharedsecret
+    );
+    if (cm_err != 0) return cm_err;
+
+    SmartBA sba_kek, sba_sharedsecret;
+    if (!sba_sharedsecret.set(bufferToBa(buf_sharedsecret))) return RET_CM_GENERAL_ERROR;
+
+    int ret = iso15946_generate_secretc(
+        hashAlgo,
+        oidWrapAlgo,
+        nullptr,
+        sba_sharedsecret.get(),
+        &sba_kek
+    );
+    if (ret != 0) return RET_CM_INVALID_WRAPPED_KEY;
+
+    SmartBA sba_sessionkey;
+    if (oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)) {
+        ret = key_unwrap_dstu7624(
+            sba_kek.get(),
+            (const ByteArray*)baWrappedKey,
+            &sba_sessionkey
+        );
+    }
+    else if (oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)) {
+        return RET_CM_UNSUPPORTED_ALG;
+    }
+    else {
+        ret = key_unwrap_gost28147(
+            nullptr,
+            sba_kek.get(),
+            (const ByteArray*)baWrappedKey,
+            &sba_sessionkey
+        );
+    }
+    if (ret != 0) return RET_CM_INVALID_WRAPPED_KEY;
+
+    return bufferFromBa(sba_sessionkey.get(), bufSessionKey) ? 0 : RET_CM_GENERAL_ERROR;
+}
+
+CM_ERROR CryptokiStorage::unwrapKeyOnToken (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        const CM_BYTEARRAY* baSalt,
+        const CM_BYTEARRAY* baWrappedKey,
+        Buffer& bufSessionKey
+)
+{
+    CK_OBJECT_HANDLE h_derivedkey = (CK_OBJECT_HANDLE)-1;
+    CM_ERROR cm_err = getDerivedKey(
+        keyInfo,
+        dwkParams,
+        baSpki,
+        baSalt,
+        h_derivedkey
+    );
+    if (cm_err != 0) return cm_err;
+
+    cm_err = getUnwrappedKey(
+        h_derivedkey,
+        dwkParams,
+        baWrappedKey,
+        bufSessionKey
+    );
+    (void)m_Session.destroyObject(h_derivedkey);
+
+    return cm_err;
 }
 
 bool CryptokiStorage::bufferFromBa (

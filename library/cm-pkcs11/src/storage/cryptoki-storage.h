@@ -364,6 +364,12 @@ private:
         const CM_BYTEARRAY* baSalt,
         CK_OBJECT_HANDLE& hDerivedKey
     );
+    CM_ERROR getDerivedKeyDstuRaw (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        Cryptoki::Buffer& bufSharedSecret
+    );
     CM_ERROR getDomainParameters (void);
     CM_ERROR getKeyInfoDstu (
         KeyInfo& keyInfo
@@ -388,6 +394,24 @@ private:
         const DeriveWrapKeyParams& dwkParams,
         const CM_BYTEARRAY* baSessionKey,
         Cryptoki::Buffer& bufWrappedKey
+    );
+
+    CM_ERROR unwrapKeyDstuRaw (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const CM_BYTEARRAY* baWrappedKey,
+        Cryptoki::Buffer& bufSessionKey
+    );
+    CM_ERROR unwrapKeyOnToken (
+        const KeyInfo& keyInfo,
+        const DeriveWrapKeyParams& dwkParams,
+        const CM_BYTEARRAY* baSpki,
+        const CM_BYTEARRAY* baSalt,
+        const CM_BYTEARRAY* baWrappedKey,
+        Cryptoki::Buffer& bufSessionKey
     );
 
 public:
