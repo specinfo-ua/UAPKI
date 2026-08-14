@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set DIR_ARCH=x64
+set DIR_ARCH=ARM64
 set DIR_BUILD=build
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 
