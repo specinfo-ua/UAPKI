@@ -95,14 +95,17 @@ if(WIN32)
 
     target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
 
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+        target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_arm64/libcurl.lib")
+    elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "AMD64")
         target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_x86-64/libcurl.lib")
-    else()
+    elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32" OR CMAKE_GENERATOR_PLATFORM STREQUAL "x86")
         target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_x86/libcurl.lib")
+    else()
+        message(FATAL_ERROR "Unsupported Windows platform for prebuilt libcurl: '${CMAKE_GENERATOR_PLATFORM}'. Expected ARM64, x64/AMD64, or Win32/x86.")
     endif()
 
-    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Wldap32 Crypt32 Normaliz)
-
+    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Wldap32 Crypt32 Normaliz Bcrypt Iphlpapi)
     set(CURL_FOUND TRUE)
 endif()
 

@@ -115,8 +115,10 @@ struct rand_data
 static inline void jent_get_nstime(uint64_t* out)
 {
 	uint64_t ticks = 0;
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64))
 	ticks = __rdtsc();
+#elif defined(_MSC_VER) && defined(_M_ARM64)
+	QueryPerformanceCounter((LARGE_INTEGER*)&ticks);
 #elif defined(__i386__)
 	asm volatile("rdtsc" : "=A"(ticks));
 #elif defined(__x86_64__) || defined(__amd64__)
