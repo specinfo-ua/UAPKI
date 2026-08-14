@@ -397,7 +397,8 @@ int gost34311_final(Gost34311Ctx *ctx, ByteArray **out)
     /* Итерация вычисления контрольной суммы для оставшихся у m32 даних. */
     DO(uint8_to_uint32(ctx->m32, 32, m32, 8));
     add(ctx->sigma, m32);
-    memset(m32, 0, sizeof(m32));
+    /* m32 более не используется: очистка обязана пережить оптимизатор */
+    secure_zero(m32, sizeof(m32));
 
     DO(hash_step(ctx, ctx->m32));
 
