@@ -13,7 +13,7 @@
 set -e
 
 LIBRARY_DIR="$(cd "$(dirname "$0")" && pwd)"
-ABIS="${ABIS:-arm64-v8a armeabi-v7a x86_64 x86}"
+ABIS="${ABIS:-arm64-v8a armeabi-v7a x86_64}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 PLATFORM="${PLATFORM:-android-28}"
 
@@ -29,20 +29,21 @@ if [ ! -f "$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" ]; then
 fi
 
 echo "NDK: $ANDROID_NDK_ROOT"
+BUILD_DIR="$LIBRARY_DIR/build"
 
 for ABI in $ABIS; do
-    BUILD_DIR="$LIBRARY_DIR/../build-android/$ABI"
+    if [ -d "$BUILD_DIR" ]; then
+        rm -rf "$BUILD_DIR"
+    fi
+
     echo ""
     echo "=== $ABI ($BUILD_TYPE, $PLATFORM) ==="
-
     cmake -G Ninja -S "$LIBRARY_DIR" -B "$BUILD_DIR" \
         -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
         -DANDROID_ABI="$ABI" \
         -DANDROID_PLATFORM="$PLATFORM" \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-
     cmake --build "$BUILD_DIR"
 done
-
 echo ""
 echo "Done. Artifacts in library/out/android-<abi>/"

@@ -98,7 +98,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIF_LIBRARY)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC uapkic)
 
-if(NOT UAPKI_DISABLE_COPY AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
+if(NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ../out/
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkif> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/

@@ -12,7 +12,7 @@
 # Output: library/out/android-<abi>/*.so
 
 param(
-    [string[]]$Abi = @("arm64-v8a", "armeabi-v7a", "x86_64", "x86"),
+    [string[]]$Abi = @("arm64-v8a", "armeabi-v7a", "x86_64"),
     [string]$BuildType = "Release",
     [string]$Platform = "android-28",
     [string]$NdkRoot = $null
@@ -49,8 +49,13 @@ if (Test-Path $sdkCmakeDir) {
 Write-Host "NDK:   $NdkRoot"
 Write-Host "CMake: $cmake"
 
+$buildDir = Join-Path $libraryDir "build"
+
 foreach ($a in $Abi) {
-    $buildDir = Join-Path $libraryDir "..\build-android\$a"
+    if (Test-Path $buildDir) {
+        Remove-Item -Recurse -Force $buildDir
+    }
+
     Write-Host "`n=== $a ($BuildType, $Platform) ===" -ForegroundColor Cyan
 
     & $cmake -G Ninja -S $libraryDir -B $buildDir `
