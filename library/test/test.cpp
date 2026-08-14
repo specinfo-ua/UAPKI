@@ -569,7 +569,7 @@ int main (int argc, char *argv[])
     log.elapsedTimeEnabled = json.getBoolean("logElapsedTime", false);
     log.open();
 
-    printf("hardware_concurrency: %d\n", thread::hardware_concurrency());
+    printf("hardware_concurrency: %u\n", thread::hardware_concurrency());
     vector<thread> threads;
     vector<uint32_t> threadIds;
 
