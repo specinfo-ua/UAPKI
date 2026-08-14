@@ -40,7 +40,7 @@ extern "C" {
 typedef HMODULE HANDLE_DLIB;
 #define LIBNAME_PREFIX ""
 #define LIBNAME_EXT "dll"
-#define DL_LOAD_LIBRARY(fn) LoadLibraryA(fn)
+#define DL_LOAD_LIBRARY(fn) dl_load_library_utf8(fn)
 #define DL_GET_PROC_ADDRESS(h, fname) GetProcAddress((HANDLE_DLIB)h, fname)
 #define DL_FREE_LIBRARY(h) FreeLibrary((HANDLE_DLIB)h);
 
@@ -69,7 +69,6 @@ typedef void* HANDLE_DLIB;
 #define LIBNAME_EXT "so"
 #endif
 #define DL_LOAD_LIBRARY(fn) dlopen(fn, RTLD_NOW)
-#define dl_load_library_utf8(fn) DL_LOAD_LIBRARY(fn)
 #define DL_GET_PROC_ADDRESS(h, fname) dlsym((HANDLE_DLIB)h, fname)
 #define DL_FREE_LIBRARY(h) dlclose((HANDLE_DLIB)h);
 
