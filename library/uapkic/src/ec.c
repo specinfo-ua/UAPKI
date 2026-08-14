@@ -814,6 +814,7 @@ int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const
 {
     WordArray* wqx = NULL;
     WordArray* wqy = NULL;
+    ECPoint* tmp = NULL;
     int ret = RET_OK;
 
     CHECK_PARAM(params != NULL);
@@ -824,7 +825,13 @@ int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const
     CHECK_NOT_NULL(wqx = wa_alloc_from_be(qx->buf, qx->len));
     CHECK_NOT_NULL(wqy = wa_alloc_from_be(qy->buf, qy->len));
 
+    /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 1, ДСТУ 4145 п.10.1 крок 1 (Q != O) */
+    if (int_is_zero(wqx) && int_is_zero(wqy)) {
+        SET_ERROR(RET_INVALID_PUBLIC_KEY);
+    }
+
     if (params->ec_field == EC_FIELD_PRIME) {
+        /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 2 */
         if (int_cmp(wqx, params->ecp->gfp->p) >= 0 ||
             int_cmp(wqy, params->ecp->gfp->p) >= 0) {
             SET_ERROR(RET_INVALID_PUBLIC_KEY);
@@ -833,11 +840,13 @@ int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const
         wa_change_len(wqx, params->ecp->len);
         wa_change_len(wqy, params->ecp->len);
 
+        /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 3 */
         if (!ecp_is_on_curve(params->ecp, wqx, wqy)) {
             SET_ERROR(RET_INVALID_PUBLIC_KEY);
         }
     }
     else {
+        /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 2, ДСТУ 4145 п.10.1 крок 2 */
         if (int_bit_len(wqx) > params->m ||
             int_bit_len(wqy) > params->m) {
             SET_ERROR(RET_INVALID_PUBLIC_KEY);
@@ -851,6 +860,7 @@ int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const
             DO(onb_to_pb(params, wqy));
         }
 
+        /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 3, ДСТУ 4145 п.10.1 крок 3 */
         if (!ec2m_is_on_curve(params->ec2m, wqx, wqy)) {
             SET_ERROR(RET_INVALID_PUBLIC_KEY);
         }
@@ -858,11 +868,21 @@ int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const
 
     CHECK_NOT_NULL(*q = ec_point_aff_alloc(wqx, wqy));
 
+    if (params->ec_field == EC_FIELD_BINARY) {
+        /* NIST SP 800-56A Rev.3. #5.6.2.3.3 step 4, ДСТУ 4145 п.10.1 крок 4 (n*Q = O) */
+        CHECK_NOT_NULL(tmp = ec_point_alloc(params->ec2m->len));
+		ec2m_mul(params->ec2m, *q, params->n, tmp);
+        
+        if ((int_is_zero(tmp->x) == false) || (int_is_zero(tmp->y) == false)) {
+            SET_ERROR(RET_INVALID_PUBLIC_KEY);
+        }
+	}
+
 cleanup:
 
+    ec_point_free(tmp);
     wa_free(wqx);
     wa_free(wqy);
-
     return ret;
 }
 
@@ -1152,7 +1172,6 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
     CHECK_PARAM(qx != NULL);
     CHECK_PARAM(qy != NULL);
     CHECK_PARAM(zx != NULL);
-    CHECK_PARAM(zy != NULL);
 
     /* Инициализация открытого ключа удаленной стороны. */
     DO(public_key_to_ec_point(ctx->params, qx, qy, &rq));
@@ -1167,23 +1186,15 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
     
     if (ctx->params->ec_field == EC_FIELD_BINARY) {
         len = ((size_t)ctx->params->ec2m->gf2m->f[0] + 7) / 8;
-        CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ec2m->len));//a
-
-        /* Проверка того что открытый ключ лежит в подгруппе порядка n. */
-        /* Получение кофактора. */
-        CHECK_NOT_NULL(cofactor = wa_alloc(ctx->params->ec2m->len));//a
-        ec2m_get_cofactor(ctx->params, cofactor);
-
-        ec2m_mul(ctx->params->ec2m, rq, cofactor, r);
-
-        if (int_is_zero(r->x) && int_is_zero(r->y)) {
-            SET_ERROR(RET_INVALID_PUBLIC_KEY);
-        }
+        CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ec2m->len));
 
         /* Получение общего секрета. */
         ec2m_mul(ctx->params->ec2m, rq, x, r);
 
         if (with_cofactor) {
+            CHECK_NOT_NULL(cofactor = wa_alloc(ctx->params->ec2m->len));
+            ec2m_get_cofactor(ctx->params, cofactor);
+
             ec2m_mul(ctx->params->ec2m, r, cofactor, r);
         }
 
@@ -1194,18 +1205,25 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
     }
     else {
         len = (int_bit_len(ctx->params->ecp->gfp->p) + 7) / 8;
-        CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ecp->len));//a
+        CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ecp->len));
 
         /* Получение общего секрета. */
         ecp_mul(ctx->params->ecp, rq, x, r);
     }
 
+    /* NIST SP 800-56A Rev.3. #5.7.1.2 step 2 (r != O) */
+    if (int_is_zero(r->x) && int_is_zero(r->y)) {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
+
     CHECK_NOT_NULL(*zx = wa_to_ba(r->x));
-    CHECK_NOT_NULL(*zy = wa_to_ba(r->y));
     DO(ba_change_len(*zx, len));
-    DO(ba_change_len(*zy, len));
     DO(ba_swap(*zx));
-    DO(ba_swap(*zy));
+    if (zy != NULL) {
+        CHECK_NOT_NULL(*zy = wa_to_ba(r->y));
+        DO(ba_change_len(*zy, len));
+        DO(ba_swap(*zy));
+    }
 
     ret = RET_OK;
 
