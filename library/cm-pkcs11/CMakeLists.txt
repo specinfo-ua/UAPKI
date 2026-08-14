@@ -48,6 +48,7 @@ set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(PATH_COMMON_CMAPI ${PATH_PRJ}/../common/cm-api)
 set(PATH_COMMON_CRYPTOKI ${PATH_PRJ}/../common/cryptoki)
+set(PATH_COMMON_LOADERS ${PATH_PRJ}/../common/loaders)
 set(PATH_COMMON_JSON ${PATH_PRJ}/../common/json)
 set(PATH_COMMON_MACROS ${PATH_PRJ}/../common/macros)
 set(PATH_COMMON_PKIX ${PATH_PRJ}/../common/pkix)
@@ -64,6 +65,7 @@ include_directories(
     ${PATH_COMMON_JSON}
     ${PATH_COMMON_MACROS}
     ${PATH_COMMON_PKIX}
+    ${PATH_COMMON_LOADERS}
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
