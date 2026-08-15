@@ -56,7 +56,7 @@ if (WIN32)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif ()
 
-if(NOT WIN32 AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android") AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten"))
+if(NOT WIN32 AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android") AND (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS") AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten"))
     find_package(CURL REQUIRED)
 endif()
 
@@ -109,6 +109,23 @@ if(WIN32)
     set(CURL_FOUND TRUE)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
+    set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
+
+    target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        "${CURL_BASE_DIR}/builds/ios/libcurl.a"
+        "${CURL_BASE_DIR}/builds/ios/libssl.a"
+        "${CURL_BASE_DIR}/builds/ios/libcrypto.a"
+        "-framework CoreFoundation"
+        "-framework Security"
+        z
+    )
+    set(CURL_FOUND TRUE)
+endif()
+
 target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
     ${PATH_COMMON_CMAPI}
     ${PATH_COMMON_JSON}
@@ -147,7 +164,7 @@ target_link_libraries(${PROJECT_NAME} ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uap
 
 if(UNIX AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten"))
     target_link_libraries(${PROJECT_NAME} PRIVATE dl)
-    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+    if((NOT CMAKE_SYSTEM_NAME STREQUAL "Android") AND (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS"))
         target_link_libraries(${PROJECT_NAME} PRIVATE curl)
     endif()
 endif()
