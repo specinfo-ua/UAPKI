@@ -228,7 +228,7 @@ static int parse_rdname (const Name_t& name, JSON_Object* joResult)
             string s_oid, s_value;
 
             DO(Util::oidFromAsn1(&attr->type, s_oid));
-            DO(Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, s_value));
+            DO(Util::decodeAnyString(attr->value.buf, (size_t)attr->value.size, s_value));
             DO_JSON(json_object_set_string(joResult, oid_to_rdname(s_oid.c_str()), s_value.c_str()));
         }
     }

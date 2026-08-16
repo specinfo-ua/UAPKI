@@ -148,7 +148,7 @@ int nameToJson (
             string s_oid, s_value;
 
             DO(Util::oidFromAsn1((OBJECT_IDENTIFIER_t*)&attr->type, s_oid));
-            DO(Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, s_value));
+            DO(Util::decodeAnyString(attr->value.buf, (size_t)attr->value.size, s_value));
             s_oid = string(oid_to_rdname(s_oid.c_str()));
             auto it = map_name.find(s_oid);
             if (it == map_name.end()) {
@@ -182,7 +182,7 @@ int rdnameFromName (
         for (int j = 0; j < rdname_src->list.count; j++) {
             const AttributeTypeAndValue_t* attr = rdname_src->list.array[j];
             if (OID_is_equal_oid(&attr->type, type)) {
-                const int ret = Util::decodeAnyString(attr->value.buf, (const size_t)attr->value.size, value);
+                const int ret = Util::decodeAnyString(attr->value.buf, (size_t)attr->value.size, value);
                 if (ret != RET_OK) return ret;
                 break;
             }

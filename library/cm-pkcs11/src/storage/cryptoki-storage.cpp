@@ -671,7 +671,7 @@ CM_ERROR CryptokiStorage::generateKeyPair (
     SmartBA sba_buf;
     if (!sba_buf.set(ba_alloc_by_len(6))) return RET_CM_GENERAL_ERROR;
 
-    CK_RV ck_err = m_Session.generateRandom((CK_BYTE_PTR)sba_buf.buf(), (const CK_ULONG)6);
+    CK_RV ck_err = m_Session.generateRandom((CK_BYTE_PTR)sba_buf.buf(), (CK_ULONG)6);
     if (ck_err != CKR_OK) return toCmError(ck_err);
 
     size_t len_id = 9;
@@ -1005,11 +1005,11 @@ CM_ERROR CryptokiStorage::dhWrapKey (
 
     ByteArray** aba_salts = nullptr;
     if (isStaticKey) {
-        aba_salts = (ByteArray**)calloc(sizeof(ByteArray*), count);
+        aba_salts = (ByteArray**)calloc(count, sizeof(ByteArray*));
         if (!aba_salts) return RET_CM_GENERAL_ERROR;
     }
 
-    ByteArray** aba_wrappedkeys = (ByteArray**)calloc(sizeof(ByteArray*), count);
+    ByteArray** aba_wrappedkeys = (ByteArray**)calloc(count, sizeof(ByteArray*));
     if (!aba_wrappedkeys) {
         ::free(aba_salts);
         return RET_CM_GENERAL_ERROR;
@@ -1114,7 +1114,7 @@ CM_ERROR CryptokiStorage::dhUnwrapKey (
         }
     }
 
-    ByteArray** aba_sessionkeys = (ByteArray**)calloc(sizeof(ByteArray*), count);
+    ByteArray** aba_sessionkeys = (ByteArray**)calloc(count, sizeof(ByteArray*));
     if (!aba_sessionkeys) return RET_CM_GENERAL_ERROR;
 
     int ret = RET_OK;
@@ -1203,7 +1203,7 @@ CM_ERROR CryptokiStorage::getDerivedKey (
     };
 
     CK_RV ck_err = m_Session.deriveKey(
-        (const CK_MECHANISM_PTR)&mech_param,
+        (CK_MECHANISM_PTR)&mech_param,
         keyInfo.hPrivateKey,
         derivekey_attrs,
         hDerivedKey
@@ -1219,7 +1219,7 @@ CM_ERROR CryptokiStorage::getDerivedKey (
 
 CM_ERROR CryptokiStorage::getDerivedKeyDstuRaw (
         const KeyInfo& keyInfo,
-        const DeriveWrapKeyParams& dwkParams,
+        const DeriveWrapKeyParams&,
         const CM_BYTEARRAY* baSpki,
         Buffer& bufSharedSecret
 )
@@ -1234,8 +1234,8 @@ CM_ERROR CryptokiStorage::getDerivedKeyDstuRaw (
 
     CK_ECDH1_DERIVE_PARAMS derive_params = {
         CKD_NULL,
-        NULL_PTR,
         0,
+        NULL_PTR,
         (CK_ULONG)sba_ecpoint.size(),
         (CK_BYTE_PTR)sba_ecpoint.buf()
     };
@@ -1257,7 +1257,7 @@ CM_ERROR CryptokiStorage::getDerivedKeyDstuRaw (
 
     CK_OBJECT_HANDLE hobj_derivedkey = (CK_OBJECT_HANDLE)-1;
     CK_RV ck_err = m_Session.deriveKey(
-        (const CK_MECHANISM_PTR)&mech_param,
+        (CK_MECHANISM_PTR)&mech_param,
         keyInfo.hPrivateKey,
         derivekey_attrs,
         hobj_derivedkey
@@ -1601,7 +1601,7 @@ CM_ERROR CryptokiStorage::getUnwrappedKey (
     CK_OBJECT_HANDLE h_unwrappedkey = (CK_OBJECT_HANDLE)-1;
     const CK_MECHANISM mech_param = { dwkParams.wrapMechType, nullptr, 0};
     CK_RV ck_err = m_Session.unwrapKey(
-        (const CK_MECHANISM_PTR)&mech_param,
+        (CK_MECHANISM_PTR)&mech_param,
         hDerivedKey,
         buf_wrappedkey,
         unwrapedkey_attrs,
@@ -1641,7 +1641,7 @@ CM_ERROR CryptokiStorage::getWrappedKey (
 
     const CK_MECHANISM mech_param = { dwkParams.wrapMechType, nullptr, 0 };
     ck_err = m_Session.wrapKey(
-        (const CK_MECHANISM_PTR)&mech_param,
+        (CK_MECHANISM_PTR)&mech_param,
         hDerivedKey,
         h_sessionkey,
         bufWrappedKey

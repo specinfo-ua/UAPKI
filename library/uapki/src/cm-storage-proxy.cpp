@@ -119,7 +119,7 @@ int CmStorageProxy::providerInit (
         const string& providerParams
 )
 {
-    const int ret = m_CmLoader.init(!providerParams.empty() ? (const CM_JSON_PCHAR)providerParams.c_str() : nullptr);
+    const int ret = m_CmLoader.init(!providerParams.empty() ? (CM_JSON_PCHAR)providerParams.c_str() : nullptr);
     m_IsInitialized = (ret == RET_OK);
     DEBUG_OUTCON(printf("CmStorageProxy::providerInit, provider is-initialized=%d\n", (int)m_IsInitialized));
     return ret;
@@ -172,7 +172,7 @@ int CmStorageProxy::storageOpen (
     const int ret = m_CmLoader.open(
         storageId.c_str(),
         openMode,
-        !openParams.empty() ? (const CM_JSON_PCHAR)openParams.c_str() : nullptr,
+        !openParams.empty() ? (CM_JSON_PCHAR)openParams.c_str() : nullptr,
         &m_Session
     );
     m_IsAuthorizedSession = (ret == RET_OK);
