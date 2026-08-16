@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 MAX_JOBS=4
 DEFINE_PARAMS=
