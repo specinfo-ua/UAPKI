@@ -41,7 +41,7 @@ static ByteArray *drbg_V = NULL;
 static size_t drbg_reseed_counter = 0;
 static bool drbg_prediction_resistance = false;
 static HmacCtx* drbg_hmac_ctx = NULL;
-static pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint8_t _separator0 = 0x00;
 static const uint8_t _separator1 = 0x01;
@@ -49,7 +49,7 @@ static const uint8_t _separator1 = 0x01;
 static const ByteArray separator0 = { (uint8_t*)&_separator0, sizeof(_separator0) };
 static const ByteArray separator1 = { (uint8_t*)&_separator1, sizeof(_separator1) };
 
-static void drbg_free_internal(void)
+void drbg_free_internal(void)
 {
 	hmac_free(drbg_hmac_ctx);
 	drbg_hmac_ctx = NULL;

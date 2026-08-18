@@ -27,8 +27,13 @@
  
 #define FILE_MARKER "uapkic/uapkic.c"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include "uapkic.h"
 #include "macros-internal.h"
+#include "pthread-internal.h"
 
 uint32_t uapkic_self_test(void)
 {
@@ -118,3 +123,40 @@ void uapkic_free(void* ptr)
 		free(ptr);
 	}
 }
+
+extern pthread_mutex_t drbg_mutex;
+extern pthread_mutex_t ec_cache_mutex;
+extern pthread_mutex_t errors_mutex;
+void drbg_free_internal(void);
+
+static void uapkic_free_lib(void)
+{
+	drbg_free_internal();
+	ec_cache_free();
+
+	pthread_mutex_destroy(&drbg_mutex);
+	pthread_mutex_destroy(&ec_cache_mutex);
+
+	stacktrace_finalize();
+	pthread_mutex_destroy(&errors_mutex);
+}
+
+#ifdef _WIN32
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+{
+	hinstDLL;
+	lpvReserved;
+
+	switch (fdwReason) {
+	case DLL_PROCESS_DETACH:
+		uapkic_free_lib();
+		break;
+	case DLL_PROCESS_ATTACH:
+	case DLL_THREAD_ATTACH:
+	case DLL_THREAD_DETACH:
+	default:
+		break;
+	}
+	return TRUE;
+}
+#endif

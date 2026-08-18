@@ -76,10 +76,8 @@ typedef struct {
 } pthread_attr_t;
 
 typedef struct {
-    HANDLE mutex;
-    int destroyed;
-    int init;
-    int lockedOrReferenced;
+    CRITICAL_SECTION cs;
+    volatile int init;
 } pthread_mutex_t;
 
 typedef struct {

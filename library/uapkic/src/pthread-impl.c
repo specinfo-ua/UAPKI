@@ -120,14 +120,17 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
     (void)attr;
 
     if (mutex) {
-        if (mutex->init && !mutex->destroyed) {
+        if (mutex->init) {
             return EBUSY;
         }
 
-        mutex->mutex = CreateMutex(NULL, FALSE, NULL);
-        mutex->destroyed = 0;
+        __try {
+            InitializeCriticalSection(&mutex->cs);
+        } __except (GetExceptionCode() == STATUS_NO_MEMORY ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH) {
+            return ENOMEM;
+        }
+
         mutex->init = 1;
-        mutex->lockedOrReferenced = 0;
     }
 
     return 0;
@@ -135,59 +138,40 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
     if (!mutex) {
         return EINVAL;
     }
 
-    if (!mutex->mutex) {
+    if (!mutex->init) {
         pthread_mutex_init(mutex, NULL);
     }
 
-    if (!mutex->mutex) {
-        return EINVAL;
-    }
-
-    ret = WaitForSingleObject(mutex->mutex, INFINITE);
-
-    if (ret != WAIT_FAILED) {
-        mutex->lockedOrReferenced = 1;
-        return 0;
-    } else {
-        return EINVAL;
-    }
+    EnterCriticalSection(&mutex->cs);
+    return 0;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
     DWORD ret;
 
-    if (!mutex) {
+    if (!mutex || !mutex->init) {
         return EINVAL;
     }
 
-    ret = ReleaseMutex(mutex->mutex);
+    LeaveCriticalSection(&mutex->cs);
 
-    if (ret != 0) {
-        mutex->lockedOrReferenced = 0;
-        return 0;
-    } else {
-        return EPERM;
-    }
+    return 0;
 }
 
+// Must be called only when the library is being unloaded.
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-    if (!mutex) {
+    if (!mutex || !mutex->init) {
         return EINVAL;
     }
 
-    if (mutex->lockedOrReferenced) {
-        return EBUSY;
-    }
-
-    mutex->destroyed = 1;
+    DeleteCriticalSection(&mutex->cs);
+    mutex->init = 0;
 
     return 0;
 }
