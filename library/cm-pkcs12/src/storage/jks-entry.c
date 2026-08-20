@@ -27,9 +27,13 @@
 
 #define FILE_MARKER "cm-pkcs12/storage/jks-entry.c"
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <string.h>
+#include <time.h>
 #include "jks-entry.h"
 #include "macros-internal.h"
-#include <time.h>
 
 
 /**

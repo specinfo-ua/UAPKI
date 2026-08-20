@@ -27,6 +27,10 @@
 
 #define FILE_MARKER "cm-pkcs12/crypto/pkcs5.c"
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <string.h>
 #include "pkcs5.h"
 #include "macros-internal.h"
 #include "aid.h"
@@ -34,7 +38,6 @@
 #include "oid-utils.h"
 #include "IITParams.h"
 #include "cm-errors.h"
-
 
 #define DEBUG_OUTCON(expression)
 #ifndef DEBUG_OUTCON

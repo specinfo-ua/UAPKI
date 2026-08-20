@@ -27,6 +27,10 @@
 
 #define FILE_MARKER "common/pkix/dstu4145-params.c"
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <string.h>
 #include "dstu4145-params.h"
 #include "oids.h"
 #include "oid-utils.h"

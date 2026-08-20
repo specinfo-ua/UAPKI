@@ -27,6 +27,9 @@
 
 #define FILE_MARKER "cm-cryptoki/cm-cryptoki-json.cpp"
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include <string.h>
 #include "cm-cryptoki.h"
 #include "oid-utils.h"
