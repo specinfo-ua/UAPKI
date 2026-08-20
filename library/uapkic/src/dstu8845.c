@@ -1024,9 +1024,54 @@ int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray *inout)
     in_len = inout->len;
     gamma = (uint8_t*)ctx->gamma;
 
+    /*
+     * T-137 investigation (local draft only, not yet proposed upstream): next_gamma() already
+     * batch-generates a full 128-byte (16-word) block, but this loop still consumed it one byte
+     * at a time - the same class of gap dstu-core's own hazmat::strumok.rs apply_keystream had
+     * before its T-135 batched/fixed-index rewrite, and outspace/dstu8845's next_stream_full_crypt
+     * never had (it fuses generation and the input XOR into one word-wide pass). Drain to an
+     * 8-byte boundary byte-at-a-time (matches whatever partial word is left in `gamma`), then XOR
+     * whole `uint64_t` words directly against `ctx->gamma[]` (naturally 8-byte-aligned - it's a
+     * real `uint64_t[16]` struct field, not a byte buffer, so no alignment concern the way a
+     * `uint8_t*`-only representation would have) while a full aligned word remains in the current
+     * buffer, falling back to the original byte-at-a-time loop for whatever's left over.
+     *
+     * gamma_cntr is only ever set by next_gamma() (to 0) or advanced here (by 1 or 8, always
+     * followed by a check that regenerates once it reaches 128), so it never actually leaves
+     * 0..127 across any call sequence - but nothing in this function proves that fact locally
+     * from ctx alone, which is exactly what a symbolic-execution-based analyzer needs to see
+     * before trusting every gamma[gamma_cntr]/ctx->gamma[gamma_cntr / 8] access below. Clamp
+     * explicitly, once, so the invariant is established here rather than assumed from call
+     * history.
+     */
+    if (ctx->gamma_cntr >= 128) {
+        ctx->gamma_cntr = 0;
+    }
+
+    while (in_len && (ctx->gamma_cntr % 8) != 0) {
+        *in++ ^= gamma[ctx->gamma_cntr++];
+        in_len--;
+        if (ctx->gamma_cntr >= 128) {
+            next_gamma(ctx);
+        }
+    }
+
+    while (in_len >= 8 && ctx->gamma_cntr < 128) {
+        uint64_t word;
+        memcpy(&word, in, 8);
+        word ^= ctx->gamma[ctx->gamma_cntr / 8];
+        memcpy(in, &word, 8);
+        in += 8;
+        in_len -= 8;
+        ctx->gamma_cntr += 8;
+        if (ctx->gamma_cntr >= 128) {
+            next_gamma(ctx);
+        }
+    }
+
     while (in_len--) {
         *in++ ^= gamma[ctx->gamma_cntr++];
-        if (ctx->gamma_cntr == 128) {
+        if (ctx->gamma_cntr >= 128) {
             next_gamma(ctx);
         }
     }
@@ -1115,6 +1160,18 @@ int dstu8845_self_test(void)
         0x965648e775c717d5ULL, 0xa63c2a7376e92df3ULL, 0x0b0eb0bbd47ca267ULL, 0xea593d979ae5bd39ULL,
         0xd773b5e5193cafe1ULL, 0xb0a26671d259422bULL, 0x85b2aa326b280156ULL, 0x511ace6451435f0cULL };
 
+    /* T-137: 200-byte keystream for key256_1/iv_1, crossing the 128-byte gamma-regeneration
+       boundary once - see this vector's own use below for why. First 8 words are identical to
+       k256_1_iv_1 above by construction (same key/iv), the remaining 17 words extend past it. */
+    static const uint64_t k256_1_iv_1_200[] = {
+        0xe442d15345dc66caULL, 0xf47d700ecc66408aULL, 0xb4cb284b5477e641ULL, 0xa2afc9092e4124b0ULL,
+        0x728e5fa26b11a7d9ULL, 0xe6a7b9288c68f972ULL, 0x70eb3606de8ba44cULL, 0xaced7956bd3e3de7ULL,
+        0x5af7ec2a83c7063eULL, 0x78b4b5fe3bae5e01ULL, 0x6bfaebec04790b89ULL, 0x67e8459e6c68a5adULL,
+        0x9ccc62a0335dc0bdULL, 0x43fffe09a1949ed8ULL, 0xdc1977716723fedaULL, 0x28b86cf4a53d0335ULL,
+        0x723f15ab6f3b620eULL, 0xd645d0a40fcb4705ULL, 0xc4c7bea786ad5745ULL, 0xedcc8f19bccf042fULL,
+        0xe1ec562e27cca869ULL, 0x5212bd227d267fb4ULL, 0x8e476714a7ca4db9ULL, 0x622bd70b93e09077ULL,
+        0x038caab66ba1a09cULL };
+
 
     static const ByteArray ba_iv_1 = { (uint8_t*)iv_1, sizeof(iv_1) };
     static const ByteArray ba_iv_2 = { (uint8_t*)iv_2, sizeof(iv_2) };
@@ -1126,6 +1183,7 @@ int dstu8845_self_test(void)
     int ret = RET_OK;
     Dstu8845Ctx* ctx = NULL;
     ByteArray* Z = NULL;
+    ByteArray* Z2 = NULL;
 
     CHECK_NOT_NULL(Z = ba_alloc_by_len(64));
     CHECK_NOT_NULL(ctx = dstu8845_alloc());
@@ -1185,9 +1243,27 @@ int dstu8845_self_test(void)
     if (memcmp(Z->buf, k512_2_iv_2, sizeof(k512_2_iv_2)) != 0) {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
-    
+
+    /*
+     * T-137: a 200-byte case (key256/iv_1), crossing the 128-byte gamma-regeneration boundary
+     * once - the 8 fixed cases above are all exactly 64 bytes, so none of them ever exercise more
+     * than one dstu8845_crypt-internal next_gamma() call. Confirms dstu8845_crypt's word-at-a-time
+     * bulk path (see its own doc comment) carries state correctly across a regeneration within a
+     * single call, not just within one 128-byte buffer. The first 64 bytes of this vector are
+     * byte-for-byte identical to k256_1_iv_1 above, by construction (same key/iv, same keystream
+     * prefix) - an internal cross-check, not an independent source for those first 64 bytes.
+     */
+    CHECK_NOT_NULL(Z2 = ba_alloc_by_len(200));
+    memset(Z2->buf, 0, Z2->len);
+    DO(dstu8845_init(ctx, &ba_k256_1, &ba_iv_1));
+    DO(dstu8845_crypt(ctx, Z2));
+    if (memcmp(Z2->buf, k256_1_iv_1_200, sizeof(k256_1_iv_1_200)) != 0) {
+        SET_ERROR(RET_SELF_TEST_FAIL);
+    }
+
 cleanup:
     ba_free(Z);
+    ba_free(Z2);
     dstu8845_free(ctx);
     return ret;
 }
