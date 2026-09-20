@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(uapkif VERSION 2.0.2 LANGUAGES C)
+project(uapkif VERSION 2.0.2 LANGUAGES C CXX)
 
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
@@ -26,6 +26,8 @@ if (NOT CMAKE_BUILD_TYPE)
 endif (NOT CMAKE_BUILD_TYPE)
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
 

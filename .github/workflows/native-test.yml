@@ -49,4 +49,12 @@ jobs:
               cat "/tmp/$scenario.log"
             fi
           done
+          echo "=== test-sessions ==="
+          if "$GITHUB_WORKSPACE/build-native/out/test-sessions" uapki --sessions 4 --signs 5 --provider-dir "$GITHUB_WORKSPACE/build-native/cm-pkcs12/" > /tmp/test-sessions.log 2>&1; then
+            grep -E '^\[PASS\]|process\(\)|parallel sessions|caches:|shared memory:|LIST_CRLS' /tmp/test-sessions.log
+          else
+            failed=1
+            echo "FAILED (test-sessions):"
+            cat /tmp/test-sessions.log
+          fi
           exit $failed

@@ -39,8 +39,9 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_generate_certbundle (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_generate_certbundle (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     int ret = RET_OK;
     Pkcs7::SignedDataBuilder sdata_builder;
     JSON_Array* ja_certs = json_object_get_array(joParams, "certificates");

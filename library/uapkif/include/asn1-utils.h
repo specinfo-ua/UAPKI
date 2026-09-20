@@ -156,6 +156,11 @@ UAPKIF_EXPORT int asn_set_oid_from_text(const char* text, OBJECT_IDENTIFIER_t * 
  */
 UAPKIF_EXPORT int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text);
 
+#define ASN_OID_TEXT_MAX 256
+
+/* Returns the text length, or -1 to fall back to asn_oid_to_text. */
+UAPKIF_EXPORT int asn_oid_to_text_buf(const OBJECT_IDENTIFIER_t* oid, char* buf, size_t size);
+
 /**
  * Возвращает OID по int`му представлению.
  * (*oid == NULL) - память под ответ выделяется и требует последующего освобождения.

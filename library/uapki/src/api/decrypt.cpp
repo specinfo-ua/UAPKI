@@ -30,9 +30,7 @@
 #include "api-json-internal.h"
 #include "cert-validator.h"
 #include "cipher-helper.h"
-#include "cm-providers.h"
 #include "envelopeddata-helper.h"
-#include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -374,10 +372,10 @@ cleanup:
 }   //  result_set_list_unprattrs
 
 
-int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_decrypt (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    Cert::CerStore* cer_store = get_cerstore();
+    Cert::CerStore* cer_store = context.cerStore();
     CmStorageProxy* storage = nullptr;
     const ByteArray* rba_keyids[2] = { nullptr, nullptr };
     Pkcs7::EnvelopedDataParser envdata_parser;
@@ -396,7 +394,7 @@ int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    storage = CmProviders::openedStorage();
+    storage = context.openedStorage();
     if (!options.noDecrypt) {
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
         if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;

@@ -31,7 +31,6 @@
 #include "cipher-helper.h"
 #include "dstu-ns.h"
 #include "envelopeddata-helper.h"
-#include "global-objects.h"
 #include "key-wrap.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
@@ -158,8 +157,14 @@ static int wrap_sessionkey (
     aba_wrappedkeys[0] = nullptr;
 
 cleanup:
-    ::free(aba_salts);
-    ::free(aba_wrappedkeys);
+    if (aba_salts) {
+        ba_free(aba_salts[0]);
+        ::free(aba_salts);
+    }
+    if (aba_wrappedkeys) {
+        ba_free(aba_wrappedkeys[0]);
+        ::free(aba_wrappedkeys);
+    }
     return ret;
 }   //  wrap_sessionkey
 
@@ -405,7 +410,7 @@ static int parse_content (
 }   //  parse_content
 
 
-int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_encrypt (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     Cert::CerStore* cer_store = nullptr;
@@ -414,7 +419,7 @@ int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult)
     vector<UapkiNS::Attribute> unpr_attrs;
     const uint32_t version = 2u;
 
-    cer_store = get_cerstore();
+    cer_store = context.cerStore();
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
     DO(envdata_builder.init(version));

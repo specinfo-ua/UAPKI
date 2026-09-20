@@ -153,13 +153,11 @@ const uint8_t* ContentHasher::baToPtr (
         const ByteArray* baPtr
 )
 {
-    const uint8_t* rv_ptr = nullptr;
-    if ((ba_get_len(baPtr) == sizeof(void*))) {
-        (void)ba_swap(baPtr);
-        memcpy(&rv_ptr, ba_get_buf_const(baPtr), sizeof(void*));
-        (void)ba_swap(baPtr);
-    }
-    return rv_ptr;
+    if (ba_get_len(baPtr) != sizeof(uintptr_t)) return nullptr;
+    uintptr_t address = 0;
+    const uint8_t* bytes = ba_get_buf_const(baPtr);
+    for (size_t i = 0; i < sizeof(address); i++) address = (address << 8) | bytes[i];
+    return reinterpret_cast<const uint8_t*>(address);
 }
 
 bool ContentHasher::numberToSize (

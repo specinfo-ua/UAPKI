@@ -42,9 +42,16 @@ class CerStore {
     std::string m_Path;
     std::vector<CerItem*>
                 m_Items;
+    CerStore*   m_Overlay;
+    CerStore*   m_Base;
 
 public:
     CerStore (void);
+    //  A layered store owns nothing: lookups go to the overlay first, then to the shared base
+    CerStore (
+        CerStore* overlay,
+        CerStore* base
+    );
     ~CerStore (void);
 
     void setParams (

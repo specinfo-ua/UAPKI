@@ -28,8 +28,6 @@
 #define FILE_MARKER "uapki/api/storage-open.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
 
@@ -121,22 +119,22 @@ cleanup:
 }   //  add_certs_from_storage_to_cache
 
 
-int uapki_storage_open (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_storage_open (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     const string s_providerid = ParsonHelper::jsonObjectGetString(joParams, "provider");
     const string s_storageid = ParsonHelper::jsonObjectGetString(joParams, "storage");
     if (s_providerid.empty() || s_storageid.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
-    int ret = CmProviders::storageOpen(s_providerid, s_storageid, joParams);
+    int ret = context.storageOpen(s_providerid, s_storageid, joParams);
     if (ret != RET_OK) return ret;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
-    Cert::CerStore* cer_store = get_cerstore();
+    CmStorageProxy* storage = context.openedStorage();
+    Cert::CerStore* cer_store = context.cerStore();
     if (!storage || !cer_store) return RET_UAPKI_GENERAL_ERROR;
 
     ret = session_info(*storage, joResult);
     if (ret != RET_OK) {
-        CmProviders::storageClose();
+        context.storageClose();
         return ret;
     }
 

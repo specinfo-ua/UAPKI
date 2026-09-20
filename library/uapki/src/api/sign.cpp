@@ -29,9 +29,7 @@
 
 #include "api-json-internal.h"
 #include "cert-validator.h"
-#include "cm-providers.h"
 #include "doc-sign.h"
-#include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -55,29 +53,23 @@ static int get_info_signalgo_and_keyid (
         Doc::Sign::SharedData& sharedData
 )
 {
-    string s_keyinfo;
+    vector<string> sign_algos;
 
-    int ret = storage.keyGetInfo(s_keyinfo, nullptr);
+    int ret = storage.keyGetSignAlgos(sign_algos);
     if (ret != RET_OK) return ret;
 
-    ParsonHelper json;
-    if (!json.parse(s_keyinfo.c_str(), false)) return RET_UAPKI_INVALID_JSON_FORMAT;
-
-    JSON_Array* ja_signalgos = nullptr;
     bool is_found = false;
-    ja_signalgos = json.getArray("signAlgo");
-    if (json_array_get_count(ja_signalgos) == 0) return RET_UAPKI_UNSUPPORTED_ALG;
+    if (sign_algos.empty()) return RET_UAPKI_UNSUPPORTED_ALG;
 
     if (sharedData.aidSignature.algorithm.empty()) {
         //  Set first signAlgo from list
-        sharedData.aidSignature.algorithm = ParsonHelper::jsonArrayGetString(ja_signalgos, 0);
+        sharedData.aidSignature.algorithm = sign_algos[0];
         is_found = (!sharedData.aidSignature.algorithm.empty());
     }
     else {
         //  Check signAlgo in list
-        for (size_t i = 0; i < json_array_get_count(ja_signalgos); i++) {
-            const string s = ParsonHelper::jsonArrayGetString(ja_signalgos, i);
-            is_found = (s == sharedData.aidSignature.algorithm);
+        for (size_t i = 0; i < sign_algos.size(); i++) {
+            is_found = (sign_algos[i] == sharedData.aidSignature.algorithm);
             if (is_found) break;
         }
     }
@@ -240,16 +232,17 @@ cleanup:
 }   //  resultdoc_to_json
 
 int uapki_sign (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
     Doc::Sign::SharedData shared_data;
     CertValidator::CertValidator& cert_validator = shared_data.certValidator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 
@@ -343,7 +336,8 @@ int uapki_sign (
         DO(parse_doc_from_json(sdoc, json_array_get_object(ja_sources, i)));
         if (
             (sdoc.contentHasher.getSourceType() != ContentHasher::SourceType::BYTEARRAY) &&
-            (shared_data.detachedData == false)
+            (shared_data.detachedData == false) &&
+            (shared_data.signatureFormat != SignatureFormat::RAW)
         ) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }

@@ -28,7 +28,9 @@
 #define FILE_MARKER "uapki/cm-storage-proxy.cpp"
 
 #include "cm-storage-proxy.h"
+#include "cm-providers.h"
 #include "oid-utils.h"
+#include "parson-helper.h"
 #include "uapki-errors.h"
 #include <stdio.h>
 
@@ -42,8 +44,10 @@
 using namespace std;
 
 
-CmStorageProxy::CmStorageProxy (void)
-    : m_IsInitialized(false)
+CmStorageProxy::CmStorageProxy (
+        shared_ptr<UapkiNS::CmProvider> provider
+)
+    : m_Provider(std::move(provider))
     , m_IsAuthorizedSession(false)
     , m_Session(nullptr)
     , m_SelectedKey(nullptr)
@@ -57,31 +61,20 @@ CmStorageProxy::~CmStorageProxy (void)
     if (isOpenedStorage()) {
         storageClose();
     }
-    if (isInitialized()) {
-        providerDeinit();
-    }
-}
-
-bool CmStorageProxy::load (
-        const string& libName,
-        const string& dir
-)
-{
-    return m_CmLoader.load(libName, dir);
 }
 
 void CmStorageProxy::cmFree (
         void* block
 )
 {
-    m_CmLoader.blockFree(block);
+    m_Provider->blockFree(block);
 }
 
 void CmStorageProxy::cmbaFree (
         CM_BYTEARRAY* ba
 )
 {
-    m_CmLoader.baFree(ba);
+    m_Provider->baFree(ba);
 }
 
 void CmStorageProxy::arrayCmbaFree (
@@ -89,78 +82,14 @@ void CmStorageProxy::arrayCmbaFree (
         CM_BYTEARRAY** arrayBa
 )
 {
-    if ((count > 0) && arrayBa) {
-        for (uint32_t i = 0; i < count; i++) {
-            cmbaFree(arrayBa[i]);
-            arrayBa[i] = nullptr;
-        }
-        cmFree(arrayBa);
+    if (!arrayBa) return;
+
+    for (uint32_t i = 0; i < count; i++) {
+        cmbaFree(arrayBa[i]);
+        arrayBa[i] = nullptr;
     }
-}
-
-int CmStorageProxy::providerInfo (
-        string& outInfo
-)
-{
-    outInfo.clear();
-
-    char* s_providerinfo = nullptr;
-    const int ret = m_CmLoader.info((CM_JSON_PCHAR*)&s_providerinfo);
-    if (ret != RET_OK) return ret;
-
-    if (s_providerinfo) {
-        outInfo = string(s_providerinfo);
-        m_CmLoader.blockFree(s_providerinfo);
-    }
-    return RET_OK;
-}
-
-int CmStorageProxy::providerInit (
-        const string& providerParams
-)
-{
-    const int ret = m_CmLoader.init(!providerParams.empty() ? (CM_JSON_PCHAR)providerParams.c_str() : nullptr);
-    m_IsInitialized = (ret == RET_OK);
-    DEBUG_OUTCON(printf("CmStorageProxy::providerInit, provider is-initialized=%d\n", (int)m_IsInitialized));
-    return ret;
-}
-
-int CmStorageProxy::providerDeinit (void)
-{
-    int ret = RET_OK;
-    if (isInitialized()) {
-        ret = m_CmLoader.deinit();
-        m_IsInitialized = false;
-        DEBUG_OUTCON(puts("CmStorageProxy::providerDeinit, provider is deinitialized"));
-    }
-    return ret;
-}
-
-int CmStorageProxy::storageList (
-        string& outList
-)
-{
-    CM_JSON_PCHAR json_listuris = nullptr;
-    const int ret = m_CmLoader.listStorages(&json_listuris);
-    if ((ret == RET_OK) && json_listuris) {
-        outList = string((char*)json_listuris);
-        cmFree(json_listuris);
-    }
-    return ret;
-}
-
-int CmStorageProxy::storageInfo (
-        const string& storageId,
-        string& outInfo
-)
-{
-    CM_JSON_PCHAR json_storageinfo = nullptr;
-    const int ret = m_CmLoader.storageInfo(storageId.c_str(), &json_storageinfo);
-    if ((ret == RET_OK) && json_storageinfo) {
-        outInfo = string((char*)json_storageinfo);
-        cmFree(json_storageinfo);
-    }
-    return ret;
+    //  a provider may hand out a non-null (calloc(0)) array for an empty list
+    cmFree(arrayBa);
 }
 
 int CmStorageProxy::storageOpen (
@@ -169,12 +98,7 @@ int CmStorageProxy::storageOpen (
         const string& openParams
 )
 {
-    const int ret = m_CmLoader.open(
-        storageId.c_str(),
-        openMode,
-        !openParams.empty() ? (CM_JSON_PCHAR)openParams.c_str() : nullptr,
-        &m_Session
-    );
+    const int ret = m_Provider->storageOpen(storageId, openMode, openParams, &m_Session);
     m_IsAuthorizedSession = (ret == RET_OK);
     return ret;
 }
@@ -186,20 +110,10 @@ int CmStorageProxy::storageClose (void)
         ret = sessionLogout();
     }
     if (isOpenedStorage()) {
-        ret = m_CmLoader.close(m_Session);
+        ret = m_Provider->storageClose(m_Session);
         m_Session = nullptr;
         DEBUG_OUTCON(puts("CmStorageProxy::storageClose, storage is cloded"));
     }
-    return ret;
-}
-
-int CmStorageProxy::storageFormat (
-        const string& storageId,
-        const char* soPassword,
-        const char* userPassword
-)
-{
-    const int ret = m_CmLoader.format(storageId.c_str(), soPassword, userPassword);
     return ret;
 }
 
@@ -264,6 +178,7 @@ int CmStorageProxy::sessionCreateKey (
     if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!m_Session->createKey) return RET_UAPKI_NOT_SUPPORTED;
 
+    m_SelectedKeySignAlgos.clear();
     const int ret = (int)m_Session->createKey(m_Session, (CM_JSON_PCHAR)keyParam.c_str(), &m_SelectedKey);
     return ret;
 }
@@ -294,6 +209,7 @@ int CmStorageProxy::sessionImportKey (
     if (!m_Session->importKey) return RET_UAPKI_NOT_SUPPORTED;
     if (!baP8container) return RET_UAPKI_INVALID_PARAMETER;
 
+    m_SelectedKeySignAlgos.clear();
     const int ret = (int)m_Session->importKey(
         m_Session,
         (const CM_BYTEARRAY*) baP8container,
@@ -511,6 +427,45 @@ int CmStorageProxy::keyGetInfo (
     }
     cmFree(json_keyinfo);
     return ret;
+}
+
+//  Перелік signAlgo залежить лише від обраного ключа: провайдер опитується один раз після SELECT_KEY,
+//  далі SIGN обходиться без keyGetInfo (для HSM це окремий запит до токена).
+int CmStorageProxy::keyGetSignAlgos (
+        vector<string>& signAlgos
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
+
+    if (m_SelectedKeySignAlgos.empty()) {
+        if (!m_SelectedKey->getInfo) return RET_UAPKI_NOT_SUPPORTED;
+
+        CM_JSON_PCHAR json_keyinfo = nullptr;
+        const int ret = (int)m_SelectedKey->getInfo(m_Session, &json_keyinfo, nullptr);
+        if (ret != RET_OK) {
+            cmFree(json_keyinfo);
+            return ret;
+        }
+
+        ParsonHelper json;
+        const bool is_parsed = json_keyinfo && json.parse((const char*)json_keyinfo, false);
+        cmFree(json_keyinfo);
+        if (!is_parsed) return RET_UAPKI_INVALID_JSON_FORMAT;
+
+        JSON_Array* ja_signalgos = json.getArray("signAlgo");
+        for (size_t i = 0; i < json_array_get_count(ja_signalgos); i++) {
+            const string s = ParsonHelper::jsonArrayGetString(ja_signalgos, i);
+            if (!s.empty()) {
+                m_SelectedKeySignAlgos.push_back(s);
+            }
+        }
+    }
+
+    signAlgos = m_SelectedKeySignAlgos;
+    return RET_OK;
 }
 
 int CmStorageProxy::keyGetPublicKey (
@@ -987,6 +942,7 @@ void CmStorageProxy::deselectKey (void)
     m_PairedCertId.clear();
     m_SelectedKeyId.clear();
     m_SelectedKeyId2.clear();
+    m_SelectedKeySignAlgos.clear();
     m_SelectedKey = nullptr;
 }
 

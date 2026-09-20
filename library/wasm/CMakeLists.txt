@@ -23,7 +23,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_link_options(${PROJECT_NAME} PRIVATE
     "-sMODULARIZE=1"
     "-sEXPORT_NAME=createUapkiModule"
-    "-sEXPORTED_FUNCTIONS=_process,_json_free,_malloc,_free"
+    "-sEXPORTED_FUNCTIONS=_process,_json_free,_uapki_session_create,_uapki_session_free,_uapki_session_process,_uapki_session_shared_memory_create,_uapki_session_shared_memory_free,_uapki_session_shared_memory_process,_malloc,_free"
     "-sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToNewUTF8,lengthBytesUTF8,FS"
     "-sALLOW_MEMORY_GROWTH=1"
     "-sINITIAL_MEMORY=67108864"

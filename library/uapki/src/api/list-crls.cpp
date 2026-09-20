@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/list-crls.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -40,11 +39,11 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_list_crls (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_list_crls (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Crl::CrlStore* crl_store = get_crlstore();
+    LibraryConfig* lib_config = context.config();
+    Crl::CrlStore* crl_store = context.crlStore();
     const bool show_crlinfos = ParsonHelper::jsonObjectGetBoolean(joParams, "showCrlInfos", false);
     Pagination pagination;
 

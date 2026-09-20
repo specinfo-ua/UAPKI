@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/remove-crl.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
@@ -40,14 +39,15 @@ using namespace UapkiNS;
 
 
 int uapki_remove_crl (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
     (void)joResult;
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Crl::CrlStore* crl_store = get_crlstore();
+    LibraryConfig* lib_config = context.config();
+    Crl::CrlStore* crl_store = context.crlStore();
     const bool present_certid = ParsonHelper::jsonObjectHasValue(joParams, "crlId", JSONString);
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
     SmartBA sba_crlid;

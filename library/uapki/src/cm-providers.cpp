@@ -27,12 +27,15 @@
 
 #define FILE_MARKER "uapki/cm-providers.cpp"
 
-#include "api-json-internal.h"
 #include "cm-providers.h"
-#include "cm-storage-proxy.h"
+#include "macros-internal.h"
+#include "parson-ba-utils.h"
 #include "parson-helper.h"
-#include <string>
+#include "session.h"
+#include "uapki-errors.h"
 #include <vector>
+#include <algorithm>
+#include <cctype>
 
 
 #define DEBUG_OUTCON(expression)
@@ -44,35 +47,7 @@
 using namespace std;
 
 
-typedef struct CM_PROVIDER_ST {
-    const string    id;
-    CmStorageProxy* storage;
-    CM_PROVIDER_ST (const string& iId, CmStorageProxy* const iCmSession)
-        : id(iId), storage(iCmSession) {
-    }
-} CM_PROVIDER;
-
-
-static struct LIB_CMPROVIDERS_ST {
-    const CM_PROVIDER* 
-                activeProvider;
-    CmStorageProxy*
-                activeStorage;
-    vector<CM_PROVIDER>
-                providers;
-
-    LIB_CMPROVIDERS_ST (void) {
-        setStorage(nullptr, nullptr);
-    }
-
-    bool storageIsOpen (void) const {
-        return (activeStorage != nullptr);
-    }
-    void setStorage (CM_PROVIDER* provider, CmStorageProxy* storage) {
-        activeProvider = provider;
-        activeStorage = storage;
-    }
-} lib_cmproviders;
+namespace UapkiNS {
 
 
 static JSON_Status json_object_copy_boolean (
@@ -145,69 +120,78 @@ cleanup:
 }   //  json_object_copy_storageinfo
 
 
-int CmProviders::loadProvider (const string& dir, const string& libName, const string& jsonParams)
+CmProvider::CmProvider (void)
+    : m_IsInitialized(false)
+    , m_IsRegistered(false)
 {
-    DEBUG_OUTCON(printf("CmProviders::loadProvider(dir: '%s', libName: '%s', params: '%s')\n", dir.c_str(), libName.c_str(), jsonParams.c_str()));
+    DEBUG_OUTCON(puts("CmProvider::CmProvider()"));
+}
 
-    CmStorageProxy* storage = new CmStorageProxy();
-    if (!storage) return RET_UAPKI_GENERAL_ERROR;
+CmProvider::~CmProvider (void)
+{
+    DEBUG_OUTCON(puts("CmProvider::~CmProvider()"));
+    if (m_IsInitialized) {
+        (void)m_CmLoader.deinit();
+        m_IsInitialized = false;
+    }
+}
 
+int CmProvider::loadLibrary (
+        const string& dir,
+        const string& libName
+)
+{
+    DEBUG_OUTCON(printf("CmProvider::loadLibrary(dir: '%s', libName: '%s')\n", dir.c_str(), libName.c_str()));
+    return m_CmLoader.load(libName, dir) ? RET_OK : RET_CM_LIBRARY_NOT_LOADED;
+}
+
+int CmProvider::loadStatic (
+        const CM_STATIC_PROVIDER_FUNCS& funcs
+)
+{
+    DEBUG_OUTCON(puts("CmProvider::loadStatic()"));
+    return m_CmLoader.loadStatic(funcs) ? RET_OK : RET_CM_LIBRARY_NOT_LOADED;
+}
+
+int CmProvider::init (
+        const string& jsonParams
+)
+{
+    DEBUG_OUTCON(printf("CmProvider::init(params: '%s')\n", jsonParams.c_str()));
     int ret = RET_OK;
-    if (!storage->load(libName, dir)) {
-        SET_ERROR(RET_CM_LIBRARY_NOT_LOADED);
+    char* s_providerinfo = nullptr;
+    ParsonHelper json;
+
+    DO(m_CmLoader.init(!jsonParams.empty() ? (CM_JSON_PCHAR)jsonParams.c_str() : nullptr));
+    m_IsInitialized = true;
+
+    DO(m_CmLoader.info((CM_JSON_PCHAR*)&s_providerinfo));
+    if (s_providerinfo) {
+        m_Info = string(s_providerinfo);
+        m_CmLoader.blockFree(s_providerinfo);
     }
 
-    ret = storage->providerInit(jsonParams);
-    DEBUG_OUTCON(printf("CmProviders::loadProvider: session->providerInit(), ret: %d\n", ret));
-    if (ret == RET_OK) {
-        string s_id, s_provinfo;
-        DO(storage->providerInfo(s_provinfo));
+    if (!json.parse(m_Info.c_str())) {
+        SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
+    }
 
-        ParsonHelper json;
-        if (!json.parse(s_provinfo.c_str())) {
-            SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
-        }
-
-        json.getString("id", s_id);
-        if (s_id.empty()) {
-            SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
-        }
-
-        lib_cmproviders.providers.push_back(CM_PROVIDER(s_id, storage));
-        storage = nullptr;
+    json.getString("id", m_Id);
+    if (m_Id.empty()) {
+        SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
     }
 
 cleanup:
-    delete storage;
     return ret;
 }
 
-void CmProviders::deinit (void)
+int CmProvider::getInfo (
+        JSON_Object* joResult
+)
 {
-    for (auto& it : lib_cmproviders.providers) {
-        delete it.storage;
-        it.storage = nullptr;
-    }
-    lib_cmproviders.providers.clear();
-}
-
-size_t CmProviders::count (void)
-{
-    return lib_cmproviders.providers.size();
-}
-
-int CmProviders::getInfo (const size_t index, JSON_Object* joResult)
-{
-    if (index >= CmProviders::count()) return RET_INVALID_PARAM;
-
     int ret = RET_OK;
-    CmStorageProxy* storage = lib_cmproviders.providers[index].storage;
-    string s_provinfo;
     ParsonHelper json;
 
-    DO(storage->providerInfo(s_provinfo));
-
-    if (!json.parse(s_provinfo.c_str())) {
+    if (!json.parse(m_Info.c_str())) {
         SET_ERROR(RET_UAPKI_INVALID_JSON_FORMAT);
     }
 
@@ -227,25 +211,27 @@ cleanup:
     return ret;
 }
 
-struct CM_PROVIDER_ST* CmProviders::getProviderById (const string& providerId)
+int CmProvider::listStorages (
+        string& outList
+)
 {
-    for (size_t i = 0; i < lib_cmproviders.providers.size(); i++) {
-        CM_PROVIDER* provider = &lib_cmproviders.providers[i];
-        if (providerId == provider->id) {
-            return provider;
-        }
+    lock_guard<mutex> lock(m_Mutex);
+
+    CM_JSON_PCHAR json_listuris = nullptr;
+    const int ret = m_CmLoader.listStorages(&json_listuris);
+    if ((ret == RET_OK) && json_listuris) {
+        outList = string((char*)json_listuris);
+        blockFree(json_listuris);
     }
-    return nullptr;
+    return ret;
 }
 
-int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
+int CmProvider::listStorages (
+        JSON_Object* joResult
+)
 {
-    CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
-    if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
-
     string s_storlist;
-    CmStorageProxy* storage = cm_provider->storage;
-    int ret = storage->storageList(s_storlist);
+    int ret = listStorages(s_storlist);
     if (ret != RET_OK) return ret;
 
     ParsonHelper json;
@@ -264,81 +250,267 @@ int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
         JSON_Object* jo_srckeyinfo = json_array_get_object(ja_srcstoreinfos, i);
         DO(json_object_copy_storageinfo(jo_dstkeyinfo, jo_srckeyinfo));
     }
+
 cleanup:
     return ret;
 }
 
-int CmProviders::storageInfo (const string& providerId, const string& storageId, JSON_Object* joResult)
+int CmProvider::storageInfo (
+        const string& storageId,
+        string& outInfo
+)
 {
-    CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
-    if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
+    lock_guard<mutex> lock(m_Mutex);
 
+    CM_JSON_PCHAR json_storageinfo = nullptr;
+    const int ret = m_CmLoader.storageInfo(storageId.c_str(), &json_storageinfo);
+    if ((ret == RET_OK) && json_storageinfo) {
+        outInfo = string((char*)json_storageinfo);
+        blockFree(json_storageinfo);
+    }
+    return ret;
+}
+
+int CmProvider::storageInfo (
+        const string& storageId,
+        JSON_Object* joResult
+)
+{
     string s_storinfo;
-    CmStorageProxy* storage = cm_provider->storage;
-    int ret = storage->storageInfo(storageId, s_storinfo);
+    const int ret = storageInfo(storageId, s_storinfo);
     if (ret != RET_OK) return ret;
 
     ParsonHelper json;
     JSON_Object* jo_resp = json.parse(s_storinfo.c_str());
     if (!jo_resp) return RET_UAPKI_INVALID_JSON_FORMAT;
 
-    ret = json_object_copy_storageinfo(joResult, jo_resp);
-    return ret;
+    return json_object_copy_storageinfo(joResult, jo_resp);
+}
+
+int CmProvider::storageOpen (
+        const string& storageId,
+        const CM_OPEN_MODE openMode,
+        const string& openParams,
+        CM_SESSION_API** session
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    return m_CmLoader.open(
+        storageId.c_str(),
+        openMode,
+        !openParams.empty() ? (CM_JSON_PCHAR)openParams.c_str() : nullptr,
+        session
+    );
+}
+
+int CmProvider::storageClose (
+        CM_SESSION_API* session
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    return m_CmLoader.close(session);
+}
+
+int CmProvider::storageFormat (
+        const string& storageId,
+        const char* soPassword,
+        const char* userPassword
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    return m_CmLoader.format(storageId.c_str(), soPassword, userPassword);
+}
+
+void CmProvider::blockFree (
+        void* block
+)
+{
+    m_CmLoader.blockFree(block);
+}
+
+void CmProvider::baFree (
+        CM_BYTEARRAY* ba
+)
+{
+    m_CmLoader.baFree(ba);
+}
+
+
+CmProviderRegistry& CmProviderRegistry::instance (void)
+{
+    static CmProviderRegistry* registry = new CmProviderRegistry();
+    return *registry;
+}
+
+int CmProviderRegistry::registerStatic (
+        const string& libName,
+        const CM_STATIC_PROVIDER_FUNCS& funcs,
+        const string& jsonParams
+)
+{
+    if (libName.empty()) return RET_UAPKI_INVALID_PARAMETER;
+
+    lock_guard<mutex> lock(m_Mutex);
+
+    if (m_StaticProviders.find(libName) != m_StaticProviders.end()) {
+        return RET_CM_ALREADY_INITIALIZED;
+    }
+
+    shared_ptr<CmProvider> provider(new CmProvider());
+    int ret = provider->loadStatic(funcs);
+    if (ret != RET_OK) return ret;
+
+    ret = provider->init(jsonParams);
+    DEBUG_OUTCON(printf("CmProviderRegistry::registerStatic(libName: '%s'), init ret: %d\n", libName.c_str(), ret));
+    if (ret != RET_OK) return ret;
+
+    m_StaticProviders[libName] = std::move(provider);
+    return RET_OK;
+}
+
+int CmProviderRegistry::acquire (
+        const string& dir,
+        const string& libName,
+        const string& jsonParams,
+        shared_ptr<CmProvider>& provider
+)
+{
+    unique_lock<mutex> lock(m_Mutex);
+
+    {
+        auto it_static = m_StaticProviders.find(libName);
+        if (it_static != m_StaticProviders.end()) {
+            provider = it_static->second;
+            return RET_OK;
+        }
+        //  Configs written for the old static loader name the provider by its id ("PKCS12")
+        for (const auto& it : m_StaticProviders) {
+            const string& id = it.second->getId();
+            if ((id.size() == libName.size()) && std::equal(id.begin(), id.end(), libName.begin(),
+                    [] (char a, char b) { return std::tolower((unsigned char)a) == std::tolower((unsigned char)b); })) {
+                provider = it.second;
+                return RET_OK;
+            }
+        }
+    }
+
+    const string key = dir + '|' + libName;
+    for (;;) {
+        auto it = m_Providers.find(key);
+        if (it != m_Providers.end()) {
+            provider = it->second.provider.lock();
+            if (provider) return RET_OK;
+
+            //  The last owner is releasing this provider right now, wait until it is unloaded
+            m_Cond.wait(lock);
+            continue;
+        }
+
+        unique_ptr<CmProvider> loaded(new CmProvider());
+        int ret = loaded->loadLibrary(dir, libName);
+        if (ret != RET_OK) return ret;
+
+        //  The same library named through another directory spelling is the same process-wide provider
+        const Entry* same = nullptr;
+        for (const auto& it_same : m_Providers) {
+            if (it_same.second.handle == loaded->getHandle()) {
+                same = &it_same.second;
+                break;
+            }
+        }
+        if (same) {
+            provider = same->provider.lock();
+            if (!provider) {
+                loaded.reset();
+                m_Cond.wait(lock);
+                continue;
+            }
+            provider->m_RegistryKeys.push_back(key);
+            m_Providers[key] = { provider, provider->getHandle() };
+            return RET_OK;
+        }
+
+        ret = loaded->init(jsonParams);
+        if (ret != RET_OK) return ret;
+
+        //  The deleter unloads the provider under the registry lock; it goes through the registry only once
+        //  the provider is registered, so a failure while registering can not re-enter the held lock
+        loaded->m_RegistryKeys.push_back(key);
+        CmProviderRegistry* registry = this;
+        provider = shared_ptr<CmProvider>(
+            loaded.release(),
+            [registry] (CmProvider* p) { if (p->m_IsRegistered) registry->release(p); else delete p; }
+        );
+        m_Providers[key] = { provider, provider->getHandle() };
+        provider->m_IsRegistered = true;
+        return RET_OK;
+    }
+}
+
+void CmProviderRegistry::release (
+        CmProvider* provider
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    for (const auto& key : provider->m_RegistryKeys) {
+        auto it = m_Providers.find(key);
+        if ((it != m_Providers.end()) && it->second.provider.expired()) {
+            m_Providers.erase(it);
+        }
+    }
+    delete provider;
+    m_Cond.notify_all();
+}
+
+
+}   //  end namespace UapkiNS
+
+
+int CmProviders::loadProvider (const string& dir, const string& libName, const string& jsonParams)
+{
+    return UapkiNS::Session::global().loadProvider(dir, libName, jsonParams);
+}
+
+void CmProviders::deinit (void)
+{
+    UapkiNS::Session::global().releaseProviders();
+}
+
+size_t CmProviders::count (void)
+{
+    return UapkiNS::Session::global().countProviders();
+}
+
+int CmProviders::getInfo (const size_t index, JSON_Object* joResult)
+{
+    return UapkiNS::Session::global().providerInfo(index, joResult);
+}
+
+int CmProviders::listStorages (const string& providerId, JSON_Object* joResult)
+{
+    return UapkiNS::Session::global().listStorages(providerId, joResult);
+}
+
+int CmProviders::storageInfo (const string& providerId, const string& storageId, JSON_Object* joResult)
+{
+    return UapkiNS::Session::global().storageInfo(providerId, storageId, joResult);
 }
 
 int CmProviders::storageOpen (const string& providerId, const string& storageId, JSON_Object* joParams)
 {
-    const string s_mode = ParsonHelper::jsonObjectGetString(joParams, "mode");
-    const string s_password = ParsonHelper::jsonObjectGetString(joParams, "password");
-    const char* s_username = json_object_get_string(joParams, "username");
-    if (s_password.empty()) return RET_UAPKI_INVALID_PARAMETER;
-
-    CM_OPEN_MODE mode = OPEN_MODE_RW;
-    if ((s_mode == "RW") || s_mode.empty()) mode = OPEN_MODE_RW;
-    else if (s_mode == "RO") mode = OPEN_MODE_RO;
-    else if (s_mode == "CREATE") mode = OPEN_MODE_CREATE;
-    else return RET_UAPKI_INVALID_PARAMETER;
-
-    CM_PROVIDER* cm_provider = CmProviders::getProviderById(providerId);
-    if (!cm_provider) return RET_UAPKI_UNKNOWN_PROVIDER;
-
-    if (lib_cmproviders.storageIsOpen()) return RET_UAPKI_STORAGE_ALREADY_OPENED;
-
-    string s_openparams;
-    if (ParsonHelper::jsonObjectHasValue(joParams, "openParams", JSONObject)) {
-        ParsonHelper json;
-        json_object_copy_all_items(json.create(), json_object_get_object(joParams, "openParams"));
-        json.serialize(s_openparams);
-    }
-
-    CmStorageProxy* storage = cm_provider->storage;
-    int ret = storage->storageOpen(storageId, mode, s_openparams);
-    if (ret != RET_OK) return ret;
-
-    ret = storage->sessionLogin(s_password.c_str(), s_username);
-    if (ret == RET_OK) {
-        lib_cmproviders.setStorage(cm_provider, storage);
-    }
-    else {
-        (void)storage->storageClose();
-    }
-    return ret;
+    return UapkiNS::Session::global().storageOpen(providerId, storageId, joParams);
 }
 
 int CmProviders::storageClose (void)
 {
-    int ret = RET_OK;
-    if (lib_cmproviders.storageIsOpen()) {
-        ret = lib_cmproviders.activeStorage->storageClose();
-        lib_cmproviders.setStorage(nullptr, nullptr);
-    }
-    else {
-        ret = RET_UAPKI_STORAGE_NOT_OPEN;
-    }
-    return ret;
+    return UapkiNS::Session::global().storageClose();
 }
 
 CmStorageProxy* CmProviders::openedStorage (void)
 {
-    return lib_cmproviders.activeStorage;
+    return UapkiNS::Session::global().openedStorage();
 }

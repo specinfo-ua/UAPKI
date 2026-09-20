@@ -30,19 +30,23 @@
 
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 #include "byte-array.h"
 #include "cm-api.h"
-#include "cm-loader.h"
 #include "uapki-ns.h"
 
 
+namespace UapkiNS {
+    class CmProvider;
+}
+
+
 class CmStorageProxy {
-    CmLoader    m_CmLoader;
-    std::atomic_bool
-                m_IsInitialized;
+    std::shared_ptr<UapkiNS::CmProvider>
+                m_Provider;
     std::atomic_bool
                 m_IsAuthorizedSession;
     std::mutex  m_Mutex;
@@ -54,17 +58,17 @@ class CmStorageProxy {
                 m_SelectedKeyId;
     UapkiNS::SmartBA
                 m_SelectedKeyId2;
+    std::vector<std::string>
+                m_SelectedKeySignAlgos;
     UapkiNS::SmartBA
                 m_PairedCertId;
 
 public:
-    CmStorageProxy (void);
+    CmStorageProxy (
+        std::shared_ptr<UapkiNS::CmProvider> provider
+    );
     ~CmStorageProxy (void);
 
-    bool load (
-        const std::string& libName,
-        const std::string& dir = std::string()
-    );
     void cmFree (
         void* block
     );
@@ -76,32 +80,12 @@ public:
         CM_BYTEARRAY** arrayBa
     );
 
-    int providerInfo (
-        std::string& outInfo
-    );
-    int providerInit (
-        const std::string& providerParams
-    );
-    int providerDeinit (void);
-
-    int storageList (
-        std::string& outList
-    );
-    int storageInfo (
-        const std::string& storageId,
-        std::string& outInfo
-    );
     int storageOpen (
         const std::string& storageId,
         const CM_OPEN_MODE openMode,
         const std::string& openParams
     );
     int storageClose (void);
-    int storageFormat (
-        const std::string& storageId,
-        const char* soPassword,
-        const char* userPassword
-    );
 
     int sessionInfo (
         std::string& outInfo
@@ -163,6 +147,9 @@ public:
     );
     int keyGetInfo (
         std::string& keyInfo
+    );
+    int keyGetSignAlgos (
+        std::vector<std::string>& signAlgos
     );
     int keyGetPublicKey (
         ByteArray** baAlgoId,
@@ -255,6 +242,9 @@ public:
     CM_SESSION_API* getCmSessionApi (void) const {
         return m_Session;
     }
+    const std::shared_ptr<UapkiNS::CmProvider>& getProvider (void) const {
+        return m_Provider;
+    }
     const ByteArray* getPairedCertId (void) const {
         return m_PairedCertId.get();
     }
@@ -269,9 +259,6 @@ public:
     }
     bool isAuthorizedSession (void) const {
         return m_IsAuthorizedSession;
-    }
-    bool isInitialized (void) const {
-        return m_IsInitialized;
     }
     bool isOpenedStorage (void) const {
         return (m_Session != nullptr);

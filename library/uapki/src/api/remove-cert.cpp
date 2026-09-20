@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/remove-cert.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
@@ -40,14 +39,15 @@ using namespace UapkiNS;
 
 
 int uapki_remove_cert (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
     (void)joResult;
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Cert::CerStore* cer_store = get_cerstore();
+    LibraryConfig* lib_config = context.config();
+    Cert::CerStore* cer_store = context.cerStore();
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
     const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
     SmartBA sba_certid, sba_encoded, sba_keyid;
@@ -79,7 +79,7 @@ int uapki_remove_cert (
             return RET_UAPKI_INVALID_PARAMETER;
         }
 
-        CmStorageProxy* storage = CmProviders::openedStorage();
+        CmStorageProxy* storage = context.openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
         if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {

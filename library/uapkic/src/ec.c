@@ -346,7 +346,7 @@ EcCtx* ec_alloc_new(EcParamsId params_id)
         CHECK_NOT_NULL(n = ba_alloc_from_uint8(def_paramsp->n, def_paramsp->len));
         CHECK_NOT_NULL(px = ba_alloc_from_uint8(def_paramsp->px, def_paramsp->len));
         CHECK_NOT_NULL(py = ba_alloc_from_uint8(def_paramsp->py, def_paramsp->len));
-        CHECK_NOT_NULL(ctx = ec_alloc_prime(p, a, b, n, px, py));
+        CHECK_NOT_NULL(ctx = ec_alloc_prime_new(p, a, b, n, px, py));
     }
     else {
         int len;
@@ -360,8 +360,8 @@ EcCtx* ec_alloc_new(EcParamsId params_id)
         CHECK_NOT_NULL(py = ba_alloc_from_uint8(def_params2m->py, len));
 
         ctx = (def_params2m->is_onb)
-            ? ec_alloc_binary_onb(def_params2m->f[0], def_params2m->a, b, n, px, py)
-            : ec_alloc_binary_pb(def_params2m->f, 5, def_params2m->a, b, n, px, py);
+            ? ec_alloc_binary_onb_new(def_params2m->f[0], def_params2m->a, b, n, px, py)
+            : ec_alloc_binary_pb_new(def_params2m->f, 5, def_params2m->a, b, n, px, py);
         CHECK_NOT_NULL(ctx);
     }
 
@@ -575,7 +575,7 @@ EcCtx* ec_copy_params_with_alloc(const EcCtx* param)
     CHECK_NOT_NULL(param_copy->params->p = ec_point_copy_with_alloc(param->params->p));
     CHECK_NOT_NULL(param_copy->params->n = wa_copy_with_alloc(param->params->n));
     if (param->params->precomp_p) {
-        CHECK_NOT_NULL(param_copy->params->precomp_p = ec_copy_precomp_with_alloc(param->params->precomp_p));
+        param_copy->params->precomp_p = ec_precomp_ref(param->params->precomp_p);
     }
 
     if (param->precomp_q != NULL) {
@@ -613,7 +613,7 @@ EcCtx* ec_copy_with_alloc(const EcCtx* param)
         if (param_copy->precomp_q) {
             ec_precomp_free(param_copy->precomp_q);
         }
-        CHECK_NOT_NULL(param_copy->precomp_q = ec_copy_precomp_with_alloc(param->precomp_q));
+        param_copy->precomp_q = ec_precomp_ref(param->precomp_q);
     }
 
     param_copy->sign_status = param->sign_status;

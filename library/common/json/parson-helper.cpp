@@ -68,17 +68,8 @@ bool ParsonHelper::serialize (char** sJson)
 {
     bool rv_ok = false;
     if (sJson) {
-        *sJson = nullptr;
-        const size_t size = json_serialization_size(m_JsonValue);
-        char* out_buf = (char*)malloc(size);
-        if (out_buf) {
-            rv_ok = (json_serialize_to_buffer(m_JsonValue, out_buf, size) == JSONSuccess);
-            if (!rv_ok) {
-                free(out_buf);
-                out_buf = nullptr;
-            }
-            *sJson = out_buf;
-        }
+        *sJson = json_serialize_to_string_malloc(m_JsonValue);
+        rv_ok = (*sJson != nullptr);
     }
     cleanup();
     return rv_ok;
@@ -87,16 +78,12 @@ bool ParsonHelper::serialize (char** sJson)
 bool ParsonHelper::serialize (string& sJson)
 {
     bool rv_ok = false;
-    const size_t size = json_serialization_size(m_JsonValue);
+    char* out_buf = json_serialize_to_string(m_JsonValue);
     sJson.clear();
-    if (size > 1) {
-        sJson.resize(size - 1);
-        if (!sJson.empty()) {
-            rv_ok = (json_serialize_to_buffer(m_JsonValue, (char*)sJson.data(), size) == JSONSuccess);
-            if (!rv_ok) {
-                sJson.clear();
-            }
-        }
+    if (out_buf) {
+        sJson.assign(out_buf);
+        json_free_serialized_string(out_buf);
+        rv_ok = !sJson.empty();
     }
     cleanup();
     return rv_ok;

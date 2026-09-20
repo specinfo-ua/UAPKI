@@ -35,6 +35,7 @@
 #include "extension-helper.h"
 #include "macros-internal.h"
 #include "oids.h"
+#include "path-lock.h"
 #include "time-util.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
@@ -131,8 +132,13 @@ int CrlStore::addCrl (
     int ret = RET_OK;
     CrlItem* parsed_item = nullptr;
     CrlItem* added_item = nullptr;
+    SmartBA encoded;
 
-    DO(parseCrl(baEncoded, &parsed_item));
+    // Borrow the caller's bytes even on persistence failure. The stored item
+    // owns its copy as soon as it is published in m_Items.
+    CHECK_NOT_NULL(*encoded = ba_copy_with_alloc(baEncoded, 0, 0));
+    DO(parseCrl(encoded.get(), &parsed_item));
+    encoded.pop();
 
     added_item = addItem(parsed_item);
     isUnique = (added_item == parsed_item);
@@ -165,6 +171,15 @@ int CrlStore::getCount (
 
     count = m_Items.size();
     return RET_OK;
+}
+
+std::shared_ptr<std::mutex> CrlStore::getDownloadMutex(const ByteArray* authorityKeyId)
+{
+    const std::string key((const char*)ba_get_buf_const(authorityKeyId), ba_get_len(authorityKeyId));
+    lock_guard<mutex> lock(m_Mutex);
+    auto& gate = m_DownloadMutexes[key];
+    if (!gate) gate = std::make_shared<std::mutex>();
+    return gate;
 }
 
 CrlItem* CrlStore::getCrl (
@@ -261,6 +276,7 @@ vector<CrlItem*> CrlStore::getCrlItems (void)
 
 int CrlStore::load (void)
 {
+    lock_guard<mutex> lock_path(lockPath(m_Path));
     lock_guard<mutex> lock(m_Mutex);
 
     const int ret = loadDir();

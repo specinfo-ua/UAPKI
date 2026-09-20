@@ -26,58 +26,35 @@
  */
 
 #include "global-objects.h"
+#include "session.h"
 
 
 namespace UapkiNS {
 
 
-static LibraryConfig* lib_config = nullptr;
-static Cert::CerStore* lib_cerstore = nullptr;
-static Crl::CrlStore* lib_crlstore = nullptr;
-
-
 LibraryConfig* get_config (void)
 {
-    if (!lib_config) {
-        lib_config = new LibraryConfig();
-    }
-    return lib_config;
+    return Session::global().config();
 }
 
 Cert::CerStore* get_cerstore (void)
 {
-    if (!lib_cerstore) {
-        lib_cerstore = new Cert::CerStore();
-    }
-    return lib_cerstore;
+    return Session::global().cerStore();
 }
 
 Crl::CrlStore* get_crlstore (void)
 {
-    if (!lib_crlstore) {
-        lib_crlstore = new Crl::CrlStore();
-    }
-    return lib_crlstore;
+    return Session::global().crlStore();
 }
 
 void release_config (void)
 {
-    if (lib_config) {
-        delete lib_config;
-        lib_config = nullptr;
-    }
+    Session::global().releaseConfig();
 }
 
 void release_stores (void)
 {
-    if (lib_cerstore) {
-        delete lib_cerstore;
-        lib_cerstore = nullptr;
-    }
-    if (lib_crlstore) {
-        delete lib_crlstore;
-        lib_crlstore = nullptr;
-    }
+    Session::global().releaseStores();
 }
 
 

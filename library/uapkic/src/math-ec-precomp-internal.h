@@ -58,6 +58,7 @@ typedef struct EcPrecomp_st {
         EcPrecompWin *win;
         EcPrecompComb *comb;
     } ctx;
+    int ref_count;
 } EcPrecomp;
 
 /**
@@ -67,6 +68,15 @@ typedef struct EcPrecomp_st {
  * @return копія контексту
  */
 EcPrecomp *ec_copy_precomp_with_alloc(EcPrecomp *precomp_p);
+
+/**
+ * Додає посилання на контекст попередніх обчислень (таблиця спільна, лише для читання).
+ * Кожне посилання звільняється окремим викликом ec_precomp_free.
+ *
+ * @param precomp контекст попередніх обчислень
+ * @return той самий контекст
+ */
+EcPrecomp *ec_precomp_ref(EcPrecomp *precomp);
 
 void ec_precomp_free(EcPrecomp *precomp);
 

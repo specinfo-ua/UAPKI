@@ -32,6 +32,15 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#define PRECOMP_REF_INC(_p) _InterlockedExchangeAdd((volatile long *)&(_p)->ref_count, 1)
+#define PRECOMP_REF_DEC(_p) _InterlockedExchangeAdd((volatile long *)&(_p)->ref_count, -1)
+#else
+#define PRECOMP_REF_INC(_p) __atomic_fetch_add(&(_p)->ref_count, 1, __ATOMIC_RELAXED)
+#define PRECOMP_REF_DEC(_p) __atomic_fetch_sub(&(_p)->ref_count, 1, __ATOMIC_ACQ_REL)
+#endif
+
 EcPrecomp *ec_copy_precomp_with_alloc(EcPrecomp *precomp)
 {
     int i, ret = RET_OK;
@@ -85,11 +94,23 @@ cleanup:
     return NULL;
 }
 
+EcPrecomp *ec_precomp_ref(EcPrecomp *precomp)
+{
+    if (precomp != NULL) {
+        PRECOMP_REF_INC(precomp);
+    }
+
+    return precomp;
+}
+
 void ec_precomp_free(EcPrecomp *precomp)
 {
     int i;
 
     if (precomp != NULL) {
+        if (PRECOMP_REF_DEC(precomp) > 0) {
+            return;
+        }
         if (precomp->type == EC_PRECOMP_TYPE_COMB) {
             if (precomp->ctx.comb->precomp != NULL) {
                 for (i = 0; i < (1 << precomp->ctx.comb->comb_width) - 1; i++) {

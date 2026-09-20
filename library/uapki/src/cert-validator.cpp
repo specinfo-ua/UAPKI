@@ -356,11 +356,11 @@ int CertValidator::getStatus (
     //  check signature in chain-certs
     idx_root = m_CertChain.size() - 1;
     entity = m_CertChain[idx_root];
-    DO(entity->getSubject()->verify(entity->getSubject(), true));
+    DO(entity->getSubject()->verify(entity->getSubject()));
     entity->setRoot();
     for (size_t i = 0; i < idx_root; i++) {
         entity = m_CertChain[i];
-        DO(entity->getSubject()->verify(m_CertChain[i + 1]->getSubject(), true));
+        DO(entity->getSubject()->verify(m_CertChain[i + 1]->getSubject()));
         entity->setIssuer(m_CertChain[i + 1]->getSubject());
     }
 
@@ -510,7 +510,7 @@ int CertValidator::validateByCrl (
 {
     if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
 
-    lock_guard<mutex> lock(cerSubject->getMutex());
+    lock_guard<mutex> lock(cerSubject->getStatusMutex());
 
     int ret = RET_OK;
     Crl::CrlItem* crl_item = nullptr;
@@ -621,7 +621,7 @@ int CertValidator::validateByOcsp (
 {
     if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
 
-    lock_guard<mutex> lock(cerSubject->getMutex());
+    lock_guard<mutex> lock(cerSubject->getStatusMutex());
 
     int ret = RET_OK;
     const LibraryConfig::OcspParams& ocsp_params = m_LibConfig->getOcsp();
@@ -634,7 +634,7 @@ int CertValidator::validateByOcsp (
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(UapkiNS::CertStatus::UNDEFINED)));
     }
 
-    if (HttpHelper::isOfflineMode()) {
+    if (m_LibConfig->getOffline()) {
         SET_ERROR(RET_UAPKI_OFFLINE_MODE);
     }
 
@@ -655,7 +655,9 @@ int CertValidator::validateByOcsp (
 
         shuffled_uris = HttpHelper::randomURIs(cerSubject->getUris().ocsp);
         for (auto& it : shuffled_uris) {
+            sba_ocspresponse.clear();
             ret = HttpHelper::post(
+                m_LibConfig->getHttp(),
                 it,
                 HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
                 sba_ocsprequest.get(),
@@ -934,8 +936,12 @@ int CertValidator::getCrl (
         uris.deltaCrl
     );
 
-    {   //  begin lock_guard
-        lock_guard<mutex> lock(crl_item ? crl_item->getMutex() : crlStore.getMutexFirstDownloading());
+    {   // Download coordination is separate from the item and store locks.
+        // Recheck after acquiring it: another request may have refreshed the CRL.
+        const auto download_gate = crlStore.getDownloadMutex(cerSubject->getAuthorityKeyId());
+        lock_guard<mutex> lock(*download_gate);
+        crl_item = crlStore.getCrl(cerSubject->getAuthorityKeyId(),
+            is_full ? Crl::Type::FULL : Crl::Type::DELTA, uris.deltaCrl);
 
         if (crl_item) {
             if (crl_item->getNextUpdate() < validateTime) {
@@ -952,7 +958,7 @@ int CertValidator::getCrl (
         crl_item = nullptr;
 #endif
         if (!crl_item) {
-            if (HttpHelper::isOfflineMode()) {
+            if (m_LibConfig->getOffline()) {
                 SET_ERROR(err_crl);
             }
             if (uris_crl.empty()) {
@@ -962,8 +968,9 @@ int CertValidator::getCrl (
             const vector<string> shuffled_uris = HttpHelper::randomURIs(uris_crl);
             DEBUG_OUTCON(printf("CertValidator::getCrl(is full=%d), download CRL", is_full));
             for (auto& it : shuffled_uris) {
+                sba_crl.clear();
                 DEBUG_OUTCON(printf("CertValidator::getCrl(), HttpHelper::get('%s')\n", it.c_str()));
-                ret = HttpHelper::get(it, &sba_crl);
+                ret = HttpHelper::get(m_LibConfig->getHttp(), it, &sba_crl);
                 if (ret == RET_OK) {
                     DEBUG_OUTCON(printf("CertValidator::getCrl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
                     break;
@@ -980,7 +987,6 @@ int CertValidator::getCrl (
                 is_unique,
                 &crl_item
             ));
-            sba_crl.set(nullptr);
             if (!crl_item) {
                 SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
             }

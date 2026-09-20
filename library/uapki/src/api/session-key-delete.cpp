@@ -28,16 +28,15 @@
 #define FILE_MARKER "uapki/api/session-key-delete.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
 #include "uapki-ns.h"
 
 
-int uapki_session_key_delete (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_session_key_delete (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joResult;
     if (!joParams) return RET_UAPKI_INVALID_PARAMETER;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
     UapkiNS::SmartBA sba_keyid;

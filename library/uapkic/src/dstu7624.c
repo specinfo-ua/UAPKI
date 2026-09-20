@@ -38,6 +38,7 @@
 #include "byte-array-internal.h"
 #include "math-gf2m-internal.h"
 #include "macros-internal.h"
+#include "dstu7624-avx512-internal.h"
 
 #define REDUCTION_POLYNOMIAL 0x11d  /* x^8 + x^4 + x^3 + x^2 + 1 */
 #define ROWS 8
@@ -108,8 +109,8 @@ typedef struct Dstu7624GcmCtx_st {
 
 typedef struct Dstu7624CcmCtx_st {
     size_t q;
-    const ByteArray *key;
-    const ByteArray *iv_tmp;
+    ByteArray *key;
+    ByteArray *iv_tmp;
     uint8_t iv[MAX_BLOCK_LEN];
     size_t nb;
 } Dstu7624CcmCtx;
@@ -125,14 +126,27 @@ typedef struct Dstu7624CmacCtx_st {
     size_t lblock_len;
 } Dstu7624CmacCtx;
 
-struct Dstu7624Ctx_st {
-    Dstu7624Mode mode_id;
+/* The standard tables are shared read-only; only custom S-boxes own tables. */
+typedef struct {
     uint64_t p_boxrowcol[ROWS][MAX_NUM_IN_BYTE];
     uint64_t p_inv_boxrowcol[ROWS][MAX_NUM_IN_BYTE];
     uint8_t s_blocks[SBOX_LEN];
     uint8_t inv_s_blocks[SBOX_LEN];
-    uint64_t p_rkeys[MAX_BLOCK_LEN * 20];
-    uint64_t p_rkeys_rev[MAX_BLOCK_LEN * 20];
+} Dstu7624Tables;
+
+struct Dstu7624Ctx_st {
+    Dstu7624Mode mode_id;
+    const uint64_t (*p_boxrowcol)[MAX_NUM_IN_BYTE];
+    const uint64_t (*p_inv_boxrowcol)[MAX_NUM_IN_BYTE];
+    const uint8_t *s_blocks;
+    const uint8_t *inv_s_blocks;
+    Dstu7624Tables *owned_tables;
+#if DSTU_AVX512
+    K256Simd simd;
+    int use_avx512;
+#endif
+    uint64_t p_rkeys[(MAX_BLOCK_LEN / 8) * 21];
+    uint64_t p_rkeys_rev[(MAX_BLOCK_LEN / 8) * 21];
     uint64_t state[ROWS];
     size_t key_len;
     size_t block_len;
@@ -316,15 +330,16 @@ static void kalyna_add(uint64_t *in, uint64_t *out, size_t size)
 }
 
 /*memory safe xor*/
-static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
+static void kalyna_xor(const void *arg1, const void *arg2, size_t len, void *out)
 {
-    uint8_t *a8, *b8, *o8;
+    const uint8_t *a8, *b8;
+    uint8_t *o8;
     size_t i;
 
     // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
     // доступ до даніх не вирівняних на 4 або 8 байт відповідно
-    a8 = (uint8_t *) arg1;
-    b8 = (uint8_t *) arg2;
+    a8 = (const uint8_t *) arg1;
+    b8 = (const uint8_t *) arg2;
     o8 = (uint8_t *) out;
     for (i = 0; i < len; i++) {
         o8[i] = a8[i] ^ b8[i];
@@ -1371,14 +1386,31 @@ static void p_sub_row_col(const uint8_t * s_blocks, uint64_t p_boxrowcol[ROWS][M
     }
 }
 
-static void crypt_basic_transform(Dstu7624Ctx *ctx, const uint8_t *plain_data, uint8_t *cipher_data)
+static __inline uint64_t load64le(const uint8_t *p)
 {
-    uint64_t state[8] = {0};
-    uint8_to_uint64(plain_data, ctx->block_len, state, ctx->block_len >> 3);
+    uint64_t v;
+    memcpy(&v, p, sizeof(v));
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    v = __builtin_bswap64(v);
+#endif
+    return v;
+}
 
+static __inline void store64le(uint8_t *p, uint64_t v)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    v = __builtin_bswap64(v);
+#endif
+    memcpy(p, &v, sizeof(v));
+}
+
+static __inline void crypt_basic_transform(Dstu7624Ctx *ctx, const uint8_t *plain_data, uint8_t *cipher_data)
+{
+    uint64_t state[8];
+    size_t i;
+    for (i = 0; i < ctx->block_len / 8; i++) state[i] = load64le(plain_data + i * 8);
     ctx->basic_transform(ctx, state);
-
-    uint64_to_uint8(state, ctx->block_len >> 3, cipher_data, ctx->block_len);
+    for (i = 0; i < ctx->block_len / 8; i++) store64le(cipher_data + i * 8, state[i]);
 }
 
 Dstu7624Ctx *dstu7624_alloc(Dstu7624SboxId sbox_id)
@@ -1390,37 +1422,46 @@ Dstu7624Ctx *dstu7624_alloc(Dstu7624SboxId sbox_id)
 
     switch (sbox_id) {
     case DSTU7624_SBOX_1:
-        memcpy(ctx->s_blocks, s_blocks_default, SBOX_LEN);
-        memcpy(ctx->inv_s_blocks, inv_s_blocks_default, SBOX_LEN);
-        memcpy(ctx->p_boxrowcol, subrowcol_default, 8 * 256 * sizeof(uint64_t));
-        memcpy(ctx->p_inv_boxrowcol, inv_subrowcol_default, 8 * 256 * sizeof(uint64_t));
+        ctx->s_blocks = s_blocks_default;
+        ctx->inv_s_blocks = inv_s_blocks_default;
+        ctx->p_boxrowcol = subrowcol_default;
+        ctx->p_inv_boxrowcol = inv_subrowcol_default;
         break;
     default:
         SET_ERROR(RET_INVALID_PARAM);
     }
 
 cleanup:
-
+    if (ret != RET_OK) {
+        dstu7624_free(ctx);
+        ctx = NULL;
+    }
     return ctx;
 }
 
 static Dstu7624Ctx *dstu7624_alloc_user_sbox_core(const uint8_t *s_blocks, size_t sbox_len)
 {
     Dstu7624Ctx *ctx = NULL;
+    Dstu7624Tables *tables;
     int ret = RET_OK;
-
     CHECK_PARAM(s_blocks != NULL);
     CHECK_PARAM(sbox_len == SBOX_LEN);
-
-    CALLOC_CHECKED(ctx, sizeof (Dstu7624Ctx));
-
-    memcpy(ctx->s_blocks, s_blocks, SBOX_LEN);
-    p_sub_row_col(s_blocks, ctx->p_boxrowcol, mds_matrix);
-    generate_reverse_table(s_blocks, ctx->inv_s_blocks);
-    p_sub_row_col(ctx->inv_s_blocks, ctx->p_inv_boxrowcol, mds_matrix_reverse);
-
+    CALLOC_CHECKED(ctx, sizeof(*ctx));
+    CALLOC_CHECKED(ctx->owned_tables, sizeof(*ctx->owned_tables));
+    tables = ctx->owned_tables;
+    memcpy(tables->s_blocks, s_blocks, SBOX_LEN);
+    p_sub_row_col(s_blocks, tables->p_boxrowcol, mds_matrix);
+    generate_reverse_table(s_blocks, tables->inv_s_blocks);
+    p_sub_row_col(tables->inv_s_blocks, tables->p_inv_boxrowcol, mds_matrix_reverse);
+    ctx->s_blocks = tables->s_blocks;
+    ctx->inv_s_blocks = tables->inv_s_blocks;
+    ctx->p_boxrowcol = tables->p_boxrowcol;
+    ctx->p_inv_boxrowcol = tables->p_inv_boxrowcol;
 cleanup:
-
+    if (ret != RET_OK) {
+        dstu7624_free(ctx);
+        ctx = NULL;
+    }
     return ctx;
 }
 
@@ -1440,35 +1481,31 @@ cleanup:
     return ctx;
 }
 
+static void clear_mode(Dstu7624Ctx *ctx)
+{
+    switch (ctx->mode_id) {
+    case DSTU7624_MODE_CCM:
+        ba_free_private(ctx->mode.ccm.key);
+        ba_free(ctx->mode.ccm.iv_tmp);
+        break;
+    case DSTU7624_MODE_XTS: gf2m_free(ctx->mode.xts.gf2m_ctx); break;
+    case DSTU7624_MODE_GCM: gf2m_free(ctx->mode.gcm.gf2m_ctx); break;
+    case DSTU7624_MODE_GMAC: gf2m_free(ctx->mode.gmac.gf2m_ctx); break;
+    default: break;
+    }
+    memset(&ctx->mode, 0, sizeof(ctx->mode));
+    ctx->mode_id = DSTU7624_MODE_ECB;
+}
+
 void dstu7624_free(Dstu7624Ctx *ctx)
 {
     if (ctx) {
-        switch (ctx->mode_id) {
-        case DSTU7624_MODE_CTR:
-            break;
-        case DSTU7624_MODE_CBC:
-            break;
-        case DSTU7624_MODE_OFB:
-            break;
-        case DSTU7624_MODE_CFB:
-            break;
-        case DSTU7624_MODE_CCM:
-            break;
-        case DSTU7624_MODE_CMAC:
-            break;
-        case DSTU7624_MODE_XTS:
-            gf2m_free(ctx->mode.xts.gf2m_ctx);
-            break;
-        case DSTU7624_MODE_GCM:
-            gf2m_free(ctx->mode.gcm.gf2m_ctx);
-            break;
-        case DSTU7624_MODE_GMAC:
-            gf2m_free(ctx->mode.gmac.gf2m_ctx);
-            break;
-        default:
-            break;
+        clear_mode(ctx);
+        if (ctx->owned_tables) {
+            secure_zero(ctx->owned_tables, sizeof(*ctx->owned_tables));
+            free(ctx->owned_tables);
         }
-        secure_zero(ctx, sizeof (Dstu7624Ctx));
+        secure_zero(ctx, sizeof(*ctx));
         free(ctx);
     }
 }
@@ -1536,25 +1573,15 @@ static __inline void basic_transform_128_256(Dstu7624Ctx *ctx, uint64_t *state)
 
 static __inline void basic_transform_256(Dstu7624Ctx *ctx, uint64_t *state)
 {
-    uint64_t point[4] = {0, 0, 0, 0};
-    uint64_t *rkey = (uint64_t *) ctx->p_rkeys;
-
-    state[0] += rkey[0];
-    state[1] += rkey[1];
-    state[2] += rkey[2];
-    state[3] += rkey[3];
-    BT_xor256(state, point, rkey + 4);
-    BT_xor256(point, state, rkey + 8);
-    BT_xor256(state, point, rkey + 12);
-    BT_xor256(point, state, rkey + 16);
-    BT_xor256(state, point, rkey + 20);
-    BT_xor256(point, state, rkey + 24);
-    BT_xor256(state, point, rkey + 28);
-    BT_xor256(point, state, rkey + 32);
-    BT_xor256(state, point, rkey + 36);
-    BT_xor256(point, state, rkey + 40);
-    BT_xor256(state, point, rkey + 44);
-    BT_xor256(point, state, rkey + 48);
+    uint64_t point[4];
+    const uint64_t *rkey = ctx->p_rkeys;
+    size_t r;
+    state[0] += rkey[0]; state[1] += rkey[1];
+    state[2] += rkey[2]; state[3] += rkey[3];
+    for (r = 1; r < 13; r += 2) {
+        BT_xor256(state, point, rkey + 4*r);
+        BT_xor256(point, state, rkey + 4*r + 4);
+    }
     BT_xor256(state, point, rkey + 52);
     BT_add256(point, state, rkey + 56);
 }
@@ -1644,7 +1671,7 @@ static __inline void subrowcol512(uint64_t *state, Dstu7624Ctx *ctx)
 }
 
 __inline static void inv_subrowcol_xor128(const uint64_t *state, uint64_t *out, const uint64_t *rkey,
-        uint64_t boxrowcol[8][256])
+        const uint64_t boxrowcol[8][256])
 {
     uint64_t s0 = state[0];
     uint64_t s1 = state[1];
@@ -1669,7 +1696,7 @@ __inline static void inv_subrowcol_xor128(const uint64_t *state, uint64_t *out, 
 }
 
 __inline static void inv_subrowcol_xor256(const uint64_t *state, uint64_t *out, const uint64_t *rkey,
-        uint64_t boxrowcol[8][256])
+        const uint64_t boxrowcol[8][256])
 {
     uint64_t s0 = state[0];
     uint64_t s1 = state[1];
@@ -1710,7 +1737,7 @@ __inline static void inv_subrowcol_xor256(const uint64_t *state, uint64_t *out, 
 }
 
 __inline static void inv_subrowcol_xor512(const uint64_t *state, uint64_t *out, const uint64_t *rkey,
-        uint64_t boxrowcol[8][256])
+        const uint64_t boxrowcol[8][256])
 {
     uint64_t s0 = state[0];
     uint64_t s1 = state[1];
@@ -1927,7 +1954,7 @@ static __inline void inv_subrowcol_sub(const uint64_t *state, uint64_t *out, con
 static __inline void invert_state(uint64_t *state, Dstu7624Ctx *ctx)
 {
     size_t block_len = ctx->block_len;
-    uint8_t *s_blocks = ctx->s_blocks;
+    const uint8_t *s_blocks = ctx->s_blocks;
 
     if (block_len == KALINA_128_BLOCK_LEN) {
         state[0] = ctx->p_inv_boxrowcol[0][s_blocks[0 * 256 + (state[0] & 0xFF)]] ^
@@ -2487,8 +2514,7 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
     CHECK_PARAM(block_size == KALINA_128_BLOCK_LEN || block_size == KALINA_256_BLOCK_LEN || 
         block_size == KALINA_512_BLOCK_LEN);
 
-    gf2m_free(ctx->mode.gmac.gf2m_ctx);
-    ctx->mode.gmac.gf2m_ctx = NULL;
+    clear_mode(ctx);
 
     key_buf = key->buf;
     key_buf_len = key->len;
@@ -2542,8 +2568,12 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
     DO(p_help_round_key(key, ctx, p_hrkey));
     DO(precomputed_rkeys(ctx, p_key_shifts, p_hrkey));
 
-    memcpy(&ctx->p_rkeys_rev[0], &ctx->p_rkeys[0], MAX_BLOCK_LEN * 20);
+    memcpy(ctx->p_rkeys_rev, ctx->p_rkeys, (ctx->rounds + 1) * ctx->block_len);
     reverse_rkey(ctx->p_rkeys_rev, ctx);
+#if DSTU_AVX512
+    ctx->use_avx512 = !ctx->owned_tables && key_buf_len == 32 && block_size == 32 && dstu_avx512_available();
+    if (ctx->use_avx512) k256_prepare(ctx->p_rkeys, &ctx->simd);
+#endif
 
 cleanup:
 
@@ -2727,13 +2757,10 @@ cleanup:
     return ret;
 }
 
-static void gamma_gen(uint8_t *gamma)
+static void gamma_gen(uint8_t *gamma, size_t len)
 {
-    size_t i = 0;
-
-    do {
-        gamma[i]++;
-    } while (gamma[i++] == 0);
+    size_t i;
+    for (i = 0; i < len; i++) if (++gamma[i]) break;
 }
 
 static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
@@ -2760,18 +2787,35 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
         }
 
         if (offset == ctx->block_len) {
-            gamma_gen(feed);
+            gamma_gen(feed, ctx->block_len);
             crypt_basic_transform(ctx, feed, gamma);
             offset = 0;
         }
     }
+
+#if DSTU_AVX512
+    if (ctx->use_avx512 && offset == 0) {
+        uint8_t counters[512], next[512];
+        for (; src->len - data_off >= sizeof(next); data_off += sizeof(next)) {
+            for (size_t i = 0; i < sizeof(counters); i += 32) {
+                gamma_gen(feed, 32);
+                memcpy(counters + i, feed, 32);
+            }
+            kalyna256_encrypt16(&ctx->simd, counters, next);
+            kalyna_xor(src->buf + data_off, gamma, 32, out->buf + data_off);
+            for (size_t i = 32; i < sizeof(next); i++)
+                out->buf[data_off + i] = src->buf[data_off + i] ^ next[i - 32];
+            memcpy(gamma, next + 480, 32);
+        }
+    }
+#endif
 
     if (data_off < src->len) {
         /* Шифрування блоками по 8 байт. */
         for (; data_off + ctx->block_len <= src->len; data_off += ctx->block_len) {
             kalyna_xor(&src->buf[data_off], gamma, ctx->block_len, &out->buf[data_off]);
 
-            gamma_gen(feed);
+            gamma_gen(feed, ctx->block_len);
             crypt_basic_transform(ctx, feed, gamma);
         }
         /* Шифрування последнйого неполного блока. */
@@ -2896,114 +2940,52 @@ cleanup:
     return ret;
 }
 
-static int encrypt_ecb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
+static int crypt_ecb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out, int decrypt)
 {
-    uint64_t *plain_data = NULL;
-    size_t block_len_word;
-    size_t plain_data_size_word;
-    size_t i;
+    ByteArray *result = NULL;
+    size_t i = 0;
     int ret = RET_OK;
-    block_len_word = ctx->block_len >> 3;
-
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(in != NULL);
     CHECK_PARAM(out != NULL);
-
-    if (in->len % ctx->block_len != 0) {
-        SET_ERROR(RET_INVALID_DATA_LEN);
+    if (in->len % ctx->block_len) SET_ERROR(RET_INVALID_DATA_LEN);
+    CHECK_NOT_NULL(result = ba_alloc_by_len(in->len));
+#if DSTU_AVX512
+    if (!decrypt && ctx->use_avx512) {
+        for (; in->len - i >= 512; i += 512)
+            kalyna256_encrypt16(&ctx->simd, in->buf + i, result->buf + i);
     }
-
-    DO(ba_to_uint64_with_alloc(in, &plain_data, &plain_data_size_word));
-
-    for (i = 0; i < plain_data_size_word; i += block_len_word) {
-        ctx->basic_transform(ctx, &plain_data[i]);
+#endif
+    for (; i < in->len; i += ctx->block_len) {
+        if (decrypt) decrypt_basic_transform(ctx, in->buf + i, result->buf + i);
+        else crypt_basic_transform(ctx, in->buf + i, result->buf + i);
     }
-
-    CHECK_NOT_NULL(*out = ba_alloc_from_uint64(plain_data, plain_data_size_word));
-
+    *out = result;
 cleanup:
-
-    free(plain_data);
-
     return ret;
+}
+
+static int encrypt_ecb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
+{
+    return crypt_ecb(ctx, in, out, 0);
 }
 
 static int decrypt_ecb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
 {
-    uint64_t *plain_data = NULL;
-    size_t block_len_word;
-    size_t plain_data_size_word;
-    size_t i;
-    int ret = RET_OK;
-    block_len_word = ctx->block_len >> 3;
-
-    CHECK_PARAM(ctx != NULL);
-    CHECK_PARAM(in != NULL);
-    CHECK_PARAM(out != NULL);
-
-    if (in->len % ctx->block_len != 0) {
-        SET_ERROR(RET_INVALID_DATA_LEN);
-    }
-
-    DO(ba_to_uint64_with_alloc(in, &plain_data, &plain_data_size_word));
-
-    for (i = 0; i < plain_data_size_word; i += block_len_word) {
-        ctx->subrowcol_dec(ctx, &plain_data[i]);
-    }
-
-    CHECK_NOT_NULL(*out = ba_alloc_from_uint64(plain_data, plain_data_size_word));
-
-cleanup:
-
-    free(plain_data);
-
-    return ret;
+    return crypt_ecb(ctx, in, out, 1);
 }
+
+#include "dstu7624-gf-internal.h"
 
 static int gf2m_mul(Gf2mCtx *ctx, size_t block_len, uint8_t *arg1, uint8_t *arg2, uint8_t *out)
 {
-    WordArray *wa_arg1 = NULL;
-    WordArray *wa_arg2 = NULL;
-    WordArray *wa_res = NULL;
-    int ret = RET_OK;
-    size_t mod_len;
-    size_t old_len;
-
-    CHECK_PARAM(ctx != NULL);
-    CHECK_PARAM(arg1 != NULL);
-    CHECK_PARAM(arg2 != NULL);
-    CHECK_PARAM(out != NULL);
-
-    CHECK_NOT_NULL(wa_arg2 = wa_alloc_from_uint8(arg2, block_len));
-    CHECK_NOT_NULL(wa_arg1 = wa_alloc_from_uint8(arg1, block_len));
-
-    mod_len = ctx->len;
-    old_len = wa_arg1->len;
-
-    CHECK_NOT_NULL(wa_res = wa_alloc(mod_len));
-
-    wa_change_len(wa_arg1, mod_len);
-    wa_change_len(wa_arg2, mod_len);
-
-    gf2m_mod_mul(ctx, wa_arg1, wa_arg2, wa_res);
-
-    wa_res->len = old_len;
-    DO(wa_to_uint8(wa_res, out, block_len));
-    wa_res->len = mod_len;
-
-cleanup:
-
-    wa_free(wa_res);
-    wa_free(wa_arg2);
-    wa_free(wa_arg1);
-
-    return ret;
+    kalyna_field_mul(ctx->clmul, block_len, arg1, arg2, out);
+    return RET_OK;
 }
 
 static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
 {
     uint8_t *plain_data = NULL;
-    uint8_t two[64] = {0};
     uint8_t gamma[64] = {0};
     size_t plain_size;
     size_t i;
@@ -3017,7 +2999,6 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_PARAM(out != NULL);
 
     block_len = ctx->block_len;
-    two[0] = 2;
 
     plain_size = ba_get_len(in);
 
@@ -3034,7 +3015,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_len; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        kalyna_field_mulx(block_len, gamma);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3047,7 +3028,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         i -= plain_size % block_len;
 
         //Конвертируем а для бе машин.
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        kalyna_field_mulx(block_len, gamma);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3102,7 +3083,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_num; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        kalyna_field_mulx(block_len, gamma);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3111,8 +3092,9 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     if (padded_len != block_len) {
         //Если было дополнение, на вход приходят последний и предпоследний блок
         //Так как при дополнении в шифровании меняются местами последний и предпоследний блоки, расшифровуем последний блок, как предпоследний
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, two));
+        kalyna_field_mulx(block_len, gamma);
+        memcpy(two, gamma, block_len);
+        kalyna_field_mulx(block_len, two);
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
@@ -3183,6 +3165,8 @@ cleanup:
     return ret;
 }
 
+#include "dstu7624-scalar-internal.h"
+
 static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 {
     size_t offset = ctx->mode.cfb.used_gamma_len;
@@ -3205,6 +3189,29 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
         if (offset == ctx->block_len) {
             crypt_basic_transform(ctx, feed, gamma);
             offset = ctx->block_len - q;
+        }
+    }
+
+    if (q == 32 && ctx->block_len == 32 && ctx->key_len == 32 && !ctx->owned_tables && offset == 0 && in->len - data_off >= 32) {
+        uint64_t g[4];
+        size_t i;
+        for (i = 0; i < 4; i++) g[i] = load64le(gamma + 8*i);
+        for (; in->len - data_off >= 32; data_off += 32) {
+            for (i = 0; i < 4; i++) {
+                g[i] ^= load64le(in->buf + data_off + 8*i);
+                store64le(out->buf + data_off + 8*i, g[i]);
+            }
+            kalyna256_scalar1(ctx->p_rkeys, 14, g);
+        }
+        for (i = 0; i < 4; i++) store64le(gamma + 8*i, g[i]);
+        memcpy(feed, out->buf + data_off - 32, 32);
+    }
+
+    if (q == ctx->block_len && offset == 0) {
+        for (; in->len - data_off >= q; data_off += q) {
+            kalyna_xor(in->buf + data_off, gamma, q, out->buf + data_off);
+            memcpy(feed, out->buf + data_off, q);
+            crypt_basic_transform(ctx, feed, gamma);
         }
     }
 
@@ -3441,131 +3448,77 @@ cleanup:
 
 static int gmac_update(Dstu7624Ctx *ctx, const ByteArray *plain_data)
 {
-    uint8_t *data_buf = NULL;
-    uint8_t *last_block = NULL;
-    uint64_t *B = NULL;
-    uint64_t *H = NULL;
-    uint8_t H8[MAX_BLOCK_LEN];
-    uint8_t B8[MAX_BLOCK_LEN];
-    size_t data_len;
-    size_t block_len;
-    size_t tail_len;
-    size_t last_block_len;
-    size_t i;
+    uint8_t B[64], H[64];
+    const uint8_t *data;
+    size_t len, take, block_len, i;
+    Dstu7624GmacCtx *mac;
     int ret = RET_OK;
-
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(plain_data != NULL);
-
-    B = ctx->mode.gmac.B;
-    H = ctx->mode.gmac.H;
+    if (!plain_data->len) goto cleanup;
+    CHECK_PARAM(plain_data->buf != NULL);
+    mac = &ctx->mode.gmac;
     block_len = ctx->block_len;
-    last_block = ctx->mode.gmac.last_block;
-    last_block_len = ctx->mode.gmac.last_block_len;
-
-    //Приводим данные к u8 типу
-    DO(uint64_to_uint8(B, block_len >> 3, B8, block_len));
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-
-    data_buf = plain_data->buf;
-    data_len = plain_data->len;
-
-    ctx->mode.gmac.msg_tot_len += data_len;
-    //Если последний блок не пустой:
-    if (last_block_len != 0) {
-        /*Если длинна последнего блока и данных в сумме меньше размера блока*/
-        if (last_block_len + data_len < block_len) {
-            //Добавляем в конец последнего блока новые данные
-            memcpy(&last_block[last_block_len], data_buf, data_len);
-            ctx->mode.gmac.last_block_len += data_len;
-            goto cleanup;
-        } else {
-            //Ксорим последний блок с текущими данными
-            kalyna_xor(last_block, B8, last_block_len, B8);
-            tail_len = block_len - last_block_len;
-            //Ксорим первые байты из пришедшего блока, до размера блока.
-            kalyna_xor(data_buf, &B8[last_block_len], tail_len, &B[last_block_len]);
-            data_len -= tail_len;
-        }
-    } else {
-
-        if (data_len >= block_len) {
-            kalyna_xor(&data_buf[0], B8, block_len, B8);
-        } else {
-            memcpy(last_block, data_buf, data_len);
-            ctx->mode.gmac.last_block_len = data_len;
-            goto cleanup;
-        }
+    data = plain_data->buf;
+    len = plain_data->len;
+    mac->msg_tot_len += len;
+    for (i = 0; i < block_len / 8; i++) {
+        store64le(B + 8*i, mac->B[i]);
+        store64le(H + 8*i, mac->H[i]);
     }
-    //Высчитываем остаток
-    tail_len = (block_len - data_len % block_len) % block_len;
-
-    data_len -= tail_len;
-    for (i = 0; i < data_len; i += block_len) {
-        DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
-        if ((i + block_len) < data_len) {
-            kalyna_xor(&data_buf[i], B8, block_len, B8);
-        }
+    if (mac->last_block_len) {
+        take = block_len - mac->last_block_len;
+        if (take > len) take = len;
+        memcpy(mac->last_block + mac->last_block_len, data, take);
+        mac->last_block_len += take;
+        data += take;
+        len -= take;
+        if (mac->last_block_len < block_len) goto cleanup;
+        kalyna_xor(mac->last_block, B, block_len, B);
+        gf2m_mul(mac->gf2m_ctx, block_len, B, H, B);
+        mac->last_block_len = 0;
     }
-
-    if (tail_len != 0) {
-        memcpy(last_block, &data_buf[i], tail_len);
-        ctx->mode.gmac.last_block_len = tail_len;
+    while (len >= block_len) {
+        kalyna_xor(data, B, block_len, B);
+        gf2m_mul(mac->gf2m_ctx, block_len, B, H, B);
+        data += block_len;
+        len -= block_len;
     }
-
-    DO(uint8_to_uint64(B8, block_len, B, block_len >> 3));
-
+    if (len) memcpy(mac->last_block, data, len);
+    mac->last_block_len = len;
+    for (i = 0; i < block_len / 8; i++) mac->B[i] = load64le(B + 8*i);
 cleanup:
-
     return ret;
 }
 
 static int gmac_final(Dstu7624Ctx *ctx, ByteArray **mac)
 {
-    uint8_t *last_block = NULL;
-    uint64_t *H;
-    uint64_t *B;
-    uint8_t B8[MAX_BLOCK_LEN];
-    uint8_t H8[MAX_BLOCK_LEN];
-    size_t last_block_len;
-    size_t block_len;
+    uint8_t B[64], H[64];
+    uint64_t state[8];
+    size_t len, block_len, padded_len, i;
     int ret = RET_OK;
-
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(mac != NULL);
-
-    B = ctx->mode.gmac.B;
-    H = ctx->mode.gmac.H;
     block_len = ctx->block_len;
-    last_block = ctx->mode.gmac.last_block;
-    last_block_len = ctx->mode.gmac.last_block_len;
-
-    DO(uint64_to_uint8(B, block_len >> 3, B8, block_len));
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-
-    // Проверяем, нужно ли достчитывать последний блок.
-    if (last_block_len != 0) {
-        //Если последний блок не нулевой, дополняем его.
-        padding(ctx, last_block, &last_block_len, last_block);
-
-        kalyna_xor(&last_block, B8, last_block_len, B8);
-        DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
+    len = ctx->mode.gmac.last_block_len;
+    padded_len = ctx->mode.gmac.msg_tot_len;
+    for (i = 0; i < block_len / 8; i++) {
+        store64le(B + 8*i, ctx->mode.gmac.B[i]);
+        store64le(H + 8*i, ctx->mode.gmac.H[i]);
     }
-    memset(H, 0, MAX_BLOCK_LEN);
-
-    //Записываем длинну всего сообщения в битах
-    H[0] = ctx->mode.gmac.msg_tot_len << 3;
-
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-    kalyna_xor(H8, B8, block_len, H8);
-    DO(uint8_to_uint64(H8, block_len, H, block_len >> 3));
-    ctx->basic_transform(ctx, H);
-
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-    CHECK_NOT_NULL(*mac = ba_alloc_from_uint8(H8, ctx->mode.gmac.q));
-
+    if (len) {
+        /* Match the one-shot GMAC padding and encoded padded bit length. */
+        padded_len += block_len - len;
+        padding(ctx, ctx->mode.gmac.last_block, &len, ctx->mode.gmac.last_block);
+        kalyna_xor(ctx->mode.gmac.last_block, B, block_len, B);
+        gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B, H, B);
+    }
+    for (i = 0; i < block_len / 8; i++) state[i] = load64le(B + 8*i);
+    state[0] ^= (uint64_t)padded_len << 3;
+    ctx->basic_transform(ctx, state);
+    for (i = 0; i < block_len / 8; i++) store64le(H + 8*i, state[i]);
+    CHECK_NOT_NULL(*mac = ba_alloc_from_uint8(H, ctx->mode.gmac.q));
 cleanup:
-
     return ret;
 }
 
@@ -3781,6 +3734,48 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
         if (offset == ctx->block_len) {
             crypt_basic_transform(ctx, feed, gamma);
             offset = ctx->block_len - q;
+        }
+    }
+
+#if DSTU_AVX512
+    if (ctx->use_avx512 && q == 32 && offset == 0) {
+        uint8_t next[512];
+        for (; in->len - data_off >= sizeof(next); data_off += sizeof(next)) {
+            const uint8_t *cipher = in->buf + data_off;
+            kalyna256_encrypt16(&ctx->simd, cipher, next);
+            kalyna_xor(cipher, gamma, 32, out->buf + data_off);
+            for (size_t i = 32; i < sizeof(next); i++)
+                out->buf[data_off + i] = cipher[i] ^ next[i - 32];
+            memcpy(gamma, next + 480, 32);
+            memcpy(feed, cipher + 480, 32);
+        }
+    }
+#endif
+
+    if (q == 32 && ctx->block_len == 32 && ctx->key_len == 32 && !ctx->owned_tables && offset == 0) {
+        for (; in->len - data_off >= 64; data_off += 64) {
+            uint64_t a[4], b[4];
+            size_t i;
+            for (i = 0; i < 4; i++) {
+                a[i] = load64le(in->buf + data_off + 8*i);
+                b[i] = load64le(in->buf + data_off + 32 + 8*i);
+            }
+            kalyna256_scalar2(ctx->p_rkeys, 14, a, b);
+            kalyna_xor(in->buf + data_off, gamma, 32, out->buf + data_off);
+            for (i = 0; i < 4; i++) {
+                store64le(out->buf + data_off + 32 + 8*i,
+                    load64le(in->buf + data_off + 32 + 8*i) ^ a[i]);
+                store64le(gamma + 8*i, b[i]);
+            }
+            memcpy(feed, in->buf + data_off + 32, 32);
+        }
+    }
+
+    if (q == ctx->block_len && offset == 0) {
+        for (; in->len - data_off >= q; data_off += q) {
+            kalyna_xor(in->buf + data_off, gamma, q, out->buf + data_off);
+            memcpy(feed, in->buf + data_off, q);
+            crypt_basic_transform(ctx, feed, gamma);
         }
     }
 
@@ -4150,10 +4145,11 @@ int dstu7624_init_ccm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
 
     CHECK_PARAM(q <= ctx->block_len);
 
-    ctx->mode.ccm.key = key;
+    ctx->mode_id = DSTU7624_MODE_CCM;
+    CHECK_NOT_NULL(ctx->mode.ccm.key = ba_copy_with_alloc(key, 0, 0));
 
     DO(ba_to_uint8(iv, ctx->mode.ccm.iv, ctx->block_len));
-    ctx->mode.ccm.iv_tmp = iv;
+    CHECK_NOT_NULL(ctx->mode.ccm.iv_tmp = ba_copy_with_alloc(iv, 0, 0));
     ctx->mode.ccm.q = q;
     ctx->mode.ccm.nb = (size_t) (((n_max - 3) >> 3) + 1);
 

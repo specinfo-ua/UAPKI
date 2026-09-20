@@ -30,6 +30,8 @@
 
 #include "cer-item.h"
 #include "crl-item.h"
+#include <memory>
+#include <unordered_map>
 
 
 namespace UapkiNS {
@@ -39,7 +41,7 @@ namespace Crl {
 
 class CrlStore {
     std::mutex  m_Mutex;
-    std::mutex  m_MutexFirstDownloading;
+    std::unordered_map<std::string, std::shared_ptr<std::mutex>> m_DownloadMutexes;
     std::string m_Path;
     bool        m_UseDeltaCrl;
     std::vector<CrlItem*>
@@ -86,9 +88,7 @@ public:
     );
 
 public:
-    std::mutex& getMutexFirstDownloading (void) {
-        return m_MutexFirstDownloading;
-    }
+    std::shared_ptr<std::mutex> getDownloadMutex(const ByteArray* authorityKeyId);
     bool useDeltaCrl (void) const {
         return m_UseDeltaCrl;
     }

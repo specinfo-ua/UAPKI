@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/crl-info.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 #include "store-json.h"
 #include "uapki-errors.h"
@@ -54,7 +53,7 @@ static int crl_info_to_json (
 }   //  crl_info_to_json
 
 
-int uapki_crl_info (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_crl_info (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     const bool show_revcerts = ParsonHelper::jsonObjectGetBoolean(joParams, "showRevokedCerts", true);
@@ -75,7 +74,7 @@ int uapki_crl_info (JSON_Object* joParams, JSON_Object* joResult)
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
 
-        Crl::CrlStore* crl_store = get_crlstore();
+        Crl::CrlStore* crl_store = context.crlStore();
         if (!crl_store) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
         }

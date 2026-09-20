@@ -30,18 +30,18 @@
 #include "api-json-internal.h"
 
 
-int uapki_list_providers (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_list_providers (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joParams;
     int ret = RET_OK;
     JSON_Array* ja_providers = NULL;
-    const size_t count = CmProviders::count();
+    const size_t count = context.countProviders();
 
     DO_JSON(json_object_set_value(joResult, "providers", json_value_init_array()));
     ja_providers = json_object_get_array(joResult, "providers");
     for (size_t i = 0; i < count; i++) {
         DO_JSON(json_array_append_value(ja_providers, json_value_init_object()));
-        DO(CmProviders::getInfo(i, json_array_get_object(ja_providers, i)));
+        DO(context.providerInfo(i, json_array_get_object(ja_providers, i)));
     }
 
 cleanup:

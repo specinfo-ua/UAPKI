@@ -307,8 +307,9 @@ cleanup:
     return ret;
 }
 
-int uapki_verify_csr (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_verify_csr (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     int ret = RET_OK;
     SmartBA sba_encoded, sba_signvalue, sba_spki, sba_tbs;
     const char* s_signalgo = nullptr;

@@ -92,8 +92,9 @@ cleanup:
 }   //  result_signinfo_to_json
 
 
-int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_modify_cms (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     int ret = RET_OK;
     Pkcs7::SignedDataParser sdata_parser, sdata2_parser;
     vector<Pkcs7::SignedDataParser::SignerInfo> parsed_signerinfos;
@@ -312,10 +313,34 @@ int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult)
             }
 
             bool equal_digest = false;
-            for (const auto& it : parsed_signerinfos) {
-                equal_digest = (parsed2_signerinfo.getDigestAlgorithm().algorithm == it.getDigestAlgorithm().algorithm) &&
-                    (ba_cmp(parsed2_signerinfo.getMessageDigest(), it.getMessageDigest()) == 0);
-                if (equal_digest) break;
+            if (refba_content) {
+                //  The actual content is known (already embedded in the base
+                //  CMS or supplied via add.content in this call) — use it as
+                //  the ground truth: hash it with the added signerInfo's own
+                //  digest algorithm and compare. This is stronger than only
+                //  comparing against already-present signerInfos' digest
+                //  values (those were never independently validated against
+                //  the real content by this function) and also allows
+                //  combining signatures that use different digest algorithms
+                //  (e.g. independently produced DSTU/Kupyna and GOST-34.311
+                //  signatures over the same document).
+                const HashAlg hash_alg2 = hash_from_oid(parsed2_signerinfo.getDigestAlgorithm().algorithm.c_str());
+                if (hash_alg2 == HashAlg::HASH_ALG_UNDEFINED) {
+                    SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+                }
+                SmartBA sba_digestmessage2;
+                DO(::hash(hash_alg2, refba_content, &sba_digestmessage2));
+                equal_digest = (ba_cmp(parsed2_signerinfo.getMessageDigest(), sba_digestmessage2.get()) == 0);
+            }
+            else {
+                //  No actual content is available (fully detached signature,
+                //  no add.content supplied) — the best available check is
+                //  consistency with an already-present signerInfo's digest.
+                for (const auto& it : parsed_signerinfos) {
+                    equal_digest = (parsed2_signerinfo.getDigestAlgorithm().algorithm == it.getDigestAlgorithm().algorithm) &&
+                        (ba_cmp(parsed2_signerinfo.getMessageDigest(), it.getMessageDigest()) == 0);
+                    if (equal_digest) break;
+                }
             }
             if (!equal_digest) {
                 SET_ERROR(RET_UAPKI_INVALID_DIGEST);

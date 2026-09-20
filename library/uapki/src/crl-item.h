@@ -126,13 +126,15 @@ private:
     const ByteArray*
                 m_DeltaCrl;
     Uris        m_Uris;
-    Cert::VerifyStatus
+    std::atomic<Cert::VerifyStatus>
                 m_StatusSign;
+    int         m_VerifyError;
+    std::string m_VerifyIssuer;
     std::vector<UapkiNS::OtherHash*>
                 m_CrlHashes;
     const ByteArray*
                 m_CrlIdentifier;
-    Actuality   m_Actuality;
+    std::atomic<Actuality> m_Actuality;
 
 public:
     CrlItem (

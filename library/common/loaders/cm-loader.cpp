@@ -40,6 +40,9 @@
 using namespace std;
 
 
+void* const CmLoader::STATIC_HANDLE = (void*)1;
+
+
 #ifdef __EMSCRIPTEN__
 //  WASM build has no dynamic loading - the cm-pkcs12 provider is linked
 //  statically and its exported API is referenced directly.
@@ -116,25 +119,48 @@ bool CmLoader::load (
 #else
     (void)libName;
     (void)dir;
-    m_Api.hlib          = (void*)1; //  fake non-null handle, see isLoaded()
-    m_Api.info          = provider_info;
-    m_Api.init          = provider_init;
-    m_Api.deinit        = provider_deinit;
-    m_Api.list_storages = nullptr;
-    m_Api.storage_info  = nullptr;
-    m_Api.open          = (cm_provider_open_f)provider_open;
-    m_Api.close         = provider_close;
-    m_Api.format        = nullptr;
-    m_Api.block_free    = block_free;
-    m_Api.bytearray_free = bytearray_free;
-    return true;
+    const CM_STATIC_PROVIDER_FUNCS funcs = {
+        provider_info, provider_init, provider_deinit,
+        nullptr, nullptr,
+        (cm_provider_open_f)provider_open, provider_close,
+        block_free, bytearray_free
+    };
+    return loadStatic(funcs);
 #endif
+}
+
+bool CmLoader::loadStatic (
+        const CM_STATIC_PROVIDER_FUNCS& funcs
+)
+{
+    unload();
+
+    const bool ok = (funcs.info && funcs.init && funcs.deinit && funcs.open && funcs.close
+        && funcs.block_free && funcs.bytearray_free);
+    DEBUG_OUTCON(printf("CmLoader.loadStatic(), ok: %d\n", ok));
+    if (!ok) return false;
+
+    memset(&m_Api, 0, sizeof(CM_PROVIDER_API));
+    m_Api.hlib           = STATIC_HANDLE;
+    m_Api.info           = funcs.info;
+    m_Api.init           = funcs.init;
+    m_Api.deinit         = funcs.deinit;
+    m_Api.list_storages  = funcs.list_storages;
+    m_Api.storage_info   = funcs.storage_info;
+    m_Api.open           = funcs.open;
+    m_Api.close          = funcs.close;
+    m_Api.format         = nullptr;
+    m_Api.block_free     = funcs.block_free;
+    m_Api.bytearray_free = funcs.bytearray_free;
+    return true;
 }
 
 void CmLoader::unload (void)
 {
     if (isLoaded()) {
-        DL_FREE_LIBRARY(m_Api.hlib);
+        if (!isStatic()) {
+            DL_FREE_LIBRARY(m_Api.hlib);
+        }
         memset(&m_Api, 0, sizeof(CM_PROVIDER_API));
     }
 }

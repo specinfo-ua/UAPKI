@@ -512,15 +512,16 @@ int ecp_calc_comb_precomp(EcGfpCtx *ctx, const ECPoint *p, int width, EcPrecomp 
         }
 
         for (i = 2; i < comb_len; i++) {
-            for (j = 0; j < width; j++) {
-                int power_precomp_ind = (1 << j) - 1;
-                if ((((i + 1) >> j) & 1) && (i != power_precomp_ind)) {
-                    ecp_add_point(ctx, comb->precomp[i], comb->precomp[power_precomp_ind]->x, comb->precomp[power_precomp_ind]->y, 1,
-                            comb->precomp[i]);
-                }
+            int power_precomp_ind;
+            for (j = width - 1; (((i + 1) >> j) & 1) == 0; j--);
+            power_precomp_ind = (1 << j) - 1;
+            if (i != power_precomp_ind) {
+                ecp_add_point(ctx, comb->precomp[i - (1 << j)], comb->precomp[power_precomp_ind]->x, comb->precomp[power_precomp_ind]->y, 1,
+                        comb->precomp[i]);
             }
-            ecp_point_to_affine(ctx, comb->precomp[i]);
         }
+
+        DO(ecp_points_to_affine(ctx, comb->precomp, 0, comb_len));
     }
 
     *precomp1 = precomp;

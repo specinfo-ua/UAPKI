@@ -28,22 +28,17 @@
 #define FILE_MARKER "uapki/api/library-deinit.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
-#include "http-helper.h"
 
 
 using namespace UapkiNS;
 
 
-int uapki_deinit (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_deinit (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joParams;
     (void)joResult;
 
-    release_config();
-    CmProviders::deinit();
-    release_stores();
-    HttpHelper::deinit();
+    context.session().deinit();
 
     return RET_OK;
 }

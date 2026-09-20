@@ -52,11 +52,9 @@ int Util::algorithmIdentifierFromAsn1 (
 )
 {
     int ret = RET_OK;
-    char* s_algo = nullptr;
 
     //  =algorithm=
-    DO(asn_oid_to_text(&asn1.algorithm, &s_algo));
-    algoId.algorithm = string(s_algo);
+    DO(oidFromAsn1(&asn1.algorithm, algoId.algorithm));
 
     //  =parameters=
     if (asn1.parameters) {
@@ -67,7 +65,6 @@ int Util::algorithmIdentifierFromAsn1 (
     }
 
 cleanup:
-    uapkif_free(s_algo);
     return ret;
 }
 
@@ -1035,6 +1032,13 @@ int Util::oidFromAsn1 (
         string& sOid
 )
 {
+    char buf[ASN_OID_TEXT_MAX];
+    const int len = asn_oid_to_text_buf(oid, buf, sizeof(buf));
+    if (len >= 0) {
+        sOid.assign(buf, (size_t)len);
+        return RET_OK;
+    }
+
     char* s_oid = nullptr;
     const int ret = asn_oid_to_text(oid, &s_oid);
     if ((ret == RET_OK) && s_oid) {

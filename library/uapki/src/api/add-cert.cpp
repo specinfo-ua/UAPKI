@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/add-cert.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "signeddata-helper.h"
@@ -110,11 +109,11 @@ cleanup:
 }   //  parse_add_certs
 
 
-int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_add_cert (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Cert::CerStore* cer_store = get_cerstore();
+    LibraryConfig* lib_config = context.config();
+    Cert::CerStore* cer_store = context.cerStore();
     const bool present_certs = ParsonHelper::jsonObjectHasValue(joParams, "certificates", JSONArray);
     const bool present_bundle = ParsonHelper::jsonObjectHasValue(joParams, "bundle", JSONString);
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
@@ -148,7 +147,7 @@ int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult)
         ));
     }
     else {
-        CmStorageProxy* storage = CmProviders::openedStorage();
+        CmStorageProxy* storage = context.openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
         for (const auto& it : vba_encodedcerts) {

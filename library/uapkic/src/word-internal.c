@@ -341,7 +341,16 @@ void wa_free_private(WordArray *in)
 
 int word_bit_len(word_t a)
 {
-#ifdef ARCH64
+#if defined(__GNUC__) || defined(__clang__)
+    if (a == 0) {
+        return 0;
+    }
+# ifdef ARCH64
+    return WORD_BIT_LENGTH - __builtin_clzll(a);
+# else
+    return WORD_BIT_LENGTH - __builtin_clz(a);
+# endif
+#elif defined(ARCH64)
     return
             (a < U64(0x100000000) ?
                     (a < 0x10000 ? (a < 0x100 ? (a < 0x10 ?

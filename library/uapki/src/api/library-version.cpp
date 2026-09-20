@@ -50,8 +50,9 @@ static string versionToStr (uint32_t version) {
     return to_string(version / 1000) + "." + to_string((version / 100) % 10) + "." + to_string(version % 100);
 }
 
-int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_version (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     (void)joParams;
     int ret = RET_OK;
 

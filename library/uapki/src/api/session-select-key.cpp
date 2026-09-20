@@ -28,8 +28,6 @@
 #define FILE_MARKER "uapki/api/session-select-key.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
-#include "global-objects.h"
 #include "oids.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
@@ -57,12 +55,12 @@ static int keyid2_from_publickey (
 }   //  keyid2_from_publickey
 
 
-int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_session_select_key (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
-    Cert::CerStore* cer_store = get_cerstore();
+    Cert::CerStore* cer_store = context.cerStore();
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
     const bool present_certid = ParsonHelper::jsonObjectHasValue(joParams, "certId", JSONString);

@@ -28,12 +28,14 @@
 #define FILE_MARKER "uapki/api/api-json.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 #include "time-util.h"
-#include <atomic>
+#include "uapki-sessions-export.h"
+#include <stdint.h>
 #include <chrono>
+#include <memory>
 #include <mutex>
+#include <unordered_map>
 
 
 #define DEBUG_OUTCON(expression)
@@ -46,9 +48,12 @@ extern "C" const char* error_code_to_str (int errorCode);
 
 
 using namespace std;
+using namespace UapkiNS;
 
-typedef int (*fUapkiMethod)(JSON_Object* joParams, JSON_Object* joResult);
-typedef int (*fUapkiMethodType)(fUapkiMethod method, JSON_Object* joParams, JSON_Object* joResult);
+struct UapkiMethod;
+
+typedef int (*fUapkiMethod)(Context& context, JSON_Object* joParams, JSON_Object* joResult);
+typedef int (*fUapkiMethodType)(Context& context, const UapkiMethod& method, JSON_Object* joParams, JSON_Object* joResult);
 
 struct UapkiMethod {
     const char* name;
@@ -56,27 +61,34 @@ struct UapkiMethod {
                 method;
     const fUapkiMethodType
                 methodType;
+    //  removes items from the shared memory when a session uses one, so it needs exclusive access to it
+    const bool  sharedExclusive;
+    //  may be executed directly on a shared memory object
+    const bool  sharedMemory;
 };
 
-static int call_serial_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
-static int call_static_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
-static int call_thread_method (fUapkiMethod fMethod, JSON_Object* joParams, JSON_Object* joResult);
+static int call_serial_method (Context& context, const UapkiMethod& method, JSON_Object* joParams, JSON_Object* joResult);
+static int call_static_method (Context& context, const UapkiMethod& method, JSON_Object* joParams, JSON_Object* joResult);
+static int call_thread_method (Context& context, const UapkiMethod& method, JSON_Object* joParams, JSON_Object* joResult);
 
 static const UapkiMethod uapki_methods[] = {
     {
         "VERSION",
         uapki_version,
-        call_static_method
+        call_static_method,
+        false, true
     },
     {
         "INIT",
         uapki_init,
-        call_serial_method
+        call_serial_method,
+        false, true
     },
     {
         "DEINIT",
         uapki_deinit,
-        call_serial_method
+        call_serial_method,
+        false, true
     },
     {
         "PROVIDERS",
@@ -161,27 +173,32 @@ static const UapkiMethod uapki_methods[] = {
     {
         "ADD_CERT",
         uapki_add_cert,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "CERT_INFO",
         uapki_cert_info,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "GET_CERT",
         uapki_get_cert,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "LIST_CERTS",
         uapki_list_certs,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "REMOVE_CERT",
         uapki_remove_cert,
-        call_serial_method
+        call_serial_method,
+        true, true
     },
     {
         "VERIFY_CERT",
@@ -191,22 +208,26 @@ static const UapkiMethod uapki_methods[] = {
     {
         "ADD_CRL",
         uapki_add_crl,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "CRL_INFO",
         uapki_crl_info,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "LIST_CRLS",
         uapki_list_crls,
-        call_thread_method
+        call_thread_method,
+        false, true
     },
     {
         "REMOVE_CRL",
         uapki_remove_crl,
-        call_serial_method
+        call_serial_method,
+        true, true
     },
     {
         "DECRYPT",
@@ -264,70 +285,125 @@ static const UapkiMethod uapki_methods[] = {
 };
 
 
-static atomic_uint api_counter_methods(0);
-static atomic_bool api_serialmethod_is_running(false);
-static mutex api_mtx_serialmethod;
+//  Handles are never reused, so a stale handle can not alias a session created later;
+//  sessions get odd handles and shared memories even ones, so the two kinds never alias either
+class SessionRegistry {
+    mutex       m_Mutex;
+    uintptr_t   m_NextHandle;
+    unordered_map<const void*, shared_ptr<Session>>
+                m_Sessions;
+
+    explicit SessionRegistry (const uintptr_t firstHandle)
+        : m_NextHandle(firstHandle)
+    {}
+
+public:
+    static SessionRegistry& sessions (void)
+    {
+        static SessionRegistry* registry = new SessionRegistry(1);
+        return *registry;
+    }
+
+    static SessionRegistry& sharedMemories (void)
+    {
+        static SessionRegistry* registry = new SessionRegistry(2);
+        return *registry;
+    }
+
+    const void* create (void)
+    {
+        shared_ptr<Session> session(new Session());
+        lock_guard<mutex> lock(m_Mutex);
+        const void* handle = reinterpret_cast<const void*>(m_NextHandle);
+        m_NextHandle += 2;
+        m_Sessions[handle] = session;
+        return handle;
+    }
+
+    shared_ptr<Session> find (const void* handle)
+    {
+        lock_guard<mutex> lock(m_Mutex);
+        auto it = m_Sessions.find(handle);
+        return (it != m_Sessions.end()) ? it->second : shared_ptr<Session>();
+    }
+
+    void remove (const void* handle)
+    {
+        shared_ptr<Session> session;
+        {
+            lock_guard<mutex> lock(m_Mutex);
+            auto it = m_Sessions.find(handle);
+            if (it == m_Sessions.end()) return;
+            session = std::move(it->second);
+            m_Sessions.erase(it);
+        }
+    }
+
+};  //  end class SessionRegistry
 
 
+//  Lock order is always: the session's gate, then the shared memory's gate
 static int call_serial_method (
-        fUapkiMethod fMethod,
+        Context& context,
+        const UapkiMethod& method,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
-    lock_guard<mutex> lock(api_mtx_serialmethod);
-    api_serialmethod_is_running = true;
-
-    unsigned int cnt_threadmethods = api_counter_methods;
-    DEBUG_OUTCON(printf("call_serial_method(), count T-methods: %d", cnt_threadmethods));
-    while (cnt_threadmethods > 0) {
-        //  If running thread methods then wait all thread methods are completed
-        TimeUtil::msSleep(1);
-        cnt_threadmethods = api_counter_methods;
-        DEBUG_OUTCON(printf("%d", cnt_threadmethods));
+    ApiGate::SerialLock lock(context.session().apiGate());
+    int ret;
+    if (context.shared() && method.sharedExclusive) {
+        ApiGate::SerialLock lock_shared(context.shared()->apiGate());
+        ret = method.method(context, joParams, joResult);
     }
-
-    const int ret = fMethod(joParams, joResult);
-    DEBUG_OUTCON(printf("  ret=%d\n", ret));
-    api_serialmethod_is_running = false;
+    else if (context.shared()) {
+        ApiGate::ThreadLock lock_shared(context.shared()->apiGate());
+        ret = method.method(context, joParams, joResult);
+    }
+    else {
+        ret = method.method(context, joParams, joResult);
+    }
+    DEBUG_OUTCON(printf("call_serial_method(), ret=%d\n", ret));
     return ret;
 }
 
 static int call_static_method (
-        fUapkiMethod fMethod,
+        Context& context,
+        const UapkiMethod& method,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
-    const int ret = fMethod(joParams, joResult);
-    DEBUG_OUTCON(printf("  ret=%d\n", ret));
+    const int ret = method.method(context, joParams, joResult);
+    DEBUG_OUTCON(printf("call_static_method(), ret=%d\n", ret));
     return ret;
 }
 
 static int call_thread_method (
-        fUapkiMethod fMethod,
+        Context& context,
+        const UapkiMethod& method,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
-    bool serialmethod_is_running = api_serialmethod_is_running;
-    DEBUG_OUTCON(printf("call_thread_method(), serial method is running: %c", serialmethod_is_running ? '+' : '-'));
-    while (serialmethod_is_running) {
-        //  If running serial method then wait serial method be completed
-        TimeUtil::msSleep(1);
-        serialmethod_is_running = api_serialmethod_is_running;
-        DEBUG_OUTCON(printf("%c", serialmethod_is_running ? '+' : '-'));
+    ApiGate::ThreadLock lock(context.session().apiGate());
+    int ret;
+    if (context.shared()) {
+        ApiGate::ThreadLock lock_shared(context.shared()->apiGate());
+        ret = method.method(context, joParams, joResult);
     }
-
-    api_counter_methods++;
-    const int ret = fMethod(joParams, joResult);
-    DEBUG_OUTCON(int cnt = (int)api_counter_methods; printf("  (api_counter_methods=%d) ret=%d\n", cnt, ret));
-    api_counter_methods--;
+    else {
+        ret = method.method(context, joParams, joResult);
+    }
+    DEBUG_OUTCON(printf("call_thread_method(), ret=%d\n", ret));
     return ret;
 }
 
-
-UAPKI_EXPORT char* process (const char* request)
+static char* process_request (
+        Context& context,
+        const char* request,
+        const bool sharedMemoryOnly = false
+)
 {
     int err_code = RET_OK;
 #ifdef ENABLE_ELAPSED_TIME
@@ -365,6 +441,10 @@ UAPKI_EXPORT char* process (const char* request)
         err_code = RET_UAPKI_INVALID_METHOD;
         goto cleanup;
     }
+    if (sharedMemoryOnly && !uapki_method->sharedMemory) {
+        err_code = RET_UAPKI_NOT_ALLOWED;
+        goto cleanup;
+    }
 
     jo_params = json_request.getObject("parameters");
     jo_result = json_result.setObject("result");
@@ -373,7 +453,7 @@ UAPKI_EXPORT char* process (const char* request)
         goto cleanup;
     }
 
-    err_code = uapki_method->methodType(uapki_method->method, jo_params, jo_result);
+    err_code = uapki_method->methodType(context, *uapki_method, jo_params, jo_result);
 
 cleanup:
     json_result.setInt32("errorCode", err_code);
@@ -393,7 +473,124 @@ cleanup:
     return rv_sjson;
 }
 
+static char* error_response (
+        const int errorCode
+)
+{
+    ParsonHelper json_result;
+    char* rv_sjson = nullptr;
+    json_result.create();
+    json_result.setInt32("errorCode", errorCode);
+    json_result.setString("error", error_code_to_str(errorCode));
+    json_result.serialize(&rv_sjson);
+    return rv_sjson;
+}
+
+static char* general_error_response (void)
+{
+    static const char RESPONSE[] = "{\"errorCode\":4097,\"error\":\"GENERAL_ERROR\"}";
+    char* rv_sjson = (char*)malloc(sizeof(RESPONSE));
+    if (rv_sjson) {
+        memcpy(rv_sjson, RESPONSE, sizeof(RESPONSE));
+    }
+    return rv_sjson;
+}
+
+//  Benign DO()/ERROR_ADD failures inside a method grow uapkic's per-thread error trace, which is
+//  reset only by the next SET_ERROR on that thread. The JSON API never reads it: release it per call.
+struct StacktraceRelease {
+    ~StacktraceRelease (void) {
+        stacktrace_free_current();
+    }
+};
+
+UAPKI_EXPORT char* process (const char* request)
+{
+    StacktraceRelease stacktrace_release;
+    try {
+        Context context(Session::global());
+        return process_request(context, request);
+    }
+    catch (...) {
+        return general_error_response();
+    }
+}
+
 UAPKI_EXPORT void json_free (char* buf)
 { 
     free(buf);
+}
+
+UAPKI_EXPORT UAPKI_SESSION* uapki_session_create (void)
+{
+    try {
+        return reinterpret_cast<UAPKI_SESSION*>(const_cast<void*>(SessionRegistry::sessions().create()));
+    }
+    catch (...) {
+        return nullptr;
+    }
+}
+
+UAPKI_EXPORT void uapki_session_free (UAPKI_SESSION* session)
+{
+    try {
+        SessionRegistry::sessions().remove(session);
+    }
+    catch (...) {
+    }
+}
+
+UAPKI_EXPORT char* uapki_session_process (UAPKI_SESSION* session, UAPKI_SESSION_SHARED_MEMORY* memory, const char* request)
+{
+    StacktraceRelease stacktrace_release;
+    try {
+        shared_ptr<Session> found = SessionRegistry::sessions().find(session);
+        if (!found) return error_response(RET_UAPKI_INVALID_SESSION);
+
+        shared_ptr<Session> found_memory;
+        if (memory) {
+            found_memory = SessionRegistry::sharedMemories().find(memory);
+            if (!found_memory) return error_response(RET_UAPKI_INVALID_SHARED_MEMORY);
+        }
+
+        Context context(*found, found_memory);
+        return process_request(context, request);
+    }
+    catch (...) {
+        return general_error_response();
+    }
+}
+
+UAPKI_EXPORT UAPKI_SESSION_SHARED_MEMORY* uapki_session_shared_memory_create (void)
+{
+    try {
+        return reinterpret_cast<UAPKI_SESSION_SHARED_MEMORY*>(const_cast<void*>(SessionRegistry::sharedMemories().create()));
+    }
+    catch (...) {
+        return nullptr;
+    }
+}
+
+UAPKI_EXPORT void uapki_session_shared_memory_free (UAPKI_SESSION_SHARED_MEMORY* memory)
+{
+    try {
+        SessionRegistry::sharedMemories().remove(memory);
+    }
+    catch (...) {
+    }
+}
+
+UAPKI_EXPORT char* uapki_session_shared_memory_process (UAPKI_SESSION_SHARED_MEMORY* memory, const char* request)
+{
+    StacktraceRelease stacktrace_release;
+    try {
+        shared_ptr<Session> found = SessionRegistry::sharedMemories().find(memory);
+        if (!found) return error_response(RET_UAPKI_INVALID_SHARED_MEMORY);
+
+        Context context(*found, shared_ptr<Session>(), true);
+        return process_request(context, request, true);
+    }
+    catch (...) {
+        return general_error_response();
+    }
 }

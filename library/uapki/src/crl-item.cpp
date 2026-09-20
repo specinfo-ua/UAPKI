@@ -236,6 +236,7 @@ CrlItem::CrlItem (
     , m_CrlNumber(nullptr)
     , m_DeltaCrl(nullptr)
     , m_StatusSign(Cert::VerifyStatus::UNDEFINED)
+    , m_VerifyError(RET_OK)
     , m_CrlIdentifier(nullptr)
     , m_Actuality(Actuality::UNDEFINED)
 {}
@@ -307,8 +308,6 @@ void CrlItem::setActuality (
         const Actuality actuality
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
-
     m_Actuality = actuality;
 }
 
@@ -329,12 +328,14 @@ int CrlItem::verify (
 {
     lock_guard<mutex> lock(m_Mutex);
 
-    if (!force) {
-        if (m_StatusSign > Cert::VerifyStatus::INDETERMINATE) return RET_OK;
-    }
-
-    m_StatusSign = Cert::VerifyStatus::INDETERMINATE;
     if (!cerCrlSigner) return RET_OK;
+    const std::string issuerKey((const char*)ba_get_buf_const(cerCrlSigner->getSpki()),
+                               ba_get_len(cerCrlSigner->getSpki()));
+    if (!force && m_VerifyIssuer == issuerKey &&
+            m_StatusSign.load() > Cert::VerifyStatus::INDETERMINATE) {
+        return m_VerifyError;
+    }
+    Cert::VerifyStatus status = Cert::VerifyStatus::FAILED;
 
     int ret = RET_OK;
     SmartBA sba_signvalue, sba_tbs;
@@ -368,17 +369,20 @@ int CrlItem::verify (
     );
     switch (ret) {
     case RET_OK:
-        m_StatusSign = Cert::VerifyStatus::VALID;
+        status = Cert::VerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        m_StatusSign = Cert::VerifyStatus::INVALID;
+        status = Cert::VerifyStatus::INVALID;
         break;
     default:
-        m_StatusSign = Cert::VerifyStatus::FAILED;
+        status = Cert::VerifyStatus::FAILED;
         break;
     }
 
 cleanup:
+    m_VerifyIssuer = issuerKey;
+    m_VerifyError = ret;
+    m_StatusSign.store(status);
     asn_free(get_X509Tbs_desc(), x509_tbs);
     return ret;
 }
@@ -657,7 +661,10 @@ int parseCrl (
     if (!baEncoded || !crlItem) return RET_UAPKI_INVALID_PARAMETER;
 
     X509Tbs_t* x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), baEncoded);
-    if (!x509_tbs || (x509_tbs->tbsData.size < 12)) return RET_UAPKI_INVALID_STRUCT;
+    if (!x509_tbs || (x509_tbs->tbsData.size < 12)) {
+        asn_free(get_X509Tbs_desc(), x509_tbs);
+        return RET_UAPKI_INVALID_STRUCT;
+    }
 
     int ret = RET_OK;
     Extensions_t* extns = nullptr;

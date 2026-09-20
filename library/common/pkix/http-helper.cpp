@@ -63,26 +63,17 @@ const char* HttpHelper::CONTENT_TYPE_TSP_REQUEST    = "Content-Type:application/
 
 
 struct HTTP_HELPER {
-    bool    isInitialized;
-    bool    offlineMode;
-    string  proxyUrl;
-    string  proxyCredentials;
+    mutex   mtxGlobal;
+    size_t  countGlobalRefs;
+    HttpHelper::Params
+            defaultParams;
     mutex   mtx;
     map<string, mutex>
             mtxByUrl;
 
     HTTP_HELPER (void)
-        : isInitialized(false)
-        , offlineMode(false)
+        : countGlobalRefs(0)
     {}
-
-    void reset (void)
-    {
-        isInitialized = false;
-        offlineMode = false;
-        proxyUrl.clear();
-        proxyCredentials.clear();
-    }
 };  //  end struct HTTP_HELPER
 
 static HTTP_HELPER http_helper;
@@ -108,22 +99,32 @@ static size_t cb_curlwrite (
     return realsize;
 }   //  cb_curlwrite
 
+//  In-process callers (Go sessions) cannot interrupt a request: bound every transfer and never let
+//  libcurl install SIGALRM handlers in a multithreaded process
+static const long CURL_CONNECT_TIMEOUT_MS = 10000;
+static const long CURL_TOTAL_TIMEOUT_MS = 60000;
+
 static bool curl_set_url_and_proxy (
         CURL* curl,
+        const HttpHelper::Params& params,
         const string& uri
 )
 {
     CURLcode rv_ccode = curl_easy_setopt(curl, CURLOPT_URL, uri.c_str());
     if (rv_ccode != CURLE_OK) return false;
 
-    if (!http_helper.proxyUrl.empty()) {
-        rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, http_helper.proxyUrl.c_str());
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, CURL_CONNECT_TIMEOUT_MS);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, CURL_TOTAL_TIMEOUT_MS);
+
+    if (!params.proxyUrl.empty()) {
+        rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, params.proxyUrl.c_str());
         if (rv_ccode != CURLE_OK) return false;
 
         curl_easy_setopt(curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
 
-        if (!http_helper.proxyCredentials.empty()) {
-            rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, http_helper.proxyCredentials.c_str());
+        if (!params.proxyCredentials.empty()) {
+            rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, params.proxyCredentials.c_str());
             if (rv_ccode != CURLE_OK) return false;
         }
     }
@@ -320,8 +321,6 @@ static int em_http_request (
         ByteArray** baResponse
 )
 {
-    if (http_helper.offlineMode) return RET_UAPKI_OFFLINE_MODE;
-
     int out_len = 0, out_status = 0;
     uint8_t* buf = em_fetch_request(
         uri.c_str(),
@@ -347,38 +346,49 @@ static int em_http_request (
 #endif
 
 
+int HttpHelper::init (void)
+{
+    lock_guard<mutex> lock(http_helper.mtxGlobal);
+
+    if (http_helper.countGlobalRefs == 0) {
+#if !defined(ANDROID) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+        if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) return RET_UAPKI_GENERAL_ERROR;
+#endif
+    }
+    http_helper.countGlobalRefs++;
+    return RET_OK;
+}
+
 int HttpHelper::init (
         const bool offlineMode,
         const char* proxyUrl,
         const char* proxyCredentials
 )
 {
-    int ret = RET_OK;
-    http_helper.offlineMode = offlineMode;
-    if (!http_helper.isInitialized) {
-#if !defined(ANDROID) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-        const CURLcode curl_code = curl_global_init(CURL_GLOBAL_ALL);
-        http_helper.isInitialized = (curl_code == CURLE_OK);
-        if (proxyUrl && http_helper.isInitialized) {
-            http_helper.proxyUrl = string(proxyUrl);
-            if (proxyCredentials && !http_helper.proxyUrl.empty()) {
-                http_helper.proxyCredentials = string(proxyCredentials);
-            }
+    const int ret = init();
+    if (ret != RET_OK) return ret;
+
+    lock_guard<mutex> lock(http_helper.mtxGlobal);
+    Params& params = http_helper.defaultParams;
+    params.offline = offlineMode;
+    if (proxyUrl) {
+        params.proxyUrl = string(proxyUrl);
+        if (proxyCredentials && !params.proxyUrl.empty()) {
+            params.proxyCredentials = string(proxyCredentials);
         }
-        ret = (http_helper.isInitialized) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
-#else
-        (void)proxyUrl;
-        (void)proxyCredentials;
-        http_helper.isInitialized = true;
-#endif
     }
-    return ret;
+    return RET_OK;
 }
 
 void HttpHelper::deinit (void)
 {
-    if (http_helper.isInitialized) {
-        http_helper.reset();
+    lock_guard<mutex> lock(http_helper.mtxGlobal);
+
+    if (http_helper.countGlobalRefs == 0) return;
+
+    http_helper.countGlobalRefs--;
+    if (http_helper.countGlobalRefs == 0) {
+        http_helper.defaultParams = Params();
 #if !defined(ANDROID) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
         curl_global_cleanup();
 #endif
@@ -387,12 +397,12 @@ void HttpHelper::deinit (void)
 
 bool HttpHelper::isOfflineMode (void)
 {
-    return http_helper.offlineMode;
+    return http_helper.defaultParams.offline;
 }
 
 const string& HttpHelper::getProxyUrl (void)
 {
-    return http_helper.proxyUrl;
+    return http_helper.defaultParams.proxyUrl;
 }
 
 int HttpHelper::get (
@@ -400,9 +410,40 @@ int HttpHelper::get (
         ByteArray** baResponse
 )
 {
+    return get(http_helper.defaultParams, uri, baResponse);
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const ByteArray* baRequest,
+        ByteArray** baResponse
+)
+{
+    return post(http_helper.defaultParams, uri, contentType, baRequest, baResponse);
+}
+
+int HttpHelper::post (
+        const string& uri,
+        const char* contentType,
+        const char* userPwd,
+        const string& authorizationBearer,
+        const string& request,
+        ByteArray** baResponse
+)
+{
+    return post(http_helper.defaultParams, uri, contentType, userPwd, authorizationBearer, request, baResponse);
+}
+
+int HttpHelper::get (
+        const Params& params,
+        const string& uri,
+        ByteArray** baResponse
+)
+{
     DEBUG_OUTCON(printf("HttpHelper::get(uri='%s')\n", uri.c_str()));
 
-    if (http_helper.offlineMode) {
+    if (params.offline) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
@@ -417,7 +458,8 @@ int HttpHelper::get (
 
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the data.
-    if (!curl_set_url_and_proxy(curl, uri)) {
+    if (!curl_set_url_and_proxy(curl, params, uri)) {
+        curl_easy_cleanup(curl);
         return RET_UAPKI_CONNECTION_ERROR;
     }
 
@@ -475,6 +517,7 @@ int HttpHelper::get (
 }
 
 int HttpHelper::post (
+        const Params& params,
         const string& uri,
         const char* contentType,
         const ByteArray* baRequest,
@@ -486,7 +529,7 @@ int HttpHelper::post (
         ba_print(stdout, baRequest);
     )
 
-    if (http_helper.offlineMode) {
+    if (params.offline) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
@@ -509,7 +552,9 @@ int HttpHelper::post (
 
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the data.
-    if (!curl_set_url_and_proxy(curl, uri)) {
+    if (!curl_set_url_and_proxy(curl, params, uri)) {
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(chunk);
         return RET_UAPKI_CONNECTION_ERROR;
     }
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -574,6 +619,7 @@ int HttpHelper::post (
 }
 
 int HttpHelper::post (
+        const Params& params,
         const string& uri,
         const char* contentType,
         const char* userPwd,
@@ -587,7 +633,7 @@ int HttpHelper::post (
                 uri.c_str(), contentType, userPwd, authorizationBearer.c_str(), request.c_str());
     )
 
-    if (http_helper.offlineMode) {
+    if (params.offline) {
         return RET_UAPKI_OFFLINE_MODE;
     }
 
@@ -622,7 +668,9 @@ int HttpHelper::post (
     // First set the URL that is about to receive our POST. This URL can
     // just as well be a https:// URL if that is what should receive the
     // data.
-    if (!curl_set_url_and_proxy(curl, uri)) {
+    if (!curl_set_url_and_proxy(curl, params, uri)) {
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(chunk);
         return RET_UAPKI_CONNECTION_ERROR;
     }
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -655,6 +703,7 @@ int HttpHelper::post (
 
     // always cleanup
     curl_easy_cleanup(curl);
+    curl_slist_free_all(chunk);
 #elif defined(ANDROID) || defined(__ANDROID__)
     (void)userPwd;
     (void)authorizationBearer;

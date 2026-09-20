@@ -28,6 +28,7 @@
 #define FILE_MARKER "uapkic/uapkic.c"
 
 #include "uapkic.h"
+#include "ec-cache-internal.h"
 #include "macros-internal.h"
 
 uint32_t uapkic_self_test(void)
@@ -97,6 +98,12 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 
 	if (self_test_status) {
 		*self_test_status = uapkic_self_test();
+	}
+
+	/* Таблиці попередніх обчислень (comb) будуються ліниво, по одній на криву при першому використанні
+	   після самотестування; застосунок, який задав свій рівень раніше, має пріоритет. */
+	if (initialized == 0 && default_opt_level == 0) {
+		DO(ec_cache_set_default_opt_level(OPT_LEVEL_COMB_11_WIN_5));
 	}
 
 	if (initialized == 0) {

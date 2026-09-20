@@ -71,6 +71,8 @@
 #define RET_UAPKI_PROVIDER_NOT_LOADED                                 (UAPKI_ERROR_NAME_CODE | 0x0000001A)
 #define RET_UAPKI_UNSUPPORTED_CMAPI                                   (UAPKI_ERROR_NAME_CODE | 0x0000001B)
 #define RET_UAPKI_STORAGE_ALREADY_OPENED                              (UAPKI_ERROR_NAME_CODE | 0x0000001C)
+#define RET_UAPKI_INVALID_SESSION                                     (UAPKI_ERROR_NAME_CODE | 0x0000001D)
+#define RET_UAPKI_INVALID_SHARED_MEMORY                               (UAPKI_ERROR_NAME_CODE | 0x0000001E)
 
 
 #define RET_UAPKI_FILE_OPEN_ERROR                                     (UAPKI_ERROR_NAME_CODE | 0x00000020)

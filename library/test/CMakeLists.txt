@@ -65,3 +65,27 @@ if(NOT UAPKI_DISABLE_COPY)
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
     )
 endif()
+
+
+add_executable (test-sessions
+    test-sessions.cpp
+    ${PATH_COMMON_LOADERS}/uapki-loader.cpp
+    ${PATH_COMMON_LOADERS}/uapki-session-loader.cpp
+    ${PATH_COMMON_JSON}/parson.c
+    ${PATH_COMMON_JSON}/parson-helper.cpp
+    ${PATH_COMMON_JSON}/strtod-no-locale.c
+)
+
+if(UNIX)
+    target_link_libraries(test-sessions PRIVATE dl)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+        target_link_libraries(test-sessions PRIVATE pthread)
+    endif()
+endif()
+
+if(NOT UAPKI_DISABLE_COPY)
+    add_custom_command(TARGET test-sessions POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test-sessions> ../out/
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:test-sessions> ${CMAKE_SOURCE_DIR}/${OUT_DIR}/
+    )
+endif()

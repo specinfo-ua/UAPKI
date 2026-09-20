@@ -31,11 +31,11 @@
 #include "parson-helper.h"
 
 
-int uapki_provider_storage_info (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_provider_storage_info (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     const std::string s_providerid = ParsonHelper::jsonObjectGetString(joParams, "provider");
     const std::string s_storageid = ParsonHelper::jsonObjectGetString(joParams, "storage");
     if (s_providerid.empty() || s_storageid.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
-    return CmProviders::storageInfo(s_providerid, s_storageid, joResult);
+    return context.storageInfo(s_providerid, s_storageid, joResult);
 }

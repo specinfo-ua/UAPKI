@@ -35,6 +35,288 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 
+#if defined(ARCH64) && (defined(__x86_64__) || defined(_M_X64)) && !defined(UAPKI_NO_CLMUL)
+# define GF2M_CLMUL 1
+# if defined(_MSC_VER) && !defined(__clang__)
+#  include <intrin.h>
+#  define GF2M_CLMUL_TARGET
+# else
+#  include <immintrin.h>
+#  define GF2M_CLMUL_TARGET __attribute__((target("pclmul,sse2")))
+# endif
+#endif
+
+#if defined(GF2M_CLMUL)
+
+/* Максимальная длина элемента поля в словах для аппаратного умножения (1024 бит). */
+#define GF2M_CLMUL_MAX_LEN 16
+
+static int gf2m_clmul_state = 0;
+
+/* UAPKIC_DISABLE_CLMUL=1 в оточенні примусово вмикає програмний шлях (для тестування резервної реалізації). */
+static int gf2m_clmul_detect(void)
+{
+    const char *disabled = getenv("UAPKIC_DISABLE_CLMUL");
+    if (disabled != NULL && disabled[0] != '\0' && disabled[0] != '0') {
+        return 0;
+    }
+#if defined(_MSC_VER) && !defined(__clang__)
+    {
+        int info[4] = {0, 0, 0, 0};
+        __cpuid(info, 1);
+        return (info[2] & (1 << 1)) != 0;
+    }
+#else
+    __builtin_cpu_init();
+    return __builtin_cpu_supports("pclmul") && __builtin_cpu_supports("sse2");
+#endif
+}
+
+/* Признак наличия PCLMULQDQ; определяется один раз (повторная запись того же значения безопасна). */
+static inline int gf2m_use_clmul(void)
+{
+#if defined(_MSC_VER) && !defined(__clang__)
+    int s = gf2m_clmul_state;
+#else
+    int s = __atomic_load_n(&gf2m_clmul_state, __ATOMIC_RELAXED);
+#endif
+    if (s == 0) {
+        s = gf2m_clmul_detect() ? 1 : -1;
+#if defined(_MSC_VER) && !defined(__clang__)
+        gf2m_clmul_state = s;
+#else
+        __atomic_store_n(&gf2m_clmul_state, s, __ATOMIC_RELAXED);
+#endif
+    }
+    return s > 0;
+}
+
+GF2M_CLMUL_TARGET
+static void gf2m_mul_64_clmul(const word_t x, const word_t y, Dword *res)
+{
+    __m128i r = _mm_clmulepi64_si128(_mm_cvtsi64_si128((long long)x), _mm_cvtsi64_si128((long long)y), 0x00);
+
+    res->lo = (word_t)_mm_cvtsi128_si64(r);
+    res->hi = (word_t)_mm_cvtsi128_si64(_mm_srli_si128(r, 8));
+}
+
+/**
+ * Умножение многочленов длиной n слов (схема "столбиком" на PCLMULQDQ), r = x * y длиной 2n слов.
+ * Столбец k накапливает все произведения x[i]*y[j], i + j = k; слово k результата = lo(c[k]) ^ hi(c[k-1]).
+ */
+GF2M_CLMUL_TARGET
+static inline void gf2m_mul_clmul_n(const word_t *x, const word_t *y, int n, word_t *r)
+{
+    __m128i c[2 * GF2M_CLMUL_MAX_LEN];
+    __m128i yv[GF2M_CLMUL_MAX_LEN];
+    __m128i prev;
+    int i, j;
+
+    for (j = 0; j < n; j++) {
+        yv[j] = _mm_cvtsi64_si128((long long)y[j]);
+    }
+
+    for (i = 0; i < n; i++) {
+        __m128i xi = _mm_cvtsi64_si128((long long)x[i]);
+        if (i == 0) {
+            for (j = 0; j < n; j++) {
+                c[j] = _mm_clmulepi64_si128(xi, yv[j], 0x00);
+            }
+        } else {
+            for (j = 0; j < n - 1; j++) {
+                c[i + j] = _mm_xor_si128(c[i + j], _mm_clmulepi64_si128(xi, yv[j], 0x00));
+            }
+            c[i + n - 1] = _mm_clmulepi64_si128(xi, yv[n - 1], 0x00);
+        }
+    }
+
+    prev = _mm_setzero_si128();
+    for (i = 0; i < 2 * n - 2; i += 2) {
+        __m128i lo = _mm_unpacklo_epi64(c[i], c[i + 1]);
+        __m128i hi = _mm_unpackhi_epi64(prev, c[i]);
+        _mm_storeu_si128((__m128i *)(r + i), _mm_xor_si128(lo, hi));
+        prev = c[i + 1];
+    }
+    _mm_storeu_si128((__m128i *)(r + 2 * n - 2),
+            _mm_xor_si128(_mm_unpacklo_epi64(c[2 * n - 2], _mm_setzero_si128()), _mm_unpackhi_epi64(prev, c[2 * n - 2])));
+}
+
+GF2M_CLMUL_TARGET
+static void gf2m_mul_clmul(const word_t *x, const word_t *y, int n, word_t *r)
+{
+    switch (n) {
+    case 3:
+        gf2m_mul_clmul_n(x, y, 3, r);
+        break;
+    case 4:
+        gf2m_mul_clmul_n(x, y, 4, r);
+        break;
+    case 5:
+        gf2m_mul_clmul_n(x, y, 5, r);
+        break;
+    case 6:
+        gf2m_mul_clmul_n(x, y, 6, r);
+        break;
+    case 7:
+        gf2m_mul_clmul_n(x, y, 7, r);
+        break;
+    case 9:
+        gf2m_mul_clmul_n(x, y, 9, r);
+        break;
+    default:
+        gf2m_mul_clmul_n(x, y, n, r);
+        break;
+    }
+}
+
+GF2M_CLMUL_TARGET
+static void gf2m_sqr_clmul(const word_t *x, int n, word_t *r)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        __m128i xi = _mm_cvtsi64_si128((long long)x[i]);
+        _mm_storeu_si128((__m128i *)(r + 2 * i), _mm_clmulepi64_si128(xi, xi, 0x00));
+    }
+}
+
+/*
+ * Один шаг приведения: a = L + H * x^m -> L + H * (f - x^m), где f - x^m = x^f[1] (+ x^f[2] + x^f[3]) + 1
+ * помещается в fr_lo | fr_hi << 64, H - старшие hw слов начиная с бита m (слово w = n - 1, бит b).
+ * Буфер a имеет 2n + 2 слов (два старших нулевые).
+ */
+GF2M_CLMUL_TARGET
+static inline void gf2m_mod_clmul_step(word_t *a, int n, int b, int hw, __m128i flo, __m128i fhi, int has_hi)
+{
+    word_t h[GF2M_CLMUL_MAX_LEN + 2];
+    word_t nmask = (b == 0) ? 0 : ~(word_t)0;
+    int ls = (WORD_BIT_LENGTH - b) & WORD_BIT_LEN_MASK;
+    int w = n - 1;
+    int i;
+
+    for (i = 0; i < hw; i++) {
+        h[i] = (a[w + i] >> b) | ((a[w + i + 1] << ls) & nmask);
+    }
+
+    a[w] &= ((word_t)1 << b) - 1;
+    for (i = w + 1; i < 2 * n; i++) {
+        a[i] = 0;
+    }
+
+    for (i = 0; i < hw; i++) {
+        __m128i hi = _mm_cvtsi64_si128((long long)h[i]);
+        __m128i p = _mm_clmulepi64_si128(hi, flo, 0x00);
+        a[i] ^= (word_t)_mm_cvtsi128_si64(p);
+        a[i + 1] ^= (word_t)_mm_cvtsi128_si64(_mm_srli_si128(p, 8));
+        if (has_hi) {
+            p = _mm_clmulepi64_si128(hi, fhi, 0x00);
+            a[i + 1] ^= (word_t)_mm_cvtsi128_si64(p);
+            a[i + 2] ^= (word_t)_mm_cvtsi128_si64(_mm_srli_si128(p, 8));
+        }
+    }
+}
+
+/*
+ * Возвращает 1, если в a остались биты со степенью >= m.
+ */
+static inline int gf2m_mod_clmul_rest(const word_t *a, int n, int b)
+{
+    int w = n - 1;
+    word_t rest = a[w] >> b;
+    int i;
+
+    for (i = w + 1; i < 2 * n; i++) {
+        rest |= a[i];
+    }
+
+    return rest != 0;
+}
+
+/**
+ * Приведение по модулю f многочлена a длиной 2n + 2 слов (a разрушается): out = a mod f.
+ * Для deg(a) <= 2m - 2 старшая часть H занимает не более n слов и достаточно двух шагов: после первого
+ * deg <= m - 2 + k, второй обрабатывает hw2 старших слов. Цикл никогда не выполняется для корректных
+ * аргументов и оставлен для полноты.
+ */
+GF2M_CLMUL_TARGET
+static inline void gf2m_mod_clmul_n(const Gf2mCtx *ctx, word_t *a, int n, word_t *out)
+{
+    __m128i flo = _mm_cvtsi64_si128((long long)ctx->fr_lo);
+    __m128i fhi = _mm_cvtsi64_si128((long long)ctx->fr_hi);
+    int has_hi = ctx->fr_hi != 0;
+    int b = ctx->f[0] & WORD_BIT_LEN_MASK;
+
+    a[2 * n] = 0;
+    a[2 * n + 1] = 0;
+
+    gf2m_mod_clmul_step(a, n, b, n, flo, fhi, has_hi);
+    gf2m_mod_clmul_step(a, n, b, ctx->hw2, flo, fhi, has_hi);
+    while (gf2m_mod_clmul_rest(a, n, b)) {
+        gf2m_mod_clmul_step(a, n, b, n + 1, flo, fhi, has_hi);
+    }
+
+    memcpy(out, a, n * sizeof(word_t));
+}
+
+GF2M_CLMUL_TARGET
+static void gf2m_mod_clmul(const Gf2mCtx *ctx, word_t *a, word_t *out)
+{
+    switch (ctx->len) {
+    case 3:
+        gf2m_mod_clmul_n(ctx, a, 3, out);
+        break;
+    case 4:
+        gf2m_mod_clmul_n(ctx, a, 4, out);
+        break;
+    case 5:
+        gf2m_mod_clmul_n(ctx, a, 5, out);
+        break;
+    case 6:
+        gf2m_mod_clmul_n(ctx, a, 6, out);
+        break;
+    case 7:
+        gf2m_mod_clmul_n(ctx, a, 7, out);
+        break;
+    case 9:
+        gf2m_mod_clmul_n(ctx, a, 9, out);
+        break;
+    default:
+        gf2m_mod_clmul_n(ctx, a, (int)ctx->len, out);
+        break;
+    }
+}
+
+/*
+ * Аппаратный путь применим, если длина элемента от 3 до GF2M_CLMUL_MAX_LEN слов, f[1] < 128
+ * (f - x^m умещается в 128 бит) и 2 * f[1] - 2 < m (двух шагов приведения достаточно).
+ * Константы приведения вычисляются один раз при создании контекста.
+ */
+static void gf2m_clmul_init(Gf2mCtx *ctx)
+{
+    int m = ctx->f[0];
+    int i;
+
+    ctx->clmul = 0;
+    if (ctx->len < 3 || ctx->len > GF2M_CLMUL_MAX_LEN || ctx->len != (size_t)(m >> WORD_BIT_LEN_SHIFT) + 1
+            || ctx->f[1] >= DWORD_BIT_LENGTH || 2 * ctx->f[1] - 2 >= m || !gf2m_use_clmul()) {
+        return;
+    }
+
+    ctx->fr_lo = 1;
+    ctx->fr_hi = 0;
+    for (i = 1; ctx->f[i] != 0; i++) {
+        if (ctx->f[i] < WORD_BIT_LENGTH) {
+            ctx->fr_lo |= (word_t)1 << ctx->f[i];
+        } else {
+            ctx->fr_hi |= (word_t)1 << (ctx->f[i] - WORD_BIT_LENGTH);
+        }
+    }
+    ctx->hw2 = ((m - 2 + ctx->f[1]) >> WORD_BIT_LEN_SHIFT) - (int)ctx->len + 2;
+    ctx->clmul = 1;
+}
+
+#endif
+
 /* Таблица предварительных вычислений для возведения у квадрат. */
 static const uint16_t GF2M_SQR_PRECOMP[256] = {
     0x0000, 0x0001, 0x0004, 0x0005, 0x0010, 0x0011, 0x0014, 0x0015,
@@ -95,6 +377,10 @@ static void gf2m_init(Gf2mCtx *ctx, const int *f, size_t f_len)
         ctx->f_ext->buf[(f[i] >> WORD_BIT_LEN_SHIFT)] |= (word_t)1 << (f[i] & WORD_BIT_LEN_MASK);
     }
 
+#if defined(GF2M_CLMUL)
+    gf2m_clmul_init(ctx);
+#endif
+
 cleanup:
 
     return;
@@ -109,12 +395,31 @@ Gf2mCtx *gf2m_alloc(const int *f, size_t f_len)
         return NULL;
     }
 
+    CHECK_PARAM(f[0] > 0 && f[0] <= GF2M_MAX_BIT_LENGTH);
+
     CALLOC_CHECKED(ctx, sizeof(Gf2mCtx));
     gf2m_init(ctx, f, f_len);
 
 cleanup:
 
     return ctx;
+}
+
+/**
+ * Длина большого целого в битах (эквивалент int_bit_len для сырого массива слов).
+ *
+ * @param a массив слов
+ * @param len длина массива в словах
+ */
+static size_t gf2m_bit_len(const word_t *a, size_t len)
+{
+    size_t i = len - 1;
+
+    while (i > 0 && a[i] == 0) {
+        i--;
+    }
+
+    return i * WORD_BIT_LENGTH + word_bit_len(a[i]);
 }
 
 void gf2m_mod_add(const WordArray *a, const WordArray *b, WordArray *out)
@@ -131,17 +436,22 @@ void gf2m_mod_add(const WordArray *a, const WordArray *b, WordArray *out)
     for (i = 0; i < a->len; out->buf[i] = a->buf[i] ^ b->buf[i], i++);
 }
 
-void gf2m_mod(const Gf2mCtx *ctx, WordArray *a, WordArray *out)
+/**
+ * Приводит многочлен по модулю порождающего полинома поля.
+ *
+ * @param ctx Параметри GF(2^m)
+ * @param a многочлен длиной 2 * ctx->len слов (разрушается)
+ * @param out буфер для результата длиной ctx->len слов
+ */
+static void gf2m_mod_raw(const Gf2mCtx *ctx, word_t *a, word_t *out)
 {
     ASSERT(ctx != NULL);
     ASSERT(a != NULL);
     ASSERT(out != NULL);
-    ASSERT(a->len == 2 * ctx->len);
-    ASSERT(out->len == ctx->len);
 
-    int degA = (int)int_bit_len(a) - 1;
-    int degF = ctx->f[0];
     int alen = (int)(2 * ctx->len);
+    int degA = (int)gf2m_bit_len(a, alen) - 1;
+    int degF = ctx->f[0];
     int i;
 
     /* Слова, содержащие x^f[0], x^f[1], x^f[2] і т.д. */
@@ -153,7 +463,7 @@ void gf2m_mod(const Gf2mCtx *ctx, WordArray *a, WordArray *out)
     ASSERT(degA <= (degF << 1) - 2);
 
     if (degA < degF) {
-        wa_copy_part(a, 0, ctx->len, out);
+        memcpy(out, a, ctx->len * WORD_BYTE_LENGTH);
         return;
     }
 
@@ -172,30 +482,30 @@ void gf2m_mod(const Gf2mCtx *ctx, WordArray *a, WordArray *out)
 
     /* XOR сложение неполного старшего слова "a" с последовательностями, начинающимися с t-го бита, с k-го бита и т.д. */
     if (a_woff0 == i) {
-        word_t T = WORD_RSHIFT(a->buf[alen - 1], a_boff0);
+        word_t T = WORD_RSHIFT(a[alen - 1], a_boff0);
         int j;
-        a->buf[alen - 1] ^= WORD_LSHIFT(T, a_boff0);
+        a[alen - 1] ^= WORD_LSHIFT(T, a_boff0);
 
         j = a_woff1 - i;
-        a->buf[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff1);
+        a[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff1);
         if (j != 0 && a_boff1 != 0) {
-            a->buf[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff1);
+            a[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff1);
         }
 
         j = a_woff2 - i;
-        a->buf[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff2);
+        a[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff2);
         if (j != 0 && a_boff2 != 0) {
-            a->buf[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff2);
+            a[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff2);
         }
 
         if (ctx->f[2] != 0) {
             j = a_woff3 - i;
-            a->buf[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff3);
+            a[alen - 1 - j] ^= WORD_LSHIFT(T, a_boff3);
             if (j != 0 && a_boff3 != 0) {
-                a->buf[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff3);
+                a[alen - j] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff3);
             }
 
-            a->buf[i] ^= T;
+            a[i] ^= T;
         }
         i--;
     }
@@ -207,36 +517,47 @@ void gf2m_mod(const Gf2mCtx *ctx, WordArray *a, WordArray *out)
             word_t a_woff1i = a_woff1 - i;
             word_t a_woff2i = a_woff2 - i;
 
-            word_t T = WORD_RSHIFT(a->buf[alen - 1 - a_woff0i], a_boff0) | (WORD_LSHIFT(a->buf[alen - a_woff0i],
+            word_t T = WORD_RSHIFT(a[alen - 1 - a_woff0i], a_boff0) | (WORD_LSHIFT(a[alen - a_woff0i],
                     WORD_BIT_LENGTH - a_boff0));
 
-            a->buf[alen - 1 - a_woff0i] ^= WORD_LSHIFT(T, a_boff0);
-            a->buf[alen - a_woff0i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff0);
-            a->buf[alen - 1 - a_woff1i] ^= WORD_LSHIFT(T, a_boff1);
+            a[alen - 1 - a_woff0i] ^= WORD_LSHIFT(T, a_boff0);
+            a[alen - a_woff0i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff0);
+            a[alen - 1 - a_woff1i] ^= WORD_LSHIFT(T, a_boff1);
             if (a_boff1 != 0) {
-                a->buf[alen - a_woff1i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff1);
+                a[alen - a_woff1i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff1);
             }
-            a->buf[alen - 1 - a_woff2i] ^= WORD_LSHIFT(T, a_boff2);
+            a[alen - 1 - a_woff2i] ^= WORD_LSHIFT(T, a_boff2);
 
             if (ctx->f[2] != 0) {
                 int a_woff3i = a_woff3 - i;
                 int a_woff4i = alen - 1 - i;
                 if (a_boff2 != 0) {
-                    a->buf[alen - a_woff2i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff2);
+                    a[alen - a_woff2i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff2);
                 }
-                a->buf[alen - 1 - a_woff3i] ^= WORD_LSHIFT(T, a_boff3);
+                a[alen - 1 - a_woff3i] ^= WORD_LSHIFT(T, a_boff3);
                 if (a_boff3 != 0) {
-                    a->buf[alen - a_woff3i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff3);
+                    a[alen - a_woff3i] ^= WORD_RSHIFT(T, WORD_BIT_LENGTH - a_boff3);
                 }
-                a->buf[alen - 1 - a_woff4i] ^= T;
+                a[alen - 1 - a_woff4i] ^= T;
             }
         }
 
-        degA = (int)int_bit_len(a) - 1;
+        degA = (int)gf2m_bit_len(a, alen) - 1;
         i = (degA - (degF - (int)a_boff0)) >> WORD_BIT_LEN_SHIFT;
     }
 
-    wa_copy_part(a, 0, ctx->len, out);
+    memcpy(out, a, ctx->len * WORD_BYTE_LENGTH);
+}
+
+void gf2m_mod(const Gf2mCtx *ctx, WordArray *a, WordArray *out)
+{
+    ASSERT(ctx != NULL);
+    ASSERT(a != NULL);
+    ASSERT(out != NULL);
+    ASSERT(a->len == 2 * ctx->len);
+    ASSERT(out->len == ctx->len);
+
+    gf2m_mod_raw(ctx, a->buf, out->buf);
 }
 
 void gf2m_mod_sqr(const Gf2mCtx *ctx, const WordArray *a, WordArray *out)
@@ -246,36 +567,41 @@ void gf2m_mod_sqr(const Gf2mCtx *ctx, const WordArray *a, WordArray *out)
     ASSERT(out != NULL);
     ASSERT(a->len == (unsigned int)ctx->len);
     ASSERT(out->len == (unsigned int)ctx->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
-    WordArray *sqr = NULL;
+    word_t sqr[2 * GF2M_MAX_LEN];
+    const word_t *ab = a->buf;
     size_t i;
-    int ret = RET_OK;
 
-    CHECK_NOT_NULL(sqr = wa_alloc(2 * ctx->len));
+#if defined(GF2M_CLMUL)
+    if (ctx->clmul) {
+        word_t t[2 * GF2M_CLMUL_MAX_LEN + 2];
+
+        gf2m_sqr_clmul(a->buf, (int)ctx->len, t);
+        gf2m_mod_clmul(ctx, t, out->buf);
+        return;
+    }
+#endif
 
     for (i = 0; i < ctx->len; i++) {
 #if defined(ARCH64)
-        sqr->buf[2 * i + 1] = ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 56) & 0xff] << 48)
-                | ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 48) & 0xff] << 32)
-                | ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 40) & 0xff] << 16)
-                |  (word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 32) & 0xff];
-        sqr->buf[2 * i] = ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 24) & 0xff] << 48)
-                | ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 16) & 0xff] << 32)
-                | ((word_t)GF2M_SQR_PRECOMP[(a->buf[i] >> 8) & 0xff] << 16)
-                |  (word_t)GF2M_SQR_PRECOMP[a->buf[i] & 0xff];
+        sqr[2 * i + 1] = ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 56) & 0xff] << 48)
+                | ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 48) & 0xff] << 32)
+                | ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 40) & 0xff] << 16)
+                |  (word_t)GF2M_SQR_PRECOMP[(ab[i] >> 32) & 0xff];
+        sqr[2 * i] = ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 24) & 0xff] << 48)
+                | ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 16) & 0xff] << 32)
+                | ((word_t)GF2M_SQR_PRECOMP[(ab[i] >> 8) & 0xff] << 16)
+                |  (word_t)GF2M_SQR_PRECOMP[ab[i] & 0xff];
 # else
-        sqr->buf[2 * i + 1] = (GF2M_SQR_PRECOMP[a->buf[i] >> 24] << 16)
-                | GF2M_SQR_PRECOMP[(a->buf[i] >> 16) & 0xff];
-        sqr->buf[2 * i] = (GF2M_SQR_PRECOMP[(a->buf[i] >> 8) & 0xff] << 16)
-                | GF2M_SQR_PRECOMP[a->buf[i] & 0xff];
+        sqr[2 * i + 1] = (GF2M_SQR_PRECOMP[ab[i] >> 24] << 16)
+                | GF2M_SQR_PRECOMP[(ab[i] >> 16) & 0xff];
+        sqr[2 * i] = (GF2M_SQR_PRECOMP[(ab[i] >> 8) & 0xff] << 16)
+                | GF2M_SQR_PRECOMP[ab[i] & 0xff];
 #endif
     }
 
-    gf2m_mod(ctx, sqr, out);
-
-cleanup:
-
-    wa_free(sqr);
+    gf2m_mod_raw(ctx, sqr, out->buf);
 }
 
 #if defined(ARCH64)
@@ -284,6 +610,13 @@ cleanup:
 
 void gf2m_mul_64_fast(const word_t x, const word_t y, Dword *res)
 {
+#if defined(GF2M_CLMUL)
+    if (gf2m_use_clmul()) {
+        gf2m_mul_64_clmul(x, y, res);
+        return;
+    }
+#endif
+
     res->hi = 0;
     res->lo = 0;
 
@@ -688,12 +1021,19 @@ static void gf2m_mul_256(const word_t *x, const word_t *y, int len, bool mode, w
 #endif
 }
 
-static void wa_swap(const WordArray *x, WordArray *y)
+/**
+ * Обращает порядок слов.
+ *
+ * @param x массив слов
+ * @param len длина в словах
+ * @param y буфер для результата
+ */
+static void words_swap(const word_t *x, size_t len, word_t *y)
 {
     size_t i;
 
-    for (i = 0; i < x->len; i++) {
-        y->buf[i] = x->buf[x->len - 1 - i];
+    for (i = 0; i < len; i++) {
+        y[i] = x[len - 1 - i];
     }
 }
 
@@ -837,90 +1177,95 @@ static void gf2m_mul_128(const word_t *x, const word_t *y, int len, word_t *z)
 #endif
 }
 
-void gf2m_mul_opt(const Gf2mCtx *ctx, const WordArray *x1, const WordArray *y1, WordArray *r1)
+/**
+ * Выполняет умножение многочленов (без приведения по модулю).
+ *
+ * @param ctx Параметри GF(2^m)
+ * @param x1 многочлен 1 длиной ctx->len слов
+ * @param y1 многочлен 2 длиной ctx->len слов
+ * @param r1 буфер для произведения длиной 2 * ctx->len слов
+ */
+static void gf2m_mul_raw(const Gf2mCtx *ctx, const word_t *x1, const word_t *y1, word_t *r1)
 {
+    word_t x[GF2M_MAX_LEN];
+    word_t y[GF2M_MAX_LEN];
+    word_t r[2 * GF2M_MAX_LEN];
     word_t xPoly[32];
     word_t yPoly[32];
     word_t dtPoly[16 * 4];
     int n;
     int s;
     int i, j;
-    int ret = RET_OK;
-
-    WordArray *x = NULL;
-    WordArray *y = NULL;
-    WordArray *r = NULL;
 
     ASSERT(ctx != NULL);
     ASSERT(x1 != NULL);
     ASSERT(y1 != NULL);
     ASSERT(r1 != NULL);
-    ASSERT(x1->len == ctx->len);
-    ASSERT(y1->len == ctx->len);
-    ASSERT(r1->len == 2 * ctx->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
     n = (int)ctx->len;
 
     if (n > WA_LEN(64)) {
-        int y_len = (int)int_bit_len(y1);
-        WordArray *ash = NULL;
+        int y_len = (int)gf2m_bit_len(y1, n);
 
-        wa_zero(r1);
-        CHECK_NOT_NULL(ash = wa_copy_with_alloc(x1));
-        wa_change_len(ash, 2 * x1->len);
+        memset(r1, 0, 2 * n * sizeof(word_t));
+        memcpy(r, x1, n * sizeof(word_t));
+        memset(r + n, 0, n * sizeof(word_t));
 
         for (i = 0; i < y_len; i++) {
             if (i != 0) {
-                int_lshift(ash, 1, ash);
+                for (j = 2 * n - 1; j > 0; j--) {
+                    r[j] = (r[j] << 1) | (r[j - 1] >> (WORD_BIT_LENGTH - 1));
+                }
+                r[0] <<= 1;
             }
-            if (int_get_bit(y1, i)) {
-                gf2m_mod_add(ash, r1, r1);
+            if ((y1[i >> WORD_BIT_LEN_SHIFT] >> (i & WORD_BIT_LEN_MASK)) & 1) {
+                for (j = 0; j < 2 * n; j++) {
+                    r1[j] ^= r[j];
+                }
             }
         }
 
-        wa_free(ash);
         return;
     }
 
-    CHECK_NOT_NULL(x = wa_alloc(x1->len));
-    CHECK_NOT_NULL(y = wa_alloc(y1->len));
-    CHECK_NOT_NULL(r = wa_alloc_with_zero(r1->len));
+    memset(r, 0, 2 * n * sizeof(word_t));
 
     /* XXX */
-    wa_swap(x1, x);
-    wa_swap(y1, y);
+    words_swap(x1, n, x);
+    words_swap(y1, n, y);
 
     /* Степень полинома, порождающего полиномиальный базис меньше 257. */
     if (n <= WA_LEN(32)) {
-        gf2m_mul_256(x->buf, y->buf, n, true, r->buf);
-        wa_swap(r, r1);
+        gf2m_mul_256(x, y, n, true, r);
+        words_swap(r, 2 * n, r1);
 
-        goto cleanup;
+        return;
     }
 
     /* Степень полинома, порождающего полиномиальный базис равна 257. */
     if (ctx->f[0] == 257) {
 
-        r->buf[0] = 0;
-        r->buf[1] = (x->buf[0] == 1 && y->buf[0] == 1 ? 1 : 0);
+        r[0] = 0;
+        r[1] = (x[0] == 1 && y[0] == 1 ? 1 : 0);
 
-        gf2m_mul_256(x->buf, y->buf, n, true, r->buf);
+        gf2m_mul_256(x, y, n, true, r);
 
-        if (x->buf[0] == 1) {
+        if (x[0] == 1) {
             for (i = 1; i < WA_LEN(36); i++) {
-                r->buf[i + 1] ^= y->buf[i];
+                r[i + 1] ^= y[i];
             }
         }
 
-        if (y->buf[0] == 1)
+        if (y[0] == 1)
             for (i = 1; i < WA_LEN(36); i++) {
-                r->buf[i + 1] ^= x->buf[i];
+                r[i + 1] ^= x[i];
             }
 
         /* XXX */
-        wa_swap(r, r1);
+        words_swap(r, 2 * n, r1);
 
-        goto cleanup;
+        return;
     }
 
     /*
@@ -930,75 +1275,69 @@ void gf2m_mul_opt(const Gf2mCtx *ctx, const WordArray *x1, const WordArray *y1, 
      */
     s = (2 * n > WA_LEN(96)) ? (2 * n - WA_LEN(96)) : 0;
 
-    gf2m_mul_256(x->buf, y->buf, n, true, r->buf);
-    memcpy(&r->buf[s], r->buf + WA_LEN(32) + s, (2 * n - WA_LEN(64) - s) * sizeof(word_t));
-    for (i = 2 * n - WA_LEN(64), j = 2 * n - WA_LEN(32); j < 2 * n; r->buf[i++] ^= r->buf[j++]);
+    gf2m_mul_256(x, y, n, true, r);
+    memcpy(&r[s], r + WA_LEN(32) + s, (2 * n - WA_LEN(64) - s) * sizeof(word_t));
+    for (i = 2 * n - WA_LEN(64), j = 2 * n - WA_LEN(32); j < 2 * n; r[i++] ^= r[j++]);
 
-    memcpy(&xPoly[0], x->buf + n - WA_LEN(32), WA_LEN(32) * sizeof(word_t));
-    for (i = WA_LEN(64) - n, j = 0; i < WA_LEN(32); xPoly[i++] ^= x->buf[j++]);
+    memcpy(&xPoly[0], x + n - WA_LEN(32), WA_LEN(32) * sizeof(word_t));
+    for (i = WA_LEN(64) - n, j = 0; i < WA_LEN(32); xPoly[i++] ^= x[j++]);
 
-    memcpy(&yPoly[0], y->buf + n - WA_LEN(32), WA_LEN(32) * sizeof(word_t));
-    for (i = WA_LEN(64) - n, j = 0; i < WA_LEN(32); yPoly[i++] ^= y->buf[j++]);
+    memcpy(&yPoly[0], y + n - WA_LEN(32), WA_LEN(32) * sizeof(word_t));
+    for (i = WA_LEN(64) - n, j = 0; i < WA_LEN(32); yPoly[i++] ^= y[j++]);
 
     gf2m_mul_256(xPoly, yPoly, WA_LEN(32), true, dtPoly);
-    for (i = s, j = WA_LEN(96) - 2 * n + s; j < WA_LEN(64); r->buf[i++] ^= dtPoly[j++]);
+    for (i = s, j = WA_LEN(96) - 2 * n + s; j < WA_LEN(64); r[i++] ^= dtPoly[j++]);
 
 #if defined(ARCH32)
     if (n == WA_LEN(36)) {
-        uint64_t res = gf2m_mul_32(x->buf[0], y->buf[0]);
+        uint64_t res = gf2m_mul_32(x[0], y[0]);
 
         word_t t = (word_t)(res >> WORD_BIT_LENGTH);
-        r->buf[0] ^= t;
-        r->buf[WA_LEN(32)] ^= t;
+        r[0] ^= t;
+        r[WA_LEN(32)] ^= t;
 
         t = (word_t)res;
-        r->buf[1] ^= t;
-        r->buf[WA_LEN(36)] ^= t;
+        r[1] ^= t;
+        r[WA_LEN(36)] ^= t;
     } else if (n <= WA_LEN(40)) {
-        gf2m_mul_64(x->buf, y->buf, dtPoly);
+        gf2m_mul_64(x, y, dtPoly);
         for (i = 0; i < WA_LEN(16); i++) {
-            r->buf[i] ^= dtPoly[i];
-            r->buf[i + WA_LEN(32)] ^= dtPoly[i];
+            r[i] ^= dtPoly[i];
+            r[i + WA_LEN(32)] ^= dtPoly[i];
         }
     } else if (n <= WA_LEN(48)) {
-        gf2m_mul_128(x->buf, y->buf, n, dtPoly);
+        gf2m_mul_128(x, y, n, dtPoly);
         for (j = (WA_LEN(48) - n) * 2, i = WA_LEN(32) - 1 - j; i >= 0 ; i--) {
-            r->buf[i] ^= dtPoly[i + j];
-            r->buf[i + WA_LEN(32)] ^= dtPoly[i + j];
+            r[i] ^= dtPoly[i + j];
+            r[i + WA_LEN(32)] ^= dtPoly[i + j];
         }
     } else {
-        gf2m_mul_256(x->buf, y->buf, n, false, r->buf);
+        gf2m_mul_256(x, y, n, false, r);
     }
 
 #elif defined(ARCH64)
     if (n <= WA_LEN(40)) {
-        gf2m_mul_64(x->buf, y->buf, dtPoly);
+        gf2m_mul_64(x, y, dtPoly);
         for (i = 0; i < WA_LEN(16); i++) {
-            r->buf[i] ^= dtPoly[i];
-            r->buf[i + WA_LEN(32)] ^= dtPoly[i];
+            r[i] ^= dtPoly[i];
+            r[i + WA_LEN(32)] ^= dtPoly[i];
         }
     } else if (n <= WA_LEN(48)) {
-        gf2m_mul_128(x->buf, y->buf, n, dtPoly);
+        gf2m_mul_128(x, y, n, dtPoly);
         for (j = (WA_LEN(48) - n) * 2, i = WA_LEN(32) - 1 - j; i >= 0 ; i--) {
-            r->buf[i] ^= dtPoly[i + j];
-            r->buf[i + WA_LEN(32)] ^= dtPoly[i + j];
+            r[i] ^= dtPoly[i + j];
+            r[i + WA_LEN(32)] ^= dtPoly[i + j];
         }
     } else {
-        gf2m_mul_256(x->buf, y->buf, n, false, r->buf);
+        gf2m_mul_256(x, y, n, false, r);
     }
 
 #else
 
-    gf2m_mul_256(x->buf, y->buf, n, false, r->buf);
+    gf2m_mul_256(x, y, n, false, r);
 
 #endif
-    wa_swap(r, r1);
-
-cleanup:
-
-    wa_free(x);
-    wa_free(y);
-    wa_free(r);
+    words_swap(r, 2 * n, r1);
 }
 
 void gf2m_mod_mul(const Gf2mCtx *ctx, const WordArray *a, const WordArray *b, WordArray *out)
@@ -1010,18 +1349,22 @@ void gf2m_mod_mul(const Gf2mCtx *ctx, const WordArray *a, const WordArray *b, Wo
     ASSERT(a->len == ctx->len);
     ASSERT(b->len == ctx->len);
     ASSERT(out->len == ctx->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
-    int ret = RET_OK;
-    WordArray *out2 = NULL;
+    word_t out2[2 * GF2M_MAX_LEN];
 
-    CHECK_NOT_NULL(out2 = wa_alloc_with_zero(2 * a->len));
+#if defined(GF2M_CLMUL)
+    if (ctx->clmul) {
+        word_t t[2 * GF2M_CLMUL_MAX_LEN + 2];
 
-    gf2m_mul_opt(ctx, a, b, out2);
-    gf2m_mod(ctx, out2, out);
+        gf2m_mul_clmul(a->buf, b->buf, (int)ctx->len, t);
+        gf2m_mod_clmul(ctx, t, out->buf);
+        return;
+    }
+#endif
 
-cleanup:
-
-    wa_free(out2);
+    gf2m_mul_raw(ctx, a->buf, b->buf, out2);
+    gf2m_mod_raw(ctx, out2, out->buf);
 }
 
 void gf2m_mod_inv(const Gf2mCtx *ctx, const WordArray *a, WordArray *out)
@@ -1041,20 +1384,30 @@ void gf2m_mod_gcd(const WordArray *a, const WordArray *b, WordArray *gcd, WordAr
     ASSERT(a != NULL && b != NULL && a->len == b->len);
 
     size_t n = a->len;
-    WordArray *t1 = NULL;
-    WordArray *t2 = NULL;
-    WordArray *t3 = NULL;
-    WordArray *t4 = NULL;
-    WordArray *dt = NULL;
+    word_t t1_buf[GF2M_MAX_LEN];
+    word_t t2_buf[GF2M_MAX_LEN];
+    word_t t3_buf[GF2M_MAX_LEN];
+    word_t t4_buf[GF2M_MAX_LEN];
+    word_t dt_buf[GF2M_MAX_LEN];
+    WordArray t1_wa = { t1_buf, n };
+    WordArray t2_wa = { t2_buf, n };
+    WordArray t3_wa = { t3_buf, n };
+    WordArray t4_wa = { t4_buf, n };
+    WordArray dt_wa = { dt_buf, n };
+    WordArray *t1 = &t1_wa;
+    WordArray *t2 = &t2_wa;
+    WordArray *t3 = &t3_wa;
+    WordArray *t4 = &t4_wa;
+    WordArray *dt = &dt_wa;
     WordArray *buf;
     int t1_blen;
-    int ret = RET_OK;
 
-    CHECK_NOT_NULL(t1 = wa_copy_with_alloc(a));
-    CHECK_NOT_NULL(t2 = wa_copy_with_alloc(b));
-    CHECK_NOT_NULL(t3 = wa_alloc_with_one(n));
-    CHECK_NOT_NULL(t4 = wa_alloc_with_zero(n));
-    CHECK_NOT_NULL(dt = wa_alloc(n));
+    ASSERT(n <= GF2M_MAX_LEN);
+
+    memcpy(t1_buf, a->buf, n * WORD_BYTE_LENGTH);
+    memcpy(t2_buf, b->buf, n * WORD_BYTE_LENGTH);
+    wa_one(t3);
+    wa_zero(t4);
 
     while ((t1_blen = (int)int_bit_len(t1)) > 1) {
         int i = t1_blen - (int)int_bit_len(t2);
@@ -1085,12 +1438,6 @@ void gf2m_mod_gcd(const WordArray *a, const WordArray *b, WordArray *gcd, WordAr
     if (kb != NULL) {
         wa_copy(t4, kb);
     }
-cleanup:
-    wa_free(t1);
-    wa_free(t2);
-    wa_free(t3);
-    wa_free(t4);
-    wa_free(dt);
 }
 
 int gf2m_mod_trace(const Gf2mCtx *ctx, const WordArray *a)
@@ -1177,6 +1524,10 @@ Gf2mCtx *gf2m_copy_with_alloc(const Gf2mCtx *ctx)
     memcpy(ctx_copy->f, ctx->f, len * sizeof(int));
 
     ctx_copy->len = ctx->len;
+    ctx_copy->fr_lo = ctx->fr_lo;
+    ctx_copy->fr_hi = ctx->fr_hi;
+    ctx_copy->hw2 = ctx->hw2;
+    ctx_copy->clmul = ctx->clmul;
 
     CHECK_NOT_NULL(ctx_copy->f_ext = wa_copy_with_alloc(ctx->f_ext));
 

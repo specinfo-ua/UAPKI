@@ -43,8 +43,9 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_digest (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_digest (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     int ret = RET_OK;
     const char* s_hashalgo = nullptr;
     const char* s_signalgo = nullptr;

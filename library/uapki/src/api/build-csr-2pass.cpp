@@ -186,10 +186,12 @@ cleanup:
 }   //  step2_encodecsr
 
 int uapki_build_csr_2pass (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
+    (void)context;
     int ret = RET_OK;
     int cnt_steps = 0;
 

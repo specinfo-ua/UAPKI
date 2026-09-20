@@ -30,7 +30,6 @@
 #include "api-json-internal.h"
 #include "cert-validator.h"
 #include "doc-sign.h"
-#include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -83,13 +82,14 @@ cleanup:
 }   //  parse_docattr_from_json
 
 static int step1_encodesa (
+        Context& context,
         JSON_Object* joStep1Params,
         JSON_Object* joResult
 )
 {
     Doc::Sign::SharedData shared_data;
     CertValidator::CertValidator& cert_validator = shared_data.certValidator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     int ret = RET_OK;
@@ -176,13 +176,14 @@ cleanup:
 }   //  step1_encodesa
 
 static int step2_encodesd (
+        Context& context,
         JSON_Object* joStep2Params,
         JSON_Object* joResult
 )
 {
     Doc::Sign::SharedData shared_data;
     CertValidator::CertValidator& cert_validator = shared_data.certValidator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     int ret = RET_OK;
@@ -296,6 +297,7 @@ cleanup:
 }   //  step2_encodesd
 
 int uapki_build_cms_2pass (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
@@ -306,6 +308,7 @@ int uapki_build_cms_2pass (
     if (ParsonHelper::jsonObjectHasValue(joParams, "step1", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step1", json_value_init_object()));
         DO(step1_encodesa(
+            context,
             json_object_get_object(joParams, "step1"),
             json_object_get_object(joResult, "step1")
         ));
@@ -314,6 +317,7 @@ int uapki_build_cms_2pass (
     if (ParsonHelper::jsonObjectHasValue(joParams, "step2", JSONObject)) {
         DO_JSON(json_object_set_value(joResult, "step2", json_value_init_object()));
         DO(step2_encodesd(
+            context,
             json_object_get_object(joParams, "step2"),
             json_object_get_object(joResult, "step2"))
         );
