@@ -39,6 +39,10 @@ jobs:
           LD_LIBRARY_PATH: ${{ github.workspace }}/build-native/uapki:${{ github.workspace }}/build-native/uapkic:${{ github.workspace }}/build-native/uapkif:${{ github.workspace }}/build-native/cm-pkcs12
         run: |
           failed=0
+          certs_copy_dir="/tmp/test-sessions-certs"
+          rm -rf "$certs_copy_dir"
+          mkdir -p "$certs_copy_dir"
+          cp certs/*.cer "$certs_copy_dir/"
           for scenario in digest.json open-jks.json; do
             echo "=== $scenario ==="
             if "$GITHUB_WORKSPACE/build-native/out/test" uapki "$scenario" > "/tmp/$scenario.log" 2>&1; then
@@ -50,7 +54,7 @@ jobs:
             fi
           done
           echo "=== test-sessions ==="
-          if "$GITHUB_WORKSPACE/build-native/out/test-sessions" uapki --sessions 4 --signs 5 --provider-dir "$GITHUB_WORKSPACE/build-native/cm-pkcs12/" > /tmp/test-sessions.log 2>&1; then
+          if "$GITHUB_WORKSPACE/build-native/out/test-sessions" uapki --sessions 4 --signs 5 --provider-dir "$GITHUB_WORKSPACE/build-native/cm-pkcs12/" --cert "$certs_copy_dir/diia-test-sign-7775603.cer" > /tmp/test-sessions.log 2>&1; then
             grep -E '^\[PASS\]|process\(\)|parallel sessions|caches:|shared memory:|LIST_CRLS' /tmp/test-sessions.log
           else
             failed=1
