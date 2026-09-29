@@ -1,0 +1,17 @@
+#  Line endings are stored as LF in the repository, converted on checkout per core.autocrlf
+* text=auto
+
+#  Shell scripts keep LF in the working tree on every platform
+*.sh text eol=lf
+
+#  Binary files (resource scripts are UTF-16)
+*.rc   binary
+*.a    binary
+*.lib  binary
+*.jar  binary
+*.cer  binary
+*.crl  binary
+*.p12  binary
+*.jks  binary
+*.pdf  binary
+*.png  binary
