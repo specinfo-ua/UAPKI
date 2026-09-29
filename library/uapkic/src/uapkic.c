@@ -87,12 +87,12 @@ int drbg_init(void);
 
 static int initialized = 0;
 
-int uapkic_init(uint32_t *version, uint32_t* self_test_status)
+int uapkic_init(const char** version, uint32_t* self_test_status)
 {
 	int ret = RET_OK;
 
 	if (version) {
-		*version = UAPKIC_VERSION;
+		*version = uapkic_version();
 	}
 
 	if (self_test_status) {
@@ -110,6 +110,11 @@ int uapkic_init(uint32_t *version, uint32_t* self_test_status)
 
 cleanup:
 	return ret;
+}
+
+const char* uapkic_version(void)
+{
+	return UAPKIC_VERSION_STRING;
 }
 
 void uapkic_free(void* ptr)

@@ -160,6 +160,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKI_LIBRARY)
+target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKI_VERSION_STRING="${PROJECT_VERSION}${UAPKI_VERSION_SUFFIX}")
 target_link_libraries(${PROJECT_NAME} ${UAPKI_INTERNAL_INCLUDES_MODE} uapkic uapkif)
 
 if(UNIX AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten"))

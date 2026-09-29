@@ -29,8 +29,6 @@
 #ifndef UAPKIC_H
 #define UAPKIC_H
 
-#define UAPKIC_VERSION 2003
-
 #include "entropy.h"
 #include "drbg.h"
 #include "des.h"
@@ -109,11 +107,18 @@ extern "C" {
 /**
  * Ініціалізує ГПВП, проводить самотестування
  *
- * @param version повертає версію бібліотеки
+ * @param version повертає адресу константного рядка з версією бібліотеки, може бути NULL
  * @param self_test_status повертає результат самотестування, якщо NULL - самотестування не виконується
  * @return код помилки
  */
-UAPKIC_EXPORT int uapkic_init(uint32_t* version, uint32_t* self_test_status);
+UAPKIC_EXPORT int uapkic_init(const char** version, uint32_t* self_test_status);
+
+/**
+ * Повертає версію бібліотеки
+ *
+ * @return адреса константного рядка з версією бібліотеки, наприклад "3.0.0-dev"
+ */
+UAPKIC_EXPORT const char* uapkic_version(void);
 
 /**
  * Звільняє блок даних

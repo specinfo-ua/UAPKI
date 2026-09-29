@@ -64,6 +64,7 @@ endif()
 add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
     ${UAPKIF_ASN1_SOURCES}
     ${UAPKIF_STRUCT_SOURCES}
+    ${PATH_PRJ_SOURCES}/uapkif.c
     ${RESOURCE_RC}
 )
 
@@ -95,6 +96,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIF_LIBRARY)
+target_compile_definitions(${PROJECT_NAME} PRIVATE UAPKIF_VERSION_STRING="${PROJECT_VERSION}${UAPKI_VERSION_SUFFIX}")
 
 target_link_libraries(${PROJECT_NAME} PUBLIC uapkic)
 

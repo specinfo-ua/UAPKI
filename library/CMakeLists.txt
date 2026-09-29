@@ -9,6 +9,9 @@ set(GLOBAL_PRODUCT_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(GLOBAL_PRODUCT_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 set(GLOBAL_PRODUCT_VERSION_TWEAK "${PROJECT_VERSION_TWEAK}")
 
+#  Suffix of version strings for uapki, uapkic, uapkif ("-dev" for development builds, empty for release)
+set(UAPKI_VERSION_SUFFIX "-dev")
+
 file(MAKE_DIRECTORY build)
 file(MAKE_DIRECTORY build/out)
 

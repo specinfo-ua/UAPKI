@@ -28,8 +28,6 @@
 #ifndef UAPKIF_H
 #define UAPKIF_H
 
-#define UAPKIF_VERSION 2002
-
 #include "uapkif-export.h"
 #include "AccessDescription.h"
 #include "Accuracy.h"
@@ -355,5 +353,20 @@
 #include "xer_decoder.h"
 #include "xer_encoder.h"
 #include "xer_support.h"
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Повертає версію бібліотеки
+ *
+ * @return адреса константного рядка з версією бібліотеки, наприклад "3.0.0-dev"
+ */
+UAPKIF_EXPORT const char* uapkif_version(void);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif
