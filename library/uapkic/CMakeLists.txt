@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(uapkic VERSION 2.0.2 LANGUAGES C)
+project(uapkic VERSION 2.0.3 LANGUAGES C)
 
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 

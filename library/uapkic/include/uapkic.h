@@ -29,7 +29,7 @@
 #ifndef UAPKIC_H
 #define UAPKIC_H
 
-#define UAPKIC_VERSION 2002
+#define UAPKIC_VERSION 2003
 
 #include "entropy.h"
 #include "drbg.h"

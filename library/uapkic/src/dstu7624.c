@@ -108,8 +108,6 @@ typedef struct Dstu7624GcmCtx_st {
 
 typedef struct Dstu7624CcmCtx_st {
     size_t q;
-    const ByteArray *key;
-    const ByteArray *iv_tmp;
     uint8_t iv[MAX_BLOCK_LEN];
     size_t nb;
 } Dstu7624CcmCtx;
@@ -2618,53 +2616,101 @@ static uint8_t unpadding(uint8_t *padded_data, size_t *data_size_byte, uint8_t *
     return 1;
 }
 
-static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArray *plain_data,
-        uint8_t **h_out, size_t Nb)
+/*
+ * Гамування режимів GCM та CCM (ДСТУ 7624:2014, формули (20), (21), (23), (24)):
+ * s0 = T(S), гама i-го блока - T(L(s0 + i) || R(s0)), тобто лічильник додається
+ * тільки до молодшої половини блока (за модулем 2^(l/2)), старша половина незмінна.
+ */
+static void half_ctr_crypt(Dstu7624Ctx *ctx, const uint64_t *iv, uint8_t *data_buf, size_t data_len)
 {
-    uint8_t *a_data_buf = NULL;
-    uint8_t *p_data_buf = NULL;
-    uint8_t *h = NULL;
-    uint8_t G1[64];
-    uint8_t G2[64];
-    uint8_t B[64];
-    uint64_t B64[8];
-    size_t i;
-    size_t tmp;
+    uint64_t gamma[8];
+    uint64_t counter[8];
+    uint8_t gamma8[MAX_BLOCK_LEN];
     size_t block_len;
-    size_t a_data_len, p_data_len;
+    size_t half_len_word;
+    size_t part_len;
+    size_t i, j;
+
+    block_len = ctx->block_len;
+    half_len_word = block_len >> 4;
+
+    memset(counter, 0, sizeof(counter));
+    memcpy(counter, iv, block_len);
+    ctx->basic_transform(ctx, counter);
+
+    for (i = 0; i < data_len; i += block_len) {
+        for (j = 0; j < half_len_word; j++) {
+            if (++counter[j] != 0) {
+                break;
+            }
+        }
+        memcpy(gamma, counter, block_len);
+        ctx->basic_transform(ctx, gamma);
+        uint64_to_uint8(gamma, block_len >> 3, gamma8, block_len);
+        part_len = ((data_len - i) < block_len) ? (data_len - i) : block_len;
+        kalyna_xor(&data_buf[i], gamma8, part_len, &data_buf[i]);
+    }
+
+    memset(gamma, 0, sizeof(gamma));
+    memset(gamma8, 0, sizeof(gamma8));
+    memset(counter, 0, sizeof(counter));
+}
+
+/* Записує довжину (в байтах) у поле завдовжки nb байтів, формат little endian. */
+static int ccm_put_len(uint8_t *buf, size_t nb, size_t len)
+{
+    size_t i;
+    int ret = RET_OK;
+
+    for (i = 0; i < nb; i++) {
+        buf[i] = (uint8_t) len;
+        len >>= 8;
+    }
+    /* Довжина не вміщується у N_Б байтів. */
+    CHECK_PARAM(len == 0);
+
+cleanup:
+
+    return ret;
+}
+
+/*
+ * Вироблення імітовставки режиму CCM (ДСТУ 7624:2014, 13.2).
+ * h8 - буфер розміром блока, імітовставка - його перші q байтів.
+ */
+static int ccm_calc_mac(Dstu7624Ctx *ctx, const uint8_t *a_data_buf, size_t a_data_len,
+        const uint8_t *p_data_buf, size_t p_data_len, uint8_t *h8)
+{
+    uint8_t G1[MAX_BLOCK_LEN];
+    uint8_t G2[2 * MAX_BLOCK_LEN];
+    uint8_t B[MAX_BLOCK_LEN];
+    uint8_t block[MAX_BLOCK_LEN];
+    size_t block_len;
+    size_t iv_len;
+    size_t g2_len;
+    size_t tail_len;
+    size_t nb;
+    size_t i, j;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
-    CHECK_PARAM(auth_data != NULL);
-    CHECK_PARAM(plain_data != NULL);
-    CHECK_PARAM(h_out != NULL);
-    CHECK_PARAM(ctx->block_len >= Nb + 1);
+    CHECK_PARAM(h8 != NULL);
+    CHECK_PARAM((a_data_buf != NULL) || (a_data_len == 0));
+    /* Довжина конфіденційної частини: |M| = 8 * r, r = 1, 2, ... (13.1). */
+    CHECK_PARAM((p_data_buf != NULL) && (p_data_len > 0));
 
-    /*Начало виробки імітовставки*/
-    tmp = ctx->block_len - Nb - 1;
     block_len = ctx->block_len;
+    nb = ctx->mode.ccm.nb;
+    CHECK_PARAM((nb >= 1) && (nb <= 8) && (block_len >= nb + 1));
 
-    memset(G1, 0, 64);
-    memset(G2, 0, 64);
-    memset(B, 0, 64);
-    memcpy(G1, ctx->mode.ccm.iv, tmp);
-    a_data_len = ba_get_len(auth_data);
-    CALLOC_CHECKED(a_data_buf, a_data_len + block_len);
-    DO(ba_to_uint8(auth_data, a_data_buf, a_data_len));
+    /* Заголовок автентифікації G1 (таблиця 13.1). */
+    iv_len = block_len - nb - 1;
+    memset(G1, 0, MAX_BLOCK_LEN);
+    memcpy(G1, ctx->mode.ccm.iv, iv_len);
+    DO(ccm_put_len(&G1[iv_len], nb, p_data_len));
 
-    p_data_len = ba_get_len(plain_data);
-    CALLOC_CHECKED(p_data_buf, p_data_len + block_len);
-    DO(ba_to_uint8(plain_data, p_data_buf, p_data_len));
-
-    //Создание заголовка аутентификации
-    G1[tmp] = (uint8_t) p_data_len;
-
-    if (ba_get_len(plain_data) > 0) {
-        G1[block_len - 1] = 1 << 7; //0b10000000
-    } else {
-        G1[block_len - 1] = 0;
-    }
-    //Код довжини імітовставки. Определен у стандарте.
+    /* Байт прапорців (таблиця 13.2): наявність відкритої частини, код довжини імітовставки, N_Б - 1. */
+    G1[block_len - 1] = (a_data_len > 0) ? 0x80 : 0x00;
     switch (ctx->mode.ccm.q) {
     case 8:
         G1[block_len - 1] |= 2 << 4;
@@ -2682,47 +2728,50 @@ static int ccm_padd(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArra
         G1[block_len - 1] |= 6 << 4;
         break;
     default:
-        break;
+        SET_ERROR(RET_INVALID_PARAM);
     }
-    G1[block_len - 1] |= ((Nb - 1));
-    //Конец создания заголовка аутентификации
+    G1[block_len - 1] |= (uint8_t) (nb - 1);
 
-    G2[0] = (uint8_t) a_data_len;
+    if (a_data_len > 0) {
+        /* G2 = lambda_o || 0..0, довжина (G1 || G2 || O) кратна розміру блока. */
+        tail_len = a_data_len % block_len;
+        g2_len = nb + ((2 * block_len - tail_len - nb) % block_len);
+        memset(G2, 0, sizeof(G2));
+        DO(ccm_put_len(G2, nb, a_data_len));
 
-    MALLOC_CHECKED(h, block_len * 2 + a_data_len);
-
-    tmp = a_data_len % block_len;
-
-    memcpy(h, G1, block_len);
-    memcpy(&h[block_len], G2, block_len - tmp);
-    memcpy(&h[block_len + block_len - tmp], a_data_buf, a_data_len);
-
-    for (i = 0; i < a_data_len + block_len + (block_len - tmp); i += block_len) {
-        kalyna_xor(B, &h[i], block_len, B);
-        uint8_to_uint64(B, block_len, B64, block_len >> 3);
-        ctx->basic_transform(ctx, B64);
-        DO(uint64_to_uint8(B64, block_len >> 3, B, block_len));
+        crypt_basic_transform(ctx, G1, B);
+        for (i = 0; i < g2_len + a_data_len; i += block_len) {
+            for (j = 0; j < block_len; j++) {
+                block[j] = ((i + j) < g2_len) ? G2[i + j] : a_data_buf[i + j - g2_len];
+            }
+            kalyna_xor(block, B, block_len, B);
+            crypt_basic_transform(ctx, B, B);
+        }
+    } else {
+        /* Відкритої частини немає: B = G1. */
+        memcpy(B, G1, block_len);
     }
 
-    padding(ctx, p_data_buf, &p_data_len, p_data_buf);
+    tail_len = p_data_len % block_len;
+    p_data_len -= tail_len;
     for (i = 0; i < p_data_len; i += block_len) {
-        kalyna_xor(B, &p_data_buf[i], block_len, B);
-        uint8_to_uint64(B, block_len, B64, block_len >> 3);
-        ctx->basic_transform(ctx, B64);
-        DO(uint64_to_uint8(B64, block_len >> 3, B, block_len));
+        kalyna_xor((void *) &p_data_buf[i], B, block_len, B);
+        crypt_basic_transform(ctx, B, B);
     }
-    memcpy(h, B, ctx->mode.ccm.q);
+    if (tail_len != 0) {
+        memset(block, 0, MAX_BLOCK_LEN);
+        memcpy(block, &p_data_buf[p_data_len], tail_len);
+        block[tail_len] = 0x80;
+        kalyna_xor(block, B, block_len, B);
+        crypt_basic_transform(ctx, B, B);
+    }
 
-    *h_out = h;
-    h = NULL;
-
-    /*Конец виробки імітовставки*/
+    memcpy(h8, B, block_len);
 
 cleanup:
 
-    free(a_data_buf);
-    free(p_data_buf);
-    free(h);
+    memset(block, 0, sizeof(block));
+    memset(B, 0, sizeof(B));
 
     return ret;
 }
@@ -2792,16 +2841,12 @@ cleanup:
 static int dstu7624_encrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArray *plain_data,
         ByteArray **h_ba, ByteArray **cipher_data)
 {
-    uint8_t *p_data_buf = NULL;
-    uint8_t *h = NULL;
-    uint8_t *h_tmp = NULL;
+    uint8_t *data_buf = NULL;
+    uint8_t h8[MAX_BLOCK_LEN];
+    uint64_t iv[8];
     size_t p_data_len;
-    size_t block_len;
     size_t q;
-    Dstu7624CcmCtx *ccm;
-    Dstu7624Ctx *ctr = NULL;
-    ByteArray *pdata_buf_part = NULL;
-    ByteArray *h_part = NULL;
+    ByteArray *h_tmp = NULL;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
@@ -2814,34 +2859,32 @@ static int dstu7624_encrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, co
         SET_ERROR(RET_INVALID_CTX_MODE);
     }
 
-    ccm = &ctx->mode.ccm;
-    DO(ccm_padd(ctx, auth_data, plain_data, &h_tmp, ccm->nb));
-
-    q = ccm->q;
-    block_len = ctx->block_len;
-
-    CHECK_NOT_NULL(*h_ba = ba_alloc_from_uint8(h_tmp, q));
+    q = ctx->mode.ccm.q;
     p_data_len = ba_get_len(plain_data);
-    MALLOC_CHECKED(p_data_buf, p_data_len + block_len);
-    DO(ba_to_uint8(plain_data, p_data_buf, p_data_len));
 
-    MALLOC_CHECKED(h, p_data_len + block_len);
+    DO(ccm_calc_mac(ctx, ba_get_buf_const(auth_data), ba_get_len(auth_data),
+            ba_get_buf_const(plain_data), p_data_len, h8));
 
-    CHECK_NOT_NULL(ctr = dstu7624_alloc(DSTU7624_SBOX_1));
-    DO(dstu7624_init_ctr(ctr, ccm->key, ccm->iv_tmp));
-    DO(encrypt_ctr(ctr, plain_data, &pdata_buf_part));
-    DO(encrypt_ctr(ctr, *h_ba, &h_part));
+    /* Зашифровується конфіденційна частина разом з імітовставкою: M || h. */
+    MALLOC_CHECKED(data_buf, p_data_len + q);
+    memcpy(data_buf, ba_get_buf_const(plain_data), p_data_len);
+    memcpy(&data_buf[p_data_len], h8, q);
 
-    CHECK_NOT_NULL(*cipher_data = ba_join(pdata_buf_part, h_part));
+    DO(uint8_to_uint64(ctx->mode.ccm.iv, ctx->block_len, iv, ctx->block_len >> 3));
+    half_ctr_crypt(ctx, iv, data_buf, p_data_len + q);
+
+    CHECK_NOT_NULL(h_tmp = ba_alloc_from_uint8(h8, q));
+    CHECK_NOT_NULL(*cipher_data = ba_alloc_from_uint8(data_buf, p_data_len + q));
+    *h_ba = h_tmp;
+    h_tmp = NULL;
 
 cleanup:
 
-    dstu7624_free(ctr);
-    ba_free(h_part);
-    ba_free(pdata_buf_part);
-    free(p_data_buf);
-    free(h);
-    free(h_tmp);
+    if (data_buf != NULL) {
+        memset(data_buf, 0, p_data_len + q);
+    }
+    free(data_buf);
+    ba_free(h_tmp);
 
     return ret;
 }
@@ -2849,14 +2892,13 @@ cleanup:
 static int dstu7624_decrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, const ByteArray *cipher_data,
         ByteArray *h_ba, ByteArray **plain_data)
 {
-    uint8_t *p_data_buf = NULL;
-    uint8_t *check_h = NULL;
+    uint8_t *data_buf = NULL;
+    uint8_t h8[MAX_BLOCK_LEN];
+    uint64_t iv[8];
+    size_t data_len = 0;
+    size_t p_data_len;
+    size_t q;
     int ret = RET_OK;
-    Dstu7624CcmCtx *ccm;
-    Dstu7624Ctx *ctr = NULL;
-    ByteArray *p_data_part = NULL;
-    size_t part_len;
-    ByteArray *ans = NULL;
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(auth_data != NULL);
@@ -2868,30 +2910,34 @@ static int dstu7624_decrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, co
         SET_ERROR(RET_INVALID_CTX_MODE);
     }
 
-    ccm = &ctx->mode.ccm;
+    q = ctx->mode.ccm.q;
+    data_len = ba_get_len(cipher_data);
+    /* Шифротекст містить конфіденційну частину (не менше одного байта) та імітовставку. */
+    CHECK_PARAM(data_len > q);
+    p_data_len = data_len - q;
 
-    CHECK_NOT_NULL(ctr = dstu7624_alloc(DSTU7624_SBOX_1));
-    DO(dstu7624_init_ctr(ctr, ccm->key, ccm->iv_tmp));
-    DO(encrypt_ctr(ctr, cipher_data, &p_data_part));
+    MALLOC_CHECKED(data_buf, data_len);
+    memcpy(data_buf, ba_get_buf_const(cipher_data), data_len);
 
-    DO(ba_to_uint8_with_alloc(p_data_part, &p_data_buf, &part_len));
-    CHECK_NOT_NULL(ans = ba_alloc_from_uint8(p_data_buf, part_len - ccm->q));
-    DO(ccm_padd(ctx, auth_data, ans, &check_h, ctx->mode.ccm.nb));
+    DO(uint8_to_uint64(ctx->mode.ccm.iv, ctx->block_len, iv, ctx->block_len >> 3));
+    half_ctr_crypt(ctx, iv, data_buf, data_len);
 
-    if (memcmp(check_h, ba_get_buf_const(h_ba), ccm->q) != 0) {
+    DO(ccm_calc_mac(ctx, ba_get_buf_const(auth_data), ba_get_len(auth_data), data_buf, p_data_len, h8));
+
+    /* Обчислена імітовставка має збігатися і з отриманою у шифротексті, і з наданою окремо. */
+    if ((memcmp(h8, &data_buf[p_data_len], q) != 0) ||
+            (ba_get_len(h_ba) != q) || (memcmp(h8, ba_get_buf_const(h_ba), q) != 0)) {
         SET_ERROR(RET_VERIFY_FAILED);
     }
 
-    *plain_data = ans;
-    ans = NULL;
+    CHECK_NOT_NULL(*plain_data = ba_alloc_from_uint8(data_buf, p_data_len));
 
 cleanup:
 
-    free(p_data_buf);
-    dstu7624_free(ctr);
-    ba_free(p_data_part);
-    free(check_h);
-    ba_free(ans);
+    if (data_buf != NULL) {
+        memset(data_buf, 0, data_len);
+    }
+    free(data_buf);
 
     return ret;
 }
@@ -3233,23 +3279,108 @@ cleanup:
     return ret;
 }
 
+/*
+ * Імітовставка режимів GCM та GMAC (ДСТУ 7624:2014, розділи 11, 12).
+ * Останній неповний блок доповнюється одиничним бітом і нулями (доповнення 10*),
+ * у блок довжин записуються фактичні довжини даних (у бітах).
+ */
+static void gcm_calc_h(Dstu7624Ctx *ctx, uint8_t *H8)
+{
+    uint64_t H[8];
+
+    memset(H, 0, sizeof(H));
+    ctx->basic_transform(ctx, H);
+    uint64_to_uint8(H, ctx->block_len >> 3, H8, ctx->block_len);
+}
+
+static int gcm_update_hash(Gf2mCtx *gf2m_ctx, size_t block_len, uint8_t *H8, const uint8_t *data, size_t data_len,
+        uint8_t *B8)
+{
+    uint8_t last_block[MAX_BLOCK_LEN];
+    size_t tail_len;
+    size_t i;
+    int ret = RET_OK;
+
+    tail_len = data_len % block_len;
+    data_len -= tail_len;
+
+    for (i = 0; i < data_len; i += block_len) {
+        kalyna_xor((void *) &data[i], B8, block_len, B8);
+        DO(gf2m_mul(gf2m_ctx, block_len, B8, H8, B8));
+    }
+
+    if (tail_len != 0) {
+        memset(last_block, 0, MAX_BLOCK_LEN);
+        memcpy(last_block, &data[data_len], tail_len);
+        last_block[tail_len] = 0x80;
+        kalyna_xor(last_block, B8, block_len, B8);
+        DO(gf2m_mul(gf2m_ctx, block_len, B8, H8, B8));
+    }
+
+cleanup:
+
+    return ret;
+}
+
+static int gcm_final_hash(Dstu7624Ctx *ctx, const uint8_t *B8, size_t auth_len, size_t data_len, uint8_t *h8)
+{
+    uint64_t H[8];
+    uint8_t H8[MAX_BLOCK_LEN];
+    size_t block_len;
+    size_t block_len_word;
+    int ret = RET_OK;
+
+    block_len = ctx->block_len;
+    block_len_word = block_len >> 3;
+
+    /* Блок довжин: lambda_o || lambda_c, кожна довжина займає половину блоку. */
+    memset(H, 0, sizeof(H));
+    H[0] = (uint64_t) auth_len << 3;
+    H[block_len_word >> 1] = (uint64_t) data_len << 3;
+
+    DO(uint64_to_uint8(H, block_len_word, H8, block_len));
+    kalyna_xor(H8, (void *) B8, block_len, H8);
+    DO(uint8_to_uint64(H8, block_len, H, block_len_word));
+    ctx->basic_transform(ctx, H);
+    DO(uint64_to_uint8(H, block_len_word, h8, block_len));
+
+cleanup:
+
+    return ret;
+}
+
+static int gcm_calc_mac(Dstu7624Ctx *ctx, Gf2mCtx *gf2m_ctx, const uint8_t *auth_buf, size_t auth_len,
+        const uint8_t *cipher_buf, size_t cipher_len, uint8_t *h8)
+{
+    uint8_t H8[MAX_BLOCK_LEN];
+    uint8_t B8[MAX_BLOCK_LEN];
+    int ret = RET_OK;
+
+    /*
+     * |O| + |M| >= 1 (12.1). Для порожнього повідомлення імітовставка дорівнює T(0),
+     * тобто розкриває параметризовану змінну автентифікації H.
+     */
+    CHECK_PARAM((auth_len + cipher_len) > 0);
+
+    memset(B8, 0, MAX_BLOCK_LEN);
+    gcm_calc_h(ctx, H8);
+
+    DO(gcm_update_hash(gf2m_ctx, ctx->block_len, H8, auth_buf, auth_len, B8));
+    DO(gcm_update_hash(gf2m_ctx, ctx->block_len, H8, cipher_buf, cipher_len, B8));
+    DO(gcm_final_hash(ctx, B8, auth_len, cipher_len, h8));
+
+cleanup:
+
+    return ret;
+}
+
 static int dstu7624_encrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *plain_data, const ByteArray *auth_data,
         ByteArray **h, ByteArray **cipher_text)
 {
-    uint8_t *auth_buf = NULL;
     uint8_t *plain_buf = NULL;
-    uint64_t gamma[8];
-    uint8_t gamma8[64];
-    uint64_t gamma_old[8];
-    uint64_t H[8];
-    uint64_t B[8];
-    uint8_t H8[64];
-    uint8_t B8[64];
-    size_t auth_len;
+    uint8_t h8[MAX_BLOCK_LEN];
     size_t plain_len;
-    size_t i = 0;
-    size_t block_len;
-    size_t block_len_word;
+    ByteArray *cipher_ba = NULL;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
@@ -3258,74 +3389,26 @@ static int dstu7624_encrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *plain_data, c
     CHECK_PARAM(h != NULL);
     CHECK_PARAM(cipher_text != NULL);
 
-    block_len = ctx->block_len;
-    block_len_word = block_len >> 3;
-
-    memset(gamma, 0, 64);
-    memset(gamma_old, 0, 64);
-    memset(B, 0, 64);
-    memset(H, 0, 64);
-
-    auth_len = ba_get_len(auth_data);
-    MALLOC_CHECKED(auth_buf, auth_len + block_len);
     plain_len = ba_get_len(plain_data);
-    MALLOC_CHECKED(plain_buf, plain_len + block_len);
-
-    memcpy(gamma_old, ctx->mode.gcm.iv, ctx->block_len);
-    ctx->basic_transform(ctx, gamma_old);
-
-    DO(ba_to_uint8(auth_data, auth_buf, auth_len));
+    MALLOC_CHECKED(plain_buf, plain_len + ctx->block_len);
     DO(ba_to_uint8(plain_data, plain_buf, plain_len));
-    memset(auth_buf + auth_len, 0, block_len);
 
-    /*Шифрування і обеспечение целостности.*/
-    for (i = 0; i < plain_len; i += block_len) {
-        gamma_old[0]++;
-        memcpy(gamma, gamma_old, block_len);
-        ctx->basic_transform(ctx, gamma);
-        uint64_to_uint8(gamma, block_len_word, gamma8, block_len);
-        kalyna_xor(&plain_buf[i], gamma8, block_len, &plain_buf[i]);
-    }
+    /*Шифрування.*/
+    half_ctr_crypt(ctx, ctx->mode.gcm.iv, plain_buf, plain_len);
 
-    CHECK_NOT_NULL(*cipher_text = ba_alloc_from_uint8(plain_buf, plain_len));
+    /*Вироблення імітовставки.*/
+    DO(gcm_calc_mac(ctx, ctx->mode.gcm.gf2m_ctx, ba_get_buf_const(auth_data), ba_get_len(auth_data),
+            plain_buf, plain_len, h8));
 
-    /*Выработка імітовставки.*/
-    padding(ctx, plain_buf, &plain_len, plain_buf);
-    ctx->basic_transform(ctx, H);
-    /*H - у ле формате. Для умножения нам нужно 2 бе формата. auth_buf - бе.*/
-    DO(uint64_to_uint8(H, block_len_word, H8, block_len));
-    for (i = 0; i < auth_len; i += block_len) {
-        kalyna_xor(&auth_buf[i], B, block_len, B);
-        DO(gf2m_mul(ctx->mode.gcm.gf2m_ctx, block_len, (uint8_t *) B, H8, (uint8_t *) B));
-    }
-
-    for (i = 0; i < plain_len; i += block_len) {
-        kalyna_xor(&plain_buf[i], B, block_len, B);
-        DO(gf2m_mul(ctx->mode.gcm.gf2m_ctx, block_len, (uint8_t *) B, H8, (uint8_t *) B));
-    }
-
-    memset(H, 0, 64);
-    auth_len <<= 3;
-    plain_len <<= 3;
-    for (i = 0; auth_len != 0; i++) {
-        H[0] ^= (auth_len & 255) << (i << 3);
-        auth_len >>= 8;
-    }
-    for (i = 0; plain_len != 0; i++) {
-        H[((block_len / 2) >> 3)] ^= (plain_len & 255) << (i << 3);
-        plain_len >>= 8;
-    }
-
-    DO(uint64_to_uint8(B, block_len_word, B8, block_len));
-    kalyna_xor(H, B8, block_len, H);
-    ctx->basic_transform(ctx, H);
-    DO(uint64_to_uint8(H, block_len_word, H8, block_len));
-    CHECK_NOT_NULL(*h = ba_alloc_from_uint8(H8, ctx->mode.gcm.q));
+    CHECK_NOT_NULL(cipher_ba = ba_alloc_from_uint8(plain_buf, plain_len));
+    CHECK_NOT_NULL(*h = ba_alloc_from_uint8(h8, ctx->mode.gcm.q));
+    *cipher_text = cipher_ba;
+    cipher_ba = NULL;
 
 cleanup:
 
     free(plain_buf);
-    free(auth_buf);
+    ba_free(cipher_ba);
 
     return ret;
 }
@@ -3333,22 +3416,9 @@ cleanup:
 static int dstu7624_decrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *cipher_data, const ByteArray *h_ba,
         const ByteArray *auth_data, ByteArray **out)
 {
-    uint8_t *auth_buf = NULL;
     uint8_t *plain_buf = NULL;
-    uint64_t *h = NULL;
-    uint64_t gamma[8];
-    uint8_t gamma8[64];
-    uint64_t gamma_old[8];
-    uint64_t H[8];
-    uint8_t H8[64];
-    uint64_t B[8];
-    uint8_t B8[64];
-    size_t auth_len;
+    uint8_t h8[MAX_BLOCK_LEN];
     size_t plain_len;
-    size_t h_len;
-    size_t block_len;
-    size_t block_len_word;
-    size_t i = 0;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
@@ -3357,163 +3427,95 @@ static int dstu7624_decrypt_gcm(Dstu7624Ctx *ctx, const ByteArray *cipher_data, 
     CHECK_PARAM(auth_data != NULL);
     CHECK_PARAM(out != NULL);
 
-    block_len = ctx->block_len;
-    block_len_word = block_len >> 3;
-
-    memset(gamma, 0, 64);
-    memset(gamma_old, 0, 64);
-    memset(B, 0, 64);
-    memset(H, 0, 64);
-
-    auth_len = ba_get_len(auth_data);
-    MALLOC_CHECKED(auth_buf, auth_len + block_len);
     plain_len = ba_get_len(cipher_data);
-    MALLOC_CHECKED(plain_buf, plain_len + block_len);
-
-    memcpy(gamma_old, ctx->mode.gcm.iv, ctx->block_len);
-    ctx->basic_transform(ctx, gamma_old);
-
-    DO(ba_to_uint8(auth_data, auth_buf, auth_len));
+    MALLOC_CHECKED(plain_buf, plain_len + ctx->block_len);
     DO(ba_to_uint8(cipher_data, plain_buf, plain_len));
-    memset(auth_buf + auth_len, 0, block_len);
 
-    /*Выработка імітовставки.*/
-    padding(ctx, plain_buf, &plain_len, plain_buf);
+    /*Перевірка імітовставки.*/
+    DO(gcm_calc_mac(ctx, ctx->mode.gcm.gf2m_ctx, ba_get_buf_const(auth_data), ba_get_len(auth_data),
+            plain_buf, plain_len, h8));
 
-    ctx->basic_transform(ctx, H);
-    /*H - у ле формате. Для умножения нам нужно 2 бе формата. auth_buf - бе.*/
-    uint64_to_uint8(H, block_len_word, H8, block_len);
-    for (i = 0; i < auth_len; i += block_len) {
-        kalyna_xor(&auth_buf[i], B, block_len, B);
-        DO(gf2m_mul(ctx->mode.gcm.gf2m_ctx, block_len, (uint8_t *) B, (uint8_t *) H8, (uint8_t *) B));
-    }
-
-    for (i = 0; i < plain_len; i += block_len) {
-        kalyna_xor(&plain_buf[i], B, block_len, B);
-        DO(gf2m_mul(ctx->mode.gcm.gf2m_ctx, block_len, (uint8_t *) B, H8, (uint8_t *) B));
-    }
-
-    memset(H, 0, 64);
-
-    auth_len <<= 3;
-    plain_len <<= 3;
-    for (i = 0; auth_len != 0; i++) {
-        H[0] ^= (auth_len & 255) << (i << 3);
-        auth_len >>= 8;
-    }
-    for (i = 0; plain_len != 0; i++) {
-        H[((block_len / 2) >> 3)] ^= (plain_len & 255) << (i << 3);
-        plain_len >>= 8;
-    }
-
-    DO(uint64_to_uint8(B, block_len_word, B8, block_len));
-    kalyna_xor(H, B8, block_len, H);
-    ctx->basic_transform(ctx, H);
-
-    DO(ba_to_uint64_with_alloc(h_ba, &h, &h_len));
-
-    if (memcmp(H, h, ctx->mode.gcm.q)) {
+    if ((ba_get_len(h_ba) != ctx->mode.gcm.q) || (memcmp(h8, ba_get_buf_const(h_ba), ctx->mode.gcm.q) != 0)) {
         SET_ERROR(RET_VERIFY_FAILED);
     }
 
-    /*Шифрування і забезпечення цілісності.*/
-    auth_len = ba_get_len(auth_data);
-    plain_len = ba_get_len(cipher_data);
-
-    for (i = 0; i < plain_len; i += ctx->block_len) {
-        gamma_old[0]++;
-        memcpy(gamma, gamma_old, ctx->block_len);
-        ctx->basic_transform(ctx, gamma);
-        DO(uint64_to_uint8(gamma, block_len_word, gamma8, block_len));
-        kalyna_xor(&plain_buf[i], gamma8, block_len, &plain_buf[i]);
-    }
+    /*Розшифрування.*/
+    half_ctr_crypt(ctx, ctx->mode.gcm.iv, plain_buf, plain_len);
 
     CHECK_NOT_NULL(*out = ba_alloc_from_uint8(plain_buf, plain_len));
 
 cleanup:
 
-    free(h);
     free(plain_buf);
-    free(auth_buf);
 
     return ret;
 }
 
+static void gmac_reset(Dstu7624Ctx *ctx)
+{
+    memset(ctx->mode.gmac.B, 0, MAX_BLOCK_LEN);
+    memset(ctx->mode.gmac.last_block, 0, MAX_BLOCK_LEN);
+    ctx->mode.gmac.last_block_len = 0;
+    ctx->mode.gmac.msg_tot_len = 0;
+}
+
 static int gmac_update(Dstu7624Ctx *ctx, const ByteArray *plain_data)
 {
-    uint8_t *data_buf = NULL;
+    const uint8_t *data_buf = NULL;
     uint8_t *last_block = NULL;
-    uint64_t *B = NULL;
-    uint64_t *H = NULL;
     uint8_t H8[MAX_BLOCK_LEN];
     uint8_t B8[MAX_BLOCK_LEN];
     size_t data_len;
     size_t block_len;
+    size_t part_len;
     size_t tail_len;
-    size_t last_block_len;
-    size_t i;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(plain_data != NULL);
 
-    B = ctx->mode.gmac.B;
-    H = ctx->mode.gmac.H;
     block_len = ctx->block_len;
     last_block = ctx->mode.gmac.last_block;
-    last_block_len = ctx->mode.gmac.last_block_len;
 
-    //Приводим данные к u8 типу
-    DO(uint64_to_uint8(B, block_len >> 3, B8, block_len));
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
+    data_buf = ba_get_buf_const(plain_data);
+    data_len = ba_get_len(plain_data);
+    if (data_len == 0) {
+        goto cleanup;
+    }
 
-    data_buf = plain_data->buf;
-    data_len = plain_data->len;
+    DO(uint64_to_uint8(ctx->mode.gmac.B, block_len >> 3, B8, block_len));
+    DO(uint64_to_uint8(ctx->mode.gmac.H, block_len >> 3, H8, block_len));
 
     ctx->mode.gmac.msg_tot_len += data_len;
-    //Если последний блок не пустой:
-    if (last_block_len != 0) {
-        /*Если длинна последнего блока и данных в сумме меньше размера блока*/
-        if (last_block_len + data_len < block_len) {
-            //Добавляем в конец последнего блока новые данные
-            memcpy(&last_block[last_block_len], data_buf, data_len);
-            ctx->mode.gmac.last_block_len += data_len;
-            goto cleanup;
-        } else {
-            //Ксорим последний блок с текущими данными
-            kalyna_xor(last_block, B8, last_block_len, B8);
-            tail_len = block_len - last_block_len;
-            //Ксорим первые байты из пришедшего блока, до размера блока.
-            kalyna_xor(data_buf, &B8[last_block_len], tail_len, &B[last_block_len]);
-            data_len -= tail_len;
-        }
-    } else {
 
-        if (data_len >= block_len) {
-            kalyna_xor(&data_buf[0], B8, block_len, B8);
-        } else {
-            memcpy(last_block, data_buf, data_len);
-            ctx->mode.gmac.last_block_len = data_len;
-            goto cleanup;
+    /*Доповнюємо неповний блок, що залишився від попереднього виклику.*/
+    if (ctx->mode.gmac.last_block_len != 0) {
+        part_len = block_len - ctx->mode.gmac.last_block_len;
+        if (part_len > data_len) {
+            part_len = data_len;
+        }
+        memcpy(&last_block[ctx->mode.gmac.last_block_len], data_buf, part_len);
+        ctx->mode.gmac.last_block_len += part_len;
+        data_buf += part_len;
+        data_len -= part_len;
+
+        if (ctx->mode.gmac.last_block_len == block_len) {
+            DO(gcm_update_hash(ctx->mode.gmac.gf2m_ctx, block_len, H8, last_block, block_len, B8));
+            ctx->mode.gmac.last_block_len = 0;
         }
     }
-    //Высчитываем остаток
-    tail_len = (block_len - data_len % block_len) % block_len;
 
+    /*Повні блоки обробляємо, неповний залишаємо до наступного виклику.*/
+    tail_len = data_len % block_len;
     data_len -= tail_len;
-    for (i = 0; i < data_len; i += block_len) {
-        DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
-        if ((i + block_len) < data_len) {
-            kalyna_xor(&data_buf[i], B8, block_len, B8);
-        }
-    }
+    DO(gcm_update_hash(ctx->mode.gmac.gf2m_ctx, block_len, H8, data_buf, data_len, B8));
 
     if (tail_len != 0) {
-        memcpy(last_block, &data_buf[i], tail_len);
+        memcpy(last_block, &data_buf[data_len], tail_len);
         ctx->mode.gmac.last_block_len = tail_len;
     }
 
-    DO(uint8_to_uint64(B8, block_len, B, block_len >> 3));
+    DO(uint8_to_uint64(B8, block_len, ctx->mode.gmac.B, block_len >> 3));
 
 cleanup:
 
@@ -3522,47 +3524,31 @@ cleanup:
 
 static int gmac_final(Dstu7624Ctx *ctx, ByteArray **mac)
 {
-    uint8_t *last_block = NULL;
-    uint64_t *H;
-    uint64_t *B;
     uint8_t B8[MAX_BLOCK_LEN];
     uint8_t H8[MAX_BLOCK_LEN];
-    size_t last_block_len;
+    uint8_t h8[MAX_BLOCK_LEN];
     size_t block_len;
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(mac != NULL);
+    /* |O| >= 1 (12.1, 12.5): імітовставка порожнього повідомлення розкриває H. */
+    CHECK_PARAM(ctx->mode.gmac.msg_tot_len > 0);
 
-    B = ctx->mode.gmac.B;
-    H = ctx->mode.gmac.H;
     block_len = ctx->block_len;
-    last_block = ctx->mode.gmac.last_block;
-    last_block_len = ctx->mode.gmac.last_block_len;
 
-    DO(uint64_to_uint8(B, block_len >> 3, B8, block_len));
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
+    DO(uint64_to_uint8(ctx->mode.gmac.B, block_len >> 3, B8, block_len));
+    DO(uint64_to_uint8(ctx->mode.gmac.H, block_len >> 3, H8, block_len));
 
-    // Проверяем, нужно ли достчитывать последний блок.
-    if (last_block_len != 0) {
-        //Если последний блок не нулевой, дополняем его.
-        padding(ctx, last_block, &last_block_len, last_block);
+    /*Останній неповний блок доповнюється у gcm_update_hash().*/
+    DO(gcm_update_hash(ctx->mode.gmac.gf2m_ctx, block_len, H8, ctx->mode.gmac.last_block,
+            ctx->mode.gmac.last_block_len, B8));
+    DO(gcm_final_hash(ctx, B8, ctx->mode.gmac.msg_tot_len, 0, h8));
 
-        kalyna_xor(&last_block, B8, last_block_len, B8);
-        DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, B8, H8, B8));
-    }
-    memset(H, 0, MAX_BLOCK_LEN);
+    CHECK_NOT_NULL(*mac = ba_alloc_from_uint8(h8, ctx->mode.gmac.q));
 
-    //Записываем длинну всего сообщения в битах
-    H[0] = ctx->mode.gmac.msg_tot_len << 3;
-
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-    kalyna_xor(H8, B8, block_len, H8);
-    DO(uint8_to_uint64(H8, block_len, H, block_len >> 3));
-    ctx->basic_transform(ctx, H);
-
-    DO(uint64_to_uint8(H, block_len >> 3, H8, block_len));
-    CHECK_NOT_NULL(*mac = ba_alloc_from_uint8(H8, ctx->mode.gmac.q));
+    /*Контекст готовий до обчислення наступної імітовставки на тому ж ключі.*/
+    gmac_reset(ctx);
 
 cleanup:
 
@@ -3571,52 +3557,19 @@ cleanup:
 
 static int encrypt_gmac(Dstu7624Ctx *ctx, const ByteArray *plain_data, ByteArray **out)
 {
-    uint8_t *data_buf = NULL;
-    uint64_t H[8];
-    uint8_t H8[64];
-    uint64_t B[8];
-    uint8_t B8[64];
-    size_t data_len;
-    size_t i;
-    size_t block_len;
-    size_t block_len_word;
+    uint8_t h8[MAX_BLOCK_LEN];
     int ret = RET_OK;
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(plain_data != NULL);
     CHECK_PARAM(out != NULL);
 
-    block_len = ctx->block_len;
-    block_len_word = block_len >> 3;
-    memset(H, 0, 64);
-    memset(B, 0, 64);
-    memset(H8, 0, 64);
-    memset(B8, 0, 64);
-    data_len = ba_get_len(plain_data);
-    MALLOC_CHECKED(data_buf, data_len + block_len);
-    DO(ba_to_uint8(plain_data, data_buf, data_len));
+    DO(gcm_calc_mac(ctx, ctx->mode.gmac.gf2m_ctx, ba_get_buf_const(plain_data), ba_get_len(plain_data),
+            NULL, 0, h8));
 
-    padding(ctx, data_buf, &data_len, data_buf);
-    ctx->basic_transform(ctx, H);
-    DO(uint64_to_uint8(H, block_len_word, H8, block_len));
-    for (i = 0; i < data_len; i += block_len) {
-        kalyna_xor(&data_buf[i], B, block_len, B);
-        DO(gf2m_mul(ctx->mode.gmac.gf2m_ctx, block_len, (uint8_t *) B, H8, (uint8_t *) B));
-    }
-
-    memset(H, 0, 64);
-
-    H[0] = data_len << 3;
-    DO(uint64_to_uint8(B, block_len_word, B8, block_len));
-    kalyna_xor(H, B8, block_len, H);
-    ctx->basic_transform(ctx, H);
-    DO(uint64_to_uint8(H, block_len_word, H8, block_len));
-
-    CHECK_NOT_NULL(*out = ba_alloc_from_uint8(H8, ctx->mode.gmac.q));
+    CHECK_NOT_NULL(*out = ba_alloc_from_uint8(h8, ctx->mode.gmac.q));
 
 cleanup:
-
-    free(data_buf);
 
     return ret;
 }
@@ -4143,19 +4096,19 @@ int dstu7624_init_ccm(Dstu7624Ctx *ctx, const ByteArray *key, const ByteArray *i
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(key != NULL);
     CHECK_PARAM(iv != NULL);
-    CHECK_PARAM(q > 0);
-    CHECK_PARAM(n_max >= 8);
+    /* Довжина імітовставки (таблиця 13.3). */
+    CHECK_PARAM(q == 8 || q == 16 || q == 32 || q == 48 || q == 64);
+    /* n_max = 8 * N_Б, N_Б - кількість байтів для збереження довжини повідомлення. */
+    CHECK_PARAM((n_max >= 8) && (n_max <= 64));
 
     DO(dstu7624_init(ctx, key, ba_get_len(iv)));
 
     CHECK_PARAM(q <= ctx->block_len);
 
-    ctx->mode.ccm.key = key;
-
     DO(ba_to_uint8(iv, ctx->mode.ccm.iv, ctx->block_len));
-    ctx->mode.ccm.iv_tmp = iv;
     ctx->mode.ccm.q = q;
     ctx->mode.ccm.nb = (size_t) (((n_max - 3) >> 3) + 1);
+    CHECK_PARAM(ctx->block_len >= ctx->mode.ccm.nb + 1);
 
     ctx->mode_id = DSTU7624_MODE_CCM;
 
@@ -5604,7 +5557,7 @@ static int dstu7624_gmac_self_test(void)
         const char* exp;
         size_t q;
         size_t block_size;
-    } gmac_test_data[5] = {
+    } gmac_test_data[7] = {
         {
             "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F",
             "303132333435363738393A3B3C3D3E3F",
@@ -5639,6 +5592,22 @@ static int dstu7624_gmac_self_test(void)
             "897C32E05E776FD988C5171FE70BB72949172E514E3308A871BA5BD898FB6EBD6E3897D2D55697D90D6428216C08052E3A5E7D4626F4DBBF1546CE21637357A3",
             64,
             64
+        },
+        /* Повідомлення з трьох блоків. */
+        {
+            "000102030405060708090A0B0C0D0E0F",
+            "808182838485868788898A8B8C8D8E8F909192939495969798999A9B9C9D9E9FA0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+            "D921A61D92B2380196D92377ED605602",
+            16,
+            16
+        },
+        /* Довжина повідомлення не кратна розміру блока. */
+        {
+            "000102030405060708090A0B0C0D0E0F",
+            "808182838485868788898A8B8C8D8E8F90919293",
+            "E6125BA626EA51631F17736CEC11836D",
+            16,
+            16
         }
     };
 
@@ -5651,7 +5620,7 @@ static int dstu7624_gmac_self_test(void)
 
     CHECK_NOT_NULL(ctx = dstu7624_alloc(DSTU7624_SBOX_1));
 
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 7; i++) {
         CHECK_NOT_NULL(key_ba = ba_alloc_from_hex(gmac_test_data[i].key));
         CHECK_NOT_NULL(data_ba = ba_alloc_from_hex(gmac_test_data[i].data));
         CHECK_NOT_NULL(expected_ba = ba_alloc_from_hex(gmac_test_data[i].exp));
@@ -5693,7 +5662,7 @@ static int dstu7624_gcm_self_test(void)
         const char* exp_h;
         const char* exp_cip;
         size_t q;
-    } gcm_test_data[6] = {
+    } gcm_test_data[7] = {
         {
             "000102030405060708090A0B0C0D0E0F",
             "101112131415161718191A1B1C1D1E1F",
@@ -5747,6 +5716,16 @@ static int dstu7624_gcm_self_test(void)
             "78A77E5948F5DC05F551486FDBB44898C9AB1BD439D7519841AE31007C09E1B312E5EA5929F952F6A3EEF5CBEAEF262B8EC1884DFCF4BAAF7B5C9291A22489E1",
             "220642D7277D104788CF97B10210984F506435512F7BF153C5CDABFECC10AFB4A2E2FC51F616AF80FFDD0607FAD4F542B8EF0667717CE3EAAA8FBC303CE76C99",
             64
+        },
+        /* Довжини відкритої та конфіденційної частин не кратні розміру блока. */
+        {
+            "000102030405060708090A0B0C0D0E0F",
+            "101112131415161718191A1B1C1D1E1F",
+            "808182838485868788898A8B8C8D8E8F90919293",
+            "404142434445464748494A4B4C4D4E4F50515253",
+            "EF1987BAB791958A2DA2E28CB01F5BE9",
+            "C96A0BF7E0CBBFBF962D749523FEE89206BC308D",
+            16
         }
     };
 
@@ -5764,7 +5743,7 @@ static int dstu7624_gcm_self_test(void)
 
     CHECK_NOT_NULL(ctx = dstu7624_alloc(DSTU7624_SBOX_1));
 
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 7; i++) {
         CHECK_NOT_NULL(key_ba = ba_alloc_from_hex(gcm_test_data[i].key));
         CHECK_NOT_NULL(iv_ba = ba_alloc_from_hex(gcm_test_data[i].iv));
         CHECK_NOT_NULL(au_ba = ba_alloc_from_hex(gcm_test_data[i].auth_data));
