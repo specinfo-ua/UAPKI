@@ -5,6 +5,11 @@ Fork of [Cryptonite](https://github.com/privat-it/cryptonite).
 
 [Expert conclusion on the results of the Ukrainian state expertise in the field of cryptographic protection of information No 04/05/02-2096 from 21.07.2021](https://data.gov.ua/dataset/7b0d45fe-75eb-4d14-9792-59e440305678).
 
+## Branches
+
++ main. Development of version 3.x (work in progress, API may change).
++ v2. Stable version 2.x, bug fixes only.
+
 ## Project structure
 
 + library. Directory contains c/cpp libraries and applications of The UAPKI Project
