@@ -16,7 +16,7 @@
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Початкова версія документа (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Конвертація в Markdown. Звірка з кодом бібліотеки v2.0.16: задокументовано відсутні поля запитів/відповідей та коди помилок, виправлено назви й типи полів, доповнено додатки Б, В, Г. Додано англійську версію документа |
-| 3       | 2026-09-30 | Бібліотека v3.0.0: API сесій (uapki_session_create, uapki_session_free, uapki_session_process) для незалежних екземплярів бібліотеки в одному процесі та спільна пам'ять (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) для кешів сертифікатів і СВС, спільних для сесій; коди помилок INVALID_SESSION, INVALID_SHARED_MEMORY; метод VERSION повертає версії завантажених бібліотек uapkic і uapkif |
+| 3       | 2026-09-30 | Бібліотека v3.0.0: API сесій (uapki_session_create, uapki_session_free, uapki_session_process) для незалежних екземплярів бібліотеки в одному процесі та спільна пам'ять (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) для кешів сертифікатів і СВС, спільних для сесій; коди помилок INVALID_SESSION, INVALID_SHARED_MEMORY; метод VERSION повертає версії завантажених бібліотек uapkic і uapkif; поле cmProviders у відповіді INIT |
 
 # Загальні відомості
 
@@ -474,6 +474,7 @@ uapki_session_shared_memory_free(memory);
 | certCache        | Object<br>CERT_CACHE_INFO | Інформація про стан кешу сертифікатів  |
 | crlCache         | Object<br>CRL_CACHE_INFO  | Інформація про стан кешу СВС           |
 | countCmProviders | Integer                   | Кількість завантажених провайдерів НКІ |
+| cmProviders      | Object<br>CM_PROVIDERS_INFO | Результат завантаження провайдерів НКІ з параметра cmProviders.allowedProviders. Відсутнє для спільної пам'яті сесій |
 | offline          | Boolean                   | Режим роботи “офлайн”                  |
 | ocsp             | Object<br>OCSP_INFO       | Інформація про параметри OCSP-сервісу  |
 | proxy            | Object<br>PROXY_INFO      | Інформація про параметри PROXY-сервісу |
@@ -486,6 +487,22 @@ uapki_session_shared_memory_free(memory);
 | ----------------- | ------- | --------------------------------------------------- |
 | countTrustedCerts | Integer | Кількість довірених сертифікатів у кеші сертифікатів |
 | countCerts        | Integer | Загальна кількість сертифікатів у кеші сертифікатів |
+
+### Структура CM_PROVIDERS_INFO
+
+| **Назва поля** | **Тип**                        | **Опис**                                                     |
+| -------------- | ------------------------------ | ------------------------------------------------------------ |
+| requested      | Integer                        | Кількість провайдерів у allowedProviders                      |
+| loaded         | Integer                        | Кількість успішно завантажених провайдерів                    |
+| failed         | Array<br>CM_PROVIDER_FAILURE   | Провайдери, які не вдалося завантажити (порожній масив, якщо таких немає). Помилка завантаження провайдера не є помилкою методу INIT |
+
+### Структура CM_PROVIDER_FAILURE
+
+| **Назва поля** | **Тип** | **Опис**                          |
+| -------------- | ------- | --------------------------------- |
+| lib            | String  | Ім'я бібліотеки провайдера        |
+| errorCode      | Integer | Код помилки завантаження          |
+| error          | String  | Назва помилки                     |
 
 ### Структура CRL_CACHE_INFO
 
@@ -566,6 +583,7 @@ uapki_session_shared_memory_free(memory);
     "certCache": { "countCerts": 29, "countTrustedCerts": 5 },
     "crlCache": { "countCrls": 4, "useDeltaCrl": true },
     "countCmProviders": 3,
+    "cmProviders": { "requested": 3, "loaded": 3, "failed": [] },
     "offline": false,
     "ocsp": { "nonceLen": 20 },
     "proxy": { "url": "" },

@@ -39,6 +39,19 @@ using namespace std;
 using namespace UapkiNS;
 
 
+extern "C" const char* error_code_to_str (int errorCode);
+
+
+//  Outcome of loading cm-providers: loading is tolerant (allowedProviders may list a provider
+//  that is absent on this machine), but the result is reported in INIT response
+struct CmProvidersReport {
+    size_t  requested = 0;
+    size_t  loaded = 0;
+    vector<pair<string, int>>
+            failed;     //  lib, errorCode
+};  //  CmProvidersReport
+
+
 static int load_config (ParsonHelper& json, const string& configFile)
 {
     int ret = RET_OK;
@@ -59,12 +72,13 @@ cleanup:
     return ret;
 }   //  load_config
 
-static int setup_cm_providers (Session& session, JSON_Object* joParams)
+static int setup_cm_providers (Session& session, JSON_Object* joParams, CmProvidersReport& report)
 {
     const string s_dir = ParsonHelper::jsonObjectGetString(joParams, "dir");
     JSON_Array* ja_providers = json_object_get_array(joParams, "allowedProviders");
     const size_t cnt_providers = json_array_get_count(ja_providers);
 
+    report.requested = cnt_providers;
     for (size_t i = 0; i < cnt_providers; i++) {
         JSON_Object* jo_provider = json_array_get_object(ja_providers, i);
         if (!jo_provider) return RET_UAPKI_INVALID_JSON_FORMAT;
@@ -78,7 +92,13 @@ static int setup_cm_providers (Session& session, JSON_Object* joParams)
             json.serialize(s_config);
         }
 
-        (void)session.loadProvider(s_dir, s_lib, s_config);
+        const int ret_load = session.loadProvider(s_dir, s_lib, s_config);
+        if (ret_load == RET_OK) {
+            report.loaded++;
+        }
+        else {
+            report.failed.push_back(make_pair(s_lib, ret_load));
+        }
     }
 
     return RET_OK;
@@ -212,6 +232,8 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
     JSON_Object* jo_refparams = joParams;
     JSON_Object* jo_category = nullptr;
+    JSON_Array* ja_failed = nullptr;
+    CmProvidersReport cm_report;
     size_t cnt_certs, cnt_crls, cnt_trustedcerts;
     bool offline;
     uint32_t selftest_status = 0;
@@ -232,7 +254,7 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 
     //  Setup subsystems
     if (!context.isSharedMemory()) {
-        DO(setup_cm_providers(session, json_object_get_object(jo_refparams, "cmProviders")));
+        DO(setup_cm_providers(session, json_object_get_object(jo_refparams, "cmProviders"), cm_report));
     }
 
     DO(setup_cert_cache(session, json_object_get_object(jo_refparams, "certCache")));
@@ -275,6 +297,21 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "useDeltaCrl", lib_crlstore->useDeltaCrl()));
 
     DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)session.countProviders()));
+    if (!context.isSharedMemory()) {
+        DO_JSON(json_object_set_value(joResult, "cmProviders", json_value_init_object()));
+        jo_category = json_object_get_object(joResult, "cmProviders");
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "requested", (uint32_t)cm_report.requested));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "loaded", (uint32_t)cm_report.loaded));
+        DO_JSON(json_object_set_value(jo_category, "failed", json_value_init_array()));
+        ja_failed = json_object_get_array(jo_category, "failed");
+        for (const auto& it : cm_report.failed) {
+            DO_JSON(json_array_append_value(ja_failed, json_value_init_object()));
+            JSON_Object* jo_failed = json_array_get_object(ja_failed, json_array_get_count(ja_failed) - 1);
+            DO_JSON(json_object_set_string(jo_failed, "lib", it.first.c_str()));
+            DO_JSON(ParsonHelper::jsonObjectSetInt32(jo_failed, "errorCode", it.second));
+            DO_JSON(json_object_set_string(jo_failed, "error", error_code_to_str(it.second)));
+        }
+    }
 
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline));
 

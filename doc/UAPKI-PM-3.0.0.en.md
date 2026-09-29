@@ -16,7 +16,7 @@ The version number in the document title corresponds to the version of the uapki
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
-| 3       | 2026-09-30 | Library v3.0.0: sessions API (uapki_session_create, uapki_session_free, uapki_session_process) for independent library instances in one process and shared memory (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) for certificate and CRL caches shared by sessions; error codes INVALID_SESSION, INVALID_SHARED_MEMORY; the VERSION method returns the versions of the loaded uapkic and uapkif libraries |
+| 3       | 2026-09-30 | Library v3.0.0: sessions API (uapki_session_create, uapki_session_free, uapki_session_process) for independent library instances in one process and shared memory (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) for certificate and CRL caches shared by sessions; error codes INVALID_SESSION, INVALID_SHARED_MEMORY; the VERSION method returns the versions of the loaded uapkic and uapkif libraries; the cmProviders field in the INIT response |
 
 # General information
 
@@ -474,6 +474,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | certCache        | Object<br>CERT_CACHE_INFO | Information about the certificate cache state  |
 | crlCache         | Object<br>CRL_CACHE_INFO  | Information about the CRL cache state           |
 | countCmProviders | Integer                   | Number of loaded storage providers |
+| cmProviders      | Object<br>CM_PROVIDERS_INFO | Outcome of loading the storage providers from the cmProviders.allowedProviders parameter. Absent for the shared memory of sessions |
 | offline          | Boolean                   | "Offline" operation mode                  |
 | ocsp             | Object<br>OCSP_INFO       | Information about the OCSP service parameters  |
 | proxy            | Object<br>PROXY_INFO      | Information about the PROXY service parameters |
@@ -486,6 +487,22 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | ----------------- | ------- | --------------------------------------------------- |
 | countTrustedCerts | Integer | Number of trusted certificates in the certificate cache |
 | countCerts        | Integer | Total number of certificates in the certificate cache |
+
+### Structure CM_PROVIDERS_INFO
+
+| **Field name** | **Type**                       | **Description**                                              |
+| -------------- | ------------------------------ | ------------------------------------------------------------ |
+| requested      | Integer                        | Number of providers in allowedProviders                       |
+| loaded         | Integer                        | Number of successfully loaded providers                       |
+| failed         | Array<br>CM_PROVIDER_FAILURE   | Providers that failed to load (empty array if none). A provider load failure is not an error of the INIT method |
+
+### Structure CM_PROVIDER_FAILURE
+
+| **Field name** | **Type** | **Description**            |
+| -------------- | -------- | -------------------------- |
+| lib            | String   | Provider library name      |
+| errorCode      | Integer  | Load error code            |
+| error          | String   | Error name                 |
 
 ### Structure CRL_CACHE_INFO
 
@@ -566,6 +583,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
     "certCache": { "countCerts": 29, "countTrustedCerts": 5 },
     "crlCache": { "countCrls": 4, "useDeltaCrl": true },
     "countCmProviders": 3,
+    "cmProviders": { "requested": 3, "loaded": 3, "failed": [] },
     "offline": false,
     "ocsp": { "nonceLen": 20 },
     "proxy": { "url": "" },
