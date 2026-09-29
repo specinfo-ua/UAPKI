@@ -29,6 +29,17 @@
 
 #include "uapkif.h"
 
+int uapkif_init_asn1_descriptors(void);
+
+int uapkif_init(const char** version)
+{
+	if (version) {
+		*version = uapkif_version();
+	}
+
+	return uapkif_init_asn1_descriptors();
+}
+
 const char* uapkif_version(void)
 {
 	return UAPKIF_VERSION_STRING;

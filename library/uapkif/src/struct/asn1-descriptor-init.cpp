@@ -30,6 +30,7 @@
 // pointer before the SEQUENCE metadata, even when sessions were independent.
 // Complete all aliases before any caller can dispatch through a descriptor.
 #include "asn_application.h"
+#include "uapkic-errors.h"
 #include <mutex>
 
 extern "C" {
@@ -135,7 +136,8 @@ void inherit(asn_TYPE_descriptor_t& td, const asn_TYPE_descriptor_t& base) {
 }
 }
 
-extern "C" void uapkif_init_asn1_descriptors(void) {
+namespace {
+void init_descriptors(void) {
     static std::once_flag once;
     std::call_once(once, [] {
         inherit(AttCertVersion_desc, INTEGER_desc);
@@ -207,8 +209,24 @@ extern "C" void uapkif_init_asn1_descriptors(void) {
         nested.specifics = specifics;
     });
 }
+}
 
-// GCC/Clang constructors run at image load, including native C/C++ embedding.
-__attribute__((constructor)) static void init_asn1_descriptors(void) {
-    uapkif_init_asn1_descriptors();
+extern "C" int uapkif_init_asn1_descriptors(void) {
+    try {
+        init_descriptors();
+    }
+    catch (...) {
+        //  std::call_once can throw only on system resource exhaustion
+        return RET_MEMORY_ALLOC_ERROR;
+    }
+    return RET_OK;
+}
+
+// C++ static initializer runs at image load (MSVC, GCC, Clang), including native C/C++ embedding.
+namespace {
+struct Asn1DescriptorsInit {
+    Asn1DescriptorsInit() {
+        (void)uapkif_init_asn1_descriptors();
+    }
+} asn1_descriptors_init;
 }

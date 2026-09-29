@@ -31,6 +31,7 @@
 #include "parson-helper.h"
 #include "time-util.h"
 #include "uapki-sessions-export.h"
+#include "uapkif.h"
 #include <stdint.h>
 #include <chrono>
 #include <memory>
@@ -418,6 +419,10 @@ static char* process_request (
 
     json_result.create();
     json_result.setInt64("errorCode", RET_UAPKI_GENERAL_ERROR); //  Reserved first place in JSON-response
+
+    //  Methods without INIT (ASN1_DECODE, DIGEST, ...) also use uapkif
+    err_code = uapkif_init(nullptr);
+    if (err_code != RET_OK) goto cleanup;
 
     if (!json_request.parse(request)) {
         err_code = RET_UAPKI_INVALID_JSON_FORMAT;

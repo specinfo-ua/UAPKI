@@ -40,11 +40,14 @@ int uapki_version (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object
     (void)context;
     (void)joParams;
     int ret = RET_OK;
+    const char* uapkif_ver = nullptr;
+
+    DO(uapkif_init(&uapkif_ver));
 
     DO_JSON(json_object_set_string(joResult, "name", LIB_NAME));
     DO_JSON(json_object_set_string(joResult, "version", UAPKI_VERSION_STRING));
     DO_JSON(json_object_set_string(joResult, "uapkicVersion", uapkic_version()));
-    DO_JSON(json_object_set_string(joResult, "uapkifVersion", uapkif_version()));
+    DO_JSON(json_object_set_string(joResult, "uapkifVersion", uapkif_ver));
 
 cleanup:
     return ret;
