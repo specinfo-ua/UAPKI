@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include "http-helper.h"
 
 
 namespace UapkiNS {
@@ -72,16 +73,17 @@ public:
 
 private:
     bool    m_IsInitialized;
+    HttpHelper::Params
+            m_HttpParams;
     OcspParams
             m_OcspParams;
-    bool    m_Offline;
     TspParams
             m_TspParams;
     bool    m_ValidationByCrl;
 
 public:
     LibraryConfig (void)
-        : m_IsInitialized(false), m_Offline(false), m_ValidationByCrl(false)
+        : m_IsInitialized(false), m_ValidationByCrl(false)
     {
     }
 
@@ -89,11 +91,14 @@ public:
         m_IsInitialized = false;
     }
 
+    const HttpHelper::Params& getHttp (void) const {
+        return m_HttpParams;
+    }
     const OcspParams& getOcsp (void) const {
         return m_OcspParams;
     }
     bool getOffline (void) const {
-        return m_Offline;
+        return m_HttpParams.offline;
     }
     const TspParams& getTsp (void) const {
         return m_TspParams;
@@ -112,7 +117,12 @@ public:
         m_OcspParams.nonceLen = ocspParams.nonceLen;
     }
     void setOffline (bool offline) {
-        m_Offline = offline;
+        m_HttpParams.offline = offline;
+    }
+    void setProxy (const char* proxyUrl, const char* proxyCredentials) {
+        m_HttpParams.proxyUrl = (proxyUrl) ? std::string(proxyUrl) : std::string();
+        m_HttpParams.proxyCredentials = (proxyCredentials && !m_HttpParams.proxyUrl.empty())
+            ? std::string(proxyCredentials) : std::string();
     }
     void setTsp (const TspParams& tspParams) {
         m_TspParams.certReq = tspParams.certReq;

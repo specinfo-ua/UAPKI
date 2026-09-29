@@ -29,8 +29,6 @@
 
 #include "api-json-internal.h"
 #include "certreq-builder.h"
-#include "cm-providers.h"
-#include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "uapkif.h"
@@ -93,6 +91,7 @@ static int get_default_signalgo (
 }
 
 int uapki_key_get_csr (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
@@ -101,7 +100,7 @@ int uapki_key_get_csr (
     SmartBA sba_attrs, sba_csr, sba_subject;
     CertReqBuilder certreq_builder;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 

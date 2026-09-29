@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/session-key-create.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
 
@@ -36,11 +35,11 @@
 using namespace std;
 
 
-int uapki_session_key_create (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_session_key_create (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     if (!joParams) return RET_UAPKI_INVALID_PARAMETER;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
     string s_keyparam;

@@ -1094,7 +1094,7 @@ SET_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
              * Cannot inherit it earlier:
              * need to make sure we get the updated version.
              */
-            elm->memb_constraints = elm->type->check_constraints;
+            /* Keep shared member descriptors immutable across callers. */
         }
     }
 

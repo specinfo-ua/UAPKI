@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/add-crl.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
@@ -37,11 +36,11 @@
 using namespace UapkiNS;
 
 
-int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_add_crl (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Crl::CrlStore* crl_store = get_crlstore();
+    LibraryConfig* lib_config = context.config();
+    Crl::CrlStore* crl_store = context.crlStore();
     Crl::CrlItem* crl_item = nullptr;
     const bool permanent = ParsonHelper::jsonObjectGetBoolean(joParams, "permanent", false);
     SmartBA sba_encoded;
@@ -55,7 +54,6 @@ int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     DO(crl_store->addCrl(sba_encoded.get(), permanent, is_unique, &crl_item));
-    sba_encoded.set(nullptr);
 
     DO(json_object_set_base64(joResult, "crlId", crl_item->getCrlId()));
     DO(ParsonHelper::jsonObjectSetBoolean(joResult, "isUnique", is_unique));

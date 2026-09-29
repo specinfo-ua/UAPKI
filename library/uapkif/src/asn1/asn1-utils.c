@@ -372,6 +372,82 @@ cleanup:
     return ret;
 }
 
+static char* oid_arc_to_text(char* p, uint32_t arc)
+{
+    char digits[10];
+    int n = 0;
+
+    if (arc < 10) {
+        *p++ = (char)('0' + arc);
+        return p;
+    }
+    if (arc < 100) {
+        *p++ = (char)('0' + (arc / 10));
+        *p++ = (char)('0' + (arc % 10));
+        return p;
+    }
+    do {
+        digits[n++] = (char)('0' + (arc % 10));
+        arc /= 10;
+    } while (arc);
+    while (n) {
+        *p++ = digits[--n];
+    }
+    return p;
+}
+
+int asn_oid_to_text_buf(const OBJECT_IDENTIFIER_t* oid, char* buf, size_t size)
+{
+    const uint8_t* p;
+    const uint8_t* end;
+    char* out = buf;
+    uint32_t v = 0;
+    int nbytes = 0;
+    bool first = true;
+
+    // Longer arcs and small buffers use the general OBJECT_IDENTIFIER_get_arcs path.
+    if (!oid || !oid->buf || !buf || oid->size < 0 || size == 0 || (size - 1) / 4 < (size_t)oid->size) {
+        return -1;
+    }
+
+    p = oid->buf;
+    end = p + oid->size;
+    while (p < end) {
+        const uint8_t b = *p++;
+        v = (v << 7) | (b & 0x7f);
+        if (b & 0x80) {
+            if (++nbytes > 3) {
+                return -1;
+            }
+            continue;
+        }
+        if (first) {
+            uint32_t first_arc;
+            if (nbytes) {
+                first_arc = 2;
+            } else if (v <= 39) {
+                first_arc = 0;
+            } else if (v < 79) {
+                first_arc = 1;
+            } else {
+                first_arc = 2;
+            }
+            if (v < 40 * first_arc) {
+                return -1;
+            }
+            *out++ = (char)('0' + first_arc);
+            v -= 40 * first_arc;
+            first = false;
+        }
+        *out++ = '.';
+        out = oid_arc_to_text(out, v);
+        v = 0;
+        nbytes = 0;
+    }
+    *out = 0;
+    return (int)(out - buf);
+}
+
 int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
 {
     int ret = RET_OK;
@@ -381,19 +457,32 @@ int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
     unsigned int arc_slots = sizeof(fixed_arcs) / sizeof(fixed_arcs[0]); // 12
     unsigned int count, i;    // Real number of arcs.
     int n, l = 0;
+    char buf[ASN_OID_TEXT_MAX];
 
     CHECK_PARAM(text != NULL);
     CHECK_PARAM(dst != NULL);
 
     *text = NULL;
 
+    n = asn_oid_to_text_buf(dst, buf, sizeof(buf));
+    if (n >= 0) {
+        MALLOC_CHECKED(*text, (size_t)n + 1);
+        memcpy(*text, buf, (size_t)n + 1);
+        goto cleanup;
+    }
+
     count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
+    if (count == (unsigned int)-1) {
+        SET_ERROR(RET_INVALID_OID);
+    }
     // If necessary, reallocate arcs array and try again.
     if (count > arc_slots) {
         arc_slots = count;
         MALLOC_CHECKED(arcs, (size_t)arc_type_size * arc_slots);
         count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
-        ASSERT(count == arc_slots);
+        if (count != arc_slots) {
+            SET_ERROR(RET_INVALID_OID);
+        }
     }
 
     CALLOC_CHECKED(*text, (size_t)count * 11); /*10 digits + 1 point or zero teminator*/
@@ -1460,5 +1549,4 @@ int asn_time2GT (
 cleanup:
     return ret;
 }
-
 

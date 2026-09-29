@@ -38,11 +38,32 @@
 #include "dl-macros.h"
 
 
+struct CM_STATIC_PROVIDER_FUNCS {
+    cm_provider_info_f          info;
+    cm_provider_init_f          init;
+    cm_provider_deinit_f        deinit;
+    //  list_storages/storage_info are optional: providers backed by a single
+    //  file/URI (e.g. cm-pkcs12) leave them null; providers that need storage
+    //  discovery (e.g. cm-pkcs11 slot/token enumeration) supply them.
+    cm_provider_list_storages_f list_storages;
+    cm_provider_storage_info_f  storage_info;
+    cm_provider_open_f          open;
+    cm_provider_close_f         close;
+    cm_block_free_f             block_free;
+    cm_bytearray_free_f         bytearray_free;
+};
+
+
 class CmLoader
 {
     CM_PROVIDER_API m_Api;
 
 public:
+    //  Sentinel value for m_Api.hlib meaning "provider functions were wired
+    //  up directly (statically linked or WASM-embedded), not via dlopen()".
+    //  unload() must skip DL_FREE_LIBRARY() for this handle.
+    static void* const STATIC_HANDLE;
+
     CmLoader (void);
     ~CmLoader (void);
 
@@ -56,9 +77,15 @@ public:
     bool isLoaded (void) const {
         return (m_Api.hlib);
     }
+    bool isStatic (void) const {
+        return (m_Api.hlib == STATIC_HANDLE);
+    }
     bool load (
         const std::string& libName,
         const std::string& dir = std::string()
+    );
+    bool loadStatic (
+        const CM_STATIC_PROVIDER_FUNCS& funcs
     );
     void unload (void);
 

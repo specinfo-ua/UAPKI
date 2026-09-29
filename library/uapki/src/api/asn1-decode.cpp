@@ -314,10 +314,12 @@ cleanup:
 
 
 int uapki_asn1_decode (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
 {
+    (void)context;
     int ret = RET_OK;
     JSON_Array* ja_items = json_object_get_array(joParams, "items");
     JSON_Array* ja_results = nullptr;

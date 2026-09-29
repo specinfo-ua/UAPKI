@@ -28,10 +28,10 @@
 #define FILE_MARKER "uapki/api/storage-change-password.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
 
 
 int uapki_storage_change_password (
+        UapkiNS::Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
@@ -40,7 +40,7 @@ int uapki_storage_change_password (
     const char* s_newpassword = json_object_get_string(joParams, "newPassword");
     if (!s_newpassword) return RET_UAPKI_INVALID_PARAMETER;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
     const int ret = storage->sessionChangePassword(s_newpassword);

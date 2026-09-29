@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/session-list-keys.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
 #include "oids.h"
 #include "parson-helper.h"
 #include "uapki-ns.h"
@@ -61,10 +60,10 @@ static int keyid2_from_publickey (
 }   //  keyid2_from_publickey
 
 
-int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_session_list_keys (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joParams;
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
     const bool flag_retpubkey = ParsonHelper::jsonObjectGetBoolean(joParams, "returnPublicKey");

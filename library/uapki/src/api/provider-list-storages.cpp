@@ -31,10 +31,10 @@
 #include "parson-helper.h"
 
 
-int uapki_provider_list_storages (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_provider_list_storages (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     const std::string s_providerid = ParsonHelper::jsonObjectGetString(joParams, "provider");
     if (s_providerid.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
-    return CmProviders::listStorages(s_providerid, joResult);
+    return context.listStorages(s_providerid, joResult);
 }

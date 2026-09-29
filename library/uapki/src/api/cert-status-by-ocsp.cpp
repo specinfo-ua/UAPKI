@@ -29,7 +29,6 @@
 
 #include "api-json-internal.h"
 #include "cert-validator.h"
-#include "global-objects.h"
 #include "oid-utils.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
@@ -43,10 +42,10 @@ using namespace std;
 using namespace UapkiNS;
 
 
-int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_cert_status_by_ocsp (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     CertValidator::CertValidator cert_validator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     int ret = RET_OK;
@@ -108,13 +107,12 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
     DO(json_object_set_base64(joResult, "requestBytes", ocsp_helper.getRequestEncoded()));
 
     if (!s_url.empty()) {
-        if (HttpHelper::isOfflineMode()) {
+        if (context.config()->getOffline()) {
             SET_ERROR(RET_UAPKI_OFFLINE_MODE);
         }
 
-        lock_guard<mutex> lock1(HttpHelper::lockUri(s_url));
-
         DO(HttpHelper::post(
+            context.config()->getHttp(),
             s_url,
             HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
             ocsp_helper.getRequestEncoded(),
@@ -146,7 +144,7 @@ int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult)
                     ret = cer_store.getCertByIssuerAndSN(sba_issuerbytes.get(), sba_serialnumber.get(), &cer_subject);
                 }
                 if ((ret == RET_OK) && cer_subject) {
-                    lock_guard<mutex> lock2(cer_subject->getMutex());
+                    lock_guard<mutex> lock2(cer_subject->getStatusMutex());
                     DO(cer_subject->getCertStatusByOcsp().set(
                         result_validation.singleResponseInfo.certStatus,
                         result_validation.singleResponseInfo.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,

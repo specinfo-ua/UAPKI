@@ -41,6 +41,17 @@ public:
     static const char* CONTENT_TYPE_OCSP_REQUEST;
     static const char* CONTENT_TYPE_TSP_REQUEST;
 
+    struct Params {
+        bool        offline;
+        std::string proxyUrl;
+        std::string proxyCredentials;
+
+        Params (void)
+            : offline(false)
+        {}
+    };  //  end struct Params
+
+    static int init (void);
     static int init (
         const bool offlineMode,
         const char* proxyUrl,
@@ -52,13 +63,34 @@ public:
     static const std::string& getProxyUrl (void);
 
     static int get (
+        const Params& params,
         const std::string& uri,
+        ByteArray** baResponse
+    );
+    static int get (
+        const std::string& uri,
+        ByteArray** baResponse
+    );
+    static int post (
+        const Params& params,
+        const std::string& uri,
+        const char* contentType,
+        const ByteArray* baRequest,
         ByteArray** baResponse
     );
     static int post (
         const std::string& uri,
         const char* contentType,
         const ByteArray* baRequest,
+        ByteArray** baResponse
+    );
+    static int post (
+        const Params& params,
+        const std::string& uri,
+        const char* httpContentType,
+        const char* userPwd,
+        const std::string& authorizationBearer,
+        const std::string& request,
         ByteArray** baResponse
     );
     static int post (

@@ -35,8 +35,9 @@
 #include "uapki-ns.h"
 
 
-int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_random_bytes (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     int ret = RET_OK;
     UapkiNS::SmartBA sba_random;
     const uint32_t len = ParsonHelper::jsonObjectGetUint32(joParams, "length", 0);

@@ -35,9 +35,69 @@
 #include "uapkif.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
 
 namespace UapkiNS {
+
+
+namespace {
+
+struct EcVerifyKey {
+    SignAlg keyAlgo;
+    EcCtx*  ecCtx;
+
+    EcVerifyKey (void)
+        : keyAlgo(SIGN_UNDEFINED), ecCtx(nullptr) {}
+    ~EcVerifyKey (void) {
+        ec_free(ecCtx);
+    }
+};  //  end struct EcVerifyKey
+
+class EcVerifyKeyCache {
+    typedef std::pair<std::string, std::shared_ptr<EcVerifyKey>> Item;
+    static const size_t MAX_ENTRIES = 10000;
+
+    std::mutex      m_Mutex;
+    std::list<Item> m_Lru;
+    std::unordered_map<std::string, std::list<Item>::iterator> m_Index;
+
+public:
+    std::shared_ptr<EcVerifyKey> get (const std::string& spki) {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        auto it = m_Index.find(spki);
+        if (it == m_Index.end()) return nullptr;
+        m_Lru.splice(m_Lru.begin(), m_Lru, it->second);
+        return it->second->second;
+    }
+
+    void put (const std::string& spki, const std::shared_ptr<EcVerifyKey>& key) {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        auto it = m_Index.find(spki);
+        if (it != m_Index.end()) {
+            m_Lru.splice(m_Lru.begin(), m_Lru, it->second);
+            return;
+        }
+        if (m_Lru.size() >= MAX_ENTRIES) {
+            m_Index.erase(m_Lru.back().first);
+            m_Lru.pop_back();
+        }
+        m_Lru.push_front(Item(spki, key));
+        m_Index[spki] = m_Lru.begin();
+    }
+};  //  end class EcVerifyKeyCache
+
+EcVerifyKeyCache& ec_verify_key_cache (void)
+{
+    static EcVerifyKeyCache* cache = new EcVerifyKeyCache();
+    return *cache;
+}
+
+}   //  end anonymous namespace
 
 
 static int parse_dstu_signvalue (const ByteArray* baSignature, ByteArray** baR, ByteArray** baS)
@@ -114,6 +174,79 @@ cleanup:
     return ret;
 }
 
+static int ec_init_verify_key (
+        const SignAlg signAlgo,
+        const EcParamsId ecParamId,
+        const ByteArray* baPubkey,
+        EcCtx** ecCtx
+)
+{
+    int ret = RET_OK;
+    EcCtx* ec_ctx = nullptr;
+    SmartBA sba_Qx, sba_Qy;
+
+    CHECK_NOT_NULL(baPubkey);
+    CHECK_NOT_NULL(ecCtx);
+
+    CHECK_NOT_NULL(ec_ctx = ec_alloc_default(ecParamId));
+    switch (signAlgo)
+    {
+    case SIGN_DSTU4145:
+        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &sba_Qx, &sba_Qy));
+        DO(ba_swap(sba_Qx.get()));
+        DO(ba_swap(sba_Qy.get()));
+        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
+        break;
+    case SIGN_ECDSA:
+        DO(parse_ecdsa_pubkey(baPubkey, &sba_Qx, &sba_Qy));
+        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
+        break;
+    default:
+        SET_ERROR(RET_UNSUPPORTED);
+        break;
+    }
+
+    *ecCtx = ec_ctx;
+    ec_ctx = nullptr;
+
+cleanup:
+    ec_free(ec_ctx);
+    return ret;
+}
+
+static int ec_verify_sign (
+        const SignAlg signAlgo,
+        const EcCtx* ecCtx,
+        const ByteArray* baHash,
+        const ByteArray* baSignValue
+)
+{
+    int ret = RET_OK;
+    SmartBA sba_r, sba_s;
+
+    CHECK_NOT_NULL(ecCtx);
+    CHECK_NOT_NULL(baHash);
+    CHECK_NOT_NULL(baSignValue);
+
+    switch (signAlgo)
+    {
+    case SIGN_DSTU4145:
+        DO(parse_dstu_signvalue(baSignValue, &sba_r, &sba_s));
+        DO(dstu4145_verify(ecCtx, baHash, sba_r.get(), sba_s.get()));
+        break;
+    case SIGN_ECDSA:
+        DO(parse_ecdsa_signvalue(baSignValue, &sba_r, &sba_s));
+        DO(ecdsa_verify(ecCtx, baHash, sba_r.get(), sba_s.get()));
+        break;
+    default:
+        SET_ERROR(RET_UNSUPPORTED);
+        break;
+    }
+
+cleanup:
+    return ret;
+}
+
 int Verify::verifyEcSign (
         const SignAlg signAlgo,
         const EcParamsId ecParamId,
@@ -124,33 +257,9 @@ int Verify::verifyEcSign (
 {
     int ret = RET_OK;
     EcCtx* ec_ctx = nullptr;
-    SmartBA sba_Qx, sba_Qy, sba_r, sba_s;
 
-    CHECK_NOT_NULL(baPubkey);
-    CHECK_NOT_NULL(baHash);
-    CHECK_NOT_NULL(baSignValue);
-
-    CHECK_NOT_NULL(ec_ctx = ec_alloc_default(ecParamId));
-    switch (signAlgo)
-    {
-    case SIGN_DSTU4145:
-        DO(dstu4145_decompress_pubkey(ec_ctx, baPubkey, &sba_Qx, &sba_Qy));
-        DO(ba_swap(sba_Qx.get()));
-        DO(ba_swap(sba_Qy.get()));
-        DO(parse_dstu_signvalue(baSignValue, &sba_r, &sba_s));
-        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
-        DO(dstu4145_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
-        break;
-    case SIGN_ECDSA:
-        DO(parse_ecdsa_pubkey(baPubkey, &sba_Qx, &sba_Qy));
-        DO(parse_ecdsa_signvalue(baSignValue, &sba_r, &sba_s));
-        DO(ec_init_verify(ec_ctx, sba_Qx.get(), sba_Qy.get()));
-        DO(ecdsa_verify(ec_ctx, baHash, sba_r.get(), sba_s.get()));
-        break;
-    default:
-        SET_ERROR(RET_UNSUPPORTED);
-        break;
-    }
+    DO(ec_init_verify_key(signAlgo, ecParamId, baPubkey, &ec_ctx));
+    DO(ec_verify_sign(signAlgo, ec_ctx, baHash, baSignValue));
 
 cleanup:
     ec_free(ec_ctx);
@@ -319,6 +428,8 @@ int Verify::verifySignature (
     SignAlg key_algo = SIGN_UNDEFINED;
     SignAlg sign_algo = SIGN_UNDEFINED;
     EcParamsId ec_paramsid = EC_PARAMS_ID_UNDEFINED;
+    std::string spki_key;
+    std::shared_ptr<EcVerifyKey> ec_key;
 
     CHECK_PARAM(signAlgo != NULL);
     CHECK_PARAM(baData != NULL);
@@ -342,16 +453,28 @@ int Verify::verifySignature (
         ref_ba = baData;
     }
 
+    spki_key.assign((const char*)ba_get_buf_const(baSignerSPKI), ba_get_len(baSignerSPKI));
+    ec_key = ec_verify_key_cache().get(spki_key);
+    if (ec_key) {
+        if (ec_key->keyAlgo != sign_algo) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(ec_verify_sign(sign_algo, ec_key->ecCtx, ref_ba, baSignValue));
+        goto cleanup;
+    }
+
     DO(parseSpki(baSignerSPKI, &key_algo, &ec_paramsid, &sba_pubkey, &sba_pubkey_rsae));
     if (key_algo != sign_algo) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
     switch (sign_algo) {
     case SIGN_DSTU4145:
-        DO(verifyEcSign(sign_algo, ec_paramsid, sba_pubkey.get(), ref_ba, baSignValue));
-        break;
     case SIGN_ECDSA:
-        DO(verifyEcSign(sign_algo, ec_paramsid, sba_pubkey.get(), ref_ba, baSignValue));
+        ec_key = std::make_shared<EcVerifyKey>();
+        ec_key->keyAlgo = key_algo;
+        DO(ec_init_verify_key(sign_algo, ec_paramsid, sba_pubkey.get(), &ec_key->ecCtx));
+        ec_verify_key_cache().put(spki_key, ec_key);
+        DO(ec_verify_sign(sign_algo, ec_key->ecCtx, ref_ba, baSignValue));
         break;
     case SIGN_RSA_PKCS_1_5:
         DO(verifyRsaV15Sign(hash_algo, sba_pubkey.get(), sba_pubkey_rsae.get(), ref_ba, baSignValue));

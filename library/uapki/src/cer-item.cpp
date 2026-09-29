@@ -109,26 +109,85 @@ static int basicconstrains_from_extns (
     return RET_OK;
 }   //  basicconstrains_from_extns
 
+static size_t der_tl_size (
+        const size_t len
+)
+{
+    size_t rv_size = 2;
+    if (len >= 0x80) {
+        for (size_t v = len; v > 0xFF; v >>= 8) rv_size++;
+        rv_size++;
+    }
+    return rv_size;
+}   //  der_tl_size
+
+static uint8_t* der_write_tl (
+        uint8_t* p,
+        const uint8_t tag,
+        const size_t len
+)
+{
+    *p++ = tag;
+    if (len < 0x80) {
+        *p++ = (uint8_t)len;
+    }
+    else {
+        size_t n = 1;
+        for (size_t v = len; v > 0xFF; v >>= 8) n++;
+        *p++ = (uint8_t)(0x80 | n);
+        for (size_t i = n; i > 0; i--) {
+            *p++ = (uint8_t)(len >> (8 * (i - 1)));
+        }
+    }
+    return p;
+}   //  der_write_tl
+
+//  Number of superfluous leading sign-extension octets, the same rule as INTEGER_encode_der
+static size_t integer_canonical_shift (
+        const INTEGER_t& value
+)
+{
+    size_t shift = 0;
+    if (value.buf && (value.size > 1)) {
+        const uint8_t* buf = value.buf;
+        const uint8_t* end1 = buf + value.size - 1;
+        for (; buf < end1; buf++) {
+            if ((buf[0] == 0x00) && ((buf[1] & 0x80) == 0)) continue;
+            if ((buf[0] == 0xFF) && ((buf[1] & 0x80) != 0)) continue;
+            break;
+        }
+        shift = (size_t)(buf - value.buf);
+    }
+    return shift;
+}   //  integer_canonical_shift
+
 static int encode_issuer_and_sn (
-        const TBSCertificate_t* tbsCert,
+        const ByteArray* baIssuer,
+        const INTEGER_t& serialNumber,
         ByteArray** baIssuerAndSN
 )
 {
-    int ret = RET_OK;
-    IssuerAndSerialNumber_t* issuer_and_sn = nullptr;
+    if (!baIssuer || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
 
-    if (!tbsCert || !baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
+    const size_t sn_shift = integer_canonical_shift(serialNumber);
+    const uint8_t* sn_buf = (serialNumber.buf) ? serialNumber.buf + sn_shift : nullptr;
+    const size_t sn_len = (serialNumber.buf) ? (size_t)serialNumber.size - sn_shift : 0;
+    const size_t issuer_len = ba_get_len(baIssuer);
+    const size_t content_len = issuer_len + der_tl_size(sn_len) + sn_len;
 
-    CHECK_NOT_NULL(issuer_and_sn = (IssuerAndSerialNumber_t*)calloc(1, sizeof(IssuerAndSerialNumber_t)));
+    ByteArray* ba_encoded = ba_alloc_by_len(der_tl_size(content_len) + content_len);
+    if (!ba_encoded) return RET_UAPKI_GENERAL_ERROR;
 
-    DO(asn_copy(get_Name_desc(), &tbsCert->issuer, &issuer_and_sn->issuer));
-    DO(asn_copy(get_INTEGER_desc(), &tbsCert->serialNumber, &issuer_and_sn->serialNumber));
-
-    DO(asn_encode_ba(get_IssuerAndSerialNumber_desc(), issuer_and_sn, baIssuerAndSN));
-
-cleanup:
-    asn_free(get_IssuerAndSerialNumber_desc(), issuer_and_sn);
-    return ret;
+    uint8_t* p = ba_get_buf(ba_encoded);
+    p = der_write_tl(p, 0x30, content_len);
+    memcpy(p, ba_get_buf_const(baIssuer), issuer_len);
+    p += issuer_len;
+    p = der_write_tl(p, 0x02, sn_len);
+    if (sn_len > 0) {
+        memcpy(p, sn_buf, sn_len);
+    }
+    *baIssuerAndSN = ba_encoded;
+    return RET_OK;
 }   //  encode_issuer_and_sn
 
 static int extkeyusage_from_extns (
@@ -269,6 +328,7 @@ CerItem::CerItem (void)
     , m_SelfSigned(false)
     , m_Trusted(false)
     , m_VerifyStatus(VerifyStatus::UNDEFINED)
+    , m_VerifyError(RET_OK)
     , m_CertStatusByCrl(ValidationType::CRL)
     , m_CertStatusByOcsp(ValidationType::OCSP)
     , m_MarkedToRemove(false)
@@ -348,8 +408,6 @@ void CerItem::markToRemove (
         const bool marked
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
-
     m_MarkedToRemove = marked;
 }
 
@@ -367,8 +425,6 @@ void CerItem::setTrusted (
         const bool trusted
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
-
     m_Trusted = trusted;
 }
 
@@ -376,8 +432,6 @@ void CerItem::setUniqueKeyId (
     const bool uniqueKeyId
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
-
     m_UniqueKeyId = uniqueKeyId;
 }
 
@@ -388,12 +442,17 @@ int CerItem::verify (
 {
     lock_guard<mutex> lock(m_Mutex);
 
-    if (!force) {
-        if (m_VerifyStatus > VerifyStatus::INDETERMINATE) return RET_OK;
-    }
-
-    m_VerifyStatus = VerifyStatus::INDETERMINATE;
     if (!cerIssuer) return RET_OK;
+    std::string issuerKey((const char*)ba_get_buf_const(cerIssuer->getSpki()),
+                          ba_get_len(cerIssuer->getSpki()));
+    issuerKey.push_back(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign) ? 1 : 0);
+    if (!force && m_VerifyIssuer == issuerKey &&
+            m_VerifyStatus.load() > VerifyStatus::INDETERMINATE) {
+        return m_VerifyError;
+    }
+    // Publish only the completed verdict; readers must not see an in-progress
+    // INDETERMINATE value while another request rechecks this certificate.
+    VerifyStatus status = VerifyStatus::FAILED;
 
     int ret = RET_OK;
     SmartBA sba_signvalue, sba_tbs;
@@ -427,23 +486,26 @@ int CerItem::verify (
     );
     switch (ret) {
     case RET_OK:
-        m_VerifyStatus = VerifyStatus::VALID;
+        status = VerifyStatus::VALID;
         break;
     case RET_VERIFY_FAILED:
-        m_VerifyStatus = VerifyStatus::INVALID;
+        status = VerifyStatus::INVALID;
         break;
     default:
-        m_VerifyStatus = VerifyStatus::FAILED;
+        status = VerifyStatus::FAILED;
         break;
     }
 
-    if (m_VerifyStatus == VerifyStatus::VALID) {
+    if (status == VerifyStatus::VALID) {
         if (!cerIssuer->keyUsageByBit(KeyUsage_keyCertSign)) {
-            m_VerifyStatus = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
+            status = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
         }
     }
 
 cleanup:
+    m_VerifyIssuer = issuerKey;
+    m_VerifyError = ret;
+    m_VerifyStatus.store(status);
     asn_free(get_X509Tbs_desc(), x509_tbs);
     return ret;
 }
@@ -488,8 +550,9 @@ int CerItem::getIssuerAndSN (
         ByteArray** baIssuerAndSN
 ) const
 {
-    const int ret = encode_issuer_and_sn(&m_Cert->tbsCertificate, baIssuerAndSN);
-    return ret;
+    if (!baIssuerAndSN) return RET_UAPKI_INVALID_PARAMETER;
+    *baIssuerAndSN = ba_copy_with_alloc(m_CertId, 0, 0);
+    return *baIssuerAndSN ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
 bool CerItem::keyUsageByBit (
@@ -691,7 +754,10 @@ int parseCert (
     if (!baEncoded || !cerItem) return RET_UAPKI_INVALID_PARAMETER;
 
     Certificate_t* cert = (Certificate_t*)asn_decode_ba_with_alloc(get_Certificate_desc(), baEncoded);
-    if (!cert || !cert->tbsCertificate.extensions) return RET_UAPKI_INVALID_STRUCT;
+    if (!cert || !cert->tbsCertificate.extensions) {
+        asn_free(get_Certificate_desc(), cert);
+        return RET_UAPKI_INVALID_STRUCT;
+    }
 
     int ret = RET_OK;
     TBSCertificate_t& tbs = cert->tbsCertificate;
@@ -714,6 +780,7 @@ int parseCert (
     CertExtKeyUsage cert_extkeyusage;
     CerItem::Uris uris;
     bool is_dstu, is_selfsigned;
+    size_t sn_shift = 0;
 
     DO(asn_INTEGER2ba(&tbs.serialNumber, &sba_serialnum));
     DO(asn_encode_ba(get_Name_desc(), &tbs.issuer, &sba_issuer));
@@ -722,7 +789,12 @@ int parseCert (
     DO(asn_encode_ba(get_Name_desc(), &tbs.subject, &sba_subject));
     DO(asn_encode_ba(get_SubjectPublicKeyInfo_desc(), &tbs.subjectPublicKeyInfo, &sba_spki));
     DO(Util::oidFromAsn1(&tbs.subjectPublicKeyInfo.algorithm.algorithm, s_keyalgo));
-    DO(encode_issuer_and_sn(&tbs, &sba_certid));
+    sn_shift = integer_canonical_shift(tbs.serialNumber);
+    if (sn_shift > 0) {
+        tbs.serialNumber.size -= (int)sn_shift;
+        memmove(tbs.serialNumber.buf, tbs.serialNumber.buf + sn_shift, (size_t)tbs.serialNumber.size);
+    }
+    DO(encode_issuer_and_sn(sba_issuer.get(), tbs.serialNumber, &sba_certid));
     DO(asn_BITSTRING2ba(&tbs.subjectPublicKeyInfo.subjectPublicKey, &sba_pubkey));
 
     is_dstu = DstuNS::isDstu4145family(s_keyalgo);

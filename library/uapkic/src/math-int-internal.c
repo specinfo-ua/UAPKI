@@ -1138,7 +1138,6 @@ int int_get_naf(const WordArray *in, int width, int **out)
     CHECK_PARAM(width >= 0);
 
     bitlen = in->len << WORD_BIT_LEN_SHIFT;
-    word_t carry = 0;
     word_t mod = (word_t)1 << width;
     word_t mask = ((word_t)(-1)) >> (WORD_BIT_LENGTH - width);
     word_t mask_div2 = mask >> 1;
@@ -1150,6 +1149,7 @@ int int_get_naf(const WordArray *in, int width, int **out)
 
     while (!int_is_zero(k_naf)) {
         word_t klow = k_naf->buf[0];
+        word_t carry = 0;
 
         if ((klow & 1) == 1) {
             word_t rest = klow & mask;

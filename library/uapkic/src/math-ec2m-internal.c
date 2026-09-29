@@ -32,6 +32,8 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 
+#define EC_MUL_WIN_WIDTH 5
+
 static int ec2m_points_to_affine(EcGf2mCtx *ctx, ECPoint **array, int off, int len)
 {
     /* Получить a0, a0*a1, ..., a0*...*aN. */
@@ -159,15 +161,19 @@ cleanup:
  */
 void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
 {
-    WordArray *t1 = NULL;
-    WordArray *t2 = NULL;
-    int ret = RET_OK;
+    word_t t1_buf[GF2M_MAX_LEN];
+    word_t t2_buf[GF2M_MAX_LEN];
+    WordArray t1_wa = { t1_buf, 0 };
+    WordArray t2_wa = { t2_buf, 0 };
+    WordArray *t1 = &t1_wa;
+    WordArray *t2 = &t2_wa;
 
     ASSERT(ctx != NULL);
     ASSERT(p != NULL);
     ASSERT(r != NULL);
     ASSERT(ctx->len == p->x->len);
     ASSERT(ctx->len == r->x->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
     if (int_is_zero(p->x)) {
         /* точка на бесконечности */
@@ -175,8 +181,8 @@ void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
         return;
     }
 
-    CHECK_NOT_NULL(t1 = wa_alloc(ctx->len));
-    CHECK_NOT_NULL(t2 = wa_alloc(ctx->len));
+    t1_wa.len = ctx->len;
+    t2_wa.len = ctx->len;
 
     gf2m_mod_sqr(ctx->gf2m, p->x, t1);
     gf2m_mod_sqr(ctx->gf2m, p->z, r->z);
@@ -196,9 +202,6 @@ void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
     gf2m_mod_mul(ctx->gf2m, r->x, t1, t1);
     gf2m_mod_mul(ctx->gf2m, r->z, t2, r->y);
     gf2m_mod_add(r->y, t1, r->y);
-cleanup:
-    wa_free(t1);
-    wa_free(t2);
 }
 
 /**
@@ -213,10 +216,15 @@ cleanup:
  */
 void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const WordArray *qy, int sign, ECPoint *r)
 {
-    WordArray *t1 = NULL;
-    WordArray *t2 = NULL;
-    WordArray *t3 = NULL;
-    int ret = RET_OK;
+    word_t t1_buf[GF2M_MAX_LEN];
+    word_t t2_buf[GF2M_MAX_LEN];
+    word_t t3_buf[GF2M_MAX_LEN];
+    WordArray t1_wa = { t1_buf, 0 };
+    WordArray t2_wa = { t2_buf, 0 };
+    WordArray t3_wa = { t3_buf, 0 };
+    WordArray *t1 = &t1_wa;
+    WordArray *t2 = &t2_wa;
+    WordArray *t3 = &t3_wa;
 
     ASSERT(ctx != NULL);
     ASSERT(p != NULL);
@@ -227,6 +235,7 @@ void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const
     ASSERT(ctx->len == qx->len);
     ASSERT(ctx->len == qy->len);
     ASSERT(ctx->len == r->x->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
     /* Q == O ? */
     if (int_is_zero(qx) && int_is_zero(qy)) {
@@ -249,9 +258,9 @@ void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const
         return;
     }
 
-    CHECK_NOT_NULL(t1 = wa_alloc(ctx->len));
-    CHECK_NOT_NULL(t2 = wa_alloc(ctx->len));
-    CHECK_NOT_NULL(t3 = wa_alloc(ctx->len));
+    t1_wa.len = ctx->len;
+    t2_wa.len = ctx->len;
+    t3_wa.len = ctx->len;
 
     gf2m_mod_sqr(ctx->gf2m, p->z, t1);
     if (sign == -1) {
@@ -268,13 +277,13 @@ void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const
     /* P == Q ? */
     if (int_is_zero(t1) && int_is_zero(t2)) {
         ec2m_double(ctx, p, r);
-        goto cleanup;
+        return;
     }
 
     /* P і Q взаимно обратны. */
     if (int_is_zero(t2)) {
         ec_point_zero(r);
-        goto cleanup;
+        return;
     }
 
     gf2m_mod_mul(ctx->gf2m, t2, p->z, t3);
@@ -306,45 +315,38 @@ void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const
 
     gf2m_mod_mul(ctx->gf2m, t1, t2, t1);
     gf2m_mod_add(t1, r->y, r->y);
-
-cleanup:
-
-    wa_free(t1);
-    wa_free(t2);
-    wa_free(t3);
 }
 
 void ec2m_point_to_affine(const EcGf2mCtx *ctx, ECPoint *p)
 {
-    WordArray *t = NULL;
-    int ret = RET_OK;
+    word_t t_buf[GF2M_MAX_LEN];
+    WordArray t_wa = { t_buf, 0 };
+    WordArray *t = &t_wa;
 
     ASSERT(ctx != NULL);
     ASSERT(p != NULL);
     ASSERT(ctx->len == p->x->len);
+    ASSERT(ctx->len <= GF2M_MAX_LEN);
 
     if (int_is_zero(p->x) && int_is_zero(p->y)) {
         wa_one(p->z);
         return;
     }
 
-    CHECK_NOT_NULL(t = wa_alloc(ctx->len));
+    t_wa.len = ctx->len;
 
     gf2m_mod_inv(ctx->gf2m, p->z, t);
     gf2m_mod_mul(ctx->gf2m, p->x, t, p->x);
     gf2m_mod_sqr(ctx->gf2m, t, t);
     gf2m_mod_mul(ctx->gf2m, p->y, t, p->y);
     wa_one(p->z);
-
-cleanup:
-
-    wa_free(t);
 }
 
 void ec2m_mul(EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k, ECPoint *r)
 {
-    ECPoint *p_ptr = NULL;
-    int len;
+    EcPrecomp *precomp = NULL;
+    ECPoint **win = NULL;
+    int *naf = NULL;
     int i;
     int ret = RET_OK;
 
@@ -355,19 +357,20 @@ void ec2m_mul(EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k, ECPoint *r)
     ASSERT(ctx->len == p->x->len);
     ASSERT(ctx->len == r->x->len);
 
-    if (p == r) {
-        CHECK_NOT_NULL(p_ptr = ec_point_copy_with_alloc(p));
-    } else {
-        p_ptr = (ECPoint *) p;
-    }
+    /* Оконный NAF: таблица нечетных кратных P, 3P, ..., (2^(w-1)-1)P в аффинных координатах. */
+    DO(ec2m_calc_win_precomp(ctx, p, EC_MUL_WIN_WIDTH, &precomp));
+    win = precomp->ctx.win->precomp;
+
+    DO(int_get_naf(k, EC_MUL_WIN_WIDTH, &naf));
 
     ec_point_zero(r);
 
-    len = (int)int_bit_len(k);
-    for (i = len - 1; i >= 0; i--) {
+    for (i = (int)int_bit_len(k); i >= 0; i--) {
         ec2m_double(ctx, r, r);
-        if (int_get_bit(k, i)) {
-            ec2m_add(ctx, r, p_ptr->x, p_ptr->y, 1, r);
+        if (naf[i] > 0) {
+            ec2m_add(ctx, r, win[(naf[i] - 1) >> 1]->x, win[(naf[i] - 1) >> 1]->y, 1, r);
+        } else if (naf[i] < 0) {
+            ec2m_add(ctx, r, win[(-naf[i] - 1) >> 1]->x, win[(-naf[i] - 1) >> 1]->y, -1, r);
         }
     }
 
@@ -375,9 +378,8 @@ void ec2m_mul(EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k, ECPoint *r)
 
 cleanup:
 
-    if (p == r) {
-        ec_point_free(p_ptr);
-    }
+    ec_precomp_free(precomp);
+    free(naf);
 }
 
 int ec2m_calc_win_precomp(EcGf2mCtx *ctx, const ECPoint *p, int width, EcPrecomp **precomp1)
@@ -479,15 +481,16 @@ int ec2m_calc_comb_precomp(EcGf2mCtx *ctx, const ECPoint *p, int width, EcPrecom
         }
 
         for (i = 2; i < comb_len; i++) {
-            for (j = 0; j < width; j++) {
-                int power_precomp_ind = (1 << j) - 1;
-                if ((((i + 1) >> j) & 1) && (i != power_precomp_ind)) {
-                    ec2m_add(ctx, comb->precomp[i], comb->precomp[power_precomp_ind]->x, comb->precomp[power_precomp_ind]->y, 1,
-                            comb->precomp[i]);
-                }
+            int power_precomp_ind;
+            for (j = width - 1; (((i + 1) >> j) & 1) == 0; j--);
+            power_precomp_ind = (1 << j) - 1;
+            if (i != power_precomp_ind) {
+                ec2m_add(ctx, comb->precomp[i - (1 << j)], comb->precomp[power_precomp_ind]->x, comb->precomp[power_precomp_ind]->y, 1,
+                        comb->precomp[i]);
             }
-            ec2m_point_to_affine(ctx, comb->precomp[i]);
         }
+
+        DO(ec2m_points_to_affine(ctx, comb->precomp, 0, comb_len));
     }
 
     *precomp1 = precomp;

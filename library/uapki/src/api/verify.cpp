@@ -32,7 +32,6 @@
 #include "attribute-helper.h"
 #include "content-hasher.h"
 #include "doc-verify.h"
-#include "global-objects.h"
 #include "http-helper.h"
 #include "parson-helper.h"
 #include "ocsp-helper.h"
@@ -495,7 +494,8 @@ cleanup:
 
 static int result_to_json (
         JSON_Object* joResult,
-        Doc::Verify::VerifySignedDoc& verifySignedDoc
+        Doc::Verify::VerifySignedDoc& verifySignedDoc,
+        const bool returnContent
 )
 {
     int ret = RET_OK;
@@ -505,7 +505,7 @@ static int result_to_json (
         json_object_set_value(joResult, "content", json_value_init_object());
         JSON_Object* jo_content = json_object_get_object(joResult, "content");
         DO_JSON(json_object_set_string(jo_content, "type", encap_cinfo.contentType.c_str()));
-        if (encap_cinfo.baEncapContent) {
+        if (returnContent && encap_cinfo.baEncapContent) {
             DO(json_object_set_base64(jo_content, "bytes", encap_cinfo.baEncapContent));
         }
     }
@@ -670,18 +670,20 @@ cleanup:
 }   //  validate_certs
 
 static int verify_p7s (
+        Context& context,
         const ByteArray* baSignature,
         ContentHasher& contentHasher,
         const bool isDigest,
         const Doc::Verify::VerifyOptions& verifyOptions,
+        const bool returnContent,
         JSON_Object* joResult
 )
 {
     int ret = RET_OK;
     Doc::Verify::VerifySignedDoc verify_sdoc(
-        get_config(),
-        get_cerstore(),
-        get_crlstore(),
+        context.config(),
+        context.cerStore(),
+        context.crlStore(),
         verifyOptions
     );
 
@@ -737,7 +739,7 @@ static int verify_p7s (
 
     verify_sdoc.detectCertSources();
 
-    DO(result_to_json(joResult, verify_sdoc));
+    DO(result_to_json(joResult, verify_sdoc, returnContent));
     ret = verify_sdoc.getLastError();
 
 cleanup:
@@ -745,6 +747,7 @@ cleanup:
 }   //  verify_p7s
 
 static int verify_raw (
+        Context& context,
         const ByteArray* baSignature,
         ContentHasher& contentHasher,
         const bool isDigest,
@@ -758,18 +761,20 @@ static int verify_raw (
     Cert::CerItem* cer_parsed = nullptr;
     SmartBA sba_pubdata;
     SignatureVerifyStatus status_sign = SignatureVerifyStatus::UNDEFINED;
+    const ByteArray* content = contentHasher.getContentBytes();
+    bool is_hash = isDigest;
 
     const string s_signalgo = ParsonHelper::jsonObjectGetString(joSignParams, "signAlgo");
     if (s_signalgo.empty()) return RET_UAPKI_INVALID_PARAMETER;
 
     if (sba_pubdata.set(json_object_get_base64(joSignerPubkey, "certificate"))) {
         DO(Cert::parseCert(sba_pubdata.get(), &cer_parsed));
-        (void)sba_pubdata.set(nullptr);
+        sba_pubdata.clear();
         cer_item = cer_parsed;
     }
     else {
         if (sba_pubdata.set(json_object_get_base64(joSignerPubkey, "certId"))) {
-            Cert::CerStore* cer_store = get_cerstore();
+            Cert::CerStore* cer_store = context.cerStore();
             if (!cer_store) {
                 SET_ERROR(RET_UAPKI_GENERAL_ERROR);
             }
@@ -782,10 +787,16 @@ static int verify_raw (
         }
     }
 
+    if (!content && !isDigest) {
+        DO(contentHasher.digest(hash_from_oid(s_signalgo.c_str())));
+        content = contentHasher.getHashValue();
+        is_hash = true;
+    }
+
     ret = Verify::verifySignature(
         s_signalgo.c_str(),
-        contentHasher.getContentBytes(),
-        isDigest,
+        content,
+        is_hash,
         (cer_item) ? cer_item->getSpki() : sba_pubdata.get(),
         baSignature
     );
@@ -810,6 +821,7 @@ cleanup:
 
 
 int uapki_verify_signature (
+        Context& context,
         JSON_Object* joParams,
         JSON_Object* joResult
 )
@@ -852,22 +864,25 @@ int uapki_verify_signature (
     if (!jo_signparams && !jo_signerpubkey) {
         //  Is P7S-signature(CMS/CAdES)
         Doc::Verify::VerifyOptions verify_options;
-        verify_options.onlyCrl = get_config()->getValidationByCrl();
+        verify_options.onlyCrl = context.config()->getValidationByCrl();
         DO(parse_verify_options(json_object_get_object(joParams, "options"), verify_options));
         DO(verify_p7s(
+            context,
             sba_signature.get(),
             content_hasher,
             is_digest,
             verify_options,
+            ParsonHelper::jsonObjectGetBoolean(joParams, "returnContent", true),
             joResult
         ));
     }
     else if (jo_signparams && jo_signerpubkey) {
         //  Is RAW-signature
-        if (!content_hasher.getContentBytes() || !jo_signparams || !jo_signerpubkey) {
+        if (!content_hasher.isPresent() || (is_digest && !content_hasher.getContentBytes())) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
         DO(verify_raw(
+            context,
             sba_signature.get(),
             content_hasher,
             is_digest,

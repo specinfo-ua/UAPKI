@@ -52,11 +52,11 @@
         call_thread_method              \
     },                                  \
 
-#define API_JSON_INTERNAL_CUSTOM                                                    \
-    int uapki_custom_static1 (JSON_Object* joParams, JSON_Object* joResult);        \
-    int uapki_custom_static2 (JSON_Object* joParams, JSON_Object* joResult);        \
-    int uapki_custom_serial1 (JSON_Object* joParams, JSON_Object* joResult);        \
-    int uapki_custom_thread1 (JSON_Object* joParams, JSON_Object* joResult);        \
+#define API_JSON_INTERNAL_CUSTOM                                                                            \
+    int uapki_custom_static1 (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);     \
+    int uapki_custom_static2 (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);     \
+    int uapki_custom_serial1 (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);     \
+    int uapki_custom_thread1 (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);     \
 
 */
 

@@ -492,8 +492,10 @@ int SigningDoc::getTimestamp (
     if (tspUri.empty()) {
         const vector<string> shuffled_uris = HttpHelper::randomURIs(tsp_params.uris);
         for (auto& it : shuffled_uris) {
+            sba_resp.clear();
             DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
             ret = HttpHelper::post(
+                certValidator.getLibConfig()->getHttp(),
                 it,
                 HttpHelper::CONTENT_TYPE_TSP_REQUEST,
                 tspHelper.getRequestEncoded(),
@@ -509,6 +511,7 @@ int SigningDoc::getTimestamp (
     else {
         DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
         ret = HttpHelper::post(
+            certValidator.getLibConfig()->getHttp(),
             tspUri,
             HttpHelper::CONTENT_TYPE_TSP_REQUEST,
             tspHelper.getRequestEncoded(),

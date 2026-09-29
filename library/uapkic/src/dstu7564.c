@@ -35,6 +35,7 @@
 #include "byte-utils-internal.h"
 #include "byte-array-internal.h"
 #include "macros-internal.h"
+#include "dstu7564-avx512-internal.h"
 
 #define UINT64_LEN 8
 #define ROWS 8
@@ -54,17 +55,8 @@
 // з dstu7624
 extern const uint64_t subrowcol_default[8][256];
 
-#define table_G(in, v1,v2,v3,v4,v5,v6,v7,v8)      (uint64_t) ( subrowcol_default[0][v1       & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[1][v2 >> 8  & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[2][v3 >> 16 & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[3][v4 >> 24 & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[4][v5 >> 32 & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[5][v6 >> 40 & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[6][v7 >> 48 & 0xFF])^\
-                                                  (uint64_t) ( subrowcol_default[7][v8 >> 56 & 0xFF]);
-
 /*Константа для P раунда*/
-static uint64_t p_pconst[NR_1024][NB_1024] = {
+static const uint64_t p_pconst[NR_1024][NB_1024] = {
     {
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
     },
@@ -110,7 +102,7 @@ static uint64_t p_pconst[NR_1024][NB_1024] = {
 };
 
 /*Константа для Q раунда, блок 64 байти*/
-static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
+static const uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     {
         8138269444283625715ULL, 6985347939676778739ULL, 5832426435069931763ULL, 4679504930463084787ULL, 
         3526583425856237811ULL, 2373661921249390835ULL, 1220740416642543859ULL, 67818912035696883ULL
@@ -154,7 +146,7 @@ static uint64_t p_qconst_NB_512[NR_512][NB_512] = {
 };
 
 /*Константа для Q раунда, блок 128 байт*/
-static uint64_t p_qconst_NB_1024[NR_1024][NB_1024] = {
+static const uint64_t p_qconst_NB_1024[NR_1024][NB_1024] = {
     {
         17361641481138401523ULL, 16208719976531554547ULL, 15055798471924707571ULL, 13902876967317860595ULL, 
         12749955462711013619ULL, 11597033958104166643ULL, 10444112453497319667ULL, 9291190948890472691ULL, 
@@ -251,12 +243,13 @@ struct Dstu7564Ctx_st {
     uint8_t last_block[STATE_BYTE_SIZE_1024 * 2];
     size_t last_block_el;
     uint64_t msg_tot_len[2];
-    uint8_t state[NB_1024 * ROWS];
+    uint64_t state[NB_1024];
     size_t nbytes;                              /* Number of bytes currently located in state. */
     size_t hash_nbytes;                         /* Hash code byte length. */
     size_t columns;                             /* Number of columns (8-byte vectors) located in internal state. */
     size_t is_inited;                           /* Reinit checker */
     size_t rounds;                              /* Number of rounds for current mode of operation. */
+    int use_avx512;
     Dstu7564Hmac *hmac;
 };
 
@@ -293,275 +286,190 @@ static void padding(uint8_t *buf, uint64_t buf_len_out, uint64_t *msg_tot_len, s
     }
 }
 
-static __inline void kupyna_G_xor(Dstu7564Ctx *ctx, uint64_t *in, uint64_t *out, size_t i)
+
+/* ---------------------------------------------------------------------------
+ * Scalar core: state as uint64_t columns (byte k of column c = bits 8k..8k+7),
+ * P/Q as rolled loops of two rounds per iteration, constants from const tables,
+ * message words XORed directly, no intermediate byte buffers.
+ * --------------------------------------------------------------------------- */
+#define T subrowcol_default
+
+static __inline uint64_t ld64le(const uint8_t *p)
 {
+    uint64_t v;
+    memcpy(&v, p, 8);
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    v = __builtin_bswap64(v);
+#endif
+    return v;
+}
+
+static __inline void st64le(uint8_t *p, uint64_t v)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    v = __builtin_bswap64(v);
+#endif
+    memcpy(p, &v, 8);
+}
+
+#define KB(w, k) ((uint8_t)((w) >> (8 * (k))))
+#define G8(x0, x1, x2, x3, x4, x5, x6, x7) \
+    (T[0][KB(x0, 0)] ^ T[1][KB(x1, 1)] ^ T[2][KB(x2, 2)] ^ T[3][KB(x3, 3)] ^ \
+     T[4][KB(x4, 4)] ^ T[5][KB(x5, 5)] ^ T[6][KB(x6, 6)] ^ T[7][KB(x7, 7)])
+
+#define MIX512(o, i) do { \
+    o[0] = G8(i[0], i[7], i[6], i[5], i[4], i[3], i[2], i[1]); \
+    o[1] = G8(i[1], i[0], i[7], i[6], i[5], i[4], i[3], i[2]); \
+    o[2] = G8(i[2], i[1], i[0], i[7], i[6], i[5], i[4], i[3]); \
+    o[3] = G8(i[3], i[2], i[1], i[0], i[7], i[6], i[5], i[4]); \
+    o[4] = G8(i[4], i[3], i[2], i[1], i[0], i[7], i[6], i[5]); \
+    o[5] = G8(i[5], i[4], i[3], i[2], i[1], i[0], i[7], i[6]); \
+    o[6] = G8(i[6], i[5], i[4], i[3], i[2], i[1], i[0], i[7]); \
+    o[7] = G8(i[7], i[6], i[5], i[4], i[3], i[2], i[1], i[0]); } while (0)
+
+#define MIX1024(o, i) do { \
+    o[0]  = G8(i[0],  i[15], i[14], i[13], i[12], i[11], i[10], i[5]);  \
+    o[1]  = G8(i[1],  i[0],  i[15], i[14], i[13], i[12], i[11], i[6]);  \
+    o[2]  = G8(i[2],  i[1],  i[0],  i[15], i[14], i[13], i[12], i[7]);  \
+    o[3]  = G8(i[3],  i[2],  i[1],  i[0],  i[15], i[14], i[13], i[8]);  \
+    o[4]  = G8(i[4],  i[3],  i[2],  i[1],  i[0],  i[15], i[14], i[9]);  \
+    o[5]  = G8(i[5],  i[4],  i[3],  i[2],  i[1],  i[0],  i[15], i[10]); \
+    o[6]  = G8(i[6],  i[5],  i[4],  i[3],  i[2],  i[1],  i[0],  i[11]); \
+    o[7]  = G8(i[7],  i[6],  i[5],  i[4],  i[3],  i[2],  i[1],  i[12]); \
+    o[8]  = G8(i[8],  i[7],  i[6],  i[5],  i[4],  i[3],  i[2],  i[13]); \
+    o[9]  = G8(i[9],  i[8],  i[7],  i[6],  i[5],  i[4],  i[3],  i[14]); \
+    o[10] = G8(i[10], i[9],  i[8],  i[7],  i[6],  i[5],  i[4],  i[15]); \
+    o[11] = G8(i[11], i[10], i[9],  i[8],  i[7],  i[6],  i[5],  i[0]);  \
+    o[12] = G8(i[12], i[11], i[10], i[9],  i[8],  i[7],  i[6],  i[1]);  \
+    o[13] = G8(i[13], i[12], i[11], i[10], i[9],  i[8],  i[7],  i[2]);  \
+    o[14] = G8(i[14], i[13], i[12], i[11], i[10], i[9],  i[8],  i[3]);  \
+    o[15] = G8(i[15], i[14], i[13], i[12], i[11], i[10], i[9],  i[4]); } while (0)
+
+#if defined(__GNUC__)
+#define ALWAYS_INLINE static __inline __attribute__((always_inline))
+#define UNROLL1 _Pragma("GCC unroll 1")
+#else
+#define ALWAYS_INLINE static __inline
+#define UNROLL1
+#endif
+
+ALWAYS_INLINE void p_round512(uint64_t *__restrict o, const uint64_t *__restrict in, const uint64_t *__restrict rc)
+{
+    uint64_t i[NB_512];
+    int j;
+    for (j = 0; j < NB_512; j++) i[j] = in[j] ^ rc[j];
+    MIX512(o, i);
+}
+ALWAYS_INLINE void q_round512(uint64_t *__restrict o, const uint64_t *__restrict in, const uint64_t *__restrict rc)
+{
+    uint64_t i[NB_512];
+    int j;
+    for (j = 0; j < NB_512; j++) i[j] = in[j] + rc[j];
+    MIX512(o, i);
+}
+ALWAYS_INLINE void p_round1024(uint64_t *__restrict o, const uint64_t *__restrict in, const uint64_t *__restrict rc)
+{
+    uint64_t i[NB_1024];
+    int j;
+    for (j = 0; j < NB_1024; j++) i[j] = in[j] ^ rc[j];
+    MIX1024(o, i);
+}
+ALWAYS_INLINE void q_round1024(uint64_t *__restrict o, const uint64_t *__restrict in, const uint64_t *__restrict rc)
+{
+    uint64_t i[NB_1024];
+    int j;
+    for (j = 0; j < NB_1024; j++) i[j] = in[j] + rc[j];
+    MIX1024(o, i);
+}
+
+static void P512(uint64_t *__restrict s)
+{
+    uint64_t t[NB_512];
+    int r;
+    UNROLL1
+    for (r = 0; r < NR_512; r += 2) { p_round512(t, s, p_pconst[r]); p_round512(s, t, p_pconst[r + 1]); }
+}
+static void Q512(uint64_t *__restrict s)
+{
+    uint64_t t[NB_512];
+    int r;
+    UNROLL1
+    for (r = 0; r < NR_512; r += 2) { q_round512(t, s, p_qconst_NB_512[r]); q_round512(s, t, p_qconst_NB_512[r + 1]); }
+}
+static void P1024(uint64_t *__restrict s)
+{
+    uint64_t t[NB_1024];
+    int r;
+    UNROLL1
+    for (r = 0; r < NR_1024; r += 2) { p_round1024(t, s, p_pconst[r]); p_round1024(s, t, p_pconst[r + 1]); }
+}
+static void Q1024(uint64_t *__restrict s)
+{
+    uint64_t t[NB_1024];
+    int r;
+    UNROLL1
+    for (r = 0; r < NR_1024; r += 2) { q_round1024(t, s, p_qconst_NB_1024[r]); q_round1024(s, t, p_qconst_NB_1024[r + 1]); }
+}
+
+/* h <- h ^ P(h ^ m) ^ Q(m) */
+static void digest_scalar(Dstu7564Ctx *ctx, const uint8_t *data)
+{
+    uint64_t p[NB_1024], q[NB_1024];
+    uint64_t *h = ctx->state;
+    int j;
+
     if (ctx->columns == NB_512) {
-        uint64_t i0 = in[0];
-        uint64_t i1 = in[1];
-        uint64_t i2 = in[2];
-        uint64_t i3 = in[3];
-        uint64_t i4 = in[4];
-        uint64_t i5 = in[5];
-        uint64_t i6 = in[6];
-        uint64_t i7 = in[7];
-        i0 ^= p_pconst[i][0];
-        i1 ^= p_pconst[i][1];
-        i2 ^= p_pconst[i][2];
-        i3 ^= p_pconst[i][3];
-        i4 ^= p_pconst[i][4];
-        i5 ^= p_pconst[i][5];
-        i6 ^= p_pconst[i][6];
-        i7 ^= p_pconst[i][7];
-        out[0] = table_G(in, i0, i7, i6, i5, i4, i3, i2, i1);
-        out[1] = table_G(in, i1, i0, i7, i6, i5, i4, i3, i2);
-        out[2] = table_G(in, i2, i1, i0, i7, i6, i5, i4, i3);
-        out[3] = table_G(in, i3, i2, i1, i0, i7, i6, i5, i4);
-        out[4] = table_G(in, i4, i3, i2, i1, i0, i7, i6, i5);
-        out[5] = table_G(in, i5, i4, i3, i2, i1, i0, i7, i6);
-        out[6] = table_G(in, i6, i5, i4, i3, i2, i1, i0, i7);
-        out[7] = table_G(in, i7, i6, i5, i4, i3, i2, i1, i0);
+        for (j = 0; j < NB_512; j++) { q[j] = ld64le(data + 8 * j); p[j] = h[j] ^ q[j]; }
+        P512(p);
+        Q512(q);
+        for (j = 0; j < NB_512; j++) h[j] ^= p[j] ^ q[j];
     } else {
-        uint64_t i0 = in[0];
-        uint64_t i1 = in[1];
-        uint64_t i2 = in[2];
-        uint64_t i3 = in[3];
-        uint64_t i4 = in[4];
-        uint64_t i5 = in[5];
-        uint64_t i6 = in[6];
-        uint64_t i7 = in[7];
-        uint64_t i8 = in[8];
-        uint64_t i9 = in[9];
-        uint64_t i10 = in[10];
-        uint64_t i11 = in[11];
-        uint64_t i12 = in[12];
-        uint64_t i13 = in[13];
-        uint64_t i14 = in[14];
-        uint64_t i15 = in[15];
-        i0  ^= p_pconst[i][0];
-        i1  ^= p_pconst[i][1];
-        i2  ^= p_pconst[i][2];
-        i3  ^= p_pconst[i][3];
-        i4  ^= p_pconst[i][4];
-        i5  ^= p_pconst[i][5];
-        i6  ^= p_pconst[i][6];
-        i7  ^= p_pconst[i][7];
-        i8  ^= p_pconst[i][8];
-        i9  ^= p_pconst[i][9];
-        i10 ^= p_pconst[i][10];
-        i11 ^= p_pconst[i][11];
-        i12 ^= p_pconst[i][12];
-        i13 ^= p_pconst[i][13];
-        i14 ^= p_pconst[i][14];
-        i15 ^= p_pconst[i][15];
-        out[0 ] = table_G(in, i0, i15, i14, i13, i12, i11, i10, i5);
-        out[1 ] = table_G(in, i1, i0, i15, i14, i13, i12, i11, i6);
-        out[2 ] = table_G(in, i2, i1, i0, i15, i14, i13, i12, i7);
-        out[3 ] = table_G(in, i3, i2, i1, i0, i15, i14, i13, i8);
-        out[4 ] = table_G(in, i4, i3, i2, i1, i0, i15, i14, i9);
-        out[5 ] = table_G(in, i5, i4, i3, i2, i1, i0, i15, i10);
-        out[6 ] = table_G(in, i6, i5, i4, i3, i2, i1, i0, i11);
-        out[7 ] = table_G(in, i7, i6, i5, i4, i3, i2, i1, i12);
-        out[8 ] = table_G(in, i8, i7, i6, i5, i4, i3, i2, i13);
-        out[9 ] = table_G(in, i9, i8, i7, i6, i5, i4, i3, i14);
-        out[10] = table_G(in, i10, i9, i8, i7, i6, i5, i4, i15);
-        out[11] = table_G(in, i11, i10, i9, i8, i7, i6, i5, i0);
-        out[12] = table_G(in, i12, i11, i10, i9, i8, i7, i6, i1);
-        out[13] = table_G(in, i13, i12, i11, i10, i9, i8, i7, i2);
-        out[14] = table_G(in, i14, i13, i12, i11, i10, i9, i8, i3);
-        out[15] = table_G(in, i15, i14, i13, i12, i11, i10, i9, i4);
+        for (j = 0; j < NB_1024; j++) { q[j] = ld64le(data + 8 * j); p[j] = h[j] ^ q[j]; }
+        P1024(p);
+        Q1024(q);
+        for (j = 0; j < NB_1024; j++) h[j] ^= p[j] ^ q[j];
     }
 }
 
-static __inline void kupyna_G_add(Dstu7564Ctx *ctx, uint64_t *in, uint64_t *out, size_t i)
+static void digest_blocks(Dstu7564Ctx *ctx, const uint8_t *data, size_t blocks)
 {
-    if (ctx->columns == NB_512) {
-        uint64_t i0 = in[0];
-        uint64_t i1 = in[1];
-        uint64_t i2 = in[2];
-        uint64_t i3 = in[3];
-        uint64_t i4 = in[4];
-        uint64_t i5 = in[5];
-        uint64_t i6 = in[6];
-        uint64_t i7 = in[7];
-        i0 += p_qconst_NB_512[i][0];
-        i1 += p_qconst_NB_512[i][1];
-        i2 += p_qconst_NB_512[i][2];
-        i3 += p_qconst_NB_512[i][3];
-        i4 += p_qconst_NB_512[i][4];
-        i5 += p_qconst_NB_512[i][5];
-        i6 += p_qconst_NB_512[i][6];
-        i7 += p_qconst_NB_512[i][7];
-        out[0] = table_G(in, i0, i7, i6, i5, i4, i3, i2, i1);
-        out[1] = table_G(in, i1, i0, i7, i6, i5, i4, i3, i2);
-        out[2] = table_G(in, i2, i1, i0, i7, i6, i5, i4, i3);
-        out[3] = table_G(in, i3, i2, i1, i0, i7, i6, i5, i4);
-        out[4] = table_G(in, i4, i3, i2, i1, i0, i7, i6, i5);
-        out[5] = table_G(in, i5, i4, i3, i2, i1, i0, i7, i6);
-        out[6] = table_G(in, i6, i5, i4, i3, i2, i1, i0, i7);
-        out[7] = table_G(in, i7, i6, i5, i4, i3, i2, i1, i0);
-    } else {
-        uint64_t i0 = in[0];
-        uint64_t i1 = in[1];
-        uint64_t i2 = in[2];
-        uint64_t i3 = in[3];
-        uint64_t i4 = in[4];
-        uint64_t i5 = in[5];
-        uint64_t i6 = in[6];
-        uint64_t i7 = in[7];
-        uint64_t i8 = in[8];
-        uint64_t i9 = in[9];
-        uint64_t i10 = in[10];
-        uint64_t i11 = in[11];
-        uint64_t i12 = in[12];
-        uint64_t i13 = in[13];
-        uint64_t i14 = in[14];
-        uint64_t i15 = in[15];
-        i0  += p_qconst_NB_1024[i][0];
-        i1  += p_qconst_NB_1024[i][1];
-        i2  += p_qconst_NB_1024[i][2];
-        i3  += p_qconst_NB_1024[i][3];
-        i4  += p_qconst_NB_1024[i][4];
-        i5  += p_qconst_NB_1024[i][5];
-        i6  += p_qconst_NB_1024[i][6];
-        i7  += p_qconst_NB_1024[i][7];
-        i8  += p_qconst_NB_1024[i][8];
-        i9  += p_qconst_NB_1024[i][9];
-        i10 += p_qconst_NB_1024[i][10];
-        i11 += p_qconst_NB_1024[i][11];
-        i12 += p_qconst_NB_1024[i][12];
-        i13 += p_qconst_NB_1024[i][13];
-        i14 += p_qconst_NB_1024[i][14];
-        i15 += p_qconst_NB_1024[i][15];
-        out[0 ] = table_G(in, i0, i15, i14, i13, i12, i11, i10, i5);
-        out[1 ] = table_G(in, i1, i0, i15, i14, i13, i12, i11, i6);
-        out[2 ] = table_G(in, i2, i1, i0, i15, i14, i13, i12, i7);
-        out[3 ] = table_G(in, i3, i2, i1, i0, i15, i14, i13, i8);
-        out[4 ] = table_G(in, i4, i3, i2, i1, i0, i15, i14, i9);
-        out[5 ] = table_G(in, i5, i4, i3, i2, i1, i0, i15, i10);
-        out[6 ] = table_G(in, i6, i5, i4, i3, i2, i1, i0, i11);
-        out[7 ] = table_G(in, i7, i6, i5, i4, i3, i2, i1, i12);
-        out[8 ] = table_G(in, i8, i7, i6, i5, i4, i3, i2, i13);
-        out[9 ] = table_G(in, i9, i8, i7, i6, i5, i4, i3, i14);
-        out[10] = table_G(in, i10, i9, i8, i7, i6, i5, i4, i15);
-        out[11] = table_G(in, i11, i10, i9, i8, i7, i6, i5, i0);
-        out[12] = table_G(in, i12, i11, i10, i9, i8, i7, i6, i1);
-        out[13] = table_G(in, i13, i12, i11, i10, i9, i8, i7, i2);
-        out[14] = table_G(in, i14, i13, i12, i11, i10, i9, i8, i3);
-        out[15] = table_G(in, i15, i14, i13, i12, i11, i10, i9, i4);
+#if DSTU_AVX512
+    if (ctx->use_avx512) {
+        digest_avx512(ctx->state, data, blocks, ctx->columns);
+        return;
+    }
+#endif
+    while (blocks--) {
+        digest_scalar(ctx, data);
+        data += ctx->nbytes;
     }
 }
 
-static __inline void P(Dstu7564Ctx *ctx, uint8_t *state_)
+static void digest(Dstu7564Ctx *ctx, const uint8_t *data)
 {
-    uint64_t s[NB_1024];
-    uint64_t state[NB_1024];
-    size_t block_len;
-
-    block_len = ctx->columns << 3;
-    uint8_to_uint64(state_, ctx->columns << 3, state, ctx->columns);
-
-    kupyna_G_xor(ctx, state, s, (size_t) 0);
-    kupyna_G_xor(ctx, s, state, (size_t) 1);
-    kupyna_G_xor(ctx, state, s, (size_t) 2);
-    kupyna_G_xor(ctx, s, state, (size_t) 3);
-    kupyna_G_xor(ctx, state, s, (size_t) 4);
-    kupyna_G_xor(ctx, s, state, (size_t) 5);
-    kupyna_G_xor(ctx, state, s, (size_t) 6);
-    kupyna_G_xor(ctx, s, state, (size_t) 7);
-    kupyna_G_xor(ctx, state, s, (size_t) 8);
-    kupyna_G_xor(ctx, s, state, (size_t) 9);
-    if (ctx->columns == NB_1024) {
-        kupyna_G_xor(ctx, state, s, (size_t) 10);
-        kupyna_G_xor(ctx, s, state, (size_t) 11);
-        kupyna_G_xor(ctx, state, s, (size_t) 12);
-        kupyna_G_xor(ctx, s, state, (size_t) 13);
-    }
-
-    uint64_to_uint8(state, ctx->columns, state_, block_len);
-}
-
-static __inline void Q(Dstu7564Ctx *ctx, uint8_t *state_)
-{
-    uint64_t s[NB_1024];
-    uint64_t state[NB_1024];
-    size_t block_len;
-
-    block_len = ctx->columns << 3;
-    uint8_to_uint64(state_, block_len, state, ctx->columns);
-
-    kupyna_G_add(ctx, state, s, (size_t) 0);
-    kupyna_G_add(ctx, s, state, (size_t) 1);
-    kupyna_G_add(ctx, state, s, (size_t) 2);
-    kupyna_G_add(ctx, s, state, (size_t) 3);
-    kupyna_G_add(ctx, state, s, (size_t) 4);
-    kupyna_G_add(ctx, s, state, (size_t) 5);
-    kupyna_G_add(ctx, state, s, (size_t) 6);
-    kupyna_G_add(ctx, s, state, (size_t) 7);
-    kupyna_G_add(ctx, state, s, (size_t) 8);
-    kupyna_G_add(ctx, s, state, (size_t) 9);
-    if (ctx->columns == NB_1024) {
-        kupyna_G_add(ctx, state, s, (size_t) 10);
-        kupyna_G_add(ctx, s, state, (size_t) 11);
-        kupyna_G_add(ctx, state, s, (size_t) 12);
-        kupyna_G_add(ctx, s, state, (size_t) 13);
-    }
-
-    uint64_to_uint8(state, ctx->columns, state_, block_len);
-}
-
-static __inline void dstu7564_xor(void *arg1, void *arg2, void *out, size_t columns)
-{
-    uint64_t *a1 = (uint64_t *) arg1;
-    uint64_t *a2 = (uint64_t *) arg2;
-    uint64_t *o = (uint64_t *) out;
-
-    o[0] = a1[0] ^ a2[0];
-    o[1] = a1[1] ^ a2[1];
-    o[2] = a1[2] ^ a2[2];
-    o[3] = a1[3] ^ a2[3];
-    o[4] = a1[4] ^ a2[4];
-    o[5] = a1[5] ^ a2[5];
-    o[6] = a1[6] ^ a2[6];
-    o[7] = a1[7] ^ a2[7];
-    if (columns == NB_1024) {
-        o[8] = a1[8] ^ a2[8];
-        o[9] = a1[9] ^ a2[9];
-        o[10] = a1[10] ^ a2[10];
-        o[11] = a1[11] ^ a2[11];
-        o[12] = a1[12] ^ a2[12];
-        o[13] = a1[13] ^ a2[13];
-        o[14] = a1[14] ^ a2[14];
-        o[15] = a1[15] ^ a2[15];
-    }
-}
-
-static __inline void digest(Dstu7564Ctx *ctx, uint8_t *data)
-{
-    uint8_t temp1[NB_1024 * ROWS];
-    uint8_t temp2[NB_1024 * ROWS];
-
-    memcpy(temp2, data, ctx->columns << 3);
-    dstu7564_xor(ctx->state, data, temp1, ctx->columns);
-
-    P(ctx, temp1);
-    Q(ctx, temp2);
-
-    dstu7564_xor(temp1, temp2, temp2, ctx->columns);
-    dstu7564_xor(ctx->state, temp2, ctx->state, ctx->columns);
+    digest_blocks(ctx, data, 1);
 }
 
 static __inline int output_transformation(Dstu7564Ctx *ctx, ByteArray **hash_code)
 {
-    uint8_t temp[NB_1024 * ROWS];
+    uint64_t t[NB_1024];
+    uint8_t out[STATE_BYTE_SIZE_1024];
     int ret = RET_OK;
+    size_t j;
 
-    memcpy(temp, ctx->state, ROWS * NB_1024);
+    for (j = 0; j < ctx->columns; j++) t[j] = ctx->state[j];
+#if DSTU_AVX512
+    if (ctx->use_avx512) {
+        output_avx512(t, ctx->columns);
+    } else
+#endif
+    {
+        if (ctx->columns == NB_512) P512(t); else P1024(t);
+        for (j = 0; j < ctx->columns; j++) t[j] ^= ctx->state[j];
+    }
+    for (j = 0; j < ctx->columns; j++) st64le(out + 8 * j, t[j]);
 
-    P(ctx, temp);
-
-    dstu7564_xor(ctx->state, temp, ctx->state, ctx->columns);
-
-    CHECK_NOT_NULL(*hash_code = ba_alloc_from_uint8(ctx->state + ctx->nbytes - ctx->hash_nbytes, ctx->hash_nbytes));
+    CHECK_NOT_NULL(*hash_code = ba_alloc_from_uint8(out + ctx->nbytes - ctx->hash_nbytes, ctx->hash_nbytes));
     dstu7564_init(ctx, ctx->hash_nbytes);
 
 cleanup:
@@ -591,6 +499,7 @@ Dstu7564Ctx* dstu7564_copy_with_alloc(const Dstu7564Ctx* ctx)
     CHECK_PARAM(ctx != NULL);
     CALLOC_CHECKED(out, sizeof(Dstu7564Ctx));
     memcpy(out, ctx, sizeof(Dstu7564Ctx));
+    out->hmac = NULL;
     if (ctx->hmac) {
         MALLOC_CHECKED(out->hmac, sizeof(Dstu7564Hmac));
         memcpy(out->hmac, ctx->hmac, sizeof(Dstu7564Hmac));
@@ -627,15 +536,16 @@ int dstu7564_init(Dstu7564Ctx *ctx, size_t hash_nbytes)
         ctx->rounds = NR_512;
         ctx->columns = NB_512;
         ctx->nbytes = STATE_BYTE_SIZE_512;
-        memset(&ctx->state[0], 0, STATE_BYTE_SIZE_512);
+        memset(ctx->state, 0, sizeof(ctx->state));
         ctx->state[0] = STATE_BYTE_SIZE_512;
     } else {
         ctx->rounds = NR_1024;
         ctx->columns = NB_1024;
         ctx->nbytes = STATE_BYTE_SIZE_1024;
-        memset(&ctx->state[0], 0, STATE_BYTE_SIZE_1024);
+        memset(ctx->state, 0, sizeof(ctx->state));
         ctx->state[0] = STATE_BYTE_SIZE_1024;
     }
+    ctx->use_avx512 = dstu_avx512_available();
     ctx->hash_nbytes = hash_nbytes;
     memset(&ctx->last_block, 0, STATE_BYTE_SIZE_1024 * 2);
 
@@ -656,52 +566,40 @@ cleanup:
 int dstu7564_update(Dstu7564Ctx *ctx, const ByteArray *data)
 {
     int ret = RET_OK;
-    uint8_t *data_buf = NULL;
-    uint8_t *shifted_buf;
-    size_t data_buf_len;
-    size_t block_size;
-    size_t i = 0;
+    const uint8_t *buf;
+    size_t len, take, blocks;
 
     CHECK_PARAM(ctx != NULL);
     CHECK_PARAM(data != NULL);
+    if (!ctx->is_inited) SET_ERROR(RET_CONTEXT_NOT_READY);
+    if (!data->len) goto cleanup;
+    CHECK_PARAM(data->buf != NULL);
+    buf = data->buf;
+    len = data->len;
+    ctx->msg_tot_len[0] += len;
+    if (ctx->msg_tot_len[0] < (uint64_t)len) ctx->msg_tot_len[1]++;
 
-    if (ctx->is_inited == false) {
-        SET_ERROR(RET_CONTEXT_NOT_READY);
+    if (ctx->last_block_el) {
+        take = ctx->nbytes - ctx->last_block_el;
+        if (take > len) take = len;
+        memcpy(ctx->last_block + ctx->last_block_el, buf, take);
+        ctx->last_block_el += take;
+        buf += take;
+        len -= take;
+        if (ctx->last_block_el != ctx->nbytes) goto cleanup;
+        digest(ctx, ctx->last_block);
+        ctx->last_block_el = 0;
     }
-
-    data_buf = data->buf;
-    data_buf_len = data->len;
-
-    block_size = ctx->nbytes;
-
-    ctx->msg_tot_len[0] += data_buf_len;
-    if (ctx->msg_tot_len[0] < (uint64_t)data_buf_len) {
-        ctx->msg_tot_len[1]++;
+    blocks = len / ctx->nbytes;
+    if (blocks) {
+        digest_blocks(ctx, buf, blocks);
+        take = blocks * ctx->nbytes;
+        buf += take;
+        len -= take;
     }
-
-    if (ctx->last_block_el + data_buf_len < block_size) {
-        memcpy(&ctx->last_block[ctx->last_block_el], data_buf, data_buf_len);
-        ctx->last_block_el += data_buf_len;
-        goto cleanup;
-    }
-
-    memcpy(&ctx->last_block[ctx->last_block_el], data_buf, block_size - ctx->last_block_el);
-    digest(ctx, ctx->last_block);
-    memset(&ctx->last_block[0], 0, MAX_BLOCK_LEN);
-
-    shifted_buf = data_buf + (block_size - ctx->last_block_el);
-    data_buf_len -= (block_size - ctx->last_block_el);
-    for (i = 0; i + block_size <= data_buf_len; i += block_size) {
-        digest(ctx, shifted_buf + i);
-    }
-
-    ctx->last_block_el = data_buf_len - i;
-    if (ctx->last_block_el != 0) {
-        memcpy(ctx->last_block, shifted_buf + i, ctx->last_block_el);
-    }
-
+    if (len) memcpy(ctx->last_block, buf, len);
+    ctx->last_block_el = len;
 cleanup:
-
     return ret;
 }
 

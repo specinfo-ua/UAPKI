@@ -227,7 +227,9 @@ EcCtx *ec_cache_get_default(EcParamsId params_id)
     EcCache *ec_cache_curr = NULL;
     EcCtx *ctx = NULL;
 
+    pthread_mutex_lock(&ec_cache_mutex);
     ec_cache_curr = ec_cache_get_element_by_id(params_id);
+    pthread_mutex_unlock(&ec_cache_mutex);
     if (ec_cache_curr != NULL) {
         CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
     } else if (default_opt_level != 0) {
@@ -236,7 +238,9 @@ EcCtx *ec_cache_get_default(EcParamsId params_id)
             SET_ERROR(ret);
         }
 
+        pthread_mutex_lock(&ec_cache_mutex);
         ec_cache_curr = ec_cache_get_element_by_id(params_id);
+        pthread_mutex_unlock(&ec_cache_mutex);
         if (ec_cache_curr != NULL) {
             CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
         }
@@ -295,14 +299,18 @@ EcCtx *ec_cache_get_ec2m_pb(const int *f, size_t f_len, size_t a, const ByteArra
     EcCache *ec_cache_curr = NULL;
     EcCtx *ctx = NULL;
 
+    pthread_mutex_lock(&ec_cache_mutex);
     ec_cache_curr = ec_cache_get_element_by_pb(f, a, b, n, px, py);
+    pthread_mutex_unlock(&ec_cache_mutex);
     if (ec_cache_curr != NULL) {
         CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
     } else if (default_opt_level != 0) {
 
         DO(ec_cache_add_ec2m_pb(f, f_len, a, b, n, px, py, default_opt_level));
 
+        pthread_mutex_lock(&ec_cache_mutex);
         ec_cache_curr = ec_cache_get_element_by_pb(f, a, b, n, px, py);
+        pthread_mutex_unlock(&ec_cache_mutex);
         if (ec_cache_curr != NULL) {
             CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
         }
@@ -361,7 +369,9 @@ EcCtx* ec_cache_get_ec2m_onb(size_t m, size_t a, const ByteArray* b, const ByteA
     EcCache* ec_cache_curr = NULL;
     EcCtx* ctx = NULL;
 
+    pthread_mutex_lock(&ec_cache_mutex);
     ec_cache_curr = ec_cache_get_element_by_onb(m, a, b, n, px, py);
+    pthread_mutex_unlock(&ec_cache_mutex);
     if (ec_cache_curr != NULL) {
         CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
     }
@@ -369,7 +379,9 @@ EcCtx* ec_cache_get_ec2m_onb(size_t m, size_t a, const ByteArray* b, const ByteA
 
         DO(ec_cache_add_ec2m_onb(m, a, b, n, px, py, default_opt_level));
 
+        pthread_mutex_lock(&ec_cache_mutex);
         ec_cache_curr = ec_cache_get_element_by_onb(m, a, b, n, px, py);
+        pthread_mutex_unlock(&ec_cache_mutex);
         if (ec_cache_curr != NULL) {
             CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
         }
@@ -429,14 +441,18 @@ EcCtx* ec_cache_get_ecp(const ByteArray* p, const ByteArray* a, const ByteArray*
     EcCache* ec_cache_curr = NULL;
     EcCtx* ctx = NULL;
 
+    pthread_mutex_lock(&ec_cache_mutex);
     ec_cache_curr = ec_cache_get_element_by_p(p, a, b, q, px, py);
+    pthread_mutex_unlock(&ec_cache_mutex);
     if (ec_cache_curr != NULL) {
         CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
     }
     else if (default_opt_level != 0) {
         DO(ec_cache_add_ecp(p, a, b, q, px, py, default_opt_level));
 
+        pthread_mutex_lock(&ec_cache_mutex);
         ec_cache_curr = ec_cache_get_element_by_p(p, a, b, q, px, py);
+        pthread_mutex_unlock(&ec_cache_mutex);
         if (ec_cache_curr != NULL) {
             CHECK_NOT_NULL(ctx = ec_copy_params_with_alloc(ec_cache_curr->ctx));
         }

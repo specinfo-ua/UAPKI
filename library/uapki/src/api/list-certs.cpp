@@ -29,7 +29,6 @@
 
 #include "api-json-internal.h"
 #include "extension-helper-json.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "oid-utils.h"
@@ -186,11 +185,11 @@ cleanup:
 }   //  info_to_json
 
 
-int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_list_certs (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Cert::CerStore* cer_store = get_cerstore();
+    LibraryConfig* lib_config = context.config();
+    Cert::CerStore* cer_store = context.cerStore();
     const bool from_storage = ParsonHelper::jsonObjectGetBoolean(joParams, "storage", false);
     const bool show_certinfos = ParsonHelper::jsonObjectGetBoolean(joParams, "showCertInfos", false);
     Cert::CerStore::FilterListCerts filter;
@@ -252,7 +251,7 @@ int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult)
         VectorBA vba_certs;
         vector<Cert::CerItem*> cer_items;
 
-        CmStorageProxy* storage = CmProviders::openedStorage();
+        CmStorageProxy* storage = context.openedStorage();
         if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
 
         ret = storage->sessionGetCertificates(vba_certs);

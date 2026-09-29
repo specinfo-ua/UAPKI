@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/cert-info.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -39,7 +38,7 @@
 using namespace UapkiNS;
 
 
-int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_cert_info (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     SmartBA sba_certid, sba_encoded;
@@ -50,8 +49,8 @@ int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult)
         DO(Cert::detailInfoToJson(joResult, parsed_ceritem));
     }
     else {
-        LibraryConfig* lib_config = get_config();
-        Cert::CerStore* cer_store = get_cerstore();
+        LibraryConfig* lib_config = context.config();
+        Cert::CerStore* cer_store = context.cerStore();
 
         if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;
         if (!lib_config->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;

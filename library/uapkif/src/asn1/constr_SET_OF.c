@@ -1132,13 +1132,6 @@ SET_OF_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
         }
     }
 
-    /*
-     * Cannot inherit it eralier:
-     * need to make sure we get the updated version.
-     */
-    if (!elm->memb_constraints) {
-        elm->memb_constraints = elm->type->check_constraints;
-    }
 
     return 0;
 }

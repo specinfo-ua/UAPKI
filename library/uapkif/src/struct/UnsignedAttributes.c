@@ -63,31 +63,12 @@ UnsignedAttributes_constraint(asn_TYPE_descriptor_t *td, const void *sptr,
  * This type is implemented using Attributes,
  * so here we adjust the DEF accordingly.
  */
-static void
-UnsignedAttributes_1_inherit_TYPE_descriptor(asn_TYPE_descriptor_t *td)
-{
-    td->free_struct    = Attributes_desc.free_struct;
-    td->print_struct   = Attributes_desc.print_struct;
-    td->check_constraints = Attributes_desc.check_constraints;
-    td->ber_decoder    = Attributes_desc.ber_decoder;
-    td->der_encoder    = Attributes_desc.der_encoder;
-    td->xer_decoder    = Attributes_desc.xer_decoder;
-    td->xer_encoder    = Attributes_desc.xer_encoder;
-    td->uper_decoder   = Attributes_desc.uper_decoder;
-    td->uper_encoder   = Attributes_desc.uper_encoder;
-    if (!td->per_constraints) {
-        td->per_constraints = Attributes_desc.per_constraints;
-    }
-    td->elements       = Attributes_desc.elements;
-    td->elements_count = Attributes_desc.elements_count;
-    td->specifics      = Attributes_desc.specifics;
-}
+/* Descriptors are initialized before use by asn1-descriptor-init.cpp. */
 
 void
 UnsignedAttributes_free(asn_TYPE_descriptor_t *td,
         void *struct_ptr, int contents_only)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     td->free_struct(td, struct_ptr, contents_only);
 }
 
@@ -95,7 +76,6 @@ int
 UnsignedAttributes_print(asn_TYPE_descriptor_t *td, const void *struct_ptr,
         int ilevel, asn_app_consume_bytes_f *cb, void *app_key)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     return td->print_struct(td, struct_ptr, ilevel, cb, app_key);
 }
 
@@ -103,7 +83,6 @@ asn_dec_rval_t
 UnsignedAttributes_decode_ber(asn_codec_ctx_t *opt_codec_ctx, asn_TYPE_descriptor_t *td,
         void **structure, const void *bufptr, size_t size, int tag_mode)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     return td->ber_decoder(opt_codec_ctx, td, structure, bufptr, size, tag_mode);
 }
 
@@ -112,7 +91,6 @@ UnsignedAttributes_encode_der(asn_TYPE_descriptor_t *td,
         void *structure, int tag_mode, ber_tlv_tag_t tag,
         asn_app_consume_bytes_f *cb, void *app_key)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     return td->der_encoder(td, structure, tag_mode, tag, cb, app_key);
 }
 
@@ -120,7 +98,6 @@ asn_dec_rval_t
 UnsignedAttributes_decode_xer(asn_codec_ctx_t *opt_codec_ctx, asn_TYPE_descriptor_t *td,
         void **structure, const char *opt_mname, const void *bufptr, size_t size)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     return td->xer_decoder(opt_codec_ctx, td, structure, opt_mname, bufptr, size);
 }
 
@@ -129,7 +106,6 @@ UnsignedAttributes_encode_xer(asn_TYPE_descriptor_t *td, void *structure,
         int ilevel, enum xer_encoder_flags_e flags,
         asn_app_consume_bytes_f *cb, void *app_key)
 {
-    UnsignedAttributes_1_inherit_TYPE_descriptor(td);
     return td->xer_encoder(td, structure, ilevel, flags, cb, app_key);
 }
 

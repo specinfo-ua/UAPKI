@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/library-init.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "http-helper.h"
 #include "ocsp-helper.h"
 #include "parson-helper.h"
@@ -60,7 +59,7 @@ cleanup:
     return ret;
 }   //  load_config
 
-static int setup_cm_providers (JSON_Object* joParams)
+static int setup_cm_providers (Session& session, JSON_Object* joParams)
 {
     const string s_dir = ParsonHelper::jsonObjectGetString(joParams, "dir");
     JSON_Array* ja_providers = json_object_get_array(joParams, "allowedProviders");
@@ -79,16 +78,16 @@ static int setup_cm_providers (JSON_Object* joParams)
             json.serialize(s_config);
         }
 
-        (void)CmProviders::loadProvider(s_dir, s_lib, s_config);
+        (void)session.loadProvider(s_dir, s_lib, s_config);
     }
 
     return RET_OK;
 }   //  setup_cm_providers
 
-static int setup_cert_cache (JSON_Object* joParams)
+static int setup_cert_cache (Session& session, JSON_Object* joParams)
 {
     int ret = RET_OK;
-    Cert::CerStore& cer_store = *get_cerstore();
+    Cert::CerStore& cer_store = *session.cerStore();
 
     cer_store.setParams(ParsonHelper::jsonObjectGetString(joParams, "path"));
 
@@ -129,10 +128,10 @@ cleanup:
     return ret;
 }   //  setup_cert_cache
 
-static int setup_crl_cache (JSON_Object* joParams)
+static int setup_crl_cache (Session& session, JSON_Object* joParams)
 {
     int ret = RET_OK;
-    Crl::CrlStore& crl_store = *get_crlstore();
+    Crl::CrlStore& crl_store = *session.crlStore();
 
     crl_store.setParams(
         ParsonHelper::jsonObjectGetString(joParams, "path"),
@@ -202,13 +201,14 @@ static int setup_tsp (LibraryConfig& libConfig, JSON_Object* joParams)
 }   //  setup_tsp
 
 
-int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
     ParsonHelper json;
-    LibraryConfig* lib_config = get_config();
-    Cert::CerStore* lib_cerstore = get_cerstore();
-    Crl::CrlStore* lib_crlstore = get_crlstore();
+    Session& session = context.session();
+    LibraryConfig* lib_config = session.config();
+    Cert::CerStore* lib_cerstore = session.cerStore();
+    Crl::CrlStore* lib_crlstore = session.crlStore();
     const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
     JSON_Object* jo_refparams = joParams;
     JSON_Object* jo_category = nullptr;
@@ -223,7 +223,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
     if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
 
-    DO(uapkic_init(nullptr, p_selftest_status));
+    DO(Session::initCryptoLibrary(p_selftest_status));
 
     if (!fn_config.empty()) {
         DO(load_config(json, fn_config));
@@ -231,11 +231,13 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     }
 
     //  Setup subsystems
-    DO(setup_cm_providers(json_object_get_object(jo_refparams, "cmProviders")));
+    if (!context.isSharedMemory()) {
+        DO(setup_cm_providers(session, json_object_get_object(jo_refparams, "cmProviders")));
+    }
 
-    DO(setup_cert_cache(json_object_get_object(jo_refparams, "certCache")));
+    DO(setup_cert_cache(session, json_object_get_object(jo_refparams, "certCache")));
 
-    DO(setup_crl_cache(json_object_get_object(jo_refparams, "crlCache")));
+    DO(setup_crl_cache(session, json_object_get_object(jo_refparams, "crlCache")));
 
     DO(setup_ocsp(*lib_config, json_object_get_object(jo_refparams, "ocsp")));
 
@@ -245,12 +247,14 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     DO(setup_tsp(*lib_config, json_object_get_object(jo_refparams, "tsp")));
 
     {   //  Setup CURL
+#if !defined(ANDROID) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
         JSON_Object* jo_proxy = json_object_get_object(jo_refparams, "proxy");
-        HttpHelper::init(
-            offline,
+        lib_config->setProxy(
             json_object_get_string(jo_proxy, "url"),
             json_object_get_string(jo_proxy, "credentials")
         );
+#endif
+        (void)session.initHttp();
     }
 
     lib_config->setValidationByCrl(ParsonHelper::jsonObjectGetBoolean(jo_refparams, "validationByCrl", false));
@@ -270,7 +274,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCrls", (uint32_t)cnt_crls));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_category, "useDeltaCrl", lib_crlstore->useDeltaCrl()));
 
-    DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)CmProviders::count()));
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "countCmProviders", (uint32_t)session.countProviders()));
 
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "offline", offline));
 
@@ -284,7 +288,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
     DO_JSON(json_object_set_value(joResult, "proxy", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "proxy");
     if (jo_category) {
-        DO_JSON(json_object_set_string(jo_category, "url", HttpHelper::getProxyUrl().c_str()));
+        DO_JSON(json_object_set_string(jo_category, "url", lib_config->getHttp().proxyUrl.c_str()));
     }
 
     DO_JSON(json_object_set_value(joResult, "tsp", json_value_init_object()));
@@ -304,10 +308,7 @@ int uapki_init (JSON_Object* joParams, JSON_Object* joResult)
 
 cleanup:
     if (ret != RET_OK) {
-        release_config();
-        CmProviders::deinit();
-        release_stores();
-        HttpHelper::deinit();
+        session.deinit();
     }
 
     return ret;

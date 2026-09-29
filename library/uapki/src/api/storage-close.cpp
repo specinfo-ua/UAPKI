@@ -30,10 +30,10 @@
 #include "api-json-internal.h"
 
 
-int uapki_storage_close (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_storage_close (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joParams;
     (void)joResult;
-    const int ret = CmProviders::storageClose();
+    const int ret = context.storageClose();
     return ret;
 }

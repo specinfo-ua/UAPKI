@@ -155,14 +155,20 @@ EcParamsId ecid_from_oid (const char* oid)
     return EC_PARAMS_ID_UNDEFINED;
 }
 
+static const char* oid_text (const OBJECT_IDENTIFIER_t* oid, char* buf, size_t size, char** heap)
+{
+    *heap = NULL;
+    if (asn_oid_to_text_buf(oid, buf, size) >= 0) return buf;
+    return (asn_oid_to_text(oid, heap) == RET_OK) ? *heap : NULL;
+}
+
 EcParamsId ecid_from_OID (const OBJECT_IDENTIFIER_t* oid)
 {
-    EcParamsId rv_ecid = EC_PARAMS_ID_UNDEFINED;
-    char* s_oid = NULL;
-    if (asn_oid_to_text(oid, &s_oid) == RET_OK) {
-        rv_ecid = ecid_from_oid(s_oid);
-        free(s_oid);
-    }
+    char buf[ASN_OID_TEXT_MAX];
+    char* heap;
+    const char* s_oid = oid_text(oid, buf, sizeof(buf), &heap);
+    const EcParamsId rv_ecid = s_oid ? ecid_from_oid(s_oid) : EC_PARAMS_ID_UNDEFINED;
+    free(heap);
     return rv_ecid;
 }
 
@@ -309,12 +315,11 @@ HashAlg hash_from_oid (const char* oid)
 
 HashAlg hash_from_OID (const OBJECT_IDENTIFIER_t* oid)
 {
-    HashAlg rv_hashalg = HASH_ALG_UNDEFINED;
-    char* s_oid = NULL;
-    if (asn_oid_to_text(oid, &s_oid) == RET_OK) {
-        rv_hashalg = hash_from_oid(s_oid);
-        free(s_oid);
-    }
+    char buf[ASN_OID_TEXT_MAX];
+    char* heap;
+    const char* s_oid = oid_text(oid, buf, sizeof(buf), &heap);
+    const HashAlg rv_hashalg = s_oid ? hash_from_oid(s_oid) : HASH_ALG_UNDEFINED;
+    free(heap);
     return rv_hashalg;
 }
 
@@ -369,34 +374,31 @@ SignAlg signature_from_oid (const char* oid)
 
 SignAlg signature_from_OID (const OBJECT_IDENTIFIER_t* oid)
 {
-    SignAlg rv_signalg = SIGN_UNDEFINED;
-    char* s_oid = NULL;
-    if (asn_oid_to_text(oid, &s_oid) == RET_OK) {
-        rv_signalg = signature_from_oid(s_oid);
-        free(s_oid);
-    }
+    char buf[ASN_OID_TEXT_MAX];
+    char* heap;
+    const char* s_oid = oid_text(oid, buf, sizeof(buf), &heap);
+    const SignAlg rv_signalg = s_oid ? signature_from_oid(s_oid) : SIGN_UNDEFINED;
+    free(heap);
     return rv_signalg;
 }
 
 bool OID_is_child_oid (const OBJECT_IDENTIFIER_t* oid, const char* strOidParent)
 {
-    bool is_child = false;
-    char* s_oid = NULL;
-    if (asn_oid_to_text(oid, &s_oid) == RET_OK) {
-        is_child = oid_is_parent(strOidParent, s_oid);
-        free(s_oid);
-    }
+    char buf[ASN_OID_TEXT_MAX];
+    char* heap;
+    const char* s_oid = oid_text(oid, buf, sizeof(buf), &heap);
+    const bool is_child = s_oid && oid_is_parent(strOidParent, s_oid);
+    free(heap);
     return is_child;
 }
 
 bool OID_is_equal_oid (const OBJECT_IDENTIFIER_t* oid, const char* strOid)
 {
-    bool is_equal = false;
-    char* s_oid = NULL;
-    if (asn_oid_to_text(oid, &s_oid) == RET_OK) {
-        is_equal = oid_is_equal(strOid, s_oid);
-        free(s_oid);
-    }
+    char buf[ASN_OID_TEXT_MAX];
+    char* heap;
+    const char* s_oid = oid_text(oid, buf, sizeof(buf), &heap);
+    const bool is_equal = s_oid && oid_is_equal(strOid, s_oid);
+    free(heap);
     return is_equal;
 }
 

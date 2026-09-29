@@ -35,8 +35,9 @@
 static const char* LIB_NAME = "UAPKI";
 
 
-int uapki_version (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_version (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    (void)context;
     (void)joParams;
     int ret = RET_OK;
 

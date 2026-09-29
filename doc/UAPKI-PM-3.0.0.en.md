@@ -1,12 +1,12 @@
 # UAPKI. Programmer's Manual
 
-Languages: [Українська](UAPKI-PM-2.0.16.md) | **English**
+Languages: [Українська](UAPKI-PM-3.0.0.md) | **English**
 
 | | |
 | ------------------- | ---------- |
-| Library version     | 2.0.16     |
-| Document revision   | 2          |
-| Revision date       | 2026-07-16 |
+| Library version     | 3.0.0      |
+| Document revision   | 3          |
+| Revision date       | 2026-09-30 |
 
 The version number in the document title corresponds to the version of the uapki library it describes (`project(uapki VERSION ...)` in `library/uapki/CMakeLists.txt`; returned by the VERSION method). The document revision is incremented when the description is edited without a change of the library version.
 
@@ -16,6 +16,7 @@ The version number in the document title corresponds to the version of the uapki
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
+| 3       | 2026-09-30 | Library v3.0.0: sessions API (uapki_session_create, uapki_session_free, uapki_session_process) for independent library instances in one process and shared memory (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) for certificate and CRL caches shared by sessions; error codes INVALID_SESSION, INVALID_SHARED_MEMORY; the VERSION method returns the versions of the loaded uapkic and uapkif libraries |
 
 # General information
 
@@ -34,9 +35,9 @@ Table 1. List of binary files
 | 3     | uapkif                | Library of data formats and ASN.1 syntax handling,<br>mandatory                                                                                                                                                                    |
 | 4     | cm-<storage-name>     | Libraries for working with storages (hereinafter — storage providers). For example,<br>for a storage in the form of a PKCS#12 file this would be "cm-pkcs12".<br>Required when using functions that depend on<br>private keys (for example, data signing) |
 
-Interaction with the library is performed by calling the methods listed in Table 2. Methods are invoked via two exported library functions: process and json_free, whose interface is described in Table 3. All interaction with the library methods is based on the use of a text string composed according to JSON rules (hereinafter — JSON string).
+Interaction with the library is performed by calling the methods listed in Table 2. Methods are invoked via the exported library functions process and json_free (the global library instance) or uapki_session_process (an explicitly created session, see "Sessions" below); their interface is described in Table 3. All interaction with the library methods is based on the use of a text string composed according to JSON rules (hereinafter — JSON string).
 
-The library supports multithreading, i.e. the ability to call methods simultaneously in parallel from different threads. Due to implementation specifics of the library, methods are divided into three types of multithreading support (the multithreading support type is specified in Table 2):
+The library supports multithreading, i.e. the ability to call methods simultaneously in parallel from different threads. Due to implementation specifics of the library, methods are divided into three types of multithreading support (the multithreading support type is specified in Table 2). The types describe how methods interact within one library instance (the global instance or one session); methods of different sessions are synchronized only while they use a shared process-wide resource (loading and unloading of a provider library, OPEN/CLOSE through the same provider, network requests to the same URL):
 
 - independent (IND), do not change the internal state of the library, do not block other methods and are not blocked by other methods;
 
@@ -90,10 +91,18 @@ Table 2. List of library methods
 
 Table 3. List of exported library functions
 
-| **№** | **Function name** | **Short description**                   |
-| ----- | ---------------- | ----------------------------------- |
-| 1     | process          | char* process(const char* request); |
-| 2     | json_free        | void json_free(char\* buf);         |
+| **№** | **Function name**     | **Short description**                                                        |
+| ----- | --------------------- | ---------------------------------------------------------------------------- |
+| 1     | process               | char* process(const char* request);                                          |
+| 2     | json_free             | void json_free(char\* buf);                                                  |
+| 3     | uapki_session_create  | UAPKI_SESSION* uapki_session_create(void);                                   |
+| 4     | uapki_session_free    | void uapki_session_free(UAPKI_SESSION* session);                             |
+| 5     | uapki_session_process | char* uapki_session_process(UAPKI_SESSION* session, UAPKI_SESSION_SHARED_MEMORY* memory, const char* request); |
+| 6     | uapki_session_shared_memory_create  | UAPKI_SESSION_SHARED_MEMORY* uapki_session_shared_memory_create(void);         |
+| 7     | uapki_session_shared_memory_free    | void uapki_session_shared_memory_free(UAPKI_SESSION_SHARED_MEMORY* memory);    |
+| 8     | uapki_session_shared_memory_process | char* uapki_session_shared_memory_process(UAPKI_SESSION_SHARED_MEMORY* memory, const char* request); |
+
+Functions 1–2 are declared in the header uapki-export.h, functions 3–8 in uapki-sessions-export.h.
 
 ### Function process
 
@@ -109,15 +118,161 @@ returns a pointer to a null-terminated JSON string in UTF8 encoding containing t
 
 ### Function json_free
 
-The function is intended for releasing the memory allocated by the process function for returning the result of a library method execution.
+The function is intended for releasing the memory allocated by the process or uapki_session_process function for returning the result of a library method execution.
 
 ### Input parameters
 
-the buf parameter is a pointer to a null-terminated JSON string in UTF8 encoding that was returned by the process function;
+the buf parameter is a pointer to a null-terminated JSON string in UTF8 encoding that was returned by the process or uapki_session_process function;
 
 Output parameters:
 
 none.
+
+## Sessions
+
+A session is an independent instance of the library inside one process: it has its own configuration (INIT parameters, including offline mode and proxy), its own certificate and CRL caches, its own opened storage and selected key. The function process works with the global session that is created automatically on its first call; applications that use only process and json_free need no changes.
+
+Sessions are intended for applications that work with several storages at the same time (for example, a server that signs documents on behalf of many users): every storage is opened in its own session, and the sessions are used in parallel from different threads without waiting for each other. Within one session the methods are synchronized according to the types in Table 2, exactly as for the global session. The storage provider libraries (cm-*) are loaded once per process and shared by all sessions; the provider parameters (CMPROVIDER_PARAMS.config) are applied by the session that loads the provider first, later sessions reuse the loaded provider as it is; a provider is unloaded when the last session that uses it executes DEINIT or is freed. Several sessions may use the same certCache/crlCache directories: scanning of a directory during INIT is serialized between sessions, permanent additions and removals are ordinary file operations of each session.
+
+Every session goes through the same method sequence as the global library: INIT, then the required methods (OPEN, SELECT_KEY, SIGN, …), then CLOSE and DEINIT. Freeing a session with uapki_session_free performs CLOSE and DEINIT automatically if they were not called.
+
+### Function uapki_session_create
+
+The function creates a new session.
+
+### Input parameters
+
+none.
+
+### Output parameters
+
+returns a session handle, or NULL if the session could not be created. The handle is passed to uapki_session_process and uapki_session_free.
+
+### Function uapki_session_free
+
+The function frees a session and all resources that belong to it (closes the opened storage, releases the caches and the provider references). The handle becomes invalid; a subsequent uapki_session_process with this handle returns the INVALID_SESSION error. If another thread is executing uapki_session_process for this session at the moment of the call, that call is completed normally and the session is freed afterwards.
+
+### Input parameters
+
+session — the session handle returned by uapki_session_create. NULL and already freed handles are ignored.
+
+### Output parameters
+
+none.
+
+### Function uapki_session_process
+
+The function is intended for calling a library method in the given session; the request and response formats are identical to the process function.
+
+### Input parameters
+
+session — the session handle returned by uapki_session_create;
+
+memory — the shared memory handle returned by uapki_session_shared_memory_create, or NULL (see "Shared memory" below);
+
+request — a pointer to a null-terminated JSON string in UTF8 encoding that defines the method being called and its parameters.
+
+### Output parameters
+
+returns a pointer to a null-terminated JSON string in UTF8 encoding containing the result of the method execution; for an invalid handle the response contains the INVALID_SESSION (or INVALID_SHARED_MEMORY) error code. The memory referenced by this pointer must always be released after processing using the json_free function.
+
+### Example
+
+```c
+#include "uapki-sessions-export.h"
+
+UAPKI_SESSION* session = uapki_session_create();
+char* response = uapki_session_process(session, NULL, "{\"method\":\"INIT\",\"parameters\":{...}}");
+json_free(response);
+response = uapki_session_process(session, NULL, "{\"method\":\"OPEN\",\"parameters\":{...}}");
+json_free(response);
+response = uapki_session_process(session, NULL, "{\"method\":\"SIGN\",\"parameters\":{...}}");
+json_free(response);
+uapki_session_free(session);
+```
+
+## Shared memory
+
+Every session keeps its own certificate and CRL caches; with many sessions and large caches (thousands of CRLs) this multiplies the same data in RAM. A shared memory is an object that holds one copy of the certificate and CRL caches and is used by any number of sessions: a session passes the shared memory handle together with each request. When the handle is NULL the session works exactly as described above.
+
+With a shared memory given in a request:
+
+- certificates are looked up first in the session's own cache (certificates from the opened storage, ADD_CERT) and then in the shared memory, so a certificate of the session takes precedence over one with the same key in the shared memory; a certificate that the shared memory already holds is not copied into the session; the certificates of the session stay private to it, permanent additions (ADD_CERT with permanent = true) go to the shared memory;
+- CRLs are taken from the shared memory only (LIST_CRLS, CRL_INFO, ADD_CRL, REMOVE_CRL and certificate validation by CRL work with the shared memory); the session's own CRL cache is not used;
+- a session that did not execute INIT uses the configuration of the shared memory (offline mode, OCSP/TSP parameters, validationByCrl), so cache and verification methods work without initializing the session; storage methods still require INIT and OPEN in the session;
+- an initialized session keeps its own configuration.
+
+The shared memory is filled and maintained with the function uapki_session_shared_memory_process, which accepts only the methods listed in Table 4; any other method of Table 2 returns the NOT_ALLOWED error, an unknown method returns INVALID_METHOD. The request and response formats of these methods are the ones described in "Library methods description". Requests of sessions that use the shared memory are synchronized with it: the methods marked ST in Table 4 (from the shared memory itself, and REMOVE_CERT/REMOVE_CRL also from any session that passes the shared memory) wait until every request that is using the shared memory has finished, including requests that are waiting for a network response, and new requests wait for them; the methods marked MT and IND run in parallel with the requests of all sessions. The ST methods are therefore meant to be rare maintenance operations.
+
+Table 4. Methods of the shared memory (uapki_session_shared_memory_process)
+
+| **№** | **Method name** | **Short description**                                                                       | **Type** |
+| ----- | --------------- | ------------------------------------------------------------------------------------------- | ------- |
+| 1     | VERSION         | Library version                                                                             | IND     |
+| 2     | INIT            | Loading of the caches (certCache, crlCache) and the configuration; cmProviders is ignored   | ST      |
+| 3     | DEINIT          | Release of the caches                                                                       | ST      |
+| 4     | ADD_CERT        | Add a certificate to the shared certificate cache                                           | MT      |
+| 5     | CERT_INFO       | Certificate information                                                                     | MT      |
+| 6     | GET_CERT        | Get a certificate from the shared certificate cache                                         | MT      |
+| 7     | LIST_CERTS      | List of certificates in the shared certificate cache                                        | MT      |
+| 8     | REMOVE_CERT     | Remove a certificate from the shared certificate cache                                      | ST      |
+| 9     | ADD_CRL         | Add a CRL to the shared CRL cache                                                           | MT      |
+| 10    | CRL_INFO        | CRL information                                                                             | MT      |
+| 11    | LIST_CRLS       | List of CRLs in the shared CRL cache                                                        | MT      |
+| 12    | REMOVE_CRL      | Remove outdated CRLs from the shared CRL cache                                              | ST      |
+
+### Function uapki_session_shared_memory_create
+
+The function creates a new, empty shared memory.
+
+### Input parameters
+
+none.
+
+### Output parameters
+
+returns a shared memory handle, or NULL if it could not be created.
+
+### Function uapki_session_shared_memory_free
+
+The function frees the shared memory and its caches. The handle becomes invalid; requests of sessions that pass this handle afterwards return the INVALID_SHARED_MEMORY error. If another thread is executing a request with this shared memory at the moment of the call, that request is completed normally and the shared memory is freed afterwards.
+
+### Input parameters
+
+memory — the shared memory handle returned by uapki_session_shared_memory_create. NULL and already freed handles are ignored.
+
+### Output parameters
+
+none.
+
+### Function uapki_session_shared_memory_process
+
+The function is intended for calling a cache management method on the shared memory; the request and response formats are identical to the process function.
+
+### Input parameters
+
+memory — the shared memory handle returned by uapki_session_shared_memory_create;
+
+request — a pointer to a null-terminated JSON string in UTF8 encoding that defines the method being called and its parameters.
+
+### Output parameters
+
+returns a pointer to a null-terminated JSON string in UTF8 encoding containing the result of the method execution; for an invalid handle the response contains the INVALID_SHARED_MEMORY error code. The memory referenced by this pointer must always be released after processing using the json_free function.
+
+### Example
+
+```c
+UAPKI_SESSION_SHARED_MEMORY* memory = uapki_session_shared_memory_create();
+char* response = uapki_session_shared_memory_process(memory,
+    "{\"method\":\"INIT\",\"parameters\":{\"certCache\":{\"path\":\"/var/uapki/certs/\"},\"crlCache\":{\"path\":\"/var/uapki/crls/\"}}}");
+json_free(response);
+
+UAPKI_SESSION* session = uapki_session_create();
+response = uapki_session_process(session, memory, "{\"method\":\"VERIFY\",\"parameters\":{...}}");
+json_free(response);
+uapki_session_free(session);
+uapki_session_shared_memory_free(memory);
+```
 
 # Library methods description
 
@@ -168,9 +323,9 @@ The method is intended for determining the library version. Input parameters: no
   "method": "VERSION",
   "result": {
     "name": "UAPKI",
-    "version": "2.0.16",
-    "uapkicVersion": "2.0.2",
-    "uapkifVersion": "2.0.2"
+    "version": "3.0.0-dev",
+    "uapkicVersion": "3.0.0-dev",
+    "uapkifVersion": "3.0.0-dev"
   }
 }
 ```
@@ -672,7 +827,7 @@ If the provider supports this method, the STORAGE_INFO structure will be returne
 
 The method is intended for user authorization and opening a storage.
 
-Attention! Only one storage can be open at a time, and it is available to all threads.
+Attention! Only one storage can be open at a time in a session (or in the global library instance), and it is available to all threads that use this session. Different sessions open their storages independently.
 
 If certificates are found on the storage when it is opened, they automatically become available for use in other library methods.
 
@@ -900,7 +1055,7 @@ The method is intended for obtaining the list of keys on the open storage.
 
 The method is intended for selecting the current key on the open storage by the key identifier on the storage (the id parameter) or by the certificate identifier in the certificate cache (the certId parameter). Exactly one of the two parameters must be specified: either id or certId.
 
-Attention! Only one key can be selected at a time, and it is available to all threads. When another key is selected, it changes for all threads of the application.
+Attention! Only one key can be selected at a time in a session (or in the global library instance), and it is available to all threads that use this session. When another key is selected, it changes for all threads that use this session.
 
 ### Structure of the parameters field in the request
 
@@ -3652,6 +3807,8 @@ Table A.1. Error codes
 | `RET_UAPKI_PROVIDER_NOT_LOADED`    | 0x101A       | Storage library not loaded                                                                                                                                                                |
 | `RET_UAPKI_UNSUPPORTED_CMAPI`      | 0x101B       | The storage library does not support this operation                                                                                                                                      |
 | `RET_UAPKI_STORAGE_ALREADY_OPENED` | 0x101C       | Storage already opened                                                                                                                                                                    |
+| `RET_UAPKI_INVALID_SESSION`        | 0x101D       | Invalid session handle (uapki_session_process)                                                                                                                                           |
+| `RET_UAPKI_INVALID_SHARED_MEMORY`  | 0x101E       | Invalid shared memory handle (uapki_session_process, uapki_session_shared_memory_process)                                                                                               |
 | `RET_UAPKI_FILE_OPEN_ERROR`        | 0x1020       | File open error                                                                                                                                                                           |
 | `RET_UAPKI_FILE_READ_ERROR`        | 0x1021       | File read error                                                                                                                                                                           |
 | `RET_UAPKI_FILE_WRITE_ERROR`       | 0x1022       | File write error                                                                                                                                                                          |

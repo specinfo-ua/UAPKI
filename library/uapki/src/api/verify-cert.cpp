@@ -29,7 +29,6 @@
 
 #include "api-json-internal.h"
 #include "cert-validator.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 #include "store-json.h"
 #include "time-util.h"
@@ -62,10 +61,10 @@ static bool check_validity_time (
 }   //  check_validity_time
 
 
-int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_verify_cert (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     CertValidator::CertValidator cert_validator;
-    if (!cert_validator.init(get_config(), get_cerstore(), get_crlstore())) return RET_UAPKI_GENERAL_ERROR;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
     if (!cert_validator.getLibConfig()->isInitialized()) return RET_UAPKI_NOT_INITIALIZED;
 
     int ret = RET_OK;

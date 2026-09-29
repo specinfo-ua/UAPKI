@@ -28,7 +28,6 @@
 #define FILE_MARKER "uapki/api/get-cert.cpp"
 
 #include "api-json-internal.h"
-#include "global-objects.h"
 #include "parson-ba-utils.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
@@ -37,11 +36,11 @@
 using namespace UapkiNS;
 
 
-int uapki_get_cert (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_get_cert (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
-    LibraryConfig* lib_config = get_config();
-    Cert::CerStore* cer_store = get_cerstore();
+    LibraryConfig* lib_config = context.config();
+    Cert::CerStore* cer_store = context.cerStore();
     SmartBA sba_certid;
 
     if (!lib_config || !cer_store) return RET_UAPKI_GENERAL_ERROR;

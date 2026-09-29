@@ -28,19 +28,17 @@
 #define FILE_MARKER "uapki/api/key-init-usage.cpp"
 
 #include "api-json-internal.h"
-#include "cm-providers.h"
-#include "global-objects.h"
 #include "parson-helper.h"
 
 
 using namespace std;
 
 
-int uapki_key_init_usage (JSON_Object* joParams, JSON_Object* joResult)
+int uapki_key_init_usage (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     (void)joResult;
 
-    CmStorageProxy* storage = CmProviders::openedStorage();
+    CmStorageProxy* storage = context.openedStorage();
     if (!storage) return RET_UAPKI_STORAGE_NOT_OPEN;
     if (!storage->keyIsSelected()) return RET_UAPKI_KEY_NOT_SELECTED;
 

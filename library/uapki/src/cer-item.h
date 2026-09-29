@@ -87,9 +87,9 @@ struct CertStatusInfo {
     std::atomic_bool
                 needUpdate;
     ByteArray*  baResult;
-    UapkiNS::CertStatus
+    std::atomic<UapkiNS::CertStatus>
                 status;
-    uint64_t    validTime;
+    std::atomic<uint64_t> validTime;
 
     CertStatusInfo (
         const ValidationType validationType
@@ -175,6 +175,7 @@ public:
 
 private:
     std::mutex  m_Mutex;
+    std::mutex  m_StatusMutex; // OCSP/CRL cache and network coordination only
     std::string m_FileName;
     const ByteArray*
                 m_Encoded;
@@ -207,8 +208,10 @@ private:
     std::atomic_bool
                 m_Trusted;
     Uris        m_Uris;
-    VerifyStatus
+    std::atomic<VerifyStatus>
                 m_VerifyStatus;
+    int         m_VerifyError;
+    std::string m_VerifyIssuer;
     std::vector<UapkiNS::EssCertId*>
                 m_EssCertIds;
     CertStatusInfo
@@ -261,6 +264,9 @@ public:
     std::mutex& getMutex (void) {
         return m_Mutex;
     }
+    std::mutex& getStatusMutex (void) {
+        return m_StatusMutex;
+    }
     const ByteArray* getIssuer (void) const {
         return m_Issuer;
     }
@@ -295,7 +301,7 @@ public:
         return m_Uris;
     }
     VerifyStatus getVerifyStatus (void) const {
-        return m_VerifyStatus;
+        return m_VerifyStatus.load();
     }
 
 public:

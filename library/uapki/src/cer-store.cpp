@@ -32,6 +32,7 @@
 #endif
 #include <string.h>
 #include "cer-store.h"
+#include <algorithm>
 #include "ba-utils.h"
 #include "crl-item.h"
 #include "dirent-internal.h"
@@ -39,6 +40,7 @@
 #include "extension-helper.h"
 #include "macros-internal.h"
 #include "oids.h"
+#include "path-lock.h"
 #include "time-util.h"
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
@@ -103,8 +105,19 @@ static int get_cert_by_keyid_internal (
 
 
 CerStore::CerStore (void)
+    : m_Overlay(nullptr)
+    , m_Base(nullptr)
 {
     m_Items.reserve(CERSTORE_RESERVE_ITEMS);
+}
+
+CerStore::CerStore (
+        CerStore* overlay,
+        CerStore* base
+)
+    : m_Overlay(overlay)
+    , m_Base(base)
+{
 }
 
 CerStore::~CerStore (void)
@@ -116,6 +129,8 @@ void CerStore::setParams (
         const string& path
 )
 {
+    if (m_Overlay) return m_Overlay->setParams(path);
+
     m_Path = path;
 }
 
@@ -126,17 +141,54 @@ int CerStore::addCerts (
         vector<AddedCerItem>& addedCerItems
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
+    if (m_Overlay) {
+        if (permanent) return m_Base->addCerts(trusted, permanent, vbaEncodedCerts, addedCerItems);
+
+        //  Certificates the shared base already holds are reported from there, only unknown ones enter the overlay
+        addedCerItems.assign(vbaEncodedCerts.size(), AddedCerItem());
+        VectorBA vba_unknown;
+        vector<size_t> idx_unknown;
+        for (size_t i = 0; i < vbaEncodedCerts.size(); i++) {
+            CerItem* cer_item = nullptr;
+            if (m_Overlay->getCertByEncoded(vbaEncodedCerts[i], &cer_item) == RET_OK ||
+                m_Base->getCertByEncoded(vbaEncodedCerts[i], &cer_item) == RET_OK) {
+                addedCerItems[i].cerItem = cer_item;
+            }
+            else {
+                vba_unknown.push_back(vbaEncodedCerts[i]);
+                idx_unknown.push_back(i);
+            }
+        }
+
+        int ret = RET_OK;
+        if (!vba_unknown.empty()) {
+            vector<AddedCerItem> added_unknown;
+            ret = m_Overlay->addCerts(trusted, permanent, vba_unknown, added_unknown);
+            for (size_t i = 0; (ret == RET_OK) && (i < added_unknown.size()); i++) {
+                addedCerItems[idx_unknown[i]] = added_unknown[i];
+            }
+        }
+        vba_unknown.clear();
+        return ret;
+    }
 
     if (vbaEncodedCerts.empty()) return RET_OK;
 
-    addedCerItems.resize(vbaEncodedCerts.size());
+    addedCerItems.assign(vbaEncodedCerts.size(), AddedCerItem());
+    std::vector<bool> parsed(vbaEncodedCerts.size(), false);
+    // Parse only new certificates, outside the store lock. ApiGate keeps
+    // returned items alive; addItem below resolves concurrent insertions.
     for (size_t i = 0; i < vbaEncodedCerts.size(); i++) {
-        AddedCerItem& added_ceritem = addedCerItems[i];
-        added_ceritem.errorCode = parseCert((const ByteArray*)vbaEncodedCerts[i], &added_ceritem.cerItem);
+        AddedCerItem& item = addedCerItems[i];
+        if (getCertByEncoded(vbaEncodedCerts[i], &item.cerItem) == RET_OK) continue;
+        item.errorCode = parseCert(vbaEncodedCerts[i], &item.cerItem);
+        parsed[i] = (item.errorCode == RET_OK);
     }
 
-    for (auto& it : addedCerItems) {
+    lock_guard<mutex> lock(m_Mutex);
+    for (size_t i = 0; i < addedCerItems.size(); i++) {
+        if (!parsed[i]) continue;
+        AddedCerItem& it = addedCerItems[i];
         if (it.errorCode != RET_OK) continue;
 
         CerItem* added_ceritem = addItem(it.cerItem);
@@ -174,6 +226,23 @@ vector<CerItem*> CerStore::getCerItems (
         const FilterListCerts& filter
 )
 {
+    if (m_Overlay) {
+        vector<CerItem*> rv_listcerts = m_Overlay->getCerItems(filter);
+        for (auto& it : m_Base->getCerItems(filter)) {
+            bool is_present = false;
+            for (const auto& it_overlay : rv_listcerts) {
+                if (ba_cmp(it->getCertId(), it_overlay->getCertId()) == RET_OK) {
+                    is_present = true;
+                    break;
+                }
+            }
+            if (!is_present) {
+                rv_listcerts.push_back(it);
+            }
+        }
+        return rv_listcerts;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     vector<CerItem*> rv_listcerts;
@@ -192,6 +261,11 @@ int CerStore::getCertByCertId (
         CerItem** cerItem
 )
 {
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertByCertId(baCertId, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertByCertId(baCertId, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -210,6 +284,11 @@ int CerStore::getCertByEncoded (
         CerItem** cerItem
 )
 {
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertByEncoded(baEncoded, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertByEncoded(baEncoded, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -228,6 +307,14 @@ int CerStore::getCertByIndex (
         CerItem** cerItem
 )
 {
+    if (m_Overlay) {
+        size_t count_overlay = 0;
+        (void)m_Overlay->getCount(count_overlay);
+        return (index < count_overlay)
+            ? m_Overlay->getCertByIndex(index, cerItem)
+            : m_Base->getCertByIndex(index - count_overlay, cerItem);
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -258,6 +345,11 @@ int CerStore::getCertByIssuerAndSN (
         CerItem** cerItem
 )
 {
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertByIssuerAndSN(baIssuer, baSerialNumber, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertByIssuerAndSN(baIssuer, baSerialNumber, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -279,6 +371,14 @@ int CerStore::getCertByKeyId (
         CerItem** cerItem
 )
 {
+    if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
+    *cerItem = nullptr;
+
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertByKeyId(baKeyId, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertByKeyId(baKeyId, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     const int ret = get_cert_by_keyid_internal(m_Items, baKeyId, cerItem);
@@ -290,6 +390,14 @@ int CerStore::getCertBySID (
         CerItem** cerItem
 )
 {
+    if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
+    *cerItem = nullptr;
+
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertBySID(baSID, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertBySID(baSID, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     SmartBA sba_issuer, sba_keyid, sba_serialnum;
@@ -321,6 +429,14 @@ int CerStore::getCertBySPKI (
         CerItem** cerItem
 )
 {
+    if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
+    *cerItem = nullptr;
+
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertBySPKI(baSPKI, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertBySPKI(baSPKI, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -340,6 +456,14 @@ int CerStore::getCertBySubject (
         CerItem** cerItem
 )
 {
+    if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
+    *cerItem = nullptr;
+
+    if (m_Overlay) {
+        const int ret = m_Overlay->getCertBySubject(baSubject, cerItem);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->getCertBySubject(baSubject, cerItem) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
@@ -368,6 +492,9 @@ int CerStore::getChainCerts (
     while (true) {
         DO(getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
         if (is_selfsigned) break;
+        if (cer_issuer == cerSubject || std::find(chainCerts.begin(), chainCerts.end(), cer_issuer) != chainCerts.end()) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
         chainCerts.push_back(cer_issuer);
         cer_subject = cer_issuer;
     }
@@ -392,6 +519,10 @@ int CerStore::getChainCerts (
         ret = getIssuerCert(cer_subject, &cer_issuer, is_selfsigned);
         if (ret == RET_OK) {
             if (is_selfsigned) break;
+            if (cer_issuer == cerSubject || std::find(chainCerts.begin(), chainCerts.end(), cer_issuer) != chainCerts.end()) {
+                ret = RET_UAPKI_INVALID_STRUCT;
+                break;
+            }
             chainCerts.push_back(cer_issuer);
             cer_subject = cer_issuer;
         }
@@ -410,6 +541,14 @@ int CerStore::getCount (
         size_t& count
 )
 {
+    if (m_Overlay) {
+        size_t count_base = 0;
+        (void)m_Overlay->getCount(count);
+        (void)m_Base->getCount(count_base);
+        count += count_base;
+        return RET_OK;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     count = m_Items.size();
@@ -421,6 +560,15 @@ int CerStore::getCount (
         size_t& countTrusted
 )
 {
+    if (m_Overlay) {
+        size_t count_base = 0, counttrusted_base = 0;
+        (void)m_Overlay->getCount(count, countTrusted);
+        (void)m_Base->getCount(count_base, counttrusted_base);
+        count += count_base;
+        countTrusted += counttrusted_base;
+        return RET_OK;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     count = m_Items.size();
@@ -457,6 +605,9 @@ int CerStore::getIssuerCert (
 
 int CerStore::load (void)
 {
+    if (m_Overlay) return m_Overlay->load();
+
+    lock_guard<mutex> lock_path(lockPath(m_Path));
     lock_guard<mutex> lock(m_Mutex);
 
     const int ret = loadDir();
@@ -471,14 +622,18 @@ int CerStore::removeCert (
         const bool permanent
 )
 {
+    if (m_Overlay) {
+        const int ret = m_Overlay->removeCert(cerSubject, permanent);
+        return (ret == RET_UAPKI_CERT_NOT_FOUND) ? m_Base->removeCert(cerSubject, permanent) : ret;
+    }
+
     lock_guard<mutex> lock(m_Mutex);
 
     if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_UAPKI_CERT_NOT_FOUND;
-    const ByteArray* pba_certid = cerSubject->getCertId();
     for (auto it = m_Items.begin(); it != m_Items.end(); it++) {
-        if (ba_cmp(pba_certid, (*it)->getCertId()) == RET_OK) {
+        if (*it == cerSubject) {
             m_Items.erase(it);
             ret = RET_OK;
             break;
@@ -499,6 +654,8 @@ int CerStore::removeCert (
 
 int CerStore::removeMarkedCerts (void)
 {
+    if (m_Overlay) return m_Overlay->removeMarkedCerts();
+
     lock_guard<mutex> lock(m_Mutex);
 
     vector<CerItem*> new_items, removing_items;
@@ -627,6 +784,8 @@ void CerStore::saveStatToLog (
         const string& message
 )
 {
+    if (m_Overlay) return m_Overlay->saveStatToLog(message);
+
     static size_t ctr_stat = 0;
 
     FILE* f = fopen("uapki-cer-store.log", "a");

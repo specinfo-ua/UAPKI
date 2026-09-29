@@ -36,74 +36,65 @@
 #include "macros-internal.h"
 #include "parson.h"
 #include "parson-ba-utils.h"
+#include "session.h"
 #include "uapki-errors.h"
 #include "uapki-export.h"
 #include "uapki-ns.h"
 #include "api-json-custom.h"
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+int uapki_init (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_version (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_deinit (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_providers (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_provider_list_storages (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_provider_storage_info (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
+int uapki_storage_open  (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_storage_close (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_storage_change_password (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_init (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_version (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_deinit (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_list_providers (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_provider_list_storages (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_provider_storage_info (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_session_list_keys (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_session_select_key (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_session_key_create (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_session_key_delete (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_storage_open  (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_storage_close (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_storage_change_password (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_key_get_csr (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_verify_csr (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_key_init_usage (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_session_list_keys (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_session_key_create (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_session_key_delete (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_sign (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_verify_signature (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_modify_cms (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_key_get_csr (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_verify_csr (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_key_init_usage (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_build_cms_2pass (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_build_csr_2pass (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_sign (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_verify_signature (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_modify_cms (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_add_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_cert_info (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_get_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_certs (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_remove_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_verify_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_build_cms_2pass (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_build_csr_2pass (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_add_crl (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_crl_info (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_crls (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_remove_crl (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_add_cert (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_cert_info (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_get_cert (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_list_certs (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_digest (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_asn1_decode (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_asn1_encode (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_generate_certbundle (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_crl_info (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_list_crls (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_remove_crl (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_decrypt (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_encrypt (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
-int uapki_digest (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_asn1_decode (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_asn1_encode (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_generate_certbundle (JSON_Object* joParams, JSON_Object* joResult);
-
-int uapki_decrypt (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_encrypt (JSON_Object* joParams, JSON_Object* joResult);
-
-int uapki_random_bytes (JSON_Object* joParams, JSON_Object* joResult);
-int uapki_cert_status_by_ocsp (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_random_bytes (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_cert_status_by_ocsp (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
 #ifdef API_JSON_INTERNAL_CUSTOM
   API_JSON_INTERNAL_CUSTOM
-#endif
-
-
-#ifdef __cplusplus
-}
 #endif
 
 #endif

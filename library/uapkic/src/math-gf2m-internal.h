@@ -40,7 +40,16 @@ typedef struct Gf2mCtx_st {
     int *f;
     WordArray *f_ext;
     size_t len;
+    word_t fr_lo;
+    word_t fr_hi;
+    int hw2;
+    int clmul;
 } Gf2mCtx;
+
+/* Максимальный степень полинома, порождающего поле: DSTU 4145 — до 431, NIST B/K-571 — 571, DSTU 7624 (GCM/XTS) — до 512. */
+#define GF2M_MAX_BIT_LENGTH 1024
+/* Максимальная длина элемента поля в словах (gf2m_init: len = (f[0] >> WORD_BIT_LEN_SHIFT) + 1). */
+#define GF2M_MAX_LEN ((GF2M_MAX_BIT_LENGTH >> WORD_BIT_LEN_SHIFT) + 1)
 
 Gf2mCtx *gf2m_alloc(const int *f, size_t f_len);
 
