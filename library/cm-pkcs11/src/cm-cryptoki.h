@@ -34,6 +34,7 @@
 #include "hash.h"
 #include "parson.h"
 #include "uapki-ns.h"
+#include <string>
 
 
 enum class CryptokiProviderId : uint32_t {
@@ -97,6 +98,13 @@ class CmCryptoki
                 m_CryptokiProviders;
     std::vector<DetectedStorage>
                 m_DetectedStorages;
+    //  Lifecycle of the process-wide provider instance (see the contract in cm-api.h):
+    //  how many consumers hold it and with which configuration it was created. Kept
+    //  INSIDE the heap instance on purpose: a namespace-scope std::string would be
+    //  destroyed on the provider's DLL_PROCESS_DETACH, while a consumer's static
+    //  destructor may still call provider_deinit() later, at process exit.
+    size_t      m_RefCount = 1;
+    std::string m_InitParams;
 
 public:
     class SessionContext {
@@ -150,6 +158,18 @@ public:
     CM_ERROR init (
         JSON_Object* joParams
     );
+    void setInitParams (const std::string& params) {
+        m_InitParams = params;
+    }
+    bool isSameInitParams (const std::string& params) const {
+        return (m_InitParams == params);
+    }
+    void addRef (void) {
+        m_RefCount++;
+    }
+    size_t release (void) {
+        return (m_RefCount > 0) ? --m_RefCount : 0;
+    }
 
 private:
     size_t detectStorages (void);

@@ -3046,10 +3046,52 @@ cleanup:
     return ret;
 }
 
+/*
+ * Множення елемента GF(2^m) на x (оновлення tweak у режимі XTS): зсув на 1 біт і, якщо старший
+ * біт був 1, XOR з молодшими членами полінома ctx->f. Замінює загальне gf2m_mul(..., two, ...).
+ */
+static int gf2m_double(const Gf2mCtx *ctx, size_t block_len, const uint8_t *arg, uint8_t *out)
+{
+    uint64_t words[8];
+    size_t n = block_len / 8;
+    size_t i;
+    uint64_t carry;
+    uint64_t next_carry;
+    uint64_t top_bit;
+    int ret = RET_OK;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(arg != NULL);
+    CHECK_PARAM(out != NULL);
+    CHECK_PARAM(n <= 8);
+
+    DO(uint8_to_uint64(arg, block_len, words, n));
+
+    top_bit = (words[n - 1] >> 63) & 1;
+    carry = 0;
+    for (i = 0; i < n; i++) {
+        next_carry = words[i] >> 63;
+        words[i] = (words[i] << 1) | carry;
+        carry = next_carry;
+    }
+    if (top_bit) {
+        words[0] ^= 1;
+        for (i = 1; i <= 3; i++) {
+            int term = ctx->f[i];
+            words[term / 64] ^= ((uint64_t)1) << (term % 64);
+        }
+    }
+
+    DO(uint64_to_uint8(words, n, out, block_len));
+
+cleanup:
+
+    return ret;
+}
+
 static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
 {
     uint8_t *plain_data = NULL;
-    uint8_t two[64] = {0};
     uint8_t gamma[64] = {0};
     size_t plain_size;
     size_t i;
@@ -3063,7 +3105,6 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_PARAM(out != NULL);
 
     block_len = ctx->block_len;
-    two[0] = 2;
 
     plain_size = ba_get_len(in);
 
@@ -3080,7 +3121,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_len; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3093,7 +3134,7 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         i -= plain_size % block_len;
 
         //Конвертируем а для бе машин.
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3128,8 +3169,6 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     CHECK_PARAM(in != NULL);
     CHECK_PARAM(out != NULL);
 
-    two[0] = 2;
-
     block_len = ctx->block_len;
 
     memset(gamma, 0, 64);
@@ -3148,7 +3187,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     for (i = 0; i < loop_num; i += block_len) {
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
@@ -3157,8 +3196,8 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     if (padded_len != block_len) {
         //Если было дополнение, на вход приходят последний и предпоследний блок
         //Так как при дополнении в шифровании меняются местами последний и предпоследний блоки, расшифровуем последний блок, как предпоследний
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, gamma));
-        DO(gf2m_mul(ctx->mode.xts.gf2m_ctx, block_len, gamma, two, two));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
+        DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, two));
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);

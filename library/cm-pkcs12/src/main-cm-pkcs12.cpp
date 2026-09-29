@@ -30,6 +30,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include "cm-api.h"
 #include "cm-errors.h"
 #include "cm-export.h"
@@ -65,6 +66,10 @@ static const char* JSON_PROVIDER_INFO = "{"
 
 
 static CmPkcs12* cm_pkcs12 = nullptr;
+static std::string params_text (const CM_UTF8_CHAR* providerParams)
+{
+    return providerParams ? std::string(reinterpret_cast<const char*>(providerParams)) : std::string();
+}
 
 
 #ifdef __cplusplus
@@ -97,9 +102,19 @@ CM_EXPORT CM_ERROR provider_init (
                 delete cm_pkcs12;
                 cm_pkcs12 = nullptr;
             }
+            else {
+                cm_pkcs12->setInitParams(params_text(providerParams));
+            }
         }
     }
+    else if (cm_pkcs12->isSameInitParams(params_text(providerParams))) {
+        //  Idempotent for the SAME configuration: the post-condition already holds.
+        cm_pkcs12->addRef();
+        cm_err = RET_OK;
+    }
     else {
+        //  A different configuration is a different request. Reject it loudly and
+        //  leave both the instance and the reference count untouched.
         cm_err = RET_CM_ALREADY_INITIALIZED;
     }
     return cm_err;
@@ -108,15 +123,13 @@ CM_EXPORT CM_ERROR provider_init (
 CM_EXPORT CM_ERROR provider_deinit (void)
 {
     DEBUG_OUTPUT("provider_deinit()");
-    CM_ERROR cm_err = RET_OK;
-    if (cm_pkcs12) {
+    if (!cm_pkcs12) return RET_CM_NOT_INITIALIZED;
+
+    if (cm_pkcs12->release() == 0) {
         delete cm_pkcs12;
         cm_pkcs12 = nullptr;
     }
-    else {
-        cm_err = RET_CM_NOT_INITIALIZED;
-    }
-    return cm_err;
+    return RET_OK;
 }
 
 CM_EXPORT CM_ERROR provider_open (

@@ -1024,9 +1024,38 @@ int dstu8845_crypt(Dstu8845Ctx *ctx, ByteArray *inout)
     in_len = inout->len;
     gamma = (uint8_t*)ctx->gamma;
 
+    /*
+     * Спочатку побайтно до межі 8 байт, потім XOR цілими 64-бітними словами з ctx->gamma[],
+     * залишок - побайтно. gamma_cntr завжди в 0..127, перевірка нижче фіксує це явно.
+     */
+    if (ctx->gamma_cntr >= 128) {
+        ctx->gamma_cntr = 0;
+    }
+
+    while (in_len && (ctx->gamma_cntr % 8) != 0) {
+        *in++ ^= gamma[ctx->gamma_cntr++];
+        in_len--;
+        if (ctx->gamma_cntr >= 128) {
+            next_gamma(ctx);
+        }
+    }
+
+    while (in_len >= 8 && ctx->gamma_cntr < 128) {
+        uint64_t word;
+        memcpy(&word, in, 8);
+        word ^= ctx->gamma[ctx->gamma_cntr / 8];
+        memcpy(in, &word, 8);
+        in += 8;
+        in_len -= 8;
+        ctx->gamma_cntr += 8;
+        if (ctx->gamma_cntr >= 128) {
+            next_gamma(ctx);
+        }
+    }
+
     while (in_len--) {
         *in++ ^= gamma[ctx->gamma_cntr++];
-        if (ctx->gamma_cntr == 128) {
+        if (ctx->gamma_cntr >= 128) {
             next_gamma(ctx);
         }
     }
@@ -1115,6 +1144,16 @@ int dstu8845_self_test(void)
         0x965648e775c717d5ULL, 0xa63c2a7376e92df3ULL, 0x0b0eb0bbd47ca267ULL, 0xea593d979ae5bd39ULL,
         0xd773b5e5193cafe1ULL, 0xb0a26671d259422bULL, 0x85b2aa326b280156ULL, 0x511ace6451435f0cULL };
 
+    /* 200 байт гами для key256_1/iv_1 (перетинає межу генерації 128-байтового блоку гами) */
+    static const uint64_t k256_1_iv_1_200[] = {
+        0xe442d15345dc66caULL, 0xf47d700ecc66408aULL, 0xb4cb284b5477e641ULL, 0xa2afc9092e4124b0ULL,
+        0x728e5fa26b11a7d9ULL, 0xe6a7b9288c68f972ULL, 0x70eb3606de8ba44cULL, 0xaced7956bd3e3de7ULL,
+        0x5af7ec2a83c7063eULL, 0x78b4b5fe3bae5e01ULL, 0x6bfaebec04790b89ULL, 0x67e8459e6c68a5adULL,
+        0x9ccc62a0335dc0bdULL, 0x43fffe09a1949ed8ULL, 0xdc1977716723fedaULL, 0x28b86cf4a53d0335ULL,
+        0x723f15ab6f3b620eULL, 0xd645d0a40fcb4705ULL, 0xc4c7bea786ad5745ULL, 0xedcc8f19bccf042fULL,
+        0xe1ec562e27cca869ULL, 0x5212bd227d267fb4ULL, 0x8e476714a7ca4db9ULL, 0x622bd70b93e09077ULL,
+        0x038caab66ba1a09cULL };
+
 
     static const ByteArray ba_iv_1 = { (uint8_t*)iv_1, sizeof(iv_1) };
     static const ByteArray ba_iv_2 = { (uint8_t*)iv_2, sizeof(iv_2) };
@@ -1126,6 +1165,7 @@ int dstu8845_self_test(void)
     int ret = RET_OK;
     Dstu8845Ctx* ctx = NULL;
     ByteArray* Z = NULL;
+    ByteArray* Z2 = NULL;
 
     CHECK_NOT_NULL(Z = ba_alloc_by_len(64));
     CHECK_NOT_NULL(ctx = dstu8845_alloc());
@@ -1185,9 +1225,19 @@ int dstu8845_self_test(void)
     if (memcmp(Z->buf, k512_2_iv_2, sizeof(k512_2_iv_2)) != 0) {
         SET_ERROR(RET_SELF_TEST_FAIL);
     }
-    
+
+    /* Гама довша за 128 байт: перевірка переходу між блоками гами в межах одного виклику */
+    CHECK_NOT_NULL(Z2 = ba_alloc_by_len(200));
+    memset(Z2->buf, 0, Z2->len);
+    DO(dstu8845_init(ctx, &ba_k256_1, &ba_iv_1));
+    DO(dstu8845_crypt(ctx, Z2));
+    if (memcmp(Z2->buf, k256_1_iv_1_200, sizeof(k256_1_iv_1_200)) != 0) {
+        SET_ERROR(RET_SELF_TEST_FAIL);
+    }
+
 cleanup:
     ba_free(Z);
+    ba_free(Z2);
     dstu8845_free(ctx);
     return ret;
 }

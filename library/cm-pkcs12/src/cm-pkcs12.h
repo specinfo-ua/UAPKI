@@ -33,11 +33,19 @@
 #include "file-storage.h"
 #include "parson.h"
 #include "store-bag.h"
+#include <string>
 
 
 class CmPkcs12
 {
     FileStorageParam m_DefaultParam;
+    //  Lifecycle of the process-wide provider instance (see the contract in cm-api.h):
+    //  how many consumers hold it and with which configuration it was created. Kept
+    //  INSIDE the heap instance on purpose: a namespace-scope std::string would be
+    //  destroyed on the provider's DLL_PROCESS_DETACH, while a consumer's static
+    //  destructor may still call provider_deinit() later, at process exit.
+    size_t      m_RefCount = 1;
+    std::string m_InitParams;
 
 public:
     static const uint32_t CM_SESSION_API_V1 = 1;
@@ -51,6 +59,18 @@ public:
 
     FileStorageParam& getDefaultParam (void) {
         return m_DefaultParam;
+    }
+    void setInitParams (const std::string& params) {
+        m_InitParams = params;
+    }
+    bool isSameInitParams (const std::string& params) const {
+        return (m_InitParams == params);
+    }
+    void addRef (void) {
+        m_RefCount++;
+    }
+    size_t release (void) {
+        return (m_RefCount > 0) ? --m_RefCount : 0;
     }
     CM_ERROR open (
             const char* fileName,
