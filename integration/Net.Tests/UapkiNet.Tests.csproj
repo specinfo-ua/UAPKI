@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sessions test of the .NET integration (console app, exit code = number of failed checks).
+    Build/run without the runtime packs of all RIDs:
+      dotnet run -c Release -p:RuntimeIdentifiers= -p:PublishTrimmed=false
+    Environment: UAPKI_CM_PROVIDERS (directory with cm-pkcs12), UAPKI_TEST_DATA (library/test/data);
+    the native uapki library must be found by the loader (PATH / LD_LIBRARY_PATH).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Net\UapkiNet.csproj" />
+  </ItemGroup>
+
+</Project>

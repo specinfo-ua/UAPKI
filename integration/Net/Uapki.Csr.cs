@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -29,14 +29,15 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
-    public static byte[] GetCsr(SignAlgo? signAlgo = null)
+    public byte[] GetCsr(SignAlgo? signAlgo = null)
     {
-        string get_crs_cmd = "{\"method\":\"GET_CSR\",\"parameters\":{}}";
-
-        if (signAlgo is not null)
-            get_crs_cmd = "{\"method\":\"GET_CSR\",\"parameters\":{\"signAlgo\":\"" + signAlgo.Value.Oid() + "\"}}";
+        string get_crs_cmd = Request("GET_CSR", p =>
+        {
+            if (signAlgo is not null)
+                p.WriteString("signAlgo", signAlgo.Value.Oid());
+        });
 
         var ret = JsonSerializer.Deserialize(Process(get_crs_cmd), jsonCtx.BytesResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -71,9 +72,9 @@ public static partial class Uapki
         public VerifyCsrInfo? Result { get; set; }
     }
 
-    public static VerifyCsrInfo VerifyCsr(byte[] csr)
+    public VerifyCsrInfo VerifyCsr(byte[] csr)
     {
-        string verify_csr_cmd = "{\"method\":\"VERIFY_CSR\",\"parameters\":{\"bytes\":\"" + Convert.ToBase64String(csr) + "\"}}";
+        string verify_csr_cmd = Request("VERIFY_CSR", p => p.WriteBase64String("bytes", csr));
         var ret = JsonSerializer.Deserialize(Process(verify_csr_cmd), jsonCtx.VerifyCsrResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
             throw new UapkiException(ret.ErrorCode);

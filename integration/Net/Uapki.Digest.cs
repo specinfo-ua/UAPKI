@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -28,7 +28,7 @@
 using System.Text.Json;
 
 namespace UapkiNet;
-public static partial class Uapki
+public partial class Uapki
 {
     private class DigestParams
     {
@@ -51,12 +51,11 @@ public static partial class Uapki
         public DigestValue? Result { get; init; }
     }
 
-    public static byte[] GetDigest(byte[] bytes, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
+    public byte[] GetDigest(byte[] bytes, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
     {
         var parameters = new DigestParams() { HashAlgo = hashAlgo?.Oid(), SignAlgo = signAlgo?.Oid(), Bytes = bytes };
 
-        string digest_cmd = "{\"method\":\"DIGEST\",\"parameters\":" +
-            JsonSerializer.Serialize(parameters, jsonCtx.DigestParams) + "}";
+        string digest_cmd = Request("DIGEST", parameters, jsonCtx.DigestParams);
 
         var ret = JsonSerializer.Deserialize(Process(digest_cmd), jsonCtx.DigestResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -68,11 +67,11 @@ public static partial class Uapki
         return ret.Result.Bytes;
     }
 
-    public static byte[] GetFileDigest(string file, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
+    public byte[] GetFileDigest(string file, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
     {
         var parameters = new DigestParams() { HashAlgo = hashAlgo?.Oid(), SignAlgo = signAlgo?.Oid(), File = file };
 
-        string digest_cmd = "{\"method\":\"DIGEST\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.DigestParams) + "}";
+        string digest_cmd = Request("DIGEST", parameters, jsonCtx.DigestParams);
 
         var ret = JsonSerializer.Deserialize(Process(digest_cmd), jsonCtx.DigestResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

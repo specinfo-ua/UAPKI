@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -31,7 +31,7 @@ using System.Text.Json.Serialization;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private static  JsonSerializerOptions jsonOpts = new JsonSerializerOptions
     {
@@ -78,7 +78,7 @@ public static partial class Uapki
     [JsonSerializable(typeof(GetCertByOcspResult))]
     [JsonSerializable(typeof(OpenKeyStorageRequest))]
     [JsonSerializable(typeof(VerifyCsrResult))]
-    [JsonSerializable(typeof(ModifyCmsRequest))]
+    [JsonSerializable(typeof(ModifyCmsParameters))]
     [JsonSerializable(typeof(ModifyCmsResponse))]
 
     private partial class Json : JsonSerializerContext

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class Signature
     {
@@ -95,7 +95,7 @@ public static partial class Uapki
         };
     }
 
-    public static List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false)
+    public List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false)
     {
         var dataTbs = new List<DataTbs>();
 
@@ -117,7 +117,7 @@ public static partial class Uapki
         };
 
 
-        string sign_cmd = "{\"method\":\"SIGN\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.SignParameters) + "}";
+        string sign_cmd = Request("SIGN", parameters, jsonCtx.SignParameters);
 
         var ret = JsonSerializer.Deserialize(Process(sign_cmd), jsonCtx.SignResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -131,7 +131,7 @@ public static partial class Uapki
         return signatures;
     }
 
-    public static void SignFiles(string[] files, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false)
+    public void SignFiles(string[] files, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false)
     {
         var dataTbs = new List<DataTbs>();
         long totalLen = 0;
@@ -178,7 +178,7 @@ public static partial class Uapki
             Options = new() { IgnoreCertStatus = ignoreCertStatus }
         };
 
-        string sign_cmd = "{\"method\":\"SIGN\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.SignParameters) + "}";
+        string sign_cmd = Request("SIGN", parameters, jsonCtx.SignParameters);
 
         var ret = JsonSerializer.Deserialize(Process(sign_cmd), jsonCtx.SignResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

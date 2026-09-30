@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class ContentToEncrypt
     {
@@ -51,7 +51,7 @@ public static partial class Uapki
 
     // ГОСТ 28147 з kdf ГОСТ 34.311: encryptionAlgo = "1.2.804.2.1.1.1.1.1.1.3", kdfAlgo = "1.2.804.2.1.1.1.1.3.4"
     // Калина-256 з kdf Купина-256: encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", kdfAlgo = "1.2.804.2.1.1.1.1.3.7"
-    public static byte[] Encrypt(byte[] plain, List<string> recipientsCerts, string encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", string kdfAlgo = "1.2.804.2.1.1.1.1.3.7")
+    public byte[] Encrypt(byte[] plain, List<string> recipientsCerts, string encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", string kdfAlgo = "1.2.804.2.1.1.1.1.3.7")
     {
         CheckInit();
 
@@ -66,7 +66,7 @@ public static partial class Uapki
             parameters.RecipientInfos.Add(new RecipientInfo { CertId = recipient, KdfAlgo = kdfAlgo });
         }
 
-        string encrypt_cmd = "{\"method\":\"ENCRYPT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.EncryptParams) + "}";
+        string encrypt_cmd = Request("ENCRYPT", parameters, jsonCtx.EncryptParams);
 
         var ret = JsonSerializer.Deserialize(Process(encrypt_cmd), jsonCtx.BytesResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -97,11 +97,11 @@ public static partial class Uapki
         public DecryptedData? Result { get; init; }
     }
 
-    public static DecryptedData Decrypt(byte[] bytes)
+    public DecryptedData Decrypt(byte[] bytes)
     {
         CheckStorage();
 
-        string decrypt_cmd = "{\"method\":\"DECRYPT\",\"parameters\":{\"bytes\":\"" + Convert.ToBase64String(bytes) + "\"}}";
+        string decrypt_cmd = Request("DECRYPT", p => p.WriteBase64String("bytes", bytes));
 
         var ret = JsonSerializer.Deserialize(Process(decrypt_cmd), jsonCtx.DecryptResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

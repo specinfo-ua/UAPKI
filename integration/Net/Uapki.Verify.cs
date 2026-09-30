@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -33,7 +33,7 @@ using UapkiNet.JsonConverters;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class SignaturePolicy
     {
@@ -254,7 +254,7 @@ public static partial class Uapki
         public ValidationOptions? Options {get; init; }
     }
 
-    public static ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
+    public ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
     {
         var parameters = new VerifyParams()
         {
@@ -266,7 +266,7 @@ public static partial class Uapki
             Options = new() { ValidationType = validationType }
         };
 
-        string verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.VerifyParams) + "}";
+        string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         if (ret.Result?.SignatureInfos is not null)
@@ -283,7 +283,7 @@ public static partial class Uapki
         }
     }
 
-    public static ValidationResult Verify(string file, string validationType = "FULL")
+    public ValidationResult Verify(string file, string validationType = "FULL")
     {
         var fi = new FileInfo(file);
         if (fi.Length > 512 * 1024 * 1024)
@@ -298,7 +298,7 @@ public static partial class Uapki
             Options = new() { ValidationType = validationType }
         };
 
-        string verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.VerifyParams) + "}";
+        string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         if (ext == ".p7s" && ret.Result?.Content?.Bytes is not null)
@@ -316,7 +316,7 @@ public static partial class Uapki
                 Options = new() { ValidationType = validationType }
             };
 
-            verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters2, jsonCtx.VerifyParams) + "}";
+            verify_cmd = Request("VERIFY", parameters2, jsonCtx.VerifyParams);
 
             ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         }

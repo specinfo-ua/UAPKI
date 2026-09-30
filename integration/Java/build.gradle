@@ -1,69 +1,85 @@
-apply plugin: 'java'
-apply plugin: 'jacoco'
-apply plugin: 'application'
-apply plugin: 'com.github.johnrengelman.shadow'
-apply plugin: 'maven-publish'
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
 
 description = 'UAPKI for Java'
-
-group = 'com.sit'
-archivesBaseName = 'uapki'
-version = findProperty('version')
-
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
-
-mainClassName = 'com.sit.uapki.Library'
+group = 'com.specinfosystems'
+version = '3.0.0'
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.8.8'
-    implementation 'net.java.dev.jna:jna:5.9.0'
-    implementation group: 'commons-io', name: 'commons-io', version: '2.6' //NOTE: 2.6 - last release for Java7, 2.7-2.11.x - required Java8
-    testImplementation 'junit:junit:4.13'
+    implementation 'net.java.dev.jna:jna:5.17.0'
+    implementation 'com.google.code.gson:gson:2.14.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-jar {
+java {
+    withSourcesJar()
+    withJavadocJar()
 }
 
-task sourcesJar(type: Jar, dependsOn: classes) {
-    archiveClassifier = 'sources'
-    from sourceSets.main.allJava
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:all']
 }
 
-task javadocJar(type: Jar, dependsOn: javadoc) {
-    archiveClassifier = 'javadoc'
-    from javadoc.destinationDir
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
-buildscript {
-    repositories {
-        gradlePluginPortal()
-    }
-    dependencies {
-        classpath 'gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0'
+//  The tests need the native libraries (not included in the jar):
+//    UAPKI_CM_PROVIDERS - directory with cm-pkcs12, UAPKI_TEST_DATA - library/test/data,
+//    the uapki library is found by JNA: -Djna.library.path (gradle test -Djna.library.path=...), PATH, LD_LIBRARY_PATH.
+//  Without UAPKI_CM_PROVIDERS/UAPKI_TEST_DATA the native tests are skipped.
+test {
+    useJUnitPlatform()
+    environment System.getenv()
+    def jnaLibraryPath = System.getProperty('jna.library.path')
+    if (jnaLibraryPath != null)
+        systemProperty 'jna.library.path', jnaLibraryPath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+        showStandardStreams = true
     }
 }
 
 // You can publish with
-// ./gradlew -Pversion=$VERSION publish  -Pmaven_repo=$MVN_URL -PrepoUsername=$MVN_USER -PrepoPassword=$MVN_PASS
+// ./gradlew publish -Pmaven_repo=$MVN_URL -PrepoUsername=$MVN_USER -PrepoPassword=$MVN_PASS
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            artifact sourcesJar
-            artifact javadocJar
+            pom {
+                name = 'UAPKI for Java'
+                description = 'Java integration of the UAPKI crypto library (native library uapki 3.0 via JNA)'
+                url = 'https://github.com/specinfo-ua/UAPKI'
+                licenses {
+                    license {
+                        name = 'BSD 2-Clause License'
+                        url = 'https://opensource.org/licenses/BSD-2-Clause'
+                    }
+                }
+            }
         }
     }
     repositories {
-        maven {
-            name = "repo"
-            url = findProperty("maven_repo")
-            credentials(PasswordCredentials)
+        if (findProperty('maven_repo') != null) {
+            maven {
+                name = 'repo'
+                url = findProperty('maven_repo')
+                credentials(PasswordCredentials)
+            }
         }
     }
 }
-

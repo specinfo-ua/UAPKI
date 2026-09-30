@@ -42,8 +42,9 @@
 *.idb
 *.pdb
 
-# Kernel Module Compile Results
-*.mod*
+# Kernel Module Compile Results (not *.mod*: it also matched Uapki.ModifyCms.cs)
+*.mod
+*.mod.[co]
 # ...but Go module files are not kernel-module artifacts (integration/Go)
 !go.mod
 !go.sum

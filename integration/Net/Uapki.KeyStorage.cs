@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -30,7 +30,7 @@ using System.Text.Json.Serialization;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class KeyStorage
     {
@@ -68,7 +68,7 @@ public static partial class Uapki
         }
     }
 
-    private static void CheckStorage(KeyStorageOpenMode requiredMode = KeyStorageOpenMode.RO)
+    private void CheckStorage(KeyStorageOpenMode requiredMode = KeyStorageOpenMode.RO)
     {
         CheckInit();
 
@@ -91,7 +91,7 @@ public static partial class Uapki
         public KeyStoragesList? Result { get; init; }
     }
 
-    public static List<KeyStorage> GetKeyStorages(List<CmProvider>? providers = null)
+    public List<KeyStorage> GetKeyStorages(List<CmProvider>? providers = null)
     {
         CheckInit();
 
@@ -104,7 +104,7 @@ public static partial class Uapki
             if (!provider.SupportListStorages)
                 continue;
 
-            string storages_cmd = "{\"method\":\"STORAGES\",\"parameters\":{\"provider\":\"" + provider.Id + "\"}}";
+            string storages_cmd = Request("STORAGES", p => p.WriteString("provider", provider.Id));
 
             var ret = JsonSerializer.Deserialize(Process(storages_cmd), jsonCtx.StoragesResult) ?? throw new UapkiException(0x2001);
             if (ret.ErrorCode != 0)
@@ -172,7 +172,7 @@ public static partial class Uapki
         public OpenKeyStorageExtParams? OpenParams { get; init; }
     }
 
-    public static void OpenKeyStorage(KeyStorage storage, string passwd, KeyStorageOpenMode mode, OpenKeyStorageLoginParams? loginParams = null, OpenKeyStorageExtParams? openParams = null)
+    public void OpenKeyStorage(KeyStorage storage, string passwd, KeyStorageOpenMode mode, OpenKeyStorageLoginParams? loginParams = null, OpenKeyStorageExtParams? openParams = null)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -199,8 +199,7 @@ public static partial class Uapki
             OpenParams = openParams
         };
 
-        string open_cmd = "{\"method\":\"OPEN\",\"parameters\":" +
-            JsonSerializer.Serialize(parameters, jsonCtx.OpenKeyStorageParams) + "}";
+        string open_cmd = Request("OPEN", parameters, jsonCtx.OpenKeyStorageParams);
 
         var ret = JsonSerializer.Deserialize(Process(open_cmd), jsonCtx.OpenKeyStorageResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -225,7 +224,7 @@ public static partial class Uapki
         public OpenKeyStorageParams? Parameters { get; init; }
     }
 
-    public static string OpenKeyStorageCmd(string open_cmd)
+    public string OpenKeyStorageCmd(string open_cmd)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -255,7 +254,7 @@ public static partial class Uapki
         return res;
     }
 
-    public static void OpenKeyStorage(string fileName, string passwd, KeyStorageOpenMode mode)
+    public void OpenKeyStorage(string fileName, string passwd, KeyStorageOpenMode mode)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -280,8 +279,7 @@ public static partial class Uapki
             Mode = openMode
         };
 
-        string open_p12_cmd = "{\"method\":\"OPEN\",\"parameters\":" +
-            JsonSerializer.Serialize(parameters, jsonCtx.OpenKeyStorageParams) + "}";
+        string open_p12_cmd = Request("OPEN", parameters, jsonCtx.OpenKeyStorageParams);
 
         var ret = JsonSerializer.Deserialize(Process(open_p12_cmd), jsonCtx.OpenKeyStorageResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -300,11 +298,11 @@ public static partial class Uapki
         UpdateKeysInOpenedStorage(true);
     }
 
-    public static void CloseKeyStorage()
+    public void CloseKeyStorage()
     {
         CheckStorage();
 
-        string close_cmd = "{\"method\":\"CLOSE\"}";
+        string close_cmd = Request("CLOSE");
 
         var ret = JsonSerializer.Deserialize(Process(close_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -314,11 +312,11 @@ public static partial class Uapki
         SelectedKey = null;
     }
 
-    public static void ChangePassword(string newPassword)
+    public void ChangePassword(string newPassword)
     {
         CheckStorage(KeyStorageOpenMode.RW);
 
-        string change_password_cmd = "{\"method\":\"CHANGE_PASSWORD\",\"parameters\":{\"newPassword\":\"" + newPassword + "\"}}";
+        string change_password_cmd = Request("CHANGE_PASSWORD", p => p.WriteString("newPassword", newPassword));
 
         var ret = JsonSerializer.Deserialize(Process(change_password_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

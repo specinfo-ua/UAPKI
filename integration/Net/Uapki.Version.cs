@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class VersionInfo
     {
@@ -49,9 +49,9 @@ public static partial class Uapki
         public string? Method { get; init; }
     }
 
-    public static string GetVersion()
+    public string GetVersion()
     {
-        string version_cmd = "{\"method\":\"VERSION\"}";
+        string version_cmd = Request("VERSION");
 
         var ret = JsonSerializer.Deserialize(Process(version_cmd), jsonCtx.VersionResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

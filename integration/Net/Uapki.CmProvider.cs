@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class CmProvider
     {
@@ -52,9 +52,9 @@ public static partial class Uapki
         public CmProviders? Result { get; init; }
     }
 
-    private static List<CmProvider> GetProviders()
+    private List<CmProvider> GetProviders()
     {
-        string providers_cmd = "{\"method\":\"PROVIDERS\"}";
+        string providers_cmd = Request("PROVIDERS");
 
         var ret = JsonSerializer.Deserialize(Process(providers_cmd), jsonCtx.CmProvidersResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

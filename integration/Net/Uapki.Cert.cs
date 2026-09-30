@@ -1,6 +1,6 @@
 ﻿/*
  * 
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -33,7 +33,7 @@ using UapkiNet.Polyfil;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class DistinguishedName
     {
@@ -477,11 +477,11 @@ public static partial class Uapki
         public Certificate? Result { get; init; }
     }
 
-    public static Certificate GetCertInfo(string certId)
+    public Certificate GetCertInfo(string certId)
     {
         CheckInit();
 
-        string cert_info_cmd = "{\"method\":\"CERT_INFO\",\"parameters\":{\"certId\":\"" + certId + "\"}}";
+        string cert_info_cmd = Request("CERT_INFO", p => p.WriteString("certId", certId));
 
         var ret = JsonSerializer.Deserialize(Process(cert_info_cmd), jsonCtx.CertInfoResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -558,7 +558,7 @@ public static partial class Uapki
         public List<string>? SubjectKeyIdentifiers { get; init; }
     }
 
-    public static List<CertificateShortInfo> GetCertsShortInfoList(bool storage = false, int offset = 0, int? pageSize = null, List<string>? keyIds = null)
+    public List<CertificateShortInfo> GetCertsShortInfoList(bool storage = false, int offset = 0, int? pageSize = null, List<string>? keyIds = null)
     {
         CheckInit();
 
@@ -571,7 +571,7 @@ public static partial class Uapki
             SubjectKeyIdentifiers = keyIds
         };
 
-        string list_certs_cmd = "{\"method\":\"LIST_CERTS\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.ListCertsParams) + "}";
+        string list_certs_cmd = Request("LIST_CERTS", parameters, jsonCtx.ListCertsParams);
 
         var ret = JsonSerializer.Deserialize(Process(list_certs_cmd), jsonCtx.CertsListResult) ?? throw new UapkiException(0x2001);
         if (ret.Result?.CertInfos is null)
@@ -580,7 +580,7 @@ public static partial class Uapki
         return ret.Result.CertInfos;
     }
 
-    public static List<string> GetCerts(bool storage = false, List<string>? keyIds = null)
+    public List<string> GetCerts(bool storage = false, List<string>? keyIds = null)
     {
         CheckInit();
 
@@ -591,7 +591,7 @@ public static partial class Uapki
             SubjectKeyIdentifiers = keyIds
         };
 
-        string list_certs_cmd = "{\"method\":\"LIST_CERTS\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.ListCertsParams) + "}";
+        string list_certs_cmd = Request("LIST_CERTS", parameters, jsonCtx.ListCertsParams);
 
         var ret = JsonSerializer.Deserialize(Process(list_certs_cmd), jsonCtx.CertsListResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -610,7 +610,7 @@ public static partial class Uapki
         public bool? Permanent { get; init; }
     }
 
-    public static void RemoveCert(string certId, bool storage = false, bool permanent = true)
+    public void RemoveCert(string certId, bool storage = false, bool permanent = true)
     {
         CheckInit();
 
@@ -618,14 +618,14 @@ public static partial class Uapki
             CheckStorage(KeyStorageOpenMode.RW);
 
         var parameters = new CertRemoveParams() { CertId = certId, Storage = storage, Permanent = permanent };
-        string cert_remove_cmd = "{\"method\":\"REMOVE_CERT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.CertRemoveParams) + "}";
+        string cert_remove_cmd = Request("REMOVE_CERT", parameters, jsonCtx.CertRemoveParams);
 
         var ret = JsonSerializer.Deserialize(Process(cert_remove_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
             throw new UapkiException(ret.ErrorCode);
     }
 
-    public static void RemoveCert(Certificate cert, bool storage = false, bool permanent = true)
+    public void RemoveCert(Certificate cert, bool storage = false, bool permanent = true)
     {
         RemoveCert(cert.Id, storage, permanent);
     }
@@ -642,11 +642,11 @@ public static partial class Uapki
         public BytesOnly? Result { get; init; }
     }
 
-    public static byte[]? GetCert(string certId)
+    public byte[]? GetCert(string certId)
     {
         CheckInit();
 
-        string get_cert_cmd = "{\"method\":\"GET_CERT\",\"parameters\":{\"certId\":\"" + certId + "\"}}";
+        string get_cert_cmd = Request("GET_CERT", p => p.WriteString("certId", certId));
 
         var ret = JsonSerializer.Deserialize(Process(get_cert_cmd), jsonCtx.BytesResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -681,7 +681,7 @@ public static partial class Uapki
         public AddedCerts? Result { get; init; }
     }
 
-    public static List<AddedCert> ImportCerts(List<byte[]> certs, bool storage = false, bool permanent = true)
+    public List<AddedCert> ImportCerts(List<byte[]> certs, bool storage = false, bool permanent = true)
     {
         if (storage)
             CheckStorage(KeyStorageOpenMode.RW);
@@ -694,7 +694,7 @@ public static partial class Uapki
             Storage = storage
         };
 
-        string cert_add_cmd = "{\"method\":\"ADD_CERT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.CertsAddParams) + "}";
+        string cert_add_cmd = Request("ADD_CERT", parameters, jsonCtx.CertsAddParams);
 
         var ret = JsonSerializer.Deserialize(Process(cert_add_cmd), jsonCtx.CertsAddResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -703,13 +703,13 @@ public static partial class Uapki
         return ret.Result?.Added is null ? new List<AddedCert>() : ret.Result.Added;
     }
 
-    public static AddedCert? ImportCert(byte[] cert, bool storage = false, bool permanent = true)
+    public AddedCert? ImportCert(byte[] cert, bool storage = false, bool permanent = true)
     {
         var addedCerts = ImportCerts(new List<byte[]>() { cert }, storage, permanent);
         return addedCerts.Count > 0 ? addedCerts[0] : null;
     }
 
-    public static int ImportCertBundle(byte[] bundle, bool storage = false, bool permanent = true)
+    public int ImportCertBundle(byte[] bundle, bool storage = false, bool permanent = true)
     {
         if (storage)
             CheckStorage(KeyStorageOpenMode.RW);
@@ -722,7 +722,7 @@ public static partial class Uapki
             Storage = storage
         };
 
-        string cert_add_bundle_cmd = "{\"method\":\"ADD_CERT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.CertsAddParams) + "}";
+        string cert_add_bundle_cmd = Request("ADD_CERT", parameters, jsonCtx.CertsAddParams);
 
         var ret = JsonSerializer.Deserialize(Process(cert_add_bundle_cmd), jsonCtx.CertsAddResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -823,7 +823,7 @@ public static partial class Uapki
         public CertValidation? Result { get; init; }
     }
 
-    public static CertValidation VerifyCert(byte[] cert, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
+    public CertValidation VerifyCert(byte[] cert, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
     {
         string? validationType = null;
         if (validateTime != null || useCRL)
@@ -838,7 +838,7 @@ public static partial class Uapki
             ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
         };
 
-        string verify_cert_cmd = "{\"method\":\"VERIFY_CERT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.CertVerifyParams) + "}";
+        string verify_cert_cmd = Request("VERIFY_CERT", parameters, jsonCtx.CertVerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cert_cmd), jsonCtx.CertVerifyResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -850,7 +850,7 @@ public static partial class Uapki
         return ret.Result;
     }
 
-    public static CertValidation VerifyCert(string certId, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
+    public CertValidation VerifyCert(string certId, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
     {
         string? validationType = null;
         if (validateTime is not null || useCRL)
@@ -865,7 +865,7 @@ public static partial class Uapki
             ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
         };
 
-        string verify_cert_cmd = "{\"method\":\"VERIFY_CERT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.CertVerifyParams) + "}";
+        string verify_cert_cmd = Request("VERIFY_CERT", parameters, jsonCtx.CertVerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cert_cmd), jsonCtx.CertVerifyResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -884,12 +884,14 @@ public static partial class Uapki
         public ValidateByOcspInfo? Result { get; init; }
     }
 
-    public static ValidateByOcspInfo GetCertByOcsp(string url, string issuerCertId, string serialNumber)
+    public ValidateByOcspInfo GetCertByOcsp(string url, string issuerCertId, string serialNumber)
     {
-        string get_cert_by_ocsp_cmd = "{\"method\":\"CERT_STATUS_BY_OCSP\",\"parameters\":{" +
-            "\"url\":\"" + url + "\"," +
-            "\"issuerCertId\":\"" + issuerCertId + "\"," +
-            "\"serialNumber\":\"" + serialNumber + "\"}}";
+        string get_cert_by_ocsp_cmd = Request("CERT_STATUS_BY_OCSP", p =>
+        {
+            p.WriteString("url", url);
+            p.WriteString("issuerCertId", issuerCertId);
+            p.WriteString("serialNumber", serialNumber);
+        });
 
         var ret = JsonSerializer.Deserialize(Process(get_cert_by_ocsp_cmd), jsonCtx.GetCertByOcspResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
