@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -54,7 +54,7 @@ public static partial class Uapki
 
     private static List<CmProvider> GetProviders()
     {
-        string providers_cmd = "{\"method\":\"PROVIDERS\"}";
+        string providers_cmd = Request("PROVIDERS");
 
         var ret = JsonSerializer.Deserialize(Process(providers_cmd), jsonCtx.CmProvidersResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

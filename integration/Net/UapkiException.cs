@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -47,15 +47,15 @@ public class UapkiException : Exception
             case 0x1006:
                 return "Неправильний тип сховища ключів";
             case 0x1007:
-                return "Потребує ім'я файлу як ідентифікатор сховища ключів";
+                return "Потрібне ім'я файлу як ідентифікатор сховища ключів";
             case 0x1008:
-                return "Потребує ім'я користувача як ідентифікатор сховища ключів";
+                return "Потрібне ім'я користувача як ідентифікатор сховища ключів";
             case 0x1009:
                 return "Бібліотеку не ініціалізовано";
             case 0x100A:
                 return "Повторна ініціалізація бібліотеки";
             case 0x100B:
-                return "Сховище ключів не відкрито";
+                return "Сховище ключів не відкрито (відсутнє)";
             case 0x100C:
                 return "Ключ не вибрано";
             case 0x100D:
@@ -73,7 +73,7 @@ public class UapkiException : Exception
             case 0x101A:
                 return "Помилка завантаження бібліотеки роботи зі сховищем ключів";
             case 0x101B:
-                return "Функція не підтримється бібліотекою роботи зі сховищем ключів";
+                return "Функція не підтримується бібліотекою роботи зі сховищем ключів";
             case 0x1020:
                 return "Помилка відкриття файлу";
             case 0x1021:
@@ -83,7 +83,7 @@ public class UapkiException : Exception
             case 0x1024:
                 return "Помилка видалення файлу";
             case 0x1025:
-                return "Помилковий статус HTTP протоколу";
+                return "Помилковий статус протоколу HTTP";
             case 0x1030:
                 return "Неправильна структура ContentInfo";
             case 0x1031:
@@ -131,11 +131,11 @@ public class UapkiException : Exception
             case 0x1054:
                 return "Термін чинності СВС закінчився";
             case 0x1060:
-                return "У сертифікаті відстуня точка доступу OCSP";
+                return "У сертифікаті відсутня точка доступу OCSP";
             case 0x1061:
                 return "Сервер OCSP не відповідає";
             case 0x1062:
-                return "Відповідь сервера OCSP не успішна";
+                return "Відповідь сервера OCSP неуспішна";
             case 0x1063:
                 return "Відповідь сервера OCSP пошкоджена";
             case 0x1064:
@@ -145,13 +145,13 @@ public class UapkiException : Exception
             case 0x1066:
                 return "Неправильна відповідь сервера OCSP";
             case 0x1070:
-                return "У сертифікаті відстуня точка доступу TSP";
+                return "У сертифікаті відсутня точка доступу TSP";
             case 0x1071:
                 return "Сервер TSP не відповідає";
             case 0x1072:
                 return "Відповідь сервера TSP \"не дозволено\"";
             case 0x1073:
-                return "Відповідь сервера TSP не співпадає з запитом";
+                return "Відповідь сервера TSP не відповідає запиту";
             case 0x1074:
                 return "Відповідь сервера TSP пошкоджена";
 

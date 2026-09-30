@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -51,7 +51,7 @@ public static partial class Uapki
 
     public static string GetVersion()
     {
-        string version_cmd = "{\"method\":\"VERSION\"}";
+        string version_cmd = Request("VERSION");
 
         var ret = JsonSerializer.Deserialize(Process(version_cmd), jsonCtx.VersionResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

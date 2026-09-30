@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -122,7 +122,11 @@ public static partial class Uapki
     {
         CheckInit();
 
-        string crl_info_cmd = "{\"method\":\"CRL_INFO\",\"parameters\":{\"crlId\":\"" + crlId + "\",\"showRevokedCerts\":" + (showRevokedCerts ? "true" : "false") + "}}";
+        string crl_info_cmd = Request("CRL_INFO", p =>
+        {
+            p.WriteString("crlId", crlId);
+            p.WriteBoolean("showRevokedCerts", showRevokedCerts);
+        });
 
         var ret = JsonSerializer.Deserialize(Process(crl_info_cmd), jsonCtx.CrlInfoResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -136,7 +140,7 @@ public static partial class Uapki
 
     public static CrlInfo GetCrlInfo(byte[] bytes)
     {
-        string crl_info_cmd = "{\"method\":\"CRL_INFO\",\"parameters\":{\"bytes\":\"" + Convert.ToBase64String(bytes) + "\"}}";
+        string crl_info_cmd = Request("CRL_INFO", p => p.WriteBase64String("bytes", bytes));
 
         var ret = JsonSerializer.Deserialize(Process(crl_info_cmd), jsonCtx.CrlInfoResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -162,7 +166,11 @@ public static partial class Uapki
     {
         CheckInit();
 
-        string add_crl_cmd = "{\"method\":\"ADD_CRL\",\"parameters\":{\"bytes\":\"" + Convert.ToBase64String(crl) + "\",\"permanent\":" + (permanent ? "true" : "false") + "}}";
+        string add_crl_cmd = Request("ADD_CRL", p =>
+        {
+            p.WriteBase64String("bytes", crl);
+            p.WriteBoolean("permanent", permanent);
+        });
 
         var ret = JsonSerializer.Deserialize(Process(add_crl_cmd), jsonCtx.CrlAddResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -173,7 +181,11 @@ public static partial class Uapki
     {
         CheckInit();
 
-        string remove_crl_cmd = "{\"method\":\"REMOVE_CRL\",\"parameters\":{\"crlId\":\"" + crlId + "\",\"permanent\":" + (permanent ? "true" : "false") + "}}";
+        string remove_crl_cmd = Request("REMOVE_CRL", p =>
+        {
+            p.WriteString("crlId", crlId);
+            p.WriteBoolean("permanent", permanent);
+        });
 
         var ret = JsonSerializer.Deserialize(Process(remove_crl_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -200,7 +212,15 @@ public static partial class Uapki
     {
         CheckInit();
 
-        string list_crls_cmd = "{\"method\":\"LIST_CRLS\",\"parameters\":{\"showCrlInfos\":" + (showCrlInfos ? "true" : "false") + ",\"offset\":" + offset.ToString() + ",\"pageSize\":" + (pageSize?.ToString() ?? "null") + "}}";
+        string list_crls_cmd = Request("LIST_CRLS", p =>
+        {
+            p.WriteBoolean("showCrlInfos", showCrlInfos);
+            p.WriteNumber("offset", offset);
+            if (pageSize.HasValue)
+                p.WriteNumber("pageSize", pageSize.Value);
+            else
+                p.WriteNull("pageSize");
+        });
 
         var ret = JsonSerializer.Deserialize(Process(list_crls_cmd), jsonCtx.CrlsListResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

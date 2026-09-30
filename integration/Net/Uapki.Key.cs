@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -173,7 +173,7 @@ public static partial class Uapki
         CheckInit();
         CheckStorage();
 
-        string keys_cmd = "{\"method\":\"KEYS\"}";
+        string keys_cmd = Request("KEYS");
 
         var ret = JsonSerializer.Deserialize(Process(keys_cmd), jsonCtx.KeysResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -225,7 +225,7 @@ public static partial class Uapki
         CheckInit();
         CheckStorage();
 
-        string select_cmd = "{\"method\":\"SELECT_KEY\",\"parameters\":{\"certId\":\"" + certId + "\"}}";
+        string select_cmd = Request("SELECT_KEY", p => p.WriteString("certId", certId));
 
         var ret = JsonSerializer.Deserialize(Process(select_cmd), jsonCtx.SelectKeyResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -243,7 +243,7 @@ public static partial class Uapki
         CheckInit();
         CheckStorage();
 
-        string select_cmd = "{\"method\":\"SELECT_KEY\",\"parameters\":{\"id\":\"" + keyId + "\"}}";
+        string select_cmd = Request("SELECT_KEY", p => p.WriteString("id", keyId));
 
         var ret = JsonSerializer.Deserialize(Process(select_cmd), jsonCtx.SelectKeyResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -286,7 +286,7 @@ public static partial class Uapki
         CheckInit();
         CheckStorage(KeyStorageOpenMode.RW);
 
-        string delete_key_cmd = "{\"method\":\"DELETE_KEY\",\"parameters\":{\"id\":\"" + key.Id + "\"}}";
+        string delete_key_cmd = Request("DELETE_KEY", p => p.WriteString("id", key.Id));
 
         var ret = JsonSerializer.Deserialize(Process(delete_key_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -312,12 +312,16 @@ public static partial class Uapki
     {
         CheckStorage(KeyStorageOpenMode.RW);
 
-        string gen_key_cmd = "{\"method\":\"CREATE_KEY\",\"parameters\":{" +
-            "\"mechanismId\":\"" + mechanism + "\"," +
-            "\"parameterId\":\"" + parameter + "\"," +
-            "\"label\":\"" + label + "\"," +
-            "\"application\":\"" + application + "\"," +
-            "\"flags\":{\"keyAgreement\":" + (isKep ? "true" : "false") + "}}}";
+        string gen_key_cmd = Request("CREATE_KEY", p =>
+        {
+            p.WriteString("mechanismId", mechanism);
+            p.WriteString("parameterId", parameter);
+            p.WriteString("label", label);
+            p.WriteString("application", application);
+            p.WriteStartObject("flags");
+            p.WriteBoolean("keyAgreement", isKep);
+            p.WriteEndObject();
+        });
 
         var ret = JsonSerializer.Deserialize(Process(gen_key_cmd), jsonCtx.KeyIdResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -104,7 +104,7 @@ public static partial class Uapki
             if (!provider.SupportListStorages)
                 continue;
 
-            string storages_cmd = "{\"method\":\"STORAGES\",\"parameters\":{\"provider\":\"" + provider.Id + "\"}}";
+            string storages_cmd = Request("STORAGES", p => p.WriteString("provider", provider.Id));
 
             var ret = JsonSerializer.Deserialize(Process(storages_cmd), jsonCtx.StoragesResult) ?? throw new UapkiException(0x2001);
             if (ret.ErrorCode != 0)
@@ -199,8 +199,7 @@ public static partial class Uapki
             OpenParams = openParams
         };
 
-        string open_cmd = "{\"method\":\"OPEN\",\"parameters\":" +
-            JsonSerializer.Serialize(parameters, jsonCtx.OpenKeyStorageParams) + "}";
+        string open_cmd = Request("OPEN", parameters, jsonCtx.OpenKeyStorageParams);
 
         var ret = JsonSerializer.Deserialize(Process(open_cmd), jsonCtx.OpenKeyStorageResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -280,8 +279,7 @@ public static partial class Uapki
             Mode = openMode
         };
 
-        string open_p12_cmd = "{\"method\":\"OPEN\",\"parameters\":" +
-            JsonSerializer.Serialize(parameters, jsonCtx.OpenKeyStorageParams) + "}";
+        string open_p12_cmd = Request("OPEN", parameters, jsonCtx.OpenKeyStorageParams);
 
         var ret = JsonSerializer.Deserialize(Process(open_p12_cmd), jsonCtx.OpenKeyStorageResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -304,7 +302,7 @@ public static partial class Uapki
     {
         CheckStorage();
 
-        string close_cmd = "{\"method\":\"CLOSE\"}";
+        string close_cmd = Request("CLOSE");
 
         var ret = JsonSerializer.Deserialize(Process(close_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -318,7 +316,7 @@ public static partial class Uapki
     {
         CheckStorage(KeyStorageOpenMode.RW);
 
-        string change_password_cmd = "{\"method\":\"CHANGE_PASSWORD\",\"parameters\":{\"newPassword\":\"" + newPassword + "\"}}";
+        string change_password_cmd = Request("CHANGE_PASSWORD", p => p.WriteString("newPassword", newPassword));
 
         var ret = JsonSerializer.Deserialize(Process(change_password_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

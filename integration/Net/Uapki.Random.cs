@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -35,7 +35,7 @@ public static partial class Uapki
     {
         CheckInit();
 
-        string random_cmd = "{\"method\":\"RANDOM_BYTES\",\"parameters\":{\"length\":" + length + "}}";
+        string random_cmd = Request("RANDOM_BYTES", p => p.WriteNumber("length", length));
 
         var ret = JsonSerializer.Deserialize(Process(random_cmd), jsonCtx.BytesResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

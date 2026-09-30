@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -266,7 +266,7 @@ public static partial class Uapki
             Options = new() { ValidationType = validationType }
         };
 
-        string verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.VerifyParams) + "}";
+        string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         if (ret.Result?.SignatureInfos is not null)
@@ -298,7 +298,7 @@ public static partial class Uapki
             Options = new() { ValidationType = validationType }
         };
 
-        string verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.VerifyParams) + "}";
+        string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         if (ext == ".p7s" && ret.Result?.Content?.Bytes is not null)
@@ -316,7 +316,7 @@ public static partial class Uapki
                 Options = new() { ValidationType = validationType }
             };
 
-            verify_cmd = "{\"method\":\"VERIFY\",\"parameters\":" + JsonSerializer.Serialize(parameters2, jsonCtx.VerifyParams) + "}";
+            verify_cmd = Request("VERIFY", parameters2, jsonCtx.VerifyParams);
 
             ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
         }
