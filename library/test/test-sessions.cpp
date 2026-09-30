@@ -195,6 +195,9 @@ public:
 //  (see run_self_test), every later INIT passes "skipSelfTest": true
 static bool self_test_done = false;
 
+//  Safety limit for workers that call until a freed session/shared memory rejects them
+static const int REJECT_TIMEOUT_S = 60;
+
 static void set_skip_self_test (JSON_Object* joParams)
 {
     if (self_test_done) {
@@ -1060,14 +1063,16 @@ static bool test_session_lifecycle (
         if (prepared) {
             const unsigned count_workers = (options.countSessions < 2) ? 2 : options.countSessions;
             atomic<bool> freed(false);
-            atomic<unsigned> count_ok(0), count_invalid(0);
+            atomic<unsigned> count_ok(0), count_invalid(0), count_finished(0);
             vector<thread> workers;
             for (unsigned t = 0; t < count_workers; t++) {
                 workers.emplace_back([&] {
                     Api thr_api(loader, victim);
                     Response thr_resp;
                     const string sign_request = request_sign_cades();
-                    for (unsigned k = 0; k < 20 * options.countSigns; k++) {
+                    //  Call until rejected: a fixed number of calls could all finish before the free on a slow runner
+                    const chrono::steady_clock::time_point deadline = chrono::steady_clock::now() + chrono::seconds(REJECT_TIMEOUT_S);
+                    while (chrono::steady_clock::now() < deadline) {
                         if (!thr_api.call(sign_request, thr_resp)) {
                             checker.fail("no response while the session is being freed");
                             break;
@@ -1085,9 +1090,10 @@ static bool test_session_lifecycle (
                             break;
                         }
                     }
+                    count_finished++;
                 });
             }
-            while (count_ok < 3 * count_workers) this_thread::yield();
+            while ((count_ok < 3 * count_workers) && (count_finished < count_workers)) this_thread::yield();
             freed = true;
             loader.sessionFree(victim);
             for (auto& it : workers) it.join();
@@ -1862,7 +1868,9 @@ static bool test_shared_memory_lifecycle (
                 UapkiSession thr_session(loader);
                 Api api(loader, thr_session.getHandle(), memory);
                 Response thr_resp;
-                for (unsigned k = 0; k < 20 * options.countSigns; k++) {
+                //  Call until rejected: a fixed number of calls could all finish before the free on a slow runner
+                const chrono::steady_clock::time_point deadline = chrono::steady_clock::now() + chrono::seconds(REJECT_TIMEOUT_S);
+                while (chrono::steady_clock::now() < deadline) {
                     if (!api.call(request_list_crls(), thr_resp)) {
                         checker.fail("no response while the shared memory is being freed");
                         break;
