@@ -1,0 +1,73 @@
+name: .NET integration build & test
+
+on:
+  push:
+    #  every branch: tests must run after each commit pushed
+    paths:
+      - 'library/**'
+      - 'integration/Net/**'
+      - 'integration/Net.Tests/**'
+      - '.github/workflows/net-test.yml'
+  pull_request:
+    paths:
+      - 'library/**'
+      - 'integration/Net/**'
+      - 'integration/Net.Tests/**'
+      - '.github/workflows/net-test.yml'
+  workflow_dispatch:
+
+#  Build only net8.0 without the runtime packs of all RuntimeIdentifiers of the package
+env:
+  DOTNET_PROPS: -c Release -p:RuntimeIdentifiers= -p:PublishTrimmed=false
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -S library -B build-native -DUAPKI_DISABLE_COPY=ON
+
+      - name: Build native libraries
+        run: cmake --build build-native --target uapki cm-pkcs12 -j"$(nproc)"
+
+      - name: Test
+        env:
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}/build-native/cm-pkcs12
+          UAPKI_TEST_DATA: ${{ github.workspace }}/library/test/data
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-native/uapki:${{ github.workspace }}/build-native/uapkic:${{ github.workspace }}/build-native/uapkif:${{ github.workspace }}/build-native/cm-pkcs12
+        run: dotnet run --project integration/Net.Tests $DOTNET_PROPS
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Configure
+        run: cmake -A x64 -S library -B build-native -DUAPKI_DISABLE_COPY=ON
+
+      - name: Build native libraries
+        run: cmake --build build-native --config Release --target uapki cm-pkcs12
+
+      - name: Test
+        shell: pwsh
+        env:
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}\build-native\Release
+          UAPKI_TEST_DATA: ${{ github.workspace }}\library\test\data
+        run: |
+          $env:PATH = "${{ github.workspace }}\build-native\Release;$env:PATH"
+          dotnet run --project integration/Net.Tests $env:DOTNET_PROPS.Split(' ')
