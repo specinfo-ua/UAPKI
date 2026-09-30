@@ -1862,17 +1862,23 @@ static bool test_shared_memory_lifecycle (
                 UapkiSession thr_session(loader);
                 Api api(loader, thr_session.getHandle(), memory);
                 Response thr_resp;
-                for (unsigned k = 0; k < 20 * options.countSigns; k++) {
+                const unsigned max_after_free_ok = max(1u, 20 * options.countSigns);
+                unsigned count_after_free_ok = 0;
+                while (true) {
                     if (!api.call(request_list_crls(), thr_resp)) {
                         checker.fail("no response while the shared memory is being freed");
                         break;
                     }
                     if (thr_resp.ok()) {
                         count_ok++;
+                        if (freed && (++count_after_free_ok >= max_after_free_ok)) {
+                            checker.fail("worker was not rejected after the free");
+                            break;
+                        }
                     }
                     else if (thr_resp.errorCode == ERR_INVALID_SHARED_MEMORY) {
                         checker.check(freed, "INVALID_SHARED_MEMORY before the free");
-                        count_invalid++;
+                        if (freed) count_invalid++;
                         break;
                     }
                     else {
