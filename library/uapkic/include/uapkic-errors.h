@@ -65,7 +65,6 @@ extern "C" {
 #define RET_INVALID_HEX_STRING           29
 #define RET_INVALID_BASE64_STRING        30
 #define RET_INDEX_OUT_OF_RANGE           31
-#define RET_SELF_TEST_NOT_ALLOWED        32
 #define RET_SELF_TEST_FAIL               33
 
 #ifdef  __cplusplus

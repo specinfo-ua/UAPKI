@@ -34,6 +34,56 @@
 extern "C" {
 #endif
 
+/**
+ * Контекст ГПВП HMAC_DRBG (SHA-512). Кожен контекст має власний стан і м'ютекс,
+ * функції *_ex потокобезпечні для одного контексту.
+ */
+typedef struct DrbgCtx_st DrbgCtx;
+
+/**
+ * Створює контекст ГПВП. Стан ініціалізується ентропією з джерел ОС та jitterentropy
+ * у drbg_init_ex() або при першому виклику drbg_random_ex().
+ *
+ * @return контекст ГПВП або NULL
+ */
+UAPKIC_EXPORT DrbgCtx* drbg_alloc(void);
+
+/**
+ * Ініціалізує (або переініціалізує) стан ГПВП ентропією з джерел ОС та jitterentropy.
+ *
+ * @param ctx контекст ГПВП
+ * @return код помилки
+ */
+UAPKIC_EXPORT int drbg_init_ex(DrbgCtx* ctx);
+
+/**
+ * Генерує випадкові дані, розмір визначається довжиною random (не більше 512 КіБ).
+ *
+ * @param ctx контекст ГПВП
+ * @param random буфер для випадкових даних
+ * @return код помилки
+ */
+UAPKIC_EXPORT int drbg_random_ex(DrbgCtx* ctx, ByteArray* random);
+
+/**
+ * Оновлює стан ГПВП новою ентропією та додатковими даними.
+ *
+ * @param ctx контекст ГПВП
+ * @param entropy додаткові дані, може бути NULL
+ * @return код помилки
+ */
+UAPKIC_EXPORT int drbg_reseed_ex(DrbgCtx* ctx, const ByteArray* entropy);
+
+/**
+ * Затирає стан і звільняє контекст ГПВП.
+ *
+ * @param ctx контекст ГПВП
+ */
+UAPKIC_EXPORT void drbg_free(DrbgCtx* ctx);
+
+/**
+ * Функції для глобального контексту ГПВП бібліотеки.
+ */
 UAPKIC_EXPORT int drbg_random(ByteArray* random);
 UAPKIC_EXPORT int drbg_reseed(const ByteArray* entropy);
 

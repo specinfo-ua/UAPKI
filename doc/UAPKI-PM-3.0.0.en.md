@@ -340,7 +340,7 @@ Library parameters can be set in two ways: via parameters or via a configuration
 
 If the library parameters are not set, the default parameters will be used. To work with storages, the storage provider parameters must be set.
 
-Starting from version 2.0.16, the INIT method (by default) performs a self-test. The self-test can be canceled by setting the skipSelfTest parameter to true. The duration of the self-test depends on system performance.
+Starting from version 2.0.16, the INIT method (by default) performs a self-test. The self-test can be canceled by setting the skipSelfTest parameter to true. The duration of the self-test depends on system performance. It is enough to run the self-test once per process: later INIT calls, including those in other sessions, can pass skipSelfTest = true.
 
 ### Structure of the parameters field in the request using a configuration file
 

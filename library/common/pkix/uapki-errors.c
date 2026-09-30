@@ -75,7 +75,7 @@ static const char* STR_UAPKIC_ERRORS[COUNT_UAPKIC_ERRORS] = {
     "INVALID_HEX_STRING",   //  29
     "INVALID_BASE64_STRING",//  30
     "INDEX_OUT_OF_RANGE",   //  31
-    "SELF_TEST_NOT_ALLOWED",//  32
+    "RESERVED",             //  32 (was SELF_TEST_NOT_ALLOWED)
     "SELF_TEST_FAIL"        //  33
 };
 

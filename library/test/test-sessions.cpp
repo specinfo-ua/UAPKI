@@ -191,6 +191,17 @@ public:
 };  //  end class Api
 
 
+//  The self-test of the crypto library is needed once per process: it runs in the first session
+//  (see run_self_test), every later INIT passes "skipSelfTest": true
+static bool self_test_done = false;
+
+static void set_skip_self_test (JSON_Object* joParams)
+{
+    if (self_test_done) {
+        json_object_set_boolean(joParams, "skipSelfTest", true);
+    }
+}
+
 static string request_init (const bool offline, const char* tspUrl = nullptr)
 {
     ParsonHelper json;
@@ -207,6 +218,7 @@ static string request_init (const bool offline, const char* tspUrl = nullptr)
     json_object_dotset_string(jo_params, "certCache.path", "");
     json_object_dotset_string(jo_params, "crlCache.path", "");
     json_object_set_boolean(jo_params, "offline", offline);
+    set_skip_self_test(jo_params);
     if (tspUrl) {
         json_object_dotset_string(jo_params, "tsp.url", tspUrl);
         json_object_dotset_boolean(jo_params, "tsp.forced", true);
@@ -227,6 +239,7 @@ static string request_init_caches (const string& certDir, const string& crlDir, 
     json_object_dotset_string(jo_params, "certCache.path", certDir.c_str());
     json_object_dotset_string(jo_params, "crlCache.path", crlDir.c_str());
     json_object_set_boolean(jo_params, "offline", offline);
+    set_skip_self_test(jo_params);
     string rv;
     json.serialize(rv);
     return rv;
@@ -284,7 +297,8 @@ static string request_init_dir (const bool offline, const char* dir)
 static string request_init_unknown_provider (void)
 {
     return "{\"method\":\"INIT\",\"parameters\":{\"cmProviders\":{\"dir\":\"\",\"allowedProviders\":[{\"lib\":\"cm-does-not-exist\"},{\"lib\":\"cm-pkcs12\"}]},"
-        "\"certCache\":{\"path\":\"\"},\"crlCache\":{\"path\":\"\"},\"offline\":true}}";
+        "\"certCache\":{\"path\":\"\"},\"crlCache\":{\"path\":\"\"},\"offline\":true"
+        + string(self_test_done ? ",\"skipSelfTest\":true" : "") + "}}";
 }
 
 static string request_open (const string& storage, const string& password, const char* mode)
@@ -592,6 +606,30 @@ static bool call_ok (
     const bool ok = api.call(request, response) && response.ok();
     if (!ok) checker.fail(what + ": " + response.error);
     return ok;
+}
+
+//  First session: INIT without skipSelfTest runs the self-test of the crypto library
+//  (an error SELF_TEST_FAIL is returned if it fails); later sessions skip it
+static bool run_self_test (UapkiSessionLoader& loader)
+{
+    Checker checker;
+    Response resp;
+    UAPKI_SESSION* session = loader.sessionCreate();
+    if (checker.check(session != nullptr, "uapki_session_create")) {
+        Api api(loader, session);
+        const chrono::steady_clock::time_point dt_start = chrono::steady_clock::now();
+        if (call_ok(api, request_init(true), resp, checker, "INIT with self-test")) {
+            self_test_done = true;
+        }
+        const int elapsed = (int)elapsed_ms(dt_start);
+        api.call(request_method("DEINIT"));
+        loader.sessionFree(session);
+        checker.report(("self-test of the crypto library in the first session (" + to_string(elapsed) + " ms), later INITs skip it").c_str());
+    }
+    else {
+        checker.report("self-test of the crypto library in the first session");
+    }
+    return checker.passed();
 }
 
 //  A session is ready for CAdES signing after INIT and adding the signer certificate to its cache
@@ -1949,7 +1987,7 @@ int main (int argc, char* argv[])
         return show_usage("Can't prepare the shared memory test data");
     }
 
-    bool ok = true;
+    bool ok = run_self_test(loader);
     if (options.runBenchmark) {
         ok = run_benchmark(loader, options, storages);
         ok = run_shared_memory_benchmark(loader, options, shared_setup) && ok;

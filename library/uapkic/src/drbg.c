@@ -28,6 +28,10 @@
 #define FILE_MARKER "uapkic/drbg.c"
 
 #include <string.h>
+#include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include "drbg.h"
 #include "pthread-internal.h"
 #include "entropy-internal.h"
@@ -36,12 +40,29 @@
 
 #include "hmac.h"
 
-static ByteArray *drbg_Key = NULL;
-static ByteArray *drbg_V = NULL;
-static size_t drbg_reseed_counter = 0;
-static bool drbg_prediction_resistance = false;
-static HmacCtx* drbg_hmac_ctx = NULL;
-static pthread_mutex_t drbg_mutex = PTHREAD_MUTEX_INITIALIZER;
+struct DrbgCtx_st {
+	ByteArray* key;
+	ByteArray* v;
+	HmacCtx* hmac_ctx;
+	size_t reseed_counter;
+	bool prediction_resistance;
+#ifndef _WIN32
+	pid_t pid;                  //  process that instantiated or reseeded the state, see fork()
+#endif
+	pthread_mutex_t mutex;
+};
+
+//  Global instance, used by drbg_random()/drbg_reseed() and all library code
+#ifndef _WIN32
+static DrbgCtx drbg_global = { NULL, NULL, NULL, 0, false, 0, PTHREAD_MUTEX_INITIALIZER };
+#else
+static DrbgCtx drbg_global = { NULL, NULL, NULL, 0, false, PTHREAD_MUTEX_INITIALIZER };
+#endif
+
+//  Reseed interval (number of generate requests), SP 800-90A allows up to 2^48
+#define DRBG_RESEED_INTERVAL    1000000
+//  Max bytes per generate request (512 KiB, kept as before; SP 800-90A limit is 2^19 bits)
+#define DRBG_MAX_REQUEST_LEN    (1 << 19)
 
 static const uint8_t _separator0 = 0x00;
 static const uint8_t _separator1 = 0x01;
@@ -49,194 +70,290 @@ static const uint8_t _separator1 = 0x01;
 static const ByteArray separator0 = { (uint8_t*)&_separator0, sizeof(_separator0) };
 static const ByteArray separator1 = { (uint8_t*)&_separator1, sizeof(_separator1) };
 
-static void drbg_free_internal(void)
+//  Static functions below do not lock ctx->mutex, the caller holds it
+
+static void drbg_uninstantiate(DrbgCtx* ctx)
 {
-	hmac_free(drbg_hmac_ctx);
-	drbg_hmac_ctx = NULL;
-	ba_free(drbg_Key);
-	drbg_Key = NULL;
-	ba_free(drbg_V);
-	drbg_V = NULL;
-	drbg_reseed_counter = 0;
+	hmac_free(ctx->hmac_ctx);
+	ctx->hmac_ctx = NULL;
+	ba_free_private(ctx->key);
+	ctx->key = NULL;
+	ba_free_private(ctx->v);
+	ctx->v = NULL;
+	ctx->reseed_counter = 0;
 }
 
-static int drbg_update(const ByteArray *provided_data)
+static bool drbg_is_instantiated(const DrbgCtx* ctx)
+{
+	return (ctx->key != NULL) && (ctx->v != NULL) && (ctx->hmac_ctx != NULL);
+}
+
+static int drbg_update(DrbgCtx* ctx, const ByteArray *provided_data)
 {
 	int ret = RET_OK;
 	ByteArray* tmp = NULL;
-	
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_update(drbg_hmac_ctx, &separator0));
+
+	DO(hmac_init(ctx->hmac_ctx, ctx->key));
+	DO(hmac_update(ctx->hmac_ctx, ctx->v));
+	DO(hmac_update(ctx->hmac_ctx, &separator0));
 
 	if (provided_data != NULL) {
-		DO(hmac_update(drbg_hmac_ctx, provided_data));
+		DO(hmac_update(ctx->hmac_ctx, provided_data));
 	}
 
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_Key);
-	drbg_Key = tmp;
+	DO(hmac_final(ctx->hmac_ctx, &tmp));
+	ba_free_private(ctx->key);
+	ctx->key = tmp;
 	tmp = NULL;
 
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_V);
-	drbg_V = tmp;
+	DO(hmac_init(ctx->hmac_ctx, ctx->key));
+	DO(hmac_update(ctx->hmac_ctx, ctx->v));
+	DO(hmac_final(ctx->hmac_ctx, &tmp));
+	ba_free_private(ctx->v);
+	ctx->v = tmp;
 	tmp = NULL;
 
 	if (provided_data == NULL) {
 		goto cleanup;
 	}
 
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_update(drbg_hmac_ctx, &separator1));
-	DO(hmac_update(drbg_hmac_ctx, provided_data));
+	DO(hmac_init(ctx->hmac_ctx, ctx->key));
+	DO(hmac_update(ctx->hmac_ctx, ctx->v));
+	DO(hmac_update(ctx->hmac_ctx, &separator1));
+	DO(hmac_update(ctx->hmac_ctx, provided_data));
 
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_Key);
-	drbg_Key = tmp;
+	DO(hmac_final(ctx->hmac_ctx, &tmp));
+	ba_free_private(ctx->key);
+	ctx->key = tmp;
 	tmp = NULL;
 
-	DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-	DO(hmac_update(drbg_hmac_ctx, drbg_V));
-	DO(hmac_final(drbg_hmac_ctx, &tmp));
-	ba_free_private(drbg_V);
-	drbg_V = tmp;
+	DO(hmac_init(ctx->hmac_ctx, ctx->key));
+	DO(hmac_update(ctx->hmac_ctx, ctx->v));
+	DO(hmac_final(ctx->hmac_ctx, &tmp));
+	ba_free_private(ctx->v);
+	ctx->v = tmp;
 	tmp = NULL;
 
 cleanup:
 	return ret;
 }
 
-static int drbg_init_internal(const ByteArray *entropy)
+//  Instantiate with the given entropy. Fixed entropy is used only by the self-test, so not exported
+static int drbg_instantiate(DrbgCtx* ctx, const ByteArray *entropy)
 {
 	int ret = RET_OK;
 
-	CHECK_NOT_NULL(drbg_hmac_ctx = hmac_alloc(HASH_ALG_SHA512));
-	CHECK_NOT_NULL(drbg_Key = ba_alloc_by_len(64));
-	CHECK_NOT_NULL(drbg_V = ba_alloc_by_len(64));
+	drbg_uninstantiate(ctx);
 
-	memset(drbg_Key->buf, 0x00, drbg_Key->len);
-	memset(drbg_V->buf, 0x01, drbg_V->len);
+	CHECK_NOT_NULL(ctx->hmac_ctx = hmac_alloc(HASH_ALG_SHA512));
+	CHECK_NOT_NULL(ctx->key = ba_alloc_by_len(64));
+	CHECK_NOT_NULL(ctx->v = ba_alloc_by_len(64));
 
-	DO(drbg_update(entropy));
-	drbg_reseed_counter = 1;
+	memset(ctx->key->buf, 0x00, ctx->key->len);
+	memset(ctx->v->buf, 0x01, ctx->v->len);
+
+	DO(drbg_update(ctx, entropy));
+	ctx->reseed_counter = 1;
+#ifndef _WIN32
+	ctx->pid = getpid();
+#endif
 
 cleanup:
-	if (ret != 0) {
-		drbg_free_internal();
+	if (ret != RET_OK) {
+		drbg_uninstantiate(ctx);
 	}
 	return ret;
 }
 
-int drbg_init(void)
+static int drbg_instantiate_from_entropy_source(DrbgCtx* ctx)
 {
 	int ret = RET_OK;
 	ByteArray *entropy = NULL;
 
 	DO(entropy_get(&entropy));
 
-	DO(drbg_init_internal(entropy));
+	DO(drbg_instantiate(ctx, entropy));
 
 cleanup:
 	ba_free_private(entropy);
 	return ret;
 }
 
-static int drbg_reseed_internal(const ByteArray* seed_material)
+static int drbg_reseed_internal(DrbgCtx* ctx, const ByteArray* seed_material)
 {
 	int ret = RET_OK;
 
-	DO(drbg_update(seed_material));
+	DO(drbg_update(ctx, seed_material));
 
-	drbg_reseed_counter = 1;
+	ctx->reseed_counter = 1;
 
 cleanup:
 	return ret;
 }
 
-int drbg_reseed(const ByteArray* additional_input)
+static int drbg_reseed_from_entropy_source(DrbgCtx* ctx, const ByteArray* additional_input)
 {
 	int ret = RET_OK;
 	ByteArray* seed_material = NULL;
 	ByteArray* entropy = NULL;
 
-	pthread_mutex_lock(&drbg_mutex);
-
-	if (drbg_Key == NULL || drbg_V == NULL || drbg_hmac_ctx == NULL) {
-		DO(drbg_init());
+	if (!drbg_is_instantiated(ctx)) {
+		DO(drbg_instantiate_from_entropy_source(ctx));
 	}
 
 	DO(entropy_get(&entropy));
 
+	//  SP 800-90A 10.1.2.4: seed_material = entropy_input || additional_input, one update
 	if (additional_input != NULL) {
 		CHECK_NOT_NULL(seed_material = ba_join(entropy, additional_input));
-		DO(drbg_reseed_internal(seed_material));
+		DO(drbg_reseed_internal(ctx, seed_material));
 	}
 	else {
-		DO(drbg_reseed_internal(entropy));
+		DO(drbg_reseed_internal(ctx, entropy));
 	}
-
-	DO(drbg_reseed_internal(additional_input));
+#ifndef _WIN32
+	ctx->pid = getpid();
+#endif
 
 cleanup:
-	pthread_mutex_unlock(&drbg_mutex);
 	ba_free_private(seed_material);
 	ba_free_private(entropy);
 	return ret;
 }
 
-static int drbg_random_internal(ByteArray* random)
+static int drbg_generate(DrbgCtx* ctx, ByteArray* random)
 {
 	int ret = RET_OK;
 	uint8_t* bufptr = random->buf;
 	size_t current_len, outlen = random->len;
 	ByteArray* tmp = NULL;
 
-	if (outlen > (1 << 19)) {
-		return -1;
-	}
-	
-	if (drbg_Key == NULL || drbg_V == NULL || drbg_hmac_ctx == NULL) {
-		DO(drbg_init());
+	if (outlen > DRBG_MAX_REQUEST_LEN) {
+		return RET_DATA_TOO_LONG;
 	}
 
-	if ((drbg_reseed_counter > 1000000) || drbg_prediction_resistance) {
-		DO(drbg_reseed_internal(NULL));
+	if (!drbg_is_instantiated(ctx)) {
+		DO(drbg_instantiate_from_entropy_source(ctx));
 	}
 
-	drbg_reseed_counter++;
+	if ((ctx->reseed_counter > DRBG_RESEED_INTERVAL) || ctx->prediction_resistance) {
+		DO(drbg_reseed_from_entropy_source(ctx, NULL));
+	}
+#ifndef _WIN32
+	else if (ctx->pid != getpid()) {
+		//  Child after fork() has a copy of the parent state: reseed, otherwise both produce the same output
+		DO(drbg_reseed_from_entropy_source(ctx, NULL));
+	}
+#endif
+
+	ctx->reseed_counter++;
 
 	while (outlen > 0) {
-		DO(hmac_init(drbg_hmac_ctx, drbg_Key));
-		DO(hmac_update(drbg_hmac_ctx, drbg_V));
-		DO(hmac_final(drbg_hmac_ctx, &tmp));
-		ba_free_private(drbg_V);
-		drbg_V = tmp;
+		DO(hmac_init(ctx->hmac_ctx, ctx->key));
+		DO(hmac_update(ctx->hmac_ctx, ctx->v));
+		DO(hmac_final(ctx->hmac_ctx, &tmp));
+		ba_free_private(ctx->v);
+		ctx->v = tmp;
 		tmp = NULL;
 
-		current_len = (drbg_V->len > outlen) ? outlen : drbg_V->len;
-		memcpy(bufptr, drbg_V->buf, current_len);
+		current_len = (ctx->v->len > outlen) ? outlen : ctx->v->len;
+		memcpy(bufptr, ctx->v->buf, current_len);
 
 		bufptr += current_len;
 		outlen -= current_len;
 	}
 
-	DO(drbg_update(NULL));
+	DO(drbg_update(ctx, NULL));
 
 cleanup:
 	return ret;
 }
- 
-int drbg_random(ByteArray* random)
+
+DrbgCtx* drbg_alloc(void)
+{
+	DrbgCtx* ctx = (DrbgCtx*)calloc(1, sizeof(DrbgCtx));
+
+	if (ctx == NULL) {
+		return NULL;
+	}
+
+	if (pthread_mutex_init(&ctx->mutex, NULL) != 0) {
+		free(ctx);
+		return NULL;
+	}
+
+	return ctx;
+}
+
+void drbg_free(DrbgCtx* ctx)
+{
+	if ((ctx == NULL) || (ctx == &drbg_global)) {
+		return;
+	}
+
+	drbg_uninstantiate(ctx);
+	pthread_mutex_destroy(&ctx->mutex);
+	free(ctx);
+}
+
+int drbg_init_ex(DrbgCtx* ctx)
 {
 	int ret;
-	pthread_mutex_lock(&drbg_mutex);
-	ret = drbg_random_internal(random);
-	pthread_mutex_unlock(&drbg_mutex);
+
+	if (ctx == NULL) {
+		return RET_INVALID_PARAM;
+	}
+
+	pthread_mutex_lock(&ctx->mutex);
+	ret = drbg_instantiate_from_entropy_source(ctx);
+	pthread_mutex_unlock(&ctx->mutex);
+
 	return ret;
+}
+
+int drbg_reseed_ex(DrbgCtx* ctx, const ByteArray* additional_input)
+{
+	int ret;
+
+	if (ctx == NULL) {
+		return RET_INVALID_PARAM;
+	}
+
+	pthread_mutex_lock(&ctx->mutex);
+	ret = drbg_reseed_from_entropy_source(ctx, additional_input);
+	pthread_mutex_unlock(&ctx->mutex);
+
+	return ret;
+}
+
+int drbg_random_ex(DrbgCtx* ctx, ByteArray* random)
+{
+	int ret;
+
+	if ((ctx == NULL) || (random == NULL)) {
+		return RET_INVALID_PARAM;
+	}
+
+	pthread_mutex_lock(&ctx->mutex);
+	ret = drbg_generate(ctx, random);
+	pthread_mutex_unlock(&ctx->mutex);
+
+	return ret;
+}
+
+int drbg_init(void)
+{
+	return drbg_init_ex(&drbg_global);
+}
+
+int drbg_reseed(const ByteArray* additional_input)
+{
+	return drbg_reseed_ex(&drbg_global, additional_input);
+}
+
+int drbg_random(ByteArray* random)
+{
+	return drbg_random_ex(&drbg_global, random);
 }
 
 int drbg_self_test(void)
@@ -276,28 +393,25 @@ int drbg_self_test(void)
 	static const ByteArray ba_test_reseed_entropy = { (uint8_t*)&test_drbg_reseed_entropy, sizeof(test_drbg_reseed_entropy) };
 
 	int ret = RET_OK;
+	DrbgCtx* ctx = NULL;
 	ByteArray *test_drbg_out = NULL;
-	
-	if (drbg_Key || drbg_V || drbg_hmac_ctx) {
-		return RET_SELF_TEST_NOT_ALLOWED;
-	}
 
-	pthread_mutex_lock(&drbg_mutex);
+	//  Known-answer test on a separate instance, the global one is not touched
+	CHECK_NOT_NULL(ctx = drbg_alloc());
 
-	DO(drbg_init_internal(&ba_test_drbg_init_entropy));
-	DO(drbg_reseed_internal(&ba_test_reseed_entropy));
+	DO(drbg_instantiate(ctx, &ba_test_drbg_init_entropy));
+	DO(drbg_reseed_internal(ctx, &ba_test_reseed_entropy));
 
 	CHECK_NOT_NULL(test_drbg_out = ba_alloc_by_len(sizeof(test_drbg_expected_bits)));
 
-	DO(drbg_random_internal(test_drbg_out));
-	DO(drbg_random_internal(test_drbg_out));
+	DO(drbg_generate(ctx, test_drbg_out));
+	DO(drbg_generate(ctx, test_drbg_out));
 	if (memcmp(test_drbg_out->buf, test_drbg_expected_bits, sizeof(test_drbg_expected_bits)) != 0) {
 		SET_ERROR(RET_SELF_TEST_FAIL);
 	}
 
 cleanup:
-	drbg_free_internal();
-	pthread_mutex_unlock(&drbg_mutex);
+	drbg_free(ctx);
 	ba_free(test_drbg_out);
 	return ret;
 }

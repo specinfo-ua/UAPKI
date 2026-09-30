@@ -115,15 +115,12 @@ int Session::initCryptoLibrary (
         uint32_t* selfTestStatus
 )
 {
+    //  uapkic_init() initializes DRBG once per process; the self-test runs on every call
+    //  with selfTestStatus (INIT without skipSelfTest), it does not touch the global DRBG state
     static mutex mtx;
-    static bool initialized = false;
 
     lock_guard<mutex> lock(mtx);
-    if (initialized) return RET_OK;
-
-    const int ret = uapkic_init(nullptr, selfTestStatus);
-    initialized = (ret == RET_OK);
-    return ret;
+    return uapkic_init(nullptr, selfTestStatus);
 }
 
 int Session::initHttp (void)
