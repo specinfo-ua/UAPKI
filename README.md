@@ -31,14 +31,17 @@ Fork of [Cryptonite](https://github.com/privat-it/cryptonite).
 + Asymmetric ciphers: RSA
 + Key agreement: ECDH
 
-## Supported palforms
+## Supported platforms
 
-+ Microsoft Windows x86 and x86-64
-+ Linux x86-64, armv7 (32 bit), armv8 (64 bit)
-+ FreeBSD x86-64, armv8
-+ Apple macOS x86-64, armv8 (Apple M1)
-+ Apple iOS, iPadOS armv8
-+ Google Android armv8, x86-64
++ Microsoft Windows x86 and x86-64 (Windows Vista / Server 2008 or later)
++ Linux x86-64, armv7 (32 bit), armv8 (64 bit) (kernel 3.17 or later)
++ FreeBSD x86-64, armv8 (FreeBSD 12 or later)
++ Apple macOS x86-64, armv8 (Apple M1) (macOS 10.12 or later)
++ Apple iOS, iPadOS armv8 (iOS 10 or later)
++ Google Android armv8, x86-64 (Android 9, API level 28 or later)
++ WebAssembly: browsers and Node.js with Web Crypto API (built with Emscripten 2.0.5 or later)
+
+The minimum versions are determined by the operating system entropy source used by the library: BCryptGenRandom (Windows), getrandom (Linux, Android), getentropy (macOS, iOS, FreeBSD, WebAssembly). There is no fallback to /dev/urandom.
 
 ## Telegram group for developers
 https://t.me/joinchat/UTjOABGHYxEqUYDp

@@ -29,114 +29,110 @@
 
 #include <time.h>
 #include <string.h>
+#include <limits.h>
 
 #ifdef _WIN32
 #   include <windows.h>
-#   if !defined(_WIN32_WCE)
-#       include <wincrypt.h>
-#   endif
+#   include <bcrypt.h>
 #else
-#   include <sys/time.h>
+#   include <errno.h>
+#   include <unistd.h>
+#   if defined(__linux__)
+#       include <sys/syscall.h>
+#   endif
+#   if defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
+#       include <sys/random.h>
+#   endif
 #endif
 
 #include "entropy.h"
 #include "jitterentropy-internal.h"
+#include "pthread-internal.h"
 #include "word-internal.h"
 #include "math-int-internal.h"
 #include "macros-internal.h"
 #include "byte-utils-internal.h"
 
-#ifndef __EMSCRIPTEN__
+#if defined(_WIN32)
+
+/* Системний ГПВП Windows (BCryptGenRandom), без відкриття провайдера алгоритму */
 static int os_prng(void *rnd, size_t size)
+{
+    uint8_t *p = (uint8_t *)rnd;
+
+    while (size > 0) {
+        const ULONG chunk = (size > ULONG_MAX) ? ULONG_MAX : (ULONG)size;
+        if (!BCRYPT_SUCCESS(BCryptGenRandom(NULL, p, chunk, BCRYPT_USE_SYSTEM_PREFERRED_RNG))) {
+            return RET_OS_PRNG_ERROR;
+        }
+        p += chunk;
+        size -= chunk;
+    }
+
+    return RET_OK;
+}
+
+#else
+
+static int os_prng(void *rnd, size_t size)
+{
+    uint8_t *p = (uint8_t *)rnd;
+
+#if defined(__linux__)
+#   if !defined(SYS_getrandom)
+#       error "SYS_getrandom is not defined: Linux kernel headers 3.17 or later are required"
+#   endif
+    /* Linux, Android: системний виклик getrandom (не залежить від версії glibc;
+       блокується, доки пул ентропії ядра не ініціалізовано) */
+    while (size > 0) {
+        const long n = syscall(SYS_getrandom, p, size, 0);
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return RET_OS_PRNG_ERROR;
+        }
+        p += n;
+        size -= (size_t)n;
+    }
+    return RET_OK;
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__EMSCRIPTEN__)
+    /* macOS, iOS, FreeBSD, OpenBSD, Emscripten: getentropy, не більше 256 байтів за виклик */
+    while (size > 0) {
+        const size_t chunk = (size > 256) ? 256 : size;
+        if (getentropy(p, chunk) != 0) {
+            return RET_OS_PRNG_ERROR;
+        }
+        p += chunk;
+        size -= chunk;
+    }
+    return RET_OK;
+#else
+#   error "Unsupported platform: no OS entropy source"
+#endif
+}
+
+#endif
+
+#ifndef __EMSCRIPTEN__
+static pthread_mutex_t jent_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int jent_initialized = 0;
+
+/* Стартова перевірка jitterentropy: один раз на процес, повторно - лише на вимогу самотестування */
+static int jent_init(int force)
 {
     int ret = RET_OK;
 
-#if defined(_WIN32) && !defined(_WIN32_WCE)
-    /* Намагаємося використати CryptGenRandom */
-        HCRYPTPROV hProv;
-
-        if (CryptAcquireContextA(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) == 0) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
+    pthread_mutex_lock(&jent_init_mutex);
+    if (force || !jent_initialized) {
+        jent_initialized = (jent_entropy_init() == 0);
+        if (!jent_initialized) {
+            ret = RET_JITTER_RNG_ERROR;
         }
+    }
+    pthread_mutex_unlock(&jent_init_mutex);
 
-        if (CryptGenRandom(hProv, (DWORD)size, rnd) == TRUE) {
-            CryptReleaseContext(hProv, 0);
-        } else {
-            CryptReleaseContext(hProv, 0);
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
-#else
-    /* Намагаємося використати /dev/urandom */
-        size_t readed;
-        FILE *fos = fopen("/dev/urandom", "rb");
-
-        if (fos == NULL) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
-
-        readed = fread(rnd, 1, size, fos);
-        fclose(fos);
-        if (readed != size) {
-            SET_ERROR(RET_OS_PRNG_ERROR);
-        }
-#endif
-
-cleanup:
     return ret;
-}
-#else
-#include <emscripten.h>
-
-int os_prng_init(void)
-{
-    return EM_ASM_INT({
-        if (Module.getRandomValue === undefined) {
-            try {
-                var window_ = 'object' === typeof window ? window : self;
-                var crypto_ = typeof window_.crypto !== 'undefined' ? window_.crypto : window_.msCrypto;
-                var randomValuesStandard = function() {
-                    var buf = new Uint8Array(1);
-                    crypto_.getRandomValues(buf);
-                    return buf[0] >>> 0;
-                };
-                randomValuesStandard();
-                Module.getRandomValue = randomValuesStandard;
-                return 0;
-            } catch (e) {
-                try {
-                    var crypto = require('crypto');
-                    var randomValueNodeJS = function() {
-                        var buf = crypto['randomBytes'](1);
-                        return buf[0] >>> 0;
-                    };
-                    randomValueNodeJS();
-                    Module.getRandomValue = randomValueNodeJS;
-                    return 0;
-                } catch (e) {
-                    return RET_OS_PRNG_ERROR;
-                }
-            }
-        }
-    });
-}
-
-int os_prng(void* buf, size_t n)
-{
-    uint8_t* p = (uint8_t*)buf;
-    size_t i;
-
-    if (os_prng_init() != 0) {
-        return RET_OS_PRNG_ERROR;
-    }
-
-    for (i = 0; i < n; i++)
-    {
-        p[i] = (uint8_t)EM_ASM_INT({
-           return Module.getRandomValue();
-            });
-    }
-
-    return 0;
 }
 #endif
 
@@ -154,9 +150,7 @@ int entropy_get(ByteArray** entropy)
 #ifndef __EMSCRIPTEN__
     DO(os_prng(out->buf, 256));
 
-    if (jent_entropy_init() != 0) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
+    DO(jent_init(0));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
     if (jent_read_entropy(jec, out->buf + 256, 256) != 0) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
@@ -187,9 +181,7 @@ int entropy_jitter(ByteArray* random)
     int ret = RET_OK;
     JitentCtx* jec = NULL;
 
-    if (jent_entropy_init() != 0) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
+    DO(jent_init(0));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
     if (jent_read_entropy(jec, random->buf, random->len) != 0) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
@@ -215,9 +207,7 @@ int entropy_self_test(void)
     DO(os_prng(buf, sizeof(buf)));
 
 #ifndef __EMSCRIPTEN__
-    if (jent_entropy_init() != 0) {
-        SET_ERROR(RET_JITTER_RNG_ERROR);
-    }
+    DO(jent_init(1));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
     if (jent_read_entropy(jec, buf, sizeof(buf)) != 0) {
         SET_ERROR(RET_JITTER_RNG_ERROR);

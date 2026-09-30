@@ -5,7 +5,7 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-IMAGE="emscripten/emsdk:3.1.61"
+IMAGE="emscripten/emsdk:6.0.1"
 
 docker run --rm -v "$REPO_ROOT:/src" -w /src "$IMAGE" bash -c '
 set -e

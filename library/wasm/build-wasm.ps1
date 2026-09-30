@@ -8,7 +8,7 @@
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$Image = "emscripten/emsdk:3.1.61"
+$Image = "emscripten/emsdk:6.0.1"
 
 Write-Host "Repo root: $RepoRoot"
 Write-Host "Docker image: $Image"

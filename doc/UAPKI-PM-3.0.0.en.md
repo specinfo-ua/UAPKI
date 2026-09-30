@@ -35,6 +35,17 @@ Table 1. List of binary files
 | 3     | uapkif                | Library of data formats and ASN.1 syntax handling,<br>mandatory                                                                                                                                                                    |
 | 4     | cm-<storage-name>     | Libraries for working with storages (hereinafter — storage providers). For example,<br>for a storage in the form of a PKCS#12 file this would be "cm-pkcs12".<br>Required when using functions that depend on<br>private keys (for example, data signing) |
 
+The minimum operating system versions are determined by the system entropy source the library uses to seed its DRBG (there is no fallback source such as /dev/urandom):
+
+- Microsoft Windows Vista / Windows Server 2008 or later – BCryptGenRandom (system RNG);
+- Linux with kernel 3.17 or later – the getrandom system call (waits until the kernel entropy pool is initialized);
+- Android 9 (API 28) or later – the getrandom system call;
+- macOS 10.12, iOS/iPadOS 10 or later – getentropy;
+- FreeBSD 12 or later – getentropy;
+- WebAssembly (browsers and Node.js with Web Crypto API) – getentropy (crypto.getRandomValues), built with Emscripten 2.0.5 or later.
+
+In addition to the system source, a CPU jitter based entropy source (jitterentropy) is used.
+
 Interaction with the library is performed by calling the methods listed in Table 2. Methods are invoked via the exported library functions process and json_free (the global library instance) or uapki_session_process (an explicitly created session, see "Sessions" below); their interface is described in Table 3. All interaction with the library methods is based on the use of a text string composed according to JSON rules (hereinafter — JSON string).
 
 The library supports multithreading, i.e. the ability to call methods simultaneously in parallel from different threads. Due to implementation specifics of the library, methods are divided into three types of multithreading support (the multithreading support type is specified in Table 2). The types describe how methods interact within one library instance (the global instance or one session); methods of different sessions are synchronized only while they use a shared process-wide resource (loading and unloading of a provider library, OPEN/CLOSE through the same provider, network requests to the same URL):

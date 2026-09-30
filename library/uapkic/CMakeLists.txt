@@ -94,6 +94,10 @@ if(UNIX AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android") AND (NOT CMAKE_SYSTEM_NAM
     target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
 endif()
 
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE bcrypt)
+endif()
+
 if(NOT UAPKI_DISABLE_COPY)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:uapkic> ../out/
