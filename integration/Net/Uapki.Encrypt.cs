@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -66,7 +66,7 @@ public static partial class Uapki
             parameters.RecipientInfos.Add(new RecipientInfo { CertId = recipient, KdfAlgo = kdfAlgo });
         }
 
-        string encrypt_cmd = "{\"method\":\"ENCRYPT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.EncryptParams) + "}";
+        string encrypt_cmd = Request("ENCRYPT", parameters, jsonCtx.EncryptParams);
 
         var ret = JsonSerializer.Deserialize(Process(encrypt_cmd), jsonCtx.BytesResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
@@ -101,7 +101,7 @@ public static partial class Uapki
     {
         CheckStorage();
 
-        string decrypt_cmd = "{\"method\":\"DECRYPT\",\"parameters\":{\"bytes\":\"" + Convert.ToBase64String(bytes) + "\"}}";
+        string decrypt_cmd = Request("DECRYPT", p => p.WriteBase64String("bytes", bytes));
 
         var ret = JsonSerializer.Deserialize(Process(decrypt_cmd), jsonCtx.DecryptResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)

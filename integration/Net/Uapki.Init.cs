@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -87,7 +87,7 @@ public static partial class Uapki
         if (parameters.CrlCache?.Path is not null)
             Directory.CreateDirectory(parameters.CrlCache.Path!);
 
-        string init_cmd = "{\"method\":\"INIT\",\"parameters\":" + JsonSerializer.Serialize(parameters, jsonCtx.Config) + "}";
+        string init_cmd = Request("INIT", parameters, jsonCtx.Config);
 
         var res = Process(init_cmd);
         UapkiInfo = new UapkiLibraryInfo(res);
@@ -116,7 +116,7 @@ public static partial class Uapki
         if (OpenedKeyStorage != null)
             CloseKeyStorage();
 
-        string deinit_cmd = "{\"method\":\"DEINIT\"}";
+        string deinit_cmd = Request("DEINIT");
         var ret = JsonSerializer.Deserialize(Process(deinit_cmd), jsonCtx.ErrorCodeResult) ?? throw new UapkiException(0x2001);
         if (ret.ErrorCode != 0)
             throw new UapkiException(ret.ErrorCode);

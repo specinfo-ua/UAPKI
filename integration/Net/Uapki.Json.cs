@@ -78,7 +78,7 @@ public static partial class Uapki
     [JsonSerializable(typeof(GetCertByOcspResult))]
     [JsonSerializable(typeof(OpenKeyStorageRequest))]
     [JsonSerializable(typeof(VerifyCsrResult))]
-    [JsonSerializable(typeof(ModifyCmsRequest))]
+    [JsonSerializable(typeof(ModifyCmsParameters))]
     [JsonSerializable(typeof(ModifyCmsResponse))]
 
     private partial class Json : JsonSerializerContext
