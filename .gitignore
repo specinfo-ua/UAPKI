@@ -59,3 +59,6 @@ dkms.conf
 
 # Per-platform build outputs (library/out/<platform>)
 /library/out/
+
+# Visual Studio helper cache files
+/.vs/
