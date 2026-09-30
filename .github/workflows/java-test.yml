@@ -1,0 +1,71 @@
+name: Java integration build & test
+
+on:
+  push:
+    #  every branch: tests must run after each commit pushed
+    paths:
+      - 'library/**'
+      - 'integration/Java/**'
+      - '.github/workflows/java-test.yml'
+  pull_request:
+    paths:
+      - 'library/**'
+      - 'integration/Java/**'
+      - '.github/workflows/java-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -S library -B build-native -DUAPKI_DISABLE_COPY=ON
+
+      - name: Build native libraries
+        run: cmake --build build-native --target uapki cm-pkcs12 -j"$(nproc)"
+
+      - name: Build and test
+        working-directory: integration/Java
+        env:
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}/build-native/cm-pkcs12
+          UAPKI_TEST_DATA: ${{ github.workspace }}/library/test/data
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-native/uapki:${{ github.workspace }}/build-native/uapkic:${{ github.workspace }}/build-native/uapkif:${{ github.workspace }}/build-native/cm-pkcs12
+        run: ./gradlew build -Djna.library.path=${{ github.workspace }}/build-native/uapki
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Configure
+        run: cmake -A x64 -S library -B build-native -DUAPKI_DISABLE_COPY=ON
+
+      - name: Build native libraries
+        run: cmake --build build-native --config Release --target uapki cm-pkcs12
+
+      - name: Build and test
+        working-directory: integration/Java
+        shell: pwsh
+        env:
+          UAPKI_CM_PROVIDERS: ${{ github.workspace }}\build-native\Release
+          UAPKI_TEST_DATA: ${{ github.workspace }}\library\test\data
+        run: ./gradlew.bat build "-Djna.library.path=${{ github.workspace }}\build-native\Release"
