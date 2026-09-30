@@ -603,6 +603,10 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 
 The method is intended for releasing the library resources that were allocated during initialization. Input parameters: none.
 
+DEINIT releases the resources of the session it is called in (the global one or one created with uapki_session_create). When DEINIT is executed in the last initialized session (counting the global session and the shared memory; freeing a session with uapki_session_free is equivalent to DEINIT), the global state of the crypto library is released as well: the DRBG state is wiped, the elliptic curve parameter cache and error stacks are freed. The application must guarantee that no other thread uses the library at that moment, including methods that do not require INIT (DIGEST, ASN1_DECODE, etc.). After that the library can be initialized again with INIT.
+
+If the library is linked statically into a module (DLL, shared library) that can be unloaded while the process keeps running, DEINIT must be executed in all initialized sessions before the module is unloaded.
+
 Output parameters: none.
 
 ### Request example

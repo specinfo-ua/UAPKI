@@ -92,6 +92,7 @@ class Session {
     std::unique_ptr<CmStorageProxy>
                 m_Storage;
     bool        m_HttpInitialized;
+    bool        m_CryptoLibraryAcquired;    //  the session is counted in the users of the crypto library
 
 public:
     Session (void);
@@ -112,9 +113,10 @@ public:
         return m_CrlStore.get();
     }
 
-    static int initCryptoLibrary (
+    int initCryptoLibrary (
         uint32_t* selfTestStatus
     );
+    void releaseCryptoLibrary (void);
     int initHttp (void);
     void deinit (void);
     void releaseConfig (void);

@@ -346,6 +346,14 @@ int drbg_init(void)
 	return drbg_init_ex(&drbg_global);
 }
 
+//  Wipes and releases the state of the global instance; it is instantiated again on the next use
+void drbg_deinit(void)
+{
+	pthread_mutex_lock(&drbg_global.mutex);
+	drbg_uninstantiate(&drbg_global);
+	pthread_mutex_unlock(&drbg_global.mutex);
+}
+
 int drbg_reseed(const ByteArray* additional_input)
 {
 	return drbg_reseed_ex(&drbg_global, additional_input);

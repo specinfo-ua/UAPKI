@@ -29,6 +29,7 @@
 
 #include "uapkic.h"
 #include "ec-cache-internal.h"
+#include "stacktrace.h"
 #include "macros-internal.h"
 
 uint32_t uapkic_self_test(void)
@@ -85,6 +86,7 @@ uint32_t uapkic_self_test(void)
 }
 
 int drbg_init(void);
+void drbg_deinit(void);
 
 static int initialized = 0;
 
@@ -117,6 +119,14 @@ int uapkic_init(const char** version, uint32_t* self_test_status)
 
 cleanup:
 	return ret;
+}
+
+void uapkic_deinit(void)
+{
+	drbg_deinit();
+	ec_cache_free();
+	stacktrace_finalize();
+	initialized = 0;
 }
 
 const char* uapkic_version(void)

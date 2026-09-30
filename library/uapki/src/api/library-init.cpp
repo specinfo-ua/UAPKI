@@ -245,7 +245,7 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 
     if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
 
-    DO(Session::initCryptoLibrary(p_selftest_status));
+    DO(session.initCryptoLibrary(p_selftest_status));
 
     if (!fn_config.empty()) {
         DO(load_config(json, fn_config));

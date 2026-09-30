@@ -46,7 +46,7 @@
 #define PTHREAD_MUTEX_DEFAULT       {0}
 #define PTHREAD_MUTEX_ERRORCHECK    {0}
 #define PTHREAD_MUTEX_NORMAL        {0}
-#define PTHREAD_MUTEX_INITIALIZER   {0}
+#define PTHREAD_MUTEX_INITIALIZER   { SRWLOCK_INIT }
 #define PTHREAD_MUTEX_RECURSIVE     {0}
 #define PTHREAD_ONCE_INIT           10
 #define PTHREAD_PRIO_INHERIT        11
@@ -75,11 +75,9 @@ typedef struct {
     int detach;
 } pthread_attr_t;
 
+//  Non-recursive mutex on SRWLOCK: statically initialized, needs no kernel handle
 typedef struct {
-    HANDLE mutex;
-    int destroyed;
-    int init;
-    int lockedOrReferenced;
+    SRWLOCK lock;
 } pthread_mutex_t;
 
 typedef struct {

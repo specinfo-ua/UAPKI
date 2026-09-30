@@ -94,6 +94,8 @@ int pthread_join(pthread_t thread, void **value_ptr)
         }
     }
 
+    CloseHandle(thread.handle);
+
     return 0;
 }
 
@@ -119,77 +121,41 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 {
     (void)attr;
 
-    if (mutex) {
-        if (mutex->init && !mutex->destroyed) {
-            return EBUSY;
-        }
-
-        mutex->mutex = CreateMutex(NULL, FALSE, NULL);
-        mutex->destroyed = 0;
-        mutex->init = 1;
-        mutex->lockedOrReferenced = 0;
+    if (!mutex) {
+        return EINVAL;
     }
+
+    InitializeSRWLock(&mutex->lock);
 
     return 0;
 }
 
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
     if (!mutex) {
         return EINVAL;
     }
 
-    if (!mutex->mutex) {
-        pthread_mutex_init(mutex, NULL);
-    }
+    AcquireSRWLockExclusive(&mutex->lock);
 
-    if (!mutex->mutex) {
-        return EINVAL;
-    }
-
-    ret = WaitForSingleObject(mutex->mutex, INFINITE);
-
-    if (ret != WAIT_FAILED) {
-        mutex->lockedOrReferenced = 1;
-        return 0;
-    } else {
-        return EINVAL;
-    }
+    return 0;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-    DWORD ret;
-
     if (!mutex) {
         return EINVAL;
     }
 
-    ret = ReleaseMutex(mutex->mutex);
+    ReleaseSRWLockExclusive(&mutex->lock);
 
-    if (ret != 0) {
-        mutex->lockedOrReferenced = 0;
-        return 0;
-    } else {
-        return EPERM;
-    }
+    return 0;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-    if (!mutex) {
-        return EINVAL;
-    }
-
-    if (mutex->lockedOrReferenced) {
-        return EBUSY;
-    }
-
-    mutex->destroyed = 1;
-
-    return 0;
+    //  SRWLOCK holds no resources
+    return (mutex) ? 0 : EINVAL;
 }
 
 int pthread_attr_init(pthread_attr_t* attr)

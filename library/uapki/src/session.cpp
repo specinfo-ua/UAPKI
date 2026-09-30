@@ -95,6 +95,7 @@ Session::Session (void)
     , m_CerStore(new Cert::CerStore())
     , m_CrlStore(new Crl::CrlStore())
     , m_HttpInitialized(false)
+    , m_CryptoLibraryAcquired(false)
 {
     DEBUG_OUTCON(puts("Session::Session()"));
 }
@@ -111,16 +112,36 @@ Session& Session::global (void)
     return *session;
 }
 
+//  Sessions (including the global one) that initialized the crypto library: when the last one
+//  is deinitialized, the global state of uapkic (DRBG, EC cache, error stacks) is released.
+//  The application guarantees that nothing else uses the library at that moment.
+static mutex crypto_library_mutex;
+static size_t crypto_library_sessions = 0;
+
 int Session::initCryptoLibrary (
         uint32_t* selfTestStatus
 )
 {
-    //  uapkic_init() initializes DRBG once per process; the self-test runs on every call
-    //  with selfTestStatus (INIT without skipSelfTest), it does not touch the global DRBG state
-    static mutex mtx;
+    //  uapkic_init() initializes DRBG once; the self-test runs on every call with selfTestStatus
+    //  (INIT without skipSelfTest), it does not touch the global DRBG state
+    lock_guard<mutex> lock(crypto_library_mutex);
+    const int ret = uapkic_init(nullptr, selfTestStatus);
+    if ((ret == RET_OK) && !m_CryptoLibraryAcquired) {
+        m_CryptoLibraryAcquired = true;
+        crypto_library_sessions++;
+    }
+    return ret;
+}
 
-    lock_guard<mutex> lock(mtx);
-    return uapkic_init(nullptr, selfTestStatus);
+void Session::releaseCryptoLibrary (void)
+{
+    lock_guard<mutex> lock(crypto_library_mutex);
+    if (!m_CryptoLibraryAcquired) return;
+
+    m_CryptoLibraryAcquired = false;
+    if (--crypto_library_sessions == 0) {
+        uapkic_deinit();
+    }
 }
 
 int Session::initHttp (void)
@@ -141,6 +162,7 @@ void Session::deinit (void)
     releaseProviders();
     releaseStores();
     releaseHttp();
+    releaseCryptoLibrary();
 }
 
 void Session::releaseConfig (void)

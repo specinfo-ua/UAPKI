@@ -484,15 +484,10 @@ cleanup:
     return ret;
 }
 
+//  The caller guarantees that no other thread uses the cache (see uapkic_deinit)
 void ec_cache_free(void)
 {
     pthread_mutex_lock(&ec_cache_mutex);
-
-#if defined(_WIN32)
-    Sleep(1000);
-#else
-    sleep(1);
-#endif
 
     if (ec_cache) {
         EcCache* ec_cache_next = ec_cache;
