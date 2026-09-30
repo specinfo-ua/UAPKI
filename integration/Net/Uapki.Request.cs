@@ -32,7 +32,7 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private static readonly JsonWriterOptions requestWriterOpts = new JsonWriterOptions
     {

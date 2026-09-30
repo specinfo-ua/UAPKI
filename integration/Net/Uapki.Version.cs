@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class VersionInfo
     {
@@ -49,7 +49,7 @@ public static partial class Uapki
         public string? Method { get; init; }
     }
 
-    public static string GetVersion()
+    public string GetVersion()
     {
         string version_cmd = Request("VERSION");
 

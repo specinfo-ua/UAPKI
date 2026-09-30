@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class ModifyCmsParameters
     {
@@ -121,7 +121,7 @@ public static partial class Uapki
     /// видалення (remove), потім додавання (add). Якщо щось додано або видалено, новий PKCS#7-підпис
     /// повертається в ModifyCmsResult.Bytes
     /// </summary>
-    public static ModifyCmsResult ModifyCms(byte[] cmsBytes, AddSignature? add, ModifyCmsRemove? remove = null, ModifyCmsOptions? options = null)
+    public ModifyCmsResult ModifyCms(byte[] cmsBytes, AddSignature? add, ModifyCmsRemove? remove = null, ModifyCmsOptions? options = null)
     {
         var parameters = new ModifyCmsParameters
         {
@@ -143,7 +143,7 @@ public static partial class Uapki
     /// <summary>
     /// Додати до PKCS#7-підпису підпис і/або сертифікати, а також отримати контент, сертифікати, СВС
     /// </summary>
-    public static ModifyCmsResult ModifyCms(byte[] cmsBytes, byte[]? addSignatureBytes = null, List<byte[]>? addCertificates = null, bool returnContent = false, bool returnCerts = false, bool returnCrls = false, bool returnEncodedSignerInfo = false)
+    public ModifyCmsResult ModifyCms(byte[] cmsBytes, byte[]? addSignatureBytes = null, List<byte[]>? addCertificates = null, bool returnContent = false, bool returnCerts = false, bool returnCrls = false, bool returnEncodedSignerInfo = false)
     {
         var add = (addSignatureBytes != null || (addCertificates != null && addCertificates.Count > 0)) ? new AddSignature
         {

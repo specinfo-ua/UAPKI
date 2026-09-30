@@ -30,7 +30,7 @@ using System.Text.Json.Serialization;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class Key
     {
@@ -168,7 +168,7 @@ public static partial class Uapki
         public KeysList? Result { get; init; }
     }
 
-    public static void UpdateKeysInOpenedStorage(bool withCerts = false)
+    public void UpdateKeysInOpenedStorage(bool withCerts = false)
     {
         CheckInit();
         CheckStorage();
@@ -220,7 +220,7 @@ public static partial class Uapki
         public ParametersId Parameters { get; init; } = new ParametersId();
     }
 
-    public static void SelectKeyByCert(string certId)
+    public void SelectKeyByCert(string certId)
     {
         CheckInit();
         CheckStorage();
@@ -238,7 +238,7 @@ public static partial class Uapki
         };
     }
 
-    public static void SelectKey(string keyId)
+    public void SelectKey(string keyId)
     {
         CheckInit();
         CheckStorage();
@@ -256,12 +256,12 @@ public static partial class Uapki
         };
     }
 
-    public static void SelectKey(Key key)
+    public void SelectKey(Key key)
     {
         SelectKey(key.Id);
     }
         
-    public static string SelectKeyCmd(string select_cmd)
+    public string SelectKeyCmd(string select_cmd)
     {
         CheckInit();
         CheckStorage();
@@ -281,7 +281,7 @@ public static partial class Uapki
         return res;
     }
 
-    public static void DeleteKey(Key key)
+    public void DeleteKey(Key key)
     {
         CheckInit();
         CheckStorage(KeyStorageOpenMode.RW);
@@ -308,7 +308,7 @@ public static partial class Uapki
         public KeyId? Result { get; init; }
     }
 
-    public static string GenerateKey(string label, string application, string mechanism, string parameter, bool isKep)
+    public string GenerateKey(string label, string application, string mechanism, string parameter, bool isKep)
     {
         CheckStorage(KeyStorageOpenMode.RW);
 

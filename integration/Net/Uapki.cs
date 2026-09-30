@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -33,11 +33,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace UapkiNet;
-public static partial class Uapki
+public partial class Uapki : IDisposable
 {
-    public static UapkiLibraryInfo? UapkiInfo { get; set; }
-    public static OpenedKeyStorageInfo? OpenedKeyStorage { get; set; }
-    public static SelectedKeyInfo? SelectedKey { get; set; }
+    public UapkiLibraryInfo? UapkiInfo { get; set; }
+    public OpenedKeyStorageInfo? OpenedKeyStorage { get; set; }
+    public SelectedKeyInfo? SelectedKey { get; set; }
 
 
     [DllImport("uapki", EntryPoint = "process", CallingConvention = CallingConvention.Cdecl)]
@@ -47,12 +47,136 @@ public static partial class Uapki
     [DllImport("uapki", EntryPoint = "json_free", CallingConvention = CallingConvention.Cdecl)]
     private static extern void _JsonFree(IntPtr response);
 
-    private static unsafe string Process(string request)
+    [DllImport("uapki", EntryPoint = "uapki_session_create", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr _SessionCreate();
+
+    [DllImport("uapki", EntryPoint = "uapki_session_free", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void _SessionFree(IntPtr session);
+
+    [DllImport("uapki", EntryPoint = "uapki_session_process", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr _SessionProcess(IntPtr session, IntPtr memory,
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.I1)] byte[] requestUtf8Z);
+
+    [DllImport("uapki", EntryPoint = "uapki_session_shared_memory_create", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr _SharedMemoryCreate();
+
+    [DllImport("uapki", EntryPoint = "uapki_session_shared_memory_free", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void _SharedMemoryFree(IntPtr memory);
+
+    [DllImport("uapki", EntryPoint = "uapki_session_shared_memory_process", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr _SharedMemoryProcess(IntPtr memory,
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.I1)] byte[] requestUtf8Z);
+
+    private sealed class SessionHandle : SafeHandle
+    {
+        public SessionHandle(IntPtr handle) : base(IntPtr.Zero, true) { SetHandle(handle); }
+        public override bool IsInvalid => handle == IntPtr.Zero;
+        protected override bool ReleaseHandle() { _SessionFree(handle); return true; }
+    }
+
+    private sealed class SharedMemoryHandle : SafeHandle
+    {
+        public SharedMemoryHandle(IntPtr handle) : base(IntPtr.Zero, true) { SetHandle(handle); }
+        public override bool IsInvalid => handle == IntPtr.Zero;
+        protected override bool ReleaseHandle() { _SharedMemoryFree(handle); return true; }
+    }
+
+    private enum InstanceMode { Global, Session, SharedMemory }
+
+    private readonly InstanceMode mode;
+    private readonly SessionHandle? sessionHandle;
+    private readonly SharedMemoryHandle? memoryHandle;      //  own (shared memory) or used by the session
+    private readonly Uapki? sharedMemory;                   //  keeps the shared memory object alive for the session
+
+    /// <summary>
+    /// Глобальний екземпляр бібліотеки (функція process), як у версіях 2.x
+    /// </summary>
+    public static Uapki Global { get; } = new Uapki(InstanceMode.Global);
+
+    private Uapki(InstanceMode instanceMode)
+    {
+        mode = instanceMode;
+        if (mode == InstanceMode.SharedMemory)
+            memoryHandle = new SharedMemoryHandle(CallSessionsApi(_SharedMemoryCreate));
+    }
+
+    /// <summary>
+    /// Створює сесію бібліотеки (uapki_session_create). Сесію потрібно звільнити викликом Dispose
+    /// </summary>
+    public Uapki() : this(InstanceMode.Session)
+    {
+        sessionHandle = new SessionHandle(CallSessionsApi(_SessionCreate));
+    }
+
+    /// <summary>
+    /// Створює сесію, яка використовує спільну пам'ять (кеші сертифікатів і СВС)
+    /// </summary>
+    public Uapki(Uapki sharedMemory) : this()
+    {
+        if (sharedMemory.mode != InstanceMode.SharedMemory)
+            throw new ArgumentException("Очікується екземпляр спільної пам'яті (Uapki.CreateSharedMemory)", nameof(sharedMemory));
+
+        this.sharedMemory = sharedMemory;
+        memoryHandle = sharedMemory.memoryHandle;
+    }
+
+    /// <summary>
+    /// Створює спільну пам'ять (uapki_session_shared_memory_create): кеші сертифікатів і СВС для кількох сесій.
+    /// Дозволені лише методи роботи з кешами; спільну пам'ять потрібно звільнити викликом Dispose
+    /// </summary>
+    public static Uapki CreateSharedMemory()
+    {
+        return new Uapki(InstanceMode.SharedMemory);
+    }
+
+    public bool IsGlobal => mode == InstanceMode.Global;
+    public bool IsSharedMemory => mode == InstanceMode.SharedMemory;
+
+    private static IntPtr CallSessionsApi(Func<IntPtr> create)
+    {
+        IntPtr handle;
+        try
+        {
+            handle = create();
+        }
+        catch (EntryPointNotFoundException)
+        {
+            throw new UapkiException("Помилка. Бібліотека uapki не підтримує сесії (потрібна версія 3.0 або новіша)");
+        }
+        if (handle == IntPtr.Zero)
+            throw new UapkiException("Помилка. Не вдалося створити сесію бібліотеки uapki");
+        return handle;
+    }
+
+    /// <summary>
+    /// Звільняє сесію або спільну пам'ять; для глобального екземпляра нічого не робить
+    /// </summary>
+    public void Dispose()
+    {
+        if (mode == InstanceMode.Global)
+            return;
+
+        if (mode == InstanceMode.Session)
+            sessionHandle?.Dispose();
+        else
+            memoryHandle?.Dispose();
+
+        UapkiInfo = null;
+        OpenedKeyStorage = null;
+        SelectedKey = null;
+    }
+
+    private string Process(string request)
     {
         LogMessage("REQ: " + request);
-        
+
         var req = ConvertToUtf8Z(request ?? string.Empty);
-        var p = _Process(req);
+        var p = mode switch
+        {
+            InstanceMode.Session => ProcessWithHandles(req),
+            InstanceMode.SharedMemory => ProcessWithHandles(req),
+            _ => _Process(req)
+        };
         var result = "{\"ErrorCode\":-1}";
 
         if (p != IntPtr.Zero)
@@ -65,7 +189,32 @@ public static partial class Uapki
         return result;
     }
 
-    public static string Do(string request)
+    //  The handles are referenced for the time of the call: Dispose from another thread waits until the call is done
+    private IntPtr ProcessWithHandles(byte[] req)
+    {
+        bool session_added = false, memory_added = false;
+        try
+        {
+            memoryHandle?.DangerousAddRef(ref memory_added);
+            IntPtr memory = (memoryHandle is not null) ? memoryHandle.DangerousGetHandle() : IntPtr.Zero;
+            if (mode == InstanceMode.SharedMemory)
+                return _SharedMemoryProcess(memory, req);
+
+            sessionHandle!.DangerousAddRef(ref session_added);
+            return _SessionProcess(sessionHandle.DangerousGetHandle(), memory, req);
+        }
+        catch (ObjectDisposedException)
+        {
+            throw new UapkiException(IsSharedMemory ? "Помилка. Спільну пам'ять звільнено" : "Помилка. Сесію звільнено");
+        }
+        finally
+        {
+            if (session_added) sessionHandle!.DangerousRelease();
+            if (memory_added) memoryHandle!.DangerousRelease();
+        }
+    }
+
+    public string Do(string request)
     {
         return Process(request);
     }
@@ -86,7 +235,7 @@ public static partial class Uapki
         public uint CrlsCount { get; }
         public List<CmProvider> Providers { get; }
 
-        public UapkiLibraryInfo(string response)
+        public UapkiLibraryInfo(Uapki uapki, string response)
         {
             var ret = JsonSerializer.Deserialize(response, jsonCtx.InitResult) ?? throw new UapkiException(0x2001);
             if (ret.ErrorCode != 0)
@@ -95,8 +244,9 @@ public static partial class Uapki
             CertsCount = ret.Result!.CertCache.CountCerts;
             TrustedCertsCount = ret.Result!.CertCache.CountTrustedCerts;
             CrlsCount = ret.Result!.CrlCache.CountCrls;
-            Version = GetVersion();
-            Providers = GetProviders();
+            Version = uapki.GetVersion();
+            //  The shared memory does not load providers (PROVIDERS is not allowed there)
+            Providers = uapki.IsSharedMemory ? new List<CmProvider>() : uapki.GetProviders();
         }
     }
 

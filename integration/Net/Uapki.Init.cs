@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class ErrorCodeResult
     {
@@ -67,13 +67,13 @@ public static partial class Uapki
         public InitResponse? Result { get; init; }
     }
 
-    private static void CheckInit()
+    private void CheckInit()
     {
         if (UapkiInfo is null)
             throw new UapkiException("Помилка. Криптографічну бібліотеку не ініціалізовано");
     }
 
-    public static string Init(Config parameters)
+    public string Init(Config parameters)
     {
         if (UapkiInfo is not null)
             return "{}";
@@ -90,11 +90,11 @@ public static partial class Uapki
         string init_cmd = Request("INIT", parameters, jsonCtx.Config);
 
         var res = Process(init_cmd);
-        UapkiInfo = new UapkiLibraryInfo(res);
+        UapkiInfo = new UapkiLibraryInfo(this, res);
         return res;
     }
 
-    public static string Init(string? config = null)
+    public string Init(string? config = null)
     {
         if (UapkiInfo is not null)
             return "{}";
@@ -109,7 +109,7 @@ public static partial class Uapki
         return Init(conf);
     }
 
-    public static void Deinit()
+    public void Deinit()
     {
         CheckInit();
 

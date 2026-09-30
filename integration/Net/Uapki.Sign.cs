@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class Signature
     {
@@ -95,7 +95,7 @@ public static partial class Uapki
         };
     }
 
-    public static List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false)
+    public List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false)
     {
         var dataTbs = new List<DataTbs>();
 
@@ -131,7 +131,7 @@ public static partial class Uapki
         return signatures;
     }
 
-    public static void SignFiles(string[] files, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false)
+    public void SignFiles(string[] files, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false)
     {
         var dataTbs = new List<DataTbs>();
         long totalLen = 0;

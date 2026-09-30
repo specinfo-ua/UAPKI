@@ -28,7 +28,7 @@
 using System.Text.Json;
 
 namespace UapkiNet;
-public static partial class Uapki
+public partial class Uapki
 {
     private class DigestParams
     {
@@ -51,7 +51,7 @@ public static partial class Uapki
         public DigestValue? Result { get; init; }
     }
 
-    public static byte[] GetDigest(byte[] bytes, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
+    public byte[] GetDigest(byte[] bytes, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
     {
         var parameters = new DigestParams() { HashAlgo = hashAlgo?.Oid(), SignAlgo = signAlgo?.Oid(), Bytes = bytes };
 
@@ -67,7 +67,7 @@ public static partial class Uapki
         return ret.Result.Bytes;
     }
 
-    public static byte[] GetFileDigest(string file, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
+    public byte[] GetFileDigest(string file, HashAlgo? hashAlgo, SignAlgo? signAlgo = null)
     {
         var parameters = new DigestParams() { HashAlgo = hashAlgo?.Oid(), SignAlgo = signAlgo?.Oid(), File = file };
 

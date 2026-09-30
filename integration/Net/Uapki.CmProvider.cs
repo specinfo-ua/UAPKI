@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class CmProvider
     {
@@ -52,7 +52,7 @@ public static partial class Uapki
         public CmProviders? Result { get; init; }
     }
 
-    private static List<CmProvider> GetProviders()
+    private List<CmProvider> GetProviders()
     {
         string providers_cmd = Request("PROVIDERS");
 

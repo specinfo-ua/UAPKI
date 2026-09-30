@@ -29,7 +29,7 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     private class ContentToEncrypt
     {
@@ -51,7 +51,7 @@ public static partial class Uapki
 
     // ГОСТ 28147 з kdf ГОСТ 34.311: encryptionAlgo = "1.2.804.2.1.1.1.1.1.1.3", kdfAlgo = "1.2.804.2.1.1.1.1.3.4"
     // Калина-256 з kdf Купина-256: encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", kdfAlgo = "1.2.804.2.1.1.1.1.3.7"
-    public static byte[] Encrypt(byte[] plain, List<string> recipientsCerts, string encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", string kdfAlgo = "1.2.804.2.1.1.1.1.3.7")
+    public byte[] Encrypt(byte[] plain, List<string> recipientsCerts, string encryptionAlgo = "1.2.804.2.1.1.1.1.1.3.3.2", string kdfAlgo = "1.2.804.2.1.1.1.1.3.7")
     {
         CheckInit();
 
@@ -97,7 +97,7 @@ public static partial class Uapki
         public DecryptedData? Result { get; init; }
     }
 
-    public static DecryptedData Decrypt(byte[] bytes)
+    public DecryptedData Decrypt(byte[] bytes)
     {
         CheckStorage();
 

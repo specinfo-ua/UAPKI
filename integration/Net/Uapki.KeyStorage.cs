@@ -30,7 +30,7 @@ using System.Text.Json.Serialization;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class KeyStorage
     {
@@ -68,7 +68,7 @@ public static partial class Uapki
         }
     }
 
-    private static void CheckStorage(KeyStorageOpenMode requiredMode = KeyStorageOpenMode.RO)
+    private void CheckStorage(KeyStorageOpenMode requiredMode = KeyStorageOpenMode.RO)
     {
         CheckInit();
 
@@ -91,7 +91,7 @@ public static partial class Uapki
         public KeyStoragesList? Result { get; init; }
     }
 
-    public static List<KeyStorage> GetKeyStorages(List<CmProvider>? providers = null)
+    public List<KeyStorage> GetKeyStorages(List<CmProvider>? providers = null)
     {
         CheckInit();
 
@@ -172,7 +172,7 @@ public static partial class Uapki
         public OpenKeyStorageExtParams? OpenParams { get; init; }
     }
 
-    public static void OpenKeyStorage(KeyStorage storage, string passwd, KeyStorageOpenMode mode, OpenKeyStorageLoginParams? loginParams = null, OpenKeyStorageExtParams? openParams = null)
+    public void OpenKeyStorage(KeyStorage storage, string passwd, KeyStorageOpenMode mode, OpenKeyStorageLoginParams? loginParams = null, OpenKeyStorageExtParams? openParams = null)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -224,7 +224,7 @@ public static partial class Uapki
         public OpenKeyStorageParams? Parameters { get; init; }
     }
 
-    public static string OpenKeyStorageCmd(string open_cmd)
+    public string OpenKeyStorageCmd(string open_cmd)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -254,7 +254,7 @@ public static partial class Uapki
         return res;
     }
 
-    public static void OpenKeyStorage(string fileName, string passwd, KeyStorageOpenMode mode)
+    public void OpenKeyStorage(string fileName, string passwd, KeyStorageOpenMode mode)
     {
         if (OpenedKeyStorage is not null)
             CloseKeyStorage();
@@ -298,7 +298,7 @@ public static partial class Uapki
         UpdateKeysInOpenedStorage(true);
     }
 
-    public static void CloseKeyStorage()
+    public void CloseKeyStorage()
     {
         CheckStorage();
 
@@ -312,7 +312,7 @@ public static partial class Uapki
         SelectedKey = null;
     }
 
-    public static void ChangePassword(string newPassword)
+    public void ChangePassword(string newPassword)
     {
         CheckStorage(KeyStorageOpenMode.RW);
 

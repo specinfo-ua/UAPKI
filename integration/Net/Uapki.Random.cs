@@ -29,9 +29,9 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
-    public static byte[] GetRandomBytes(uint length)
+    public byte[] GetRandomBytes(uint length)
     {
         CheckInit();
 

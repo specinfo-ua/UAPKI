@@ -29,9 +29,9 @@ using System.Text.Json;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
-    public static byte[] GetCsr(SignAlgo? signAlgo = null)
+    public byte[] GetCsr(SignAlgo? signAlgo = null)
     {
         string get_crs_cmd = Request("GET_CSR", p =>
         {
@@ -72,7 +72,7 @@ public static partial class Uapki
         public VerifyCsrInfo? Result { get; set; }
     }
 
-    public static VerifyCsrInfo VerifyCsr(byte[] csr)
+    public VerifyCsrInfo VerifyCsr(byte[] csr)
     {
         string verify_csr_cmd = Request("VERIFY_CSR", p => p.WriteBase64String("bytes", csr));
         var ret = JsonSerializer.Deserialize(Process(verify_csr_cmd), jsonCtx.VerifyCsrResult) ?? throw new UapkiException(0x2001);

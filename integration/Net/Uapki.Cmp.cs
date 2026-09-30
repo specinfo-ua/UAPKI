@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2025, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  * 
  * Redistribution and use in source and binary forms, with or without 
  * modification, are permitted provided that the following conditions are 
@@ -38,7 +38,7 @@ using UapkiNet.Polyfil;
 /// <summary>
 /// Клієнт для роботи з CMP-сервером ЦСК за власним протоколом (тип 13). Підтримує від 1 до 4 ідентифікаторів відкритих ключів (UAKEYID).
 /// </summary>
-public static partial class Uapki
+public partial class Uapki
 {
     // OID 1.2.840.113549.1.7.1  (pkcs7-data) у DER:
     private static readonly byte[] OidPkcs7Data =

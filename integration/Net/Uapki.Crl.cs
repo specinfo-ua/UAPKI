@@ -33,7 +33,7 @@ using UapkiNet.Polyfil;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class RevokedCertInfo
     {
@@ -118,7 +118,7 @@ public static partial class Uapki
         public CrlInfo? Result { get; init; }
     }
 
-    public static CrlInfo GetCrlInfo(string crlId, bool showRevokedCerts = true)
+    public CrlInfo GetCrlInfo(string crlId, bool showRevokedCerts = true)
     {
         CheckInit();
 
@@ -138,7 +138,7 @@ public static partial class Uapki
         return ret.Result;
     }
 
-    public static CrlInfo GetCrlInfo(byte[] bytes)
+    public CrlInfo GetCrlInfo(byte[] bytes)
     {
         string crl_info_cmd = Request("CRL_INFO", p => p.WriteBase64String("bytes", bytes));
 
@@ -162,7 +162,7 @@ public static partial class Uapki
         public CrlAddResponse? Result { get; init; }
     }
 
-    public static void ImportCrl(byte[] crl, bool permanent = true)
+    public void ImportCrl(byte[] crl, bool permanent = true)
     {
         CheckInit();
 
@@ -177,7 +177,7 @@ public static partial class Uapki
             throw new UapkiException(ret.ErrorCode);
     }
 
-    public static void RemoveCrl(string crlId, bool permanent = true)
+    public void RemoveCrl(string crlId, bool permanent = true)
     {
         CheckInit();
 
@@ -208,7 +208,7 @@ public static partial class Uapki
         public CrlsList? Result { get; init; }
     }
 
-    public static List<CrlInfo> GetAllCrls(bool showCrlInfos = true, int offset = 0, int? pageSize = null)
+    public List<CrlInfo> GetAllCrls(bool showCrlInfos = true, int offset = 0, int? pageSize = null)
     {
         CheckInit();
 

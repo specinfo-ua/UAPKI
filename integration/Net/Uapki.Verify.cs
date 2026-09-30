@@ -33,7 +33,7 @@ using UapkiNet.JsonConverters;
 
 namespace UapkiNet;
 
-public static partial class Uapki
+public partial class Uapki
 {
     public class SignaturePolicy
     {
@@ -254,7 +254,7 @@ public static partial class Uapki
         public ValidationOptions? Options {get; init; }
     }
 
-    public static ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
+    public ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
     {
         var parameters = new VerifyParams()
         {
@@ -283,7 +283,7 @@ public static partial class Uapki
         }
     }
 
-    public static ValidationResult Verify(string file, string validationType = "FULL")
+    public ValidationResult Verify(string file, string validationType = "FULL")
     {
         var fi = new FileInfo(file);
         if (fi.Length > 512 * 1024 * 1024)
