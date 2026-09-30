@@ -111,13 +111,17 @@ public partial class Uapki : IDisposable
     /// <summary>
     /// Створює сесію, яка використовує спільну пам'ять (кеші сертифікатів і СВС)
     /// </summary>
-    public Uapki(Uapki sharedMemory) : this()
+    public Uapki(Uapki sharedMemory) : this(InstanceMode.Session)
     {
+        //  The argument is checked before the native session is created
+        if (sharedMemory is null)
+            throw new ArgumentNullException(nameof(sharedMemory));
         if (sharedMemory.mode != InstanceMode.SharedMemory)
             throw new ArgumentException("Очікується екземпляр спільної пам'яті (Uapki.CreateSharedMemory)", nameof(sharedMemory));
 
         this.sharedMemory = sharedMemory;
         memoryHandle = sharedMemory.memoryHandle;
+        sessionHandle = new SessionHandle(CallSessionsApi(_SessionCreate));
     }
 
     /// <summary>
@@ -177,7 +181,7 @@ public partial class Uapki : IDisposable
             InstanceMode.SharedMemory => ProcessWithHandles(req),
             _ => _Process(req)
         };
-        var result = "{\"ErrorCode\":-1}";
+        var result = "{\"errorCode\":-1}";
 
         if (p != IntPtr.Zero)
         {
@@ -195,22 +199,33 @@ public partial class Uapki : IDisposable
         bool session_added = false, memory_added = false;
         try
         {
-            memoryHandle?.DangerousAddRef(ref memory_added);
+            if (mode == InstanceMode.Session)
+                AddRef(sessionHandle!, ref session_added, "Помилка. Сесію звільнено");
+            if (memoryHandle is not null)
+                AddRef(memoryHandle, ref memory_added, "Помилка. Спільну пам'ять звільнено");
+
             IntPtr memory = (memoryHandle is not null) ? memoryHandle.DangerousGetHandle() : IntPtr.Zero;
             if (mode == InstanceMode.SharedMemory)
                 return _SharedMemoryProcess(memory, req);
 
-            sessionHandle!.DangerousAddRef(ref session_added);
-            return _SessionProcess(sessionHandle.DangerousGetHandle(), memory, req);
-        }
-        catch (ObjectDisposedException)
-        {
-            throw new UapkiException(IsSharedMemory ? "Помилка. Спільну пам'ять звільнено" : "Помилка. Сесію звільнено");
+            return _SessionProcess(sessionHandle!.DangerousGetHandle(), memory, req);
         }
         finally
         {
             if (session_added) sessionHandle!.DangerousRelease();
             if (memory_added) memoryHandle!.DangerousRelease();
+        }
+    }
+
+    private static void AddRef(SafeHandle handle, ref bool added, string releasedMessage)
+    {
+        try
+        {
+            handle.DangerousAddRef(ref added);
+        }
+        catch (ObjectDisposedException)
+        {
+            throw new UapkiException(releasedMessage);
         }
     }
 

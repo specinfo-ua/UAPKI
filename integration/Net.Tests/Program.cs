@@ -114,6 +114,20 @@ try
     var disposed = new Uapki();
     disposed.Dispose();
     Expect<UapkiException>(() => disposed.GetVersion(), "a disposed session rejects calls");
+    var released = Uapki.CreateSharedMemory();
+    using (var session = new Uapki(released))
+    {
+        released.Dispose();
+        try
+        {
+            session.GetVersion();
+            Check(false, "a session rejects calls after its shared memory is released");
+        }
+        catch (UapkiException e)
+        {
+            Check(e.Message.Contains("Спільну пам'ять звільнено"), "a session rejects calls after its shared memory is released");
+        }
+    }
     Uapki.Global.Dispose();
     Check(Uapki.Global.GetVersion().Length > 0, "Global: Dispose does nothing");
     Uapki.Global.Deinit();
