@@ -55,7 +55,7 @@ char* utf8_to_cp1251(const char * utf8_str)
         else if ((c1 & 0xE0) == 0xC0) {
             unsigned char c2 = (unsigned char)utf8_str[i + 1];
 
-            /* Перевірка: продовжний байт має бути виду 10xxxxxx,
+            /* Перевірка: байт продовження має бути вигляду 10xxxxxx,
              * а також не може бути нульовим (кінець C-рядка) */
             if ((c2 & 0xC0) != 0x80) { free(cp1251_str); return NULL; }
 
@@ -89,7 +89,7 @@ char* utf8_to_cp1251(const char * utf8_str)
             unsigned char c2 = (unsigned char)utf8_str[i + 1];
             unsigned char c3 = (unsigned char)utf8_str[i + 2];
 
-            /* Перевірка продовжних байтів */
+            /* Перевірка байтів продовження */
             if ((c2 & 0xC0) != 0x80 || (c3 & 0xC0) != 0x80) { free(cp1251_str); return NULL; }
 
             unsigned int unicode = ((c1 & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
@@ -104,7 +104,7 @@ char* utf8_to_cp1251(const char * utf8_str)
                 case 0x2019: cp1251_str[j++] = (char)0x92; break; /* Права одинарна лапка / апостроф (') */
                 case 0x201C: cp1251_str[j++] = (char)0x93; break; /* Ліва подвійна лапка (")  */
                 case 0x201D: cp1251_str[j++] = (char)0x94; break; /* Права подвійна лапка (") */
-                case 0x201E: cp1251_str[j++] = (char)0x84; break; /* Лапки-лапки („)     */
+                case 0x201E: cp1251_str[j++] = (char)0x84; break; /* Нижня подвійна лапка („) */
                 case 0x2116: cp1251_str[j++] = (char)0xB9; break; /* Знак номера (№)     */
                 default:     free(cp1251_str); return NULL;
             }
@@ -171,11 +171,11 @@ int utf8_to_utf16be (const char * in, unsigned char ** out, size_t * out_len)
             SET_ERROR(RET_INVALID_UTF8_STR);
         }
 
-        /* Читаємо та перевіряємо продовжні байти */
+        /* Читаємо та перевіряємо байти продовження */
         for (b = 1; b < bytes_to_read; b++) {
             unsigned char next_byte = (unsigned char)in[i + b];
 
-            /* Перевірка на передчасний кінець C-рядка або невалідний продовжний байт */
+            /* Перевірка на передчасний кінець C-рядка або невалідний байт продовження */
             if (next_byte == '\0' || (next_byte & 0xC0) != 0x80) {
                 free(buf);
                 SET_ERROR(RET_INVALID_UTF8_STR);

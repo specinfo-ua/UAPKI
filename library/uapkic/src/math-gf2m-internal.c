@@ -48,12 +48,12 @@
 
 #if defined(GF2M_CLMUL)
 
-/* Максимальная длина элемента поля в словах для аппаратного умножения (1024 бит). */
+/* Максимальна довжина елемента поля в словах для апаратного множення (1024 біти). */
 #define GF2M_CLMUL_MAX_LEN 16
 
 static int gf2m_clmul_state = 0;
 
-/* UAPKIC_DISABLE_CLMUL=1 в оточенні примусово вмикає програмний шлях (для тестування резервної реалізації). */
+/* UAPKIC_DISABLE_CLMUL=1 у змінних середовища примусово вмикає програмний шлях (для тестування резервної реалізації). */
 static int gf2m_clmul_detect(void)
 {
     const char *disabled = getenv("UAPKIC_DISABLE_CLMUL");
@@ -72,7 +72,7 @@ static int gf2m_clmul_detect(void)
 #endif
 }
 
-/* Признак наличия PCLMULQDQ; определяется один раз (повторная запись того же значения безопасна). */
+/* Ознака наявності PCLMULQDQ; визначається один раз (повторний запис того самого значення безпечний). */
 static inline int gf2m_use_clmul(void)
 {
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -101,8 +101,8 @@ static void gf2m_mul_64_clmul(const word_t x, const word_t y, Dword *res)
 }
 
 /**
- * Умножение многочленов длиной n слов (схема "столбиком" на PCLMULQDQ), r = x * y длиной 2n слов.
- * Столбец k накапливает все произведения x[i]*y[j], i + j = k; слово k результата = lo(c[k]) ^ hi(c[k-1]).
+ * Множення многочленів довжиною n слів (схема "стовпчиком" на PCLMULQDQ), r = x * y довжиною 2n слів.
+ * Стовпець k накопичує всі добутки x[i]*y[j], i + j = k; слово k результату = lo(c[k]) ^ hi(c[k-1]).
  */
 GF2M_CLMUL_TARGET
 static inline void gf2m_mul_clmul_n(const word_t *x, const word_t *y, int n, word_t *r)
@@ -181,9 +181,9 @@ static void gf2m_sqr_clmul(const word_t *x, int n, word_t *r)
 }
 
 /*
- * Один шаг приведения: a = L + H * x^m -> L + H * (f - x^m), где f - x^m = x^f[1] (+ x^f[2] + x^f[3]) + 1
- * помещается в fr_lo | fr_hi << 64, H - старшие hw слов начиная с бита m (слово w = n - 1, бит b).
- * Буфер a имеет 2n + 2 слов (два старших нулевые).
+ * Один крок зведення: a = L + H * x^m -> L + H * (f - x^m), де f - x^m = x^f[1] (+ x^f[2] + x^f[3]) + 1
+ * розміщується в fr_lo | fr_hi << 64, H - старші hw слів, починаючи з біта m (слово w = n - 1, біт b).
+ * Буфер a має 2n + 2 слова (два старші - нульові).
  */
 GF2M_CLMUL_TARGET
 static inline void gf2m_mod_clmul_step(word_t *a, int n, int b, int hw, __m128i flo, __m128i fhi, int has_hi)
@@ -217,7 +217,7 @@ static inline void gf2m_mod_clmul_step(word_t *a, int n, int b, int hw, __m128i 
 }
 
 /*
- * Возвращает 1, если в a остались биты со степенью >= m.
+ * Повертає 1, якщо в a залишилися біти зі степенем >= m.
  */
 static inline int gf2m_mod_clmul_rest(const word_t *a, int n, int b)
 {
@@ -233,10 +233,10 @@ static inline int gf2m_mod_clmul_rest(const word_t *a, int n, int b)
 }
 
 /**
- * Приведение по модулю f многочлена a длиной 2n + 2 слов (a разрушается): out = a mod f.
- * Для deg(a) <= 2m - 2 старшая часть H занимает не более n слов и достаточно двух шагов: после первого
- * deg <= m - 2 + k, второй обрабатывает hw2 старших слов. Цикл никогда не выполняется для корректных
- * аргументов и оставлен для полноты.
+ * Зведення за модулем f многочлена a довжиною 2n + 2 слова (a руйнується): out = a mod f.
+ * Для deg(a) <= 2m - 2 старша частина H займає не більше n слів і достатньо двох кроків: після першого
+ * deg <= m - 2 + k, другий обробляє hw2 старших слів. Цикл ніколи не виконується для коректних
+ * аргументів і залишений для повноти.
  */
 GF2M_CLMUL_TARGET
 static inline void gf2m_mod_clmul_n(const Gf2mCtx *ctx, word_t *a, int n, word_t *out)
@@ -287,9 +287,9 @@ static void gf2m_mod_clmul(const Gf2mCtx *ctx, word_t *a, word_t *out)
 }
 
 /*
- * Аппаратный путь применим, если длина элемента от 3 до GF2M_CLMUL_MAX_LEN слов, f[1] < 128
- * (f - x^m умещается в 128 бит) и 2 * f[1] - 2 < m (двух шагов приведения достаточно).
- * Константы приведения вычисляются один раз при создании контекста.
+ * Апаратний шлях застосовний, якщо довжина елемента від 3 до GF2M_CLMUL_MAX_LEN слів, f[1] < 128
+ * (f - x^m вміщується в 128 біт) і 2 * f[1] - 2 < m (двох кроків зведення достатньо).
+ * Константи зведення обчислюються один раз під час створення контексту.
  */
 static void gf2m_clmul_init(Gf2mCtx *ctx)
 {
@@ -317,7 +317,7 @@ static void gf2m_clmul_init(Gf2mCtx *ctx)
 
 #endif
 
-/* Таблица предварительных вычислений для возведения у квадрат. */
+/* Таблиця попередніх обчислень для піднесення до квадрата. */
 static const uint16_t GF2M_SQR_PRECOMP[256] = {
     0x0000, 0x0001, 0x0004, 0x0005, 0x0010, 0x0011, 0x0014, 0x0015,
     0x0040, 0x0041, 0x0044, 0x0045, 0x0050, 0x0051, 0x0054, 0x0055,
@@ -406,10 +406,10 @@ cleanup:
 }
 
 /**
- * Длина большого целого в битах (эквивалент int_bit_len для сырого массива слов).
+ * Довжина великого цілого в бітах (еквівалент int_bit_len для необробленого масиву слів).
  *
- * @param a массив слов
- * @param len длина массива в словах
+ * @param a масив слів
+ * @param len довжина масиву в словах
  */
 static size_t gf2m_bit_len(const word_t *a, size_t len)
 {
@@ -437,11 +437,11 @@ void gf2m_mod_add(const WordArray *a, const WordArray *b, WordArray *out)
 }
 
 /**
- * Приводит многочлен по модулю порождающего полинома поля.
+ * Зводить многочлен за модулем твірного многочлена поля.
  *
  * @param ctx Параметри GF(2^m)
- * @param a многочлен длиной 2 * ctx->len слов (разрушается)
- * @param out буфер для результата длиной ctx->len слов
+ * @param a многочлен довжиною 2 * ctx->len слів (руйнується)
+ * @param out буфер для результату довжиною ctx->len слів
  */
 static void gf2m_mod_raw(const Gf2mCtx *ctx, word_t *a, word_t *out)
 {
@@ -454,10 +454,10 @@ static void gf2m_mod_raw(const Gf2mCtx *ctx, word_t *a, word_t *out)
     int degF = ctx->f[0];
     int i;
 
-    /* Слова, содержащие x^f[0], x^f[1], x^f[2] і т.д. */
+    /* Слова, що містять x^f[0], x^f[1], x^f[2] тощо. */
     int a_woff0, a_woff1, a_woff2, a_woff3 = 0;
 
-    /* Смещение в битах от границы слова для x^f[0], x^f[1] і т.д. */
+    /* Зсув у бітах від межі слова для x^f[0], x^f[1] тощо. */
     word_t a_boff0, a_boff1, a_boff2, a_boff3 = 0;
 
     ASSERT(degA <= (degF << 1) - 2);
@@ -480,7 +480,7 @@ static void gf2m_mod_raw(const Gf2mCtx *ctx, word_t *a, word_t *out)
 
     i = (degA - (degF - (int)a_boff0)) >> WORD_BIT_LEN_SHIFT;
 
-    /* XOR сложение неполного старшего слова "a" с последовательностями, начинающимися с t-го бита, с k-го бита и т.д. */
+    /* XOR-додавання неповного старшого слова "a" з послідовностями, що починаються з t-го біта, з k-го біта тощо. */
     if (a_woff0 == i) {
         word_t T = WORD_RSHIFT(a[alen - 1], a_boff0);
         int j;
@@ -510,7 +510,7 @@ static void gf2m_mod_raw(const Gf2mCtx *ctx, word_t *a, word_t *out)
         i--;
     }
 
-    /* XOR сложение полных слов, начиная з m-того бита с последовательностями, начинающимися з t-го бита, с k-го бита и т.д. */
+    /* XOR-додавання повних слів, починаючи з m-го біта, з послідовностями, що починаються з t-го біта, з k-го біта тощо. */
     while (degA >= degF) {
         for (; i >= 0; i--) {
             word_t a_woff0i = a_woff0 - i;
@@ -733,13 +733,13 @@ static uint64_t gf2m_mul_32(word_t x, word_t y)
 #endif
 
 /**
- * Выполняет умножение многочленов, степень которых меньше 256. Используется метод Карацубы.
+ * Виконує множення многочленів, степінь яких менший за 256. Використовується метод Карацуби.
  *
  * @param x многочлен 1
  * @param y многочлен 2
- * @param len длина многочленов в словах
- * @param mode указывает на изменения в многочлене r
- * @param r буфер для произведения многочленов
+ * @param len довжина многочленів у словах
+ * @param mode вказує на зміни в многочлені r
+ * @param r буфер для добутку многочленів
  */
 static void gf2m_mul_256(const word_t *x, const word_t *y, int len, bool mode, word_t *r)
 {
@@ -1022,11 +1022,11 @@ static void gf2m_mul_256(const word_t *x, const word_t *y, int len, bool mode, w
 }
 
 /**
- * Обращает порядок слов.
+ * Змінює порядок слів на зворотний.
  *
- * @param x массив слов
- * @param len длина в словах
- * @param y буфер для результата
+ * @param x масив слів
+ * @param len довжина в словах
+ * @param y буфер для результату
  */
 static void words_swap(const word_t *x, size_t len, word_t *y)
 {
@@ -1038,11 +1038,11 @@ static void words_swap(const word_t *x, size_t len, word_t *y)
 }
 
 /**
-* Выполняет умножение многочленов, степень которых больше 32 и меньше 64.
+* Виконує множення многочленів, степінь яких більший за 32 і менший за 64.
 *
 * @param x многочлен 1
 * @param y многочлен 2
-* @param r буфер для произведения многочленов
+* @param r буфер для добутку многочленів
 */
 static void gf2m_mul_64(const word_t *x, const word_t *y, word_t *r)
 {
@@ -1074,12 +1074,12 @@ static void gf2m_mul_64(const word_t *x, const word_t *y, word_t *r)
 }
 
 /**
-* Выполняет умножение многочленов, степень которых больше 64 и меньше 128.
+* Виконує множення многочленів, степінь яких більший за 64 і менший за 128.
 *
 * @param x многочлен 1
 * @param y многочлен 2
-* @param len длина многочленов в словах
-* @param z буфер для произведения многочленов
+* @param len довжина многочленів у словах
+* @param z буфер для добутку многочленів
 */
 static void gf2m_mul_128(const word_t *x, const word_t *y, int len, word_t *z)
 {
@@ -1178,12 +1178,12 @@ static void gf2m_mul_128(const word_t *x, const word_t *y, int len, word_t *z)
 }
 
 /**
- * Выполняет умножение многочленов (без приведения по модулю).
+ * Виконує множення многочленів (без зведення за модулем).
  *
  * @param ctx Параметри GF(2^m)
- * @param x1 многочлен 1 длиной ctx->len слов
- * @param y1 многочлен 2 длиной ctx->len слов
- * @param r1 буфер для произведения длиной 2 * ctx->len слов
+ * @param x1 многочлен 1 довжиною ctx->len слів
+ * @param y1 многочлен 2 довжиною ctx->len слів
+ * @param r1 буфер для добутку довжиною 2 * ctx->len слів
  */
 static void gf2m_mul_raw(const Gf2mCtx *ctx, const word_t *x1, const word_t *y1, word_t *r1)
 {
@@ -1235,7 +1235,7 @@ static void gf2m_mul_raw(const Gf2mCtx *ctx, const word_t *x1, const word_t *y1,
     words_swap(x1, n, x);
     words_swap(y1, n, y);
 
-    /* Степень полинома, порождающего полиномиальный базис меньше 257. */
+    /* Степінь многочлена, що породжує поліноміальний базис, менший за 257. */
     if (n <= WA_LEN(32)) {
         gf2m_mul_256(x, y, n, true, r);
         words_swap(r, 2 * n, r1);
@@ -1243,7 +1243,7 @@ static void gf2m_mul_raw(const Gf2mCtx *ctx, const word_t *x1, const word_t *y1,
         return;
     }
 
-    /* Степень полинома, порождающего полиномиальный базис равна 257. */
+    /* Степінь многочлена, що породжує поліноміальний базис, дорівнює 257. */
     if (ctx->f[0] == 257) {
 
         r[0] = 0;
@@ -1269,7 +1269,7 @@ static void gf2m_mul_raw(const Gf2mCtx *ctx, const word_t *x1, const word_t *y1,
     }
 
     /*
-     * Степень полинома больше 257. Многочлены x и y представляются в виде:
+     * Степінь многочлена більший за 257. Многочлени x і y подаються у вигляді:
      * x(t) = x0(t) * t^256 + x1(t),
      * y(t) = y0(t) * t^256 + y1(t)
      */
@@ -1461,11 +1461,11 @@ cleanup:
 }
 
 /**
- * Вычисляет полуслед элемента поля GF(2^m).
+ * Обчислює напівслід елемента поля GF(2^m).
  *
  * @param ctx параметри GF(2^m)
- * @param a элемент поля
- * @param htrace полуслед размера n
+ * @param a елемент поля
+ * @param htrace напівслід розміром n
  */
 static void gf2m_mod_htrace(const Gf2mCtx *ctx, const WordArray *a, WordArray *htrace)
 {

@@ -211,9 +211,9 @@ static int pbkdf2_dstu7564kmac(const char* pass, const ByteArray* salt, size_t i
             DO(ba_xor(key, u));
         }
 
-        //Добавляем результат в Т
+        //Додаємо результат до Т
         ba_append(key, 0, cplen, out);
-        //Увеличиваем счетчик.
+        //Збільшуємо лічильник.
         count++;
         key_len -= cplen;
 

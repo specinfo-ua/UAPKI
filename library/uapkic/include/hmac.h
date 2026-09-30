@@ -53,13 +53,13 @@ UAPKIC_EXPORT HmacCtx *hmac_alloc(HashAlg alg);
 /**
  * Створює контекст HMAC на базі ГОСТ 34.311 зі стандартним ДКЕ.
  *
- * @param sbox_id ідентифікатор стандартної ДКЕ для ГОСТ 34.311
+ * @param sbox_id ідентифікатор стандартного ДКЕ для ГОСТ 34.311
  * @return контекст HMAC
  */
 UAPKIC_EXPORT HmacCtx* hmac_alloc_gost34311_with_sbox_id(Gost28147SboxId sbox_id);
 
 /**
- * Створює контекст HMAC на базі ГОСТ 34.311 з ДКЕ заданим користувачем.
+ * Створює контекст HMAC на базі ГОСТ 34.311 з ДКЕ, заданим користувачем.
  *
  * @param sbox ДКЕ для ГОСТ 34.311
  * @return контекст HMAC
@@ -67,9 +67,9 @@ UAPKIC_EXPORT HmacCtx* hmac_alloc_gost34311_with_sbox_id(Gost28147SboxId sbox_id
 UAPKIC_EXPORT HmacCtx* hmac_alloc_gost34311_with_sbox(const ByteArray* sbox);
 
 /**
- * Ініціалізує контекст для виробки HMAC ключем.
+ * Ініціалізує контекст для обчислення HMAC із заданим ключем.
  *
- * @param ctx контекст
+ * @param ctx контекст HMAC
  * @param key секретний ключ
  * @return код помилки
  */
@@ -79,22 +79,22 @@ UAPKIC_EXPORT int hmac_init(HmacCtx *ctx, const ByteArray *key);
  * Модифікує HMAC фрагментом даних.
  *
  * @param ctx контекст HMAC
- * @param data дані для шифрування
+ * @param data дані
  * @return код помилки
  */
 UAPKIC_EXPORT int hmac_update(HmacCtx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку HMAC і повертає його значення.
+ * Завершує обчислення HMAC і повертає його значення.
  *
  * @param ctx контекст HMAC
- * @param H геш вектор
+ * @param H значення HMAC
  * @return код помилки
  */
 UAPKIC_EXPORT int hmac_final(HmacCtx *ctx, ByteArray **H);
 
 /**
- * Ініціалізує контекст для виробки HMAC з попередньо встановленим ключем.
+ * Ініціалізує контекст для обчислення HMAC з попередньо встановленим ключем.
  *
  * @param ctx контекст HMAC
  * @return код помилки

@@ -41,7 +41,7 @@ extern "C" {
 #endif
 
 /*
- * Выделяет память для asn структуры.
+ * Виділяє пам'ять для asn-структури.
  */
 #define ASN_ALLOC(obj) ((obj) = calloc(1, sizeof(*(obj))));                                    \
     if ((obj) == NULL) { ret = RET_MEMORY_ALLOC_ERROR;                                         \
@@ -53,15 +53,15 @@ extern "C" {
 #define    ASN_FREE_CONTENT_STATIC(asn_DEF, ptr) { (asn_DEF)->free_struct(asn_DEF,ptr,1); memset(ptr, 0, sizeof *ptr); }
 
 /**
- * Возвращает байтовое представление объекта в DER-кодировании.
- * Выделяемая память требует освобождения.
+ * Повертає байтове подання об'єкта в DER-кодуванні.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param desc       дескриптор объекта
- * @param object     указатель на объект
- * @param encode     указатель на выделяемую память, содержащую DER-представление.
- * @param encode_len актуальный размер данных
+ * @param desc       дескриптор об'єкта
+ * @param object     вказівник на об'єкт
+ * @param encode     вказівник на виділену пам'ять, що містить DER-подання.
+ * @param encode_len фактичний розмір даних
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_encode(asn_TYPE_descriptor_t *desc, const void *object,
         uint8_t **encode, size_t *encode_len);
@@ -69,15 +69,15 @@ UAPKIF_EXPORT int asn_encode(asn_TYPE_descriptor_t *desc, const void *object,
 UAPKIF_EXPORT int asn_encode_ba(asn_TYPE_descriptor_t *desc, const void *object, ByteArray **encoded);
 
 /**
- * Инициализирует asn структуру объекта из байтового представления.
- * Выделяемая память требует освобождения.
+ * Ініціалізує asn-структуру об'єкта з байтового подання.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param desc        дескриптор объекта
- * @param object      указатель на объект
- * @param encode      указатель буфер содержащий BER-представление структуры.
- * @param encode_len  размер буфер
+ * @param desc        дескриптор об'єкта
+ * @param object      вказівник на об'єкт
+ * @param encode      вказівник на буфер, що містить BER-подання структури.
+ * @param encode_len  розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_decode(asn_TYPE_descriptor_t *desc, void *object, const void *encode, size_t encode_len);
 
@@ -89,70 +89,69 @@ UAPKIF_EXPORT void *asn_decode_with_alloc(asn_TYPE_descriptor_t *desc, const voi
 UAPKIF_EXPORT void *asn_decode_ba_with_alloc(asn_TYPE_descriptor_t *desc, const ByteArray *encoded);
 
 /**
- * Создает копию ASN.1 объекта заданного типа.
+ * Створює копію ASN.1-об'єкта заданого типу.
  *
- * @param type тип объекта
- * @param src  источник
- * @param dst  приемник
+ * @param type тип об'єкта
+ * @param src  джерело
+ * @param dst  приймач
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_copy(asn_TYPE_descriptor_t *type, const void *src, void *dst);
 
 /**
-* Создает копию ASN.1 объекта заданного типа.
-* Выделяемая память требует освобождения.
+* Створює копію ASN.1-об'єкта заданого типу.
+* Виділена пам'ять потребує вивільнення.
 *
-* @param type тип объекта
-* @param src  источник
-* @param dst  приемник
+* @param type тип об'єкта
+* @param src  джерело
 *
-* @return копия ASN.1 объекта заданного типа.
+* @return копія ASN.1-об'єкта заданого типу.
 */
 UAPKIF_EXPORT void *asn_copy_with_alloc(asn_TYPE_descriptor_t *type, const void *src);
 
 /**
- * Сравнивает две ASN.1 структуры.
+ * Порівнює дві ASN.1-структури.
  *
- * @param type тип объекта
- * @param a    сравниваемая структура
- * @param b    сравниваемая структура
+ * @param type тип об'єкта
+ * @param a    структура для порівняння
+ * @param b    структура для порівняння
  *
- * @return равны ли a и b
+ * @return чи рівні a і b
  */
 UAPKIF_EXPORT bool asn_equals(asn_TYPE_descriptor_t *type, const void *a, const void *b);
 
 UAPKIF_EXPORT int asn_parse_args_oid(const char *text, long **arcs, size_t *size);
 
 /**
- * Возвращает OID по текстовому представлению.
- * (*oid == NULL) - память под ответ выделяется и требует последующего освобождения.
- * (*oid != NULL) - если память под возвращаемый объект уже выделена.
+ * Повертає OID за текстовим поданням.
+ * (*oid == NULL) - пам'ять під відповідь виділяється і потребує подальшого вивільнення.
+ * (*oid != NULL) - якщо пам'ять під об'єкт, що повертається, вже виділена.
  *
- * @param text  строка з OID
+ * @param text  рядок з OID
  * @param dst  OID
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_oid_from_text(const char *text, OBJECT_IDENTIFIER_t **dst);
 
 /**
- * Устанавливает OID по текстовому представлению.
+ * Встановлює OID за текстовим поданням.
  *
- * @param text  строка з OID
+ * @param text  рядок з OID
  * @param dst  OID
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_set_oid_from_text(const char* text, OBJECT_IDENTIFIER_t * dst);
 
 /**
- * Создает текстовое представление OID.
+ * Створює текстове подання OID.
  *
  * @param dst  OID
- * @param text  строка з OID
+ * @param text  рядок з OID
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text);
 
@@ -162,85 +161,85 @@ UAPKIF_EXPORT int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text);
 UAPKIF_EXPORT int asn_oid_to_text_buf(const OBJECT_IDENTIFIER_t* oid, char* buf, size_t size);
 
 /**
- * Возвращает OID по int`му представлению.
- * (*oid == NULL) - память под ответ выделяется и требует последующего освобождения.
- * (*oid != NULL) - если память под возвращаемый объект уже выделена.
+ * Повертає OID за int-поданням.
+ * (*oid == NULL) - пам'ять під відповідь виділяється і потребує подальшого вивільнення.
+ * (*oid != NULL) - якщо пам'ять під об'єкт, що повертається, вже виділена.
  *
- * @param src  указатель на буфер для int`ов
- * @param size размер буфера для int`ов
+ * @param src  вказівник на буфер для int-ів
+ * @param size розмір буфера для int-ів
  * @param dst  OID
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_oid(const long *src, const size_t size, OBJECT_IDENTIFIER_t **dst);
 
 /**
- * Устанавливает OID по int`му представлению.
+ * Встановлює OID за int-поданням.
  *
- * @param src  указатель на буфер для int`ов
- * @param size размер буфера для int`ов
+ * @param src  вказівник на буфер для int-ів
+ * @param size розмір буфера для int-ів
  * @param dst  OID
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_set_oid(const long *src, const size_t size, OBJECT_IDENTIFIER_t *dst);
 
 /**
- * Создает OCTET_STRING_t из масива байт.
- * Выделяемая память требует освобождения.
+ * Створює OCTET_STRING_t з масиву байтів.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src масив байт
- * @param len размер входного буфера
+ * @param src масив байтів
+ * @param len розмір вхідного буфера
  * @param dst OCTET_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_octstring(const void *src, const size_t len, OCTET_STRING_t **dst);
 
 /**
- * Создает OCTET_STRING_t из масива байт.
- * Выделяемая память требует освобождения.
+ * Створює OCTET_STRING_t з масиву байтів.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src масив байт
+ * @param src масив байтів
  * @param dst OCTET_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_octstring_from_ba(const ByteArray *src, OCTET_STRING_t **dst);
 
 /**
- * Создает BIT_STRING_t из байтогово масива.
- * Выделяемая память требует освобождения.
+ * Створює BIT_STRING_t з масиву байтів.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src байтовый масив
- * @param len размер входного буфера
- * @param dst создаваемый BIT_STRING_t
+ * @param src масив байтів
+ * @param len розмір вхідного буфера
+ * @param dst створюваний BIT_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_bitstring(const void *src, const size_t len, BIT_STRING_t **dst);
 
 /**
- * Создает BIT_STRING_t из байтогово масива.
- * Выделяемая память требует освобождения.
+ * Створює BIT_STRING_t з масиву байтів.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src байтовый масив
- * @param dst создаваемый BIT_STRING_t
+ * @param src масив байтів
+ * @param dst створюваний BIT_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_bitstring_from_ba(const ByteArray *src, BIT_STRING_t **dst);
 
 UAPKIF_EXPORT int asn_set_bitstring_from_ba(const ByteArray *src, BIT_STRING_t *dst);
 /**
- * Создает INTEGER_t из байтового представления целого числа.
- * Выделяемая память требует освобождения.
+ * Створює INTEGER_t з байтового подання цілого числа.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src байтовое представление целого числа
- * @param len размер входного буфера
- * @param dst создаваемый INTEGER_t
+ * @param src байтове подання цілого числа
+ * @param len розмір вхідного буфера
+ * @param dst створюваний INTEGER_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_integer(const void *src, const size_t len, INTEGER_t **dst);
 
@@ -249,187 +248,187 @@ UAPKIF_EXPORT int asn_create_integer_from_ba(const ByteArray *src, INTEGER_t **d
 UAPKIF_EXPORT void *asn_any2type(const ANY_t *src, asn_TYPE_descriptor_t *dst_type);
 
 /**
- * Создает ANY_t из произвольного ASN.1 объекта.
- * Выделяемая память требует освобождения.
+ * Створює ANY_t з довільного ASN.1-об'єкта.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src_type тип входной структуры
- * @param src ASN.1 объект
- * @param dst создаваемый ANY_t
+ * @param src_type тип вхідної структури
+ * @param src ASN.1-об'єкт
+ * @param dst створюваний ANY_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_any(const asn_TYPE_descriptor_t *src_type, const void *src, ANY_t **dst);
 
 /**
- * Устанавливает ANY_t из произвольного ASN.1 объекта.
+ * Встановлює ANY_t з довільного ASN.1-об'єкта.
  *
- * @param src_type тип входной структуры
- * @param src ASN.1 объект
- * @param dst создаваемый ANY_t
+ * @param src_type тип вхідної структури
+ * @param src ASN.1-об'єкт
+ * @param dst створюваний ANY_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_set_any(const asn_TYPE_descriptor_t *src_type, const void *src, ANY_t *dst);
 
 /**
- * Создает INTEGER_t из long представления целого числа.
- * Выделяемая память требует освобождения.
+ * Створює INTEGER_t з long-подання цілого числа.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src long представление целого числа
- * @param dst создаваемый INTEGER_t
+ * @param src long-подання цілого числа
+ * @param dst створюваний INTEGER_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_integer_from_long(long src, INTEGER_t **dst);
 
 /**
- * Создает BIT_STRING_t содержаций заданный OCTET_STRING_t.
- * Выделяемая память требует освобождения.
+ * Створює BIT_STRING_t, що містить заданий OCTET_STRING_t.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src входные данные
- * @param dst создаваемый BIT_STRING_t
+ * @param src вхідні дані
+ * @param dst створюваний BIT_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_bitstring_from_octstring(const OCTET_STRING_t *src, BIT_STRING_t **dst);
 
 /**
- * Создает BIT_STRING_t содержаций заданный INTEGER_t.
- * Выделяемая память требует освобождения.
+ * Створює BIT_STRING_t, що містить заданий INTEGER_t.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param src входные данные
- * @param dst создаваемый BIT_STRING_t
+ * @param src вхідні дані
+ * @param dst створюваний BIT_STRING_t
  *
- * @return код ощибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_create_bitstring_from_integer(const INTEGER_t *src, BIT_STRING_t **dst);
 
 /**
- * Возвращает массив int`ов, представляющих OID.
+ * Повертає масив int-ів, що подають OID.
  *
  * @param oid  OID
- * @param arcs указатель на буфер для int`ов
- * @param size указатель на размер буфера для int`ов
+ * @param arcs вказівник на буфер для int-ів
+ * @param size вказівник на розмір буфера для int-ів
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_get_oid_arcs(const OBJECT_IDENTIFIER_t *oid, long **arcs, size_t *size);
 
 /**
- * Проверяет вхождение заданного OID`а в другой (родительский) OID.
+ * Перевіряє входження заданого OID в інший (батьківський) OID.
  *
- * @param oid         проверяемый OID
- * @param parent_arcs int-представление родительского OID`а
- * @param parent_size размер родительского OID`а
+ * @param oid         OID, що перевіряється
+ * @param parent_arcs int-подання батьківського OID
+ * @param parent_size розмір батьківського OID
  *
- * @return true  - OID входит в родительский
- *         false - OID не входит в родительский
+ * @return true  - OID входить до батьківського
+ *         false - OID не входить до батьківського
  */
 UAPKIF_EXPORT bool asn_check_oid_parent(const OBJECT_IDENTIFIER_t *oid, const long *parent_arcs, size_t parent_size);
 
 /**
- * Сравнивает два OID.
+ * Порівнює два OID.
  *
  * @param oid         OID
- * @param parent_arcs указатель на буфер для int`ов
- * @param parent_size указатель на размер буфера для int`ов
+ * @param parent_arcs вказівник на буфер для int-ів
+ * @param parent_size вказівник на розмір буфера для int-ів
  *
- * @return равны ли oid и parent_arcs
+ * @return чи рівні oid і parent_arcs
  */
 UAPKIF_EXPORT bool asn_check_oid_equal(const OBJECT_IDENTIFIER_t *oid, const long *parent_arcs, size_t parent_size);
 
 /**
- * Возврощает содержимое структуры OCTET STRING.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури OCTET STRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet      указатель на объект
- * @param bytes      указатель буфер содержащий содержимое структуры.
- * @param bytes_len  размер буфера
+ * @param octet      вказівник на об'єкт
+ * @param bytes      вказівник на буфер, що містить вміст структури.
+ * @param bytes_len  розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_OCTSTRING2bytes(const OCTET_STRING_t *octet, unsigned char **bytes, size_t *bytes_len);
 
 /**
- * Устанвливает содержимое структуры OCTET STRING.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури OCTET STRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet      указатель на объект
- * @param bytes      указатель буфер с данными.
- * @param bytes_len  размер буфера
+ * @param octet      вказівник на об'єкт
+ * @param bytes      вказівник на буфер з даними.
+ * @param bytes_len  розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_bytes2OCTSTRING(OCTET_STRING_t *octet, const unsigned char *bytes, size_t bytes_len);
 
 /**
- * Возврощает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet      указатель на объект
- * @param bytes      указатель буфер содержащий содержимое структуры.
- * @param bytes_len  размер буфера
+ * @param integer    вказівник на об'єкт
+ * @param bytes      вказівник на буфер, що містить вміст структури.
+ * @param bytes_len  розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_INTEGER2bytes(const INTEGER_t *integer, unsigned char **bytes, size_t *bytes_len);
 
 /**
- * Устанвливает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param integer    указатель на объект
- * @param bytes      указатель буфер с данными.
- * @param bytes_len  размер буфера
+ * @param integer    вказівник на об'єкт
+ * @param value      вказівник на буфер з даними.
+ * @param len        розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_bytes2INTEGER(INTEGER_t *integer, const unsigned char *value, size_t len);
 
 /**
- * Устанвливает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param bytes     указатель буфер с данными.
- * @param integer   указатель на объект
+ * @param value     масив байтів з даними.
+ * @param integer   вказівник на об'єкт
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_ba2INTEGER(const ByteArray *value, INTEGER_t *integer);
 
 /**
- * Возврощает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури BITSTRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet     указатель на объект
- * @param bytes     указатель буфер содержащий содержимое структуры.
- * @param bytes_len размер буфера
+ * @param string    вказівник на об'єкт
+ * @param bytes     вказівник на буфер, що містить вміст структури.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_BITSTRING2bytes(const BIT_STRING_t *string, unsigned char **bytes, size_t *bytes_len);
 
 /**
- * Устанвливает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури BITSTRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet     указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param bytes     вказівник на буфер з даними.
+ * @param string    вказівник на об'єкт
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_bytes2BITSTRING(const unsigned char *bytes, BIT_STRING_t *string, size_t bytes_len);
 
 /**
- * Устанвливает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Повертає значення біта структури BITSTRING із заданим номером.
+ * Біти нумеруються від старшого біта першого байта; для номера за межами рядка повертається 0.
  *
- * @param string    указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param string    вказівник на об'єкт
+ * @param bit_num   номер біта
+ * @param bit_value значення біта (0 або 1)
  *
- * @return код ошибки
+ * @return код помилки
  */
 UAPKIF_EXPORT int asn_BITSTRING_get_bit(const BIT_STRING_t *string, int bit_num, int *bit_value);
 
@@ -440,7 +439,7 @@ UAPKIF_EXPORT int asn_INTEGER2ba(const INTEGER_t *in, ByteArray **ba);
 
 UAPKIF_EXPORT int asn_BITSTRING2ba(const BIT_STRING_t *string, ByteArray **ba);
 
-/** Преобразует OCTERT_STRING в объект указанного типа. */
+/** Перетворює OCTET_STRING на об'єкт зазначеного типу. */
 UAPKIF_EXPORT int asn_OCTSTRING_to_type(const OCTET_STRING_t *src, asn_TYPE_descriptor_t *type, void **dst);
 
 UAPKIF_EXPORT int asn_print(FILE *stream, asn_TYPE_descriptor_t *td, void *sptr);

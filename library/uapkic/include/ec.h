@@ -74,12 +74,12 @@ UAPKIC_EXPORT EcCtx* ec_alloc_prime(const ByteArray* p, const ByteArray* a, cons
  * Створює контекст еліптичної кривої над розширеним полем з параметрами у поліноміальному базисі
  *
  * @param f примітивний многочлен f(t) (тричлен, п'ятичлен), який визначає поліноміальний базис
- * @param f_len число членів у полиномі f (3 або 5)
+ * @param f_len число членів у многочлені f (3 або 5)
  * @param a коефіцієнт у рівнянні еліптичної кривої (0 або 1)
  * @param b коефіцієнт b у рівнянні еліптичної кривої
  * @param n порядок циклічної підгрупи групи точок еліптичної кривої
- * @param px X-координата точки еліптичної кривої порядока n
- * @param py Y-координата точки еліптичної кривої порядока n
+ * @param px X-координата точки еліптичної кривої порядку n
+ * @param py Y-координата точки еліптичної кривої порядку n
  * @return контекст еліптичної кривої
  */
 UAPKIC_EXPORT EcCtx* ec_alloc_binary_pb(const int* f, size_t f_len, size_t a, const ByteArray* b, const ByteArray* n,
@@ -92,8 +92,8 @@ UAPKIC_EXPORT EcCtx* ec_alloc_binary_pb(const int* f, size_t f_len, size_t a, co
  * @param a коефіцієнт у рівнянні еліптичної кривої (0 або 1)
  * @param b коефіцієнт b у рівнянні еліптичної кривої
  * @param n порядок циклічної підгрупи групи точок еліптичної кривої
- * @param px X-координата точки еліптичної кривої порядока n
- * @param py Y-координата точки еліптичної кривої порядока n
+ * @param px X-координата точки еліптичної кривої порядку n
+ * @param py Y-координата точки еліптичної кривої порядку n
  * @return контекст еліптичної кривої
  */
 UAPKIC_EXPORT EcCtx* ec_alloc_binary_onb(size_t m, size_t a, const ByteArray* b, const ByteArray* n, const ByteArray* px,
@@ -108,16 +108,16 @@ UAPKIC_EXPORT EcCtx* ec_alloc_binary_onb(size_t m, size_t a, const ByteArray* b,
 UAPKIC_EXPORT void ec_free(EcCtx* ctx);
 
 /**
- * Встановити рівень передобчислення.
+ * Встановлює рівень передобчислення.
  *
- * @param ctx контекст алгорітмів еліптичної кривої
+ * @param ctx контекст алгоритмів еліптичної кривої
  * @param opt_level рівень передобчислення
  * @return код помилки
  */
 UAPKIC_EXPORT int ec_set_opt_level(EcCtx* ctx, OptLevelId opt_level);
 
 /**
- * Створює новий контекст еліптичної кривої та копіює туди параметри
+ * Створює новий контекст еліптичної кривої та копіює до нього параметри
  *
  * @param param контекст еліптичної кривої
  * @return контекст еліптичної кривої
@@ -125,7 +125,7 @@ UAPKIC_EXPORT int ec_set_opt_level(EcCtx* ctx, OptLevelId opt_level);
 UAPKIC_EXPORT EcCtx* ec_copy_params_with_alloc(const EcCtx* param);
 
 /**
- * Створює копію контекст еліптичної кривої
+ * Створює копію контексту еліптичної кривої
  *
  * @param param контекст еліптичної кривої
  * @return контекст еліптичної кривої
@@ -133,16 +133,16 @@ UAPKIC_EXPORT EcCtx* ec_copy_params_with_alloc(const EcCtx* param);
 UAPKIC_EXPORT EcCtx* ec_copy_with_alloc(const EcCtx* param);
 
 /**
- * Визначає чи є параметри у ОНБ.
+ * Визначає, чи задано параметри в ОНБ.
  *
  * @param ctx контекст еліптичної кривої
- * @param is_onb_params чи є параметри у ОНБ
+ * @param is_onb_params чи задано параметри в ОНБ
  * @return код помилки
  */
 UAPKIC_EXPORT int ec_is_onb_params(const EcCtx* ctx, bool* is_onb_params);
 
 /**
- * Визначає чи єліптичні криві однакоі.
+ * Визначає, чи однакові еліптичні криві.
  *
  * @param param_a контекст еліптичної кривої
  * @param param_b контекст еліптичної кривої
@@ -152,9 +152,10 @@ UAPKIC_EXPORT int ec_is_onb_params(const EcCtx* ctx, bool* is_onb_params);
 UAPKIC_EXPORT int ec_equals_params(const EcCtx* param_a, const EcCtx* param_b, bool* equals);
 
 /**
- * Повертає параметри ECDSA.
+ * Повертає параметри еліптичної кривої.
  *
- * @param ctx контекст ECDSA
+ * @param ctx контекст еліптичної кривої
+ * @param field_type тип поля
  * @param p порядок скінченного простого поля GF(p)
  * @param f примітивний многочлен f(t) (тричлен, п'ятичлен), який визначає поліноміальний базис
  * @param a коефіцієнт a у рівнянні еліптичної кривої
@@ -169,7 +170,7 @@ UAPKIC_EXPORT int ec_get_params(const EcCtx *ctx, EcFieldType *field_type, ByteA
                                     ByteArray **n, ByteArray **px, ByteArray **py);
 
 /**
- * Стисканя Y-координати точки на ЕК (для ДСТУ 4145 використовується окрема функція).
+ * Стиснення Y-координати точки на ЕК (для ДСТУ 4145 використовується окрема функція).
  *
  * @param ctx контекст ЕК
  * @param qx X-координата точки
@@ -203,21 +204,21 @@ UAPKIC_EXPORT int ec_init_sign(EcCtx* ctx, const ByteArray* d);
  * Ініціалізує контекст ЕК для перевірки підписів.
  *
  * @param ctx контекст ЕК
- * @param qx Х-координата відкритого ключа
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
 UAPKIC_EXPORT int ec_init_verify(EcCtx* ctx, const ByteArray* qx, const ByteArray* qy);
 
 /**
- * Повертає загальне секретне значення по схемі Диффі-Хеллмана (з кофактором для ЕК над розширеним полем)
+ * Повертає спільне секретне значення за схемою Діффі-Геллмана (з кофактором для ЕК над розширеним полем)
  *
  * @param ctx контекст ЕК
  * @param with_cofactor алгоритм з кофакторним множенням
- * @param d закритий ключ
- * @param qx Х-координата відкритого ключа
+ * @param d особистий ключ
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
- * @param zx Х-координата спільного секретного значення
+ * @param zx X-координата спільного секретного значення
  * @param zy Y-координата спільного секретного значення
  * @return код помилки
  */
@@ -225,7 +226,7 @@ UAPKIC_EXPORT int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d
     const ByteArray* qy, ByteArray** zx, ByteArray** zy);
 
 /**
- * Виконує самотестування реалізації криптопримітиву протоколу Диффі-Геллмана на ЕК
+ * Виконує самотестування реалізації криптопримітиву протоколу Діффі-Геллмана на ЕК
  *
  * @return код помилки або RET_OK, якщо самотестування пройдено
  */

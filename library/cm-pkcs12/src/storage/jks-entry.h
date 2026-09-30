@@ -43,9 +43,9 @@ extern "C" {
 #define JKS_VERSION_2   0x02
 
 
-/*********************** Объекты хранилища. **********************************/
+/*********************** Об'єкти сховища. **********************************/
 
-/** Типы объектов ключевого хранилища. */
+/** Типи об'єктів сховища ключів. */
 typedef enum {
     SECRET_KEY_ENTRY,
     PRIVATE_KEY_ENTRY,
@@ -53,86 +53,87 @@ typedef enum {
     UNKNOWN_ENTRY
 } EntryType;
 
-/** Структура сертификата. */
+/** Структура сертифіката. */
 typedef struct JksCertificate_st
 {
-    char          *type;       /**< тип сертификата */
-    ByteArray     *encoded;    /**< сертификат */
+    char          *type;       /**< тип сертифіката */
+    ByteArray     *encoded;    /**< сертифікат */
 } JksCertificate;
 
 typedef struct JksCertificaties_st
 {
-    JksCertificate **list;     /**< Список объектов */
-    uint32_t         count;    /**< количество объектов */
+    JksCertificate **list;     /**< Список об'єктів */
+    uint32_t         count;    /**< кількість об'єктів */
 } JksCertificaties;
 
-/** Структура объекта ключевого хранилища. */
+/** Структура об'єкта сховища ключів. */
 typedef struct JksEntry_st
 {
-    EntryType  entry_type;                  /**< тип объекта */
-    char      *alias;                       /**< уникальный идентификатор объекта (строка UTF-8) */
-    uint64_t   date;                        /**< дата создания объекта */
+    EntryType  entry_type;                  /**< тип об'єкта */
+    char      *alias;                       /**< унікальний ідентифікатор об'єкта (рядок UTF-8) */
+    uint64_t   date;                        /**< дата створення об'єкта */
 
-    union {                                 /**< данные объекта */
-        EncryptedPrivateKeyInfo_t *key;     /**< закрытый ключ */
-        JksCertificate            *cert;    /**< сертификат */
+    union {                                 /**< дані об'єкта */
+        EncryptedPrivateKeyInfo_t *key;     /**< особистий ключ */
+        JksCertificate            *cert;    /**< сертифікат */
     } entry;
 
-    JksCertificaties *entry_exts;           /**< дополнительные данные, может быть NULL */
+    JksCertificaties *entry_exts;           /**< додаткові дані, може бути NULL */
 } JksEntry;
 
 typedef struct JksEntries_st
 {
-    JksEntry **list;          /**< Список объектов */
-    uint32_t   count;         /**< количество объектов */
+    JksEntry **list;          /**< Список об'єктів */
+    uint32_t   count;         /**< кількість об'єктів */
 } JksEntries;
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає об'єкт.
  *
- * @param entries удаляемый объект или NULL
+ * @param entry об'єкт, що видаляється, або NULL
  */
 void jks_entry_free(JksEntry* entry);
 
 /**
- * Создает пустой список объектов JksEntry.
+ * Створює порожній список об'єктів JksEntry.
  *
- * @param count количество элементов
+ * @param count кількість елементів
  *
- * @return указатель на созданный объект или NULL в случае ошибки
+ * @return вказівник на створений об'єкт або NULL у разі помилки
  */
 JksEntries* jks_entries_alloc(const uint32_t count);
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає список.
  *
- * @param entry удаляемый объект или NULL
+ * @param entries об'єкт, що видаляється, або NULL
  */
 void jks_entries_free(JksEntries* entries);
 
 /**
- * Создает пустой список сертфикатов.
+ * Створює порожній список сертифікатів.
  *
- * @param count количество элементов
+ * @param count кількість елементів
  *
- * @return указатель на созданный объект или NULL в случае ошибки
+ * @return вказівник на створений об'єкт або NULL у разі помилки
  */
 JksCertificaties* jks_entry_certs_alloc(const uint32_t count);
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає список.
  *
- * @param certs удаляемый объект или NULL
+ * @param certs об'єкт, що видаляється, або NULL
  */
 void jks_entry_certs_free(JksCertificaties* certs);
 
 /**
- * Чтение объекта из буфера.
+ * Читання об'єкта з буфера.
  *
- * @param reader контекст буфера
- * @param entry  объект
+ * @param buffer  контекст буфера
+ * @param jks_ver версія формату JKS
+ * @param entry   об'єкт
  *
- * @return код ошибки
+ * @return код помилки
  */
 int jks_entry_read(JksBufferCtx* buffer, const uint32_t jks_ver, JksEntry** entry);
 

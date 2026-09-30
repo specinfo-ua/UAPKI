@@ -169,7 +169,7 @@ static int sm2dsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const Word
     int_mul(ws, t_inv, tmp);
     int_div(tmp, q, NULL, ws);
 
-    /* Якщо s = 0, то повернутися до Шагу 2. */
+    /* Якщо s = 0, то повернутися до Кроку 2. */
     if (int_is_zero(ws)) {
         ret = -1;
     }
@@ -224,7 +224,7 @@ int sm2dsa_sign(const EcCtx* ctx, const ByteArray* H, ByteArray** r, ByteArray**
     CHECK_NOT_NULL(k = wa_alloc(q->len));
 
     do {
-        /* Шаг 2. Згенерувати випадкове число k (0 < k < q). */
+        /* Крок 2. Згенерувати випадкове число k (0 < k < q). */
         DO(int_rand(q, k));
         ret = sm2dsa_sign_internal(ctx, H, k, r, s);
     } while (ret == -1);

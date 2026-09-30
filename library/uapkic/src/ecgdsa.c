@@ -117,7 +117,7 @@ static int ecgdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const Word
         int_sub(q, e, e);
     }
 
-    /* Шаг 3. Обчислити точку ЕК C = kP,
+    /* Крок 3. Обчислити точку ЕК C = kP,
      * c = (cx, cy) та визначити r = cx (mod q). */
     CHECK_NOT_NULL(C = ec_point_alloc(ctx->params->ecp->len));
     DO(ecp_dual_mul_opt(ctx->params->ecp, ctx->params->precomp_p, k, NULL, NULL, C));
@@ -129,7 +129,7 @@ static int ecgdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const Word
     wa_copy(C->x, tmp);
     int_div(tmp, q, NULL, wr);
 
-    /* Якщо r = 0, то повернутися до Шагу 2. */
+    /* Якщо r = 0, то повернутися до Кроку 2. */
     if (int_is_zero(wr)) {
         ret = -1;
         goto cleanup;
@@ -144,7 +144,7 @@ static int ecgdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const Word
     int_mul(ws, ctx->priv_key, tmp);
     int_div(tmp, q, NULL, ws);
 
-    /* Якщо r = 0, то повернутися до Шагу 2. */
+    /* Якщо r = 0, то повернутися до Кроку 2. */
     if (int_is_zero(ws)) {
         ret = -1;
     }
@@ -200,7 +200,7 @@ int ecgdsa_sign(const EcCtx* ctx, const ByteArray* H, ByteArray** r, ByteArray**
     CHECK_NOT_NULL(k = wa_alloc(q->len));
 
     do {
-        /* Шаг 2. Згенерувати випадкове число k (0 < k < q). */
+        /* Крок 2. Згенерувати випадкове число k (0 < k < q). */
         DO(int_rand(q, k));
         ret = ecgdsa_sign_internal(ctx, H, k, r, s);
     } while (ret == -1);
@@ -260,10 +260,10 @@ int ecgdsa_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, cons
     }
     wa_change_len(e, q->len);
 
-    /* Шаг 3. Обчислити r = s^(-1)(mod q). */
+    /* Крок 3. Обчислити r^(-1) (mod q). */
     CHECK_NOT_NULL(r_inv = gfp_mod_inv_core(wr, q));
 
-    /* Шаг 4. Обчислити u = ((r^-1)e mod q), v = ((r^-1)s mod q). */
+    /* Крок 4. Обчислити u = ((r^-1)e mod q), v = ((r^-1)s mod q). */
     CHECK_NOT_NULL(u = wa_alloc(q->len));
     CHECK_NOT_NULL(v = wa_alloc(q->len));
     CHECK_NOT_NULL(tmp = wa_alloc(q->len * 2));
@@ -273,7 +273,7 @@ int ecgdsa_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, cons
     int_mul(r_inv, ws, tmp);
     int_div(tmp, q, NULL, v);
 
-    /* Шаг 5. Обчислити точку ЕК C = uG + vY */
+    /* Крок 5. Обчислити точку ЕК C = uG + vY */
     CHECK_NOT_NULL(C = ec_point_alloc(ctx->params->ecp->len));
     DO(ecp_dual_mul_opt(ctx->params->ecp, ctx->params->precomp_p, u, ctx->precomp_q, v, C));
 

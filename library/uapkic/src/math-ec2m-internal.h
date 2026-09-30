@@ -39,9 +39,9 @@
 extern "C" {
 # endif
 
-/** Контекст для работы з группой точек еліптичної кривої. */
+/** Контекст для роботи з групою точок еліптичної кривої. */
 typedef struct EC2m_st {
-    Gf2mCtx *gf2m;          /* Контекст поля GF(2m). */
+    Gf2mCtx *gf2m;          /* Контекст поля GF(2^m). */
     size_t a;               /* коефіцієнт еліптичної кривої a (0 або 1). */
     WordArray *b;           /* коефіцієнт еліптичної кривої b. */
     size_t len;
@@ -53,7 +53,7 @@ EcGf2mCtx *ec2m_alloc(const int *f, size_t f_len, size_t a, const WordArray *b);
  * Ініціалізує контекст еліптичної кривої.
  *
  * @param ctx контекст еліптичної кривої
- * @param f не нулевые степени полинома
+ * @param f ненульові степені многочлена
  * @param f_len розмір f
  * @param a коефіцієнт a еліптичної кривої
  * @param b коефіцієнт b еліптичної кривої
@@ -61,24 +61,24 @@ EcGf2mCtx *ec2m_alloc(const int *f, size_t f_len, size_t a, const WordArray *b);
 void ec2m_init(EcGf2mCtx *ctx, const int *f, size_t f_len, size_t a, const WordArray *b);
 
 /**
- * Перевіряє принадлежность точки еліптичної кривої.
+ * Перевіряє належність точки еліптичній кривій.
  *
  * @param ctx контекст еліптичної кривої
  * @param px x-координата точки еліптичної кривої
  * @param py y-координата точки еліптичної кривої
  *
- * @return true - точка лежит на кривої,
- *         false - точка не лежит на кривої
+ * @return true - точка лежить на кривій,
+ *         false - точка не лежить на кривій
  */
 bool ec2m_is_on_curve(const EcGf2mCtx *ctx, const WordArray *px, const WordArray *py);
 
 /**
- * Умножает точку еліптичної кривої на число.
+ * Множить точку еліптичної кривої на число.
  *
  * @param ctx контекст еліптичної кривої
  * @param p точка еліптичної кривої
- * @param k целое число
- * @param r результат скалярного умножения (k * P)
+ * @param k ціле число
+ * @param r результат скалярного множення (k * P)
  */
 void ec2m_mul(EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k, ECPoint *r);
 
@@ -86,27 +86,27 @@ int ec2m_dual_mul_opt(const EcGf2mCtx *ctx, const EcPrecomp *p_precomp, const Wo
         const EcPrecomp *q_precomp, const WordArray *n, ECPoint *r);
 
 /**
- * Вычисляет сумму двух умножений точек еліптичної кривої на число.
+ * Обчислює суму двох добутків точок еліптичної кривої на числа.
  *
  * @param ctx контекст еліптичної кривої
  * @param p точка еліптичної кривої
- * @param k число на яке умножается P
+ * @param k число, на яке множиться P
  * @param q точка еліптичної кривої
- * @param n число на яке умножается Q
- * @param r сумма двух умножений точек еліптичної кривої на число (k * P + n * Q)
+ * @param n число, на яке множиться Q
+ * @param r сума двох добутків точок еліптичної кривої на числа (k * P + n * Q)
  */
 void ec2m_dual_mul(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k,
         const ECPoint *q, const WordArray *n, ECPoint *r);
 
 /**
- * Вычисляет сумму двух умножений точек еліптичної кривої на число.
+ * Обчислює суму двох добутків точок еліптичної кривої на числа.
  *
  * @param ctx контекст еліптичної кривої
- * @param precomp_p предварительные обчислення для точки P
- * @param k число на яке умножается P
- * @param precomp_q предварительные обчислення для точки Q
- * @param n число на яке умножается Q
- * @param r сумма двух умножений точек еліптичної кривої на число (k * P + n * Q)
+ * @param precomp_p попередні обчислення для точки P
+ * @param k число, на яке множиться P
+ * @param precomp_q попередні обчислення для точки Q
+ * @param n число, на яке множиться Q
+ * @param r сума двох добутків точок еліптичної кривої на числа (k * P + n * Q)
  */
 void ec2m_dual_mul_by_precomp(EcGf2mCtx *ctx, const EcPrecomp *precomp_p, const WordArray *k,
         const EcPrecomp *precomp_q, const WordArray *n, ECPoint *r);
@@ -122,26 +122,24 @@ void ec2m_point_to_affine(const EcGf2mCtx *ctx, ECPoint *p);
 EcGf2mCtx *ec2m_copy_with_alloc(EcGf2mCtx *ctx);
 
 /**
- * Рассчитывает предобчислення для оконного метода умножения точки на число.
+ * Виконує попередні обчислення для віконного методу множення точки на число.
  *
  * @param ctx контекст еліптичної кривої
- * @param px x-координата точки еліптичної кривої
- * @param py y-координата точки еліптичної кривої
- * @param w ширина окна
- * @param precomp_p буфер для передвичесленням розміра 2^(w - 2) * 2 * sizeof(p)
+ * @param p точка еліптичної кривої
+ * @param width ширина вікна
+ * @param precomp1 попередні обчислення розміром 2^(width - 2) * 2 * sizeof(p)
  *
  * @return код помилки
  */
 int ec2m_calc_win_precomp(EcGf2mCtx *ctx, const ECPoint *p, int width, EcPrecomp **precomp1);
 
 /**
- * Рассчитывает предобчислення для метода гребня.
+ * Виконує попередні обчислення для методу гребеня.
  *
  * @param ctx контекст еліптичної кривої
- * @param px x-координата точка еліптичної кривої
- * @param py y-координата точка еліптичної кривої
- * @param w ширина окна
- * @param precomp_p попередні обчислення
+ * @param p точка еліптичної кривої
+ * @param width ширина вікна
+ * @param precomp1 попередні обчислення
  *
  * @return код помилки
  */

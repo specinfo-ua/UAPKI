@@ -37,9 +37,9 @@
 
 
 /**
- * Создает пустой список объектов JksCertificate.
+ * Створює порожній список об'єктів JksCertificate.
  *
- * @return указатель на созданный объект или NULL в случае ошибки
+ * @return вказівник на створений об'єкт або NULL у разі помилки
  */
 JksCertificaties* jks_entry_certs_alloc(const uint32_t count)
 {
@@ -61,9 +61,9 @@ cleanup:
 }
 
 /**
- * Освобождает память, занимаемую сертификатом.
+ * Звільняє пам'ять, яку займає сертифікат.
  *
- * @param cert удаляемый объект или NULL
+ * @param cert об'єкт, що видаляється, або NULL
  */
 static void jks_entry_cert_free(JksCertificate *cert)
 {
@@ -76,9 +76,9 @@ static void jks_entry_cert_free(JksCertificate *cert)
 }
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає список.
  *
- * @param certs удаляемый объект или NULL
+ * @param certs об'єкт, що видаляється, або NULL
  */
 void jks_entry_certs_free(JksCertificaties* certs)
 {
@@ -95,9 +95,9 @@ void jks_entry_certs_free(JksCertificaties* certs)
 }
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає об'єкт.
  *
- * @param entries удаляемый объект или NULL
+ * @param entry об'єкт, що видаляється, або NULL
  */
 void jks_entry_free(JksEntry *entry)
 {
@@ -123,9 +123,9 @@ void jks_entry_free(JksEntry *entry)
 }
 
 /**
- * Создает пустой список объектов entry.
+ * Створює порожній список об'єктів entry.
  *
- * @return указатель на созданный объект или NULL в случае ошибки
+ * @return вказівник на створений об'єкт або NULL у разі помилки
  */
 JksEntries* jks_entries_alloc(const uint32_t count)
 {
@@ -150,9 +150,9 @@ cleanup:
 }
 
 /**
- * Освобождает память, занимаемую списком.
+ * Звільняє пам'ять, яку займає список.
  *
- * @param entries удаляемый объект или NULL
+ * @param entries об'єкт, що видаляється, або NULL
  */
 void jks_entries_free(JksEntries *entries)
 {
@@ -169,12 +169,13 @@ void jks_entries_free(JksEntries *entries)
 }
 
 /**
- * Чтение сертификата из буфера.
+ * Читання сертифіката з буфера.
  *
- * @param buffer контекст буфера
- * @param cert   сертификат
+ * @param buffer  контекст буфера
+ * @param jks_ver версія формату JKS
+ * @param cert    сертифікат
  *
- * @return код ошибки
+ * @return код помилки
  */
 static int jks_entry_cert_read(JksBufferCtx *buffer, const uint32_t jks_ver, JksCertificate **cert)
 {
@@ -187,14 +188,14 @@ static int jks_entry_cert_read(JksBufferCtx *buffer, const uint32_t jks_ver, Jks
     CALLOC_CHECKED(read_cert, sizeof(JksCertificate));
 
     if (jks_ver == JKS_VERSION_2) {
-        //  Считывание типа сертификата
+        //  Зчитування типу сертифіката
         DO(jks_buffer_read_string(buffer, &read_cert->type));
     } else {
-        //  Устанавливаем тип по умолчанию
+        //  Встановлюємо тип за замовчуванням
         CHECK_NOT_NULL(read_cert->type = strdup("X.509"));
     }
 
-    //  Считывание сертификат
+    //  Зчитування сертифіката
     DO(jks_buffer_read_data(buffer, &read_cert->encoded));
 
     *cert = read_cert;
@@ -208,12 +209,13 @@ cleanup:
 }
 
 /**
- * Чтение объекта из буфера.
+ * Читання об'єкта з буфера.
  *
- * @param reader контекст буфера
- * @param entry  объект
+ * @param buffer  контекст буфера
+ * @param jks_ver версія формату JKS
+ * @param entry   об'єкт
  *
- * @return код ошибки
+ * @return код помилки
  */
 int jks_entry_read(JksBufferCtx *buffer, const uint32_t jks_ver, JksEntry **entry)
 {
@@ -227,20 +229,20 @@ int jks_entry_read(JksBufferCtx *buffer, const uint32_t jks_ver, JksEntry **entr
 
     CALLOC_CHECKED(read_entry, sizeof(JksEntry));
 
-    //  Считывание тэга
+    //  Зчитування тегу
     DO(jks_buffer_read_int(buffer, (uint32_t *)&read_entry->entry_type));
-    //  Считывание алиаса
+    //  Зчитування аліасу
     DO(jks_buffer_read_string(buffer, &read_entry->alias));
-    //  Считывание даты создания
+    //  Зчитування дати створення
     DO(jks_buffer_read_long(buffer, &read_entry->date));
 
     switch (read_entry->entry_type) {
         case PRIVATE_KEY_ENTRY:
             cnt_certs = 0;
-            //  Считываем закрытый ключ
+            //  Зчитуємо особистий ключ
             DO(jks_buffer_read_data(buffer, &encoded));
             CHECK_NOT_NULL(read_entry->entry.key = asn_decode_ba_with_alloc(get_EncryptedPrivateKeyInfo_desc(), encoded));
-            //  Считываем цепочку сертификатов
+            //  Зчитуємо ланцюжок сертифікатів
             DO(jks_buffer_read_int(buffer, &cnt_certs));
             if (cnt_certs > 0) {
                 CHECK_NOT_NULL(read_entry->entry_exts =  jks_entry_certs_alloc(cnt_certs));
@@ -250,7 +252,7 @@ int jks_entry_read(JksBufferCtx *buffer, const uint32_t jks_ver, JksEntry **entr
             }
             break;
         case CERTIFICATE_ENTRY:
-            //  Считываем сертификат
+            //  Зчитуємо сертифікат
             DO(jks_entry_cert_read(buffer, jks_ver, &read_entry->entry.cert));
             break;
         default:

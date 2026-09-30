@@ -44,8 +44,8 @@ typedef struct Gost34311Ctx_st Gost34311Ctx;
 /**
  * Створює контекст ГОСТ 34.311 зі стандартним sbox.
  *
- * @param sbox_id ідентифікатор стандартной таблиці замін
- * @param sync синхропосилка (опціональний, якщо NULL синхропосилка 0)
+ * @param sbox_id ідентифікатор стандартної таблиці замін
+ * @param sync синхропосилка (необов'язкова; якщо NULL, синхропосилка нульова)
  * @return контекст ГОСТ 34.311
  */
 UAPKIC_EXPORT Gost34311Ctx *gost34311_alloc(Gost28147SboxId sbox_id, const ByteArray *sync);
@@ -65,16 +65,16 @@ UAPKIC_EXPORT Gost34311Ctx *gost34311_copy_with_alloc(const Gost34311Ctx *ctx);
  * Модифікує геш-вектор фрагментом даних.
  *
  * @param ctx контекст ГОСТ 34.311
- * @param data дані для шифрування
+ * @param data дані
  * @return код помилки
  */
 UAPKIC_EXPORT int gost34311_update(Gost34311Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує вироботку геша і повертає його значення.
+ * Завершує обчислення геша і повертає його значення.
  *
  * @param ctx контекст ГОСТ 34.311
- * @param H геш вектор
+ * @param H геш-вектор
  * @return код помилки
  */
 UAPKIC_EXPORT int gost34311_final(Gost34311Ctx *ctx, ByteArray **H);

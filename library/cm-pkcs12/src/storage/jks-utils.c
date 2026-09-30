@@ -118,11 +118,11 @@ int jks_hash_store (const char* password, const ByteArray* data, ByteArray** has
     CHECK_NOT_NULL(ba_salt = ba_alloc_from_str(MAC_SALT));
 
     CHECK_NOT_NULL(ctx = hash_alloc(HASH_ALG_SHA1));
-    //  Хеш от пароля пользователя
+    //  Геш від пароля користувача
     DO(hash_update(ctx, ba_pass));
-    //  Хеш от "соли"
+    //  Геш від "солі"
     DO(hash_update(ctx, ba_salt));
-    //  Хеш от данных хранилища
+    //  Геш від даних сховища
     DO(hash_update(ctx, data));
     DO(hash_final(ctx, hash));
 

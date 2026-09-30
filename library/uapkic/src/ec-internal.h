@@ -51,7 +51,7 @@ struct EcParamsCtx_st {
     ECPoint* p;                     /* Базова точка (генератор підгрупи) */
     WordArray* n;                   /* Порядок підгрупи групи точок еліптичної кривої. */
     EcGfpCtx* ecp;                  /* Параметри простого поля */
-    EcGf2mCtx* ec2m;                /* Параметри розширеного поля поля */
+    EcGf2mCtx* ec2m;                /* Параметри розширеного поля */
     bool is_onb;                    /* Чи є формат подання у розширеному полі ОНБ */
     size_t m;                       /* Степінь основного поля (ОНБ) */
     WordArray** to_pb;              /* Матриця перетворення елемента з ОНБ у ПБ */
@@ -61,7 +61,7 @@ struct EcParamsCtx_st {
 };
 
 struct EcCtx_st {
-    EcParamsCtx* params;            /* Параметри єліптичної кривої */
+    EcParamsCtx* params;            /* Параметри еліптичної кривої */
     WordArray* priv_key;            /* Особистий ключ */
     ECPoint* pub_key;               /* Відкритий ключ */
     EcPrecomp* precomp_q;
@@ -89,18 +89,18 @@ const int *get_defaut_f_onb(size_t m);
 int init_onb_params(EcParamsCtx *params, size_t m);
 
 /**
- * Преобразовывает елемент з ОНБ в ПБ.
+ * Перетворює елемент з ОНБ у ПБ.
  *
- * @param params Параметри
+ * @param params параметри
  * @param x елемент поля
  */
 int onb_to_pb(const EcParamsCtx *params, WordArray *x);
 
 /**
- * Выполняет преобразование элемента поля GF(2^m) из ПБ в ОНБ.
+ * Виконує перетворення елемента поля GF(2^m) з ПБ у ОНБ.
  *
- * @param params параметры криптосистемы
- * @param x элемент поля
+ * @param params параметри криптосистеми
+ * @param x елемент поля
  */
 int pb_to_onb(const EcParamsCtx *params, WordArray *x);
 
@@ -109,7 +109,7 @@ int ec2m_decompress_point_core(const EcParamsCtx* params, const ByteArray* x, in
 int public_key_to_ec_point(const EcParamsCtx* params, const ByteArray* qx, const ByteArray* qy, ECPoint** q);
 
 /**
- * Генерує особистий ключ для будь якого алгоритму підпису або Д-Х на ЕК.
+ * Генерує особистий ключ для будь-якого алгоритму підпису або Д-Х на ЕК.
  *
  * @param ctx контекст ЕК
  * @param d особистий ключ

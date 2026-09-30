@@ -50,7 +50,7 @@ UAPKIC_EXPORT DesCtx *des_alloc(void);
 /**
  * Генерує секретний ключ.
  *
- * @param key_len размер ключа 8, 16 или 24
+ * @param key_len розмір ключа 8, 16 або 24
  * @param key секретний ключ
  * @return код помилки
  */
@@ -109,7 +109,7 @@ UAPKIC_EXPORT int des_init_ctr(DesCtx *ctx, const ByteArray *key, const ByteArra
  * Шифрування у режимі DES.
  *
  * @param ctx контекст DES
- * @param data розшифровані дані
+ * @param data дані для шифрування
  * @param encrypted_data зашифровані дані
  * @return код помилки
  */
@@ -129,7 +129,7 @@ UAPKIC_EXPORT int des_decrypt(DesCtx *ctx, const ByteArray *encrypted_data, Byte
  * Шифрування у режимі TDES EDE.
  *
  * @param ctx контекст DES
- * @param data розшифровані дані
+ * @param data дані для шифрування
  * @param encrypted_data зашифровані дані
  * @return код помилки
  */

@@ -37,30 +37,31 @@ extern "C" {
 #endif
 
 /**
- * Генерує закритий ключ EC-KCDSA.
+ * Генерує особистий ключ EC-KCDSA.
  *
  * @param ctx контекст EC-KCDSA
- * @param d закритий ключ EC-KCDSA
+ * @param d особистий ключ EC-KCDSA
  * @return код помилки
  */
 UAPKIC_EXPORT int eckcdsa_generate_privkey(const EcCtx *ctx, ByteArray **d);
 
 /**
- * Формує відкритий ключ по закритому.
+ * Формує відкритий ключ за особистим.
  *
  * @param ctx контекст EC-KCDSA
- * @param d закритий ключ
- * @param qx Х-координата відкритого ключа
+ * @param d особистий ключ
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
 UAPKIC_EXPORT int eckcdsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, ByteArray **qy);
 
 /**
- * Формує підпис по гешу.
+ * Формує підпис за гешем.
  *
  * @param ctx контекст EC-KCDSA
  * @param H геш
+ * @param hash_alg алгоритм гешування
  * @param r частина підпису
  * @param s частина підпису
  * @return код помилки
@@ -68,13 +69,14 @@ UAPKIC_EXPORT int eckcdsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteA
 UAPKIC_EXPORT int eckcdsa_sign(const EcCtx *ctx, const ByteArray *H, HashAlg hash_alg, ByteArray **r, ByteArray **s);
 
 /**
- * Виконує перевірку підпису по гешу від даних.
+ * Виконує перевірку підпису за гешем від даних.
  *
  * @param ctx контекст EC-KCDSA
  * @param H геш
+ * @param hash_alg алгоритм гешування
  * @param r частина підпису
  * @param s частина підпису
- * @return код помилки або RET_OK, якщо підпис вірний
+ * @return код помилки або RET_OK, якщо підпис правильний
  */
 UAPKIC_EXPORT int eckcdsa_verify(const EcCtx* ctx, const ByteArray* H, HashAlg hash_alg, const ByteArray* r, const ByteArray* s);
 
@@ -82,7 +84,7 @@ UAPKIC_EXPORT int eckcdsa_verify(const EcCtx* ctx, const ByteArray* H, HashAlg h
  * Створює контекст для визначеного алгоритму гешування та гешує відкритий ключ відповідно до вимог EC-KCDSA.
  *
  * @param alg алгоритм гешування
- * @param qx Х-координата відкритого ключа
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return контекст гешування
  */
@@ -90,7 +92,7 @@ UAPKIC_EXPORT HashCtx* eckcdsa_hash_alloc(HashAlg alg, const ByteArray* qx, cons
 
 /**
  * Виконує самотестування алгоритму EC-KCDSA.
- * @return код помилки або RET_OK, якщо срмотестування пройдено
+ * @return код помилки або RET_OK, якщо самотестування пройдено
  */
 UAPKIC_EXPORT int eckcdsa_self_test(void);
 

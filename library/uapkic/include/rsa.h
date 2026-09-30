@@ -52,117 +52,117 @@ typedef struct RsaCtx_st RsaCtx;
 UAPKIC_EXPORT RsaCtx *rsa_alloc(void);
 
 /**
- * Генерує закритий ключ RSA.
+ * Генерує особистий ключ RSA.
  *
  * @param bits довжина ключа в бітах
- * @param e публічна експонента
+ * @param e відкрита експонента
  * @param n модуль
- * @param d приватна експонента
+ * @param d особиста експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_generate_privkey(const size_t bits, const ByteArray *e,
         ByteArray **n, ByteArray **d);
 
 /**
- * Генерує закритий ключ RSA.
+ * Генерує особистий ключ RSA.
  *
  * @param bits довжина ключа в бітах
- * @param e публічна експонента
+ * @param e відкрита експонента
  * @param n модуль
- * @param d приватна експонента
+ * @param d особиста експонента
  * @param p просте число №1
  * @param q просте число №2
  * @param dmp1 d mod (p-1)
  * @param dmq1 d mod (q-1)
- * @param iqmp зворотній елемент q
+ * @param iqmp обернений елемент q за модулем p
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_generate_privkey_ext(const size_t bits, const ByteArray *e,
         ByteArray **n, ByteArray **d, ByteArray **p, ByteArray **q, ByteArray **dmp1, ByteArray **dmq1, ByteArray **iqmp);
 
 /**
- * Перевіряє закритий ключ RSA.
+ * Перевіряє особистий ключ RSA.
  *
  * @param ctx контекст RSA
  * @param n модуль
- * @param e публічна експонента
- * @param d приватна експонента
+ * @param e відкрита експонента
+ * @param d особиста експонента
  * @param p просте число №1
  * @param q просте число №2
  * @param dmp1 d mod (p-1)
  * @param dmq1 d mod (q-1)
- * @param iqmp зворотній елемент q
+ * @param iqmp обернений елемент q за модулем p
  * @return код помилки
  */
 UAPKIC_EXPORT bool rsa_validate_key(RsaCtx *ctx, const ByteArray *n, const ByteArray *e, const ByteArray *d,
         const ByteArray *p, const ByteArray *q, const ByteArray *dmp1, const ByteArray *dmq1, const ByteArray *iqmp);
 
 /**
- * Ініціалізація контексту RSA для режиму OAEP.
+ * Ініціалізація контексту RSA для шифрування в режимі OAEP.
  *
  * @param ctx контекст RSA
  * @param hash_alg алгоритм гешування
  * @param label необов'язкова мітка, яка асоціюється з повідомленням;
- * значення за замовчуванням - пустий рядок
+ * значення за замовчуванням - порожній рядок
  * @param n модуль
- * @param e публічна експонента
+ * @param e відкрита експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_encrypt_oaep(RsaCtx *ctx, HashAlg hash_alg, ByteArray *label,
         const ByteArray *n, const ByteArray *e);
 
 /**
- * Ініціалізація контексту RSA для режиму OAEP.
+ * Ініціалізація контексту RSA для розшифрування в режимі OAEP.
  *
  * @param ctx контекст RSA
  * @param hash_alg алгоритм гешування
  * @param label необов'язкова мітка, яка асоціюється з повідомленням;
- * значення за замовчуванням - пустий рядок
+ * значення за замовчуванням - порожній рядок
  * @param n модуль
- * @param d приватна экспонента
+ * @param d особиста експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_decrypt_oaep(RsaCtx *ctx, HashAlg hash_alg, ByteArray *label, const ByteArray *n,
         const ByteArray *d);
 
 /**
- * Ініціалізація контексту RSA для режиму PKCS1_5.
+ * Ініціалізація контексту RSA для шифрування в режимі PKCS1_5.
  *
  * @param ctx контекст RSA
  * @param n модуль
- * @param e публічна експонента
+ * @param e відкрита експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_encrypt_pkcs1_v1_5(RsaCtx *ctx, const ByteArray *n, const ByteArray *e);
 
 /**
- * Ініціалізація контексту RSA для режиму PKCS1_5.
+ * Ініціалізація контексту RSA для розшифрування в режимі PKCS1_5.
  *
  * @param ctx контекст RSA
  * @param n модуль
- * @param d приватна экспонента
+ * @param d особиста експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_decrypt_pkcs1_v1_5(RsaCtx *ctx, const ByteArray *n, const ByteArray *d);
 
 /**
- * Ініціалізує контекст RSA для формування ЕЦП згідно з PKCS№1 v2.1 “RSA  Cryptography  Standard” RSASSA-PKCS1-v1_5.
+ * Ініціалізує контекст RSA для формування ЕЦП згідно з PKCS #1 v2.1 “RSA Cryptography Standard” RSASSA-PKCS1-v1_5.
  *
  * @param ctx контекст RSA
  * @param hash_alg алгоритм гешування
  * @param n модуль
- * @param d приватна експонента
+ * @param d особиста експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_sign_pkcs1_v1_5(RsaCtx *ctx, HashAlg hash_alg, const ByteArray *n, const ByteArray *d);
 
 /**
- * Ініціалізує контекст RSA для перевірки ЕЦП згідно з PKCS№1 v2.1 “RSA  Cryptography  Standard” RSASSA-PKCS1-v1_5.
+ * Ініціалізує контекст RSA для перевірки ЕЦП згідно з PKCS #1 v2.1 “RSA Cryptography Standard” RSASSA-PKCS1-v1_5.
  *
  * @param ctx контекст RSA
  * @param hash_alg алгоритм гешування
  * @param n модуль
- * @param e публічна экспонента
+ * @param e відкрита експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_verify_pkcs1_v1_5(RsaCtx *ctx, HashAlg hash_alg, const ByteArray *n, const ByteArray *e);
@@ -173,7 +173,7 @@ UAPKIC_EXPORT int rsa_init_verify_pkcs1_v1_5(RsaCtx *ctx, HashAlg hash_alg, cons
  * @param ctx контекст RSA
  * @param hash_alg алгоритм гешування
  * @param n модуль
- * @param d приватна експонента
+ * @param d особиста експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_sign_pss(RsaCtx* ctx, HashAlg hash_alg, const ByteArray* n, const ByteArray* d);
@@ -185,7 +185,7 @@ UAPKIC_EXPORT int rsa_init_sign_pss(RsaCtx* ctx, HashAlg hash_alg, const ByteArr
  * @param hash_alg алгоритм гешування
  * @param salt_len очікувана довжина salt
  * @param n модуль
- * @param e публічна экспонента
+ * @param e відкрита експонента
  * @return код помилки
  */
 UAPKIC_EXPORT int rsa_init_verify_pss(RsaCtx* ctx, HashAlg hash_alg, size_t salt_len, const ByteArray* n, const ByteArray* e);
@@ -211,7 +211,7 @@ UAPKIC_EXPORT int rsa_encrypt(RsaCtx* ctx, const ByteArray* data, ByteArray** en
 UAPKIC_EXPORT int rsa_decrypt(RsaCtx* ctx, const ByteArray* encrypted_data, ByteArray** data);
 
 /**
- * Формує ЕЦП згідно RSASSA-PKCS1-v1_5 або RSA-PSS.
+ * Формує ЕЦП згідно з RSASSA-PKCS1-v1_5 або RSA-PSS.
  *
  * @param ctx контекст RSA
  * @param hash значення геша
@@ -226,20 +226,20 @@ UAPKIC_EXPORT int rsa_sign(RsaCtx* ctx, const ByteArray* hash, ByteArray** sign)
  * @param ctx контекст RSA
  * @param hash значення геша
  * @param sign підпис RSA
- * @return код помилки або RET_OK, якщо підпис вірний
+ * @return код помилки або RET_OK, якщо підпис правильний
  */
 UAPKIC_EXPORT int rsa_verify(RsaCtx* ctx, const ByteArray* hash, const ByteArray* sign);
 
 /**
  * Звільняє контекст RSA.
  *
- * @param ctx
+ * @param ctx контекст RSA
  */
 UAPKIC_EXPORT void rsa_free(RsaCtx *ctx);
 
 /**
  * Виконує самотестування реалізації алгоритму RSA.
- * @return код помилки або RET_OK, якщо срмотестування пройдено
+ * @return код помилки або RET_OK, якщо самотестування пройдено
  */
 UAPKIC_EXPORT int rsa_self_test(void);
 

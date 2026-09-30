@@ -36,7 +36,7 @@
 
 #define HMAC_MAX_BLOCK_SIZE   144
 
-/** Контекст выработки хэш-вектора. */
+/** Контекст вироблення геш-вектора. */
 
 struct HmacCtx_st {
     ByteArray *k_ipad;

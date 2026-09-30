@@ -38,9 +38,9 @@
 #define RET_UAPKI_INVALID_JSON_FORMAT                                 (UAPKI_ERROR_NAME_CODE | 0x00000003)
 /** Невказаний або неправильний метод. */
 #define RET_UAPKI_INVALID_METHOD                                      (UAPKI_ERROR_NAME_CODE | 0x00000004)
-/** Невказаний або неправильний метод. */
+/** Невказаний або неправильний параметр. */
 #define RET_UAPKI_INVALID_PARAMETER                                   (UAPKI_ERROR_NAME_CODE | 0x00000005)
-/** Потребує ім'я файлу як ідентифікатор сховища. */
+/** Невідомий провайдер. */
 #define RET_UAPKI_UNKNOWN_PROVIDER                                    (UAPKI_ERROR_NAME_CODE | 0x00000006)
 /** Потребує ім'я файлу як ідентифікатор сховища. */
 #define RET_UAPKI_FILENAME_REQUIRED                                   (UAPKI_ERROR_NAME_CODE | 0x00000007)

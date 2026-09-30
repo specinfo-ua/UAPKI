@@ -55,7 +55,7 @@
 // з dstu7624
 extern const uint64_t subrowcol_default[8][256];
 
-/*Константа для P раунда*/
+/*Константа для P-раунду*/
 static const uint64_t p_pconst[NR_1024][NB_1024] = {
     {
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0,
@@ -101,7 +101,7 @@ static const uint64_t p_pconst[NR_1024][NB_1024] = {
     }
 };
 
-/*Константа для Q раунда, блок 64 байти*/
+/*Константа для Q-раунду, блок 64 байти*/
 static const uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     {
         8138269444283625715ULL, 6985347939676778739ULL, 5832426435069931763ULL, 4679504930463084787ULL, 
@@ -145,7 +145,7 @@ static const uint64_t p_qconst_NB_512[NR_512][NB_512] = {
     }
 };
 
-/*Константа для Q раунда, блок 128 байт*/
+/*Константа для Q-раунду, блок 128 байт*/
 static const uint64_t p_qconst_NB_1024[NR_1024][NB_1024] = {
     {
         17361641481138401523ULL, 16208719976531554547ULL, 15055798471924707571ULL, 13902876967317860595ULL, 
@@ -615,7 +615,7 @@ int dstu7564_final(Dstu7564Ctx *ctx, ByteArray **hash_code)
 
     padding(ctx->last_block, ctx->last_block_el, ctx->msg_tot_len, ctx->nbytes);
     digest(ctx, ctx->last_block);
-    /*Якщо доповнуння призвело до утворення додаткового блоку - гешуємо його*/
+    /*Якщо доповнення призвело до утворення додаткового блоку - гешуємо його*/
     if (ctx->last_block_el > ctx->nbytes - 13) {
         digest(ctx, ctx->last_block + ctx->nbytes);
     }
@@ -655,7 +655,7 @@ int dstu7564_init_kmac(Dstu7564Ctx *ctx, const ByteArray *key, size_t mac_len)
     for (i = 0; i < key_buf_len; i++) {
         ctx->hmac->invert_key[i] = ~ctx->hmac->key[i];
     }
-    /*PAD(K). Ключ всегда дополняется в один блок*/
+    /*PAD(K). Ключ завжди доповнюється до одного блока*/
     ctx->msg_tot_len[0] = key_buf_len;
     padding(ctx->hmac->key, key_buf_len, ctx->msg_tot_len, ctx->nbytes);
     ctx->msg_tot_len[0] = 0;
@@ -703,7 +703,7 @@ int dstu7564_final_kmac(Dstu7564Ctx *ctx, ByteArray **mac)
         ctx->msg_tot_len[1]++;
     }
 
-    /*Якщо доповнуння призвело до утворення додаткового блоку - гешуємо його*/
+    /*Якщо доповнення призвело до утворення додаткового блоку - гешуємо його*/
     if (ctx->last_block_el > ctx->nbytes - 13) {
         digest(ctx, ctx->last_block + ctx->nbytes);
         /*Додаємо довжину додаткового блоку*/
@@ -716,7 +716,7 @@ int dstu7564_final_kmac(Dstu7564Ctx *ctx, ByteArray **mac)
     memset(ctx->last_block, 0, ctx->nbytes);
     ctx->last_block_el = 0;
 
-    /*Так как наше сообщение состоит еще из PAD(K) и ~K, то добавляем их размер.*/
+    /*Оскільки наше повідомлення складається ще з PAD(K) і ~K, додаємо їхній розмір.*/
     ctx->msg_tot_len[0] += ((uint64_t)ctx->nbytes + ctx->hmac->key_len);
     if (ctx->msg_tot_len[0] < ((uint64_t)ctx->nbytes + ctx->hmac->key_len)) {
         ctx->msg_tot_len[1]++;
@@ -724,14 +724,14 @@ int dstu7564_final_kmac(Dstu7564Ctx *ctx, ByteArray **mac)
     
     memcpy(ctx->last_block, ctx->hmac->invert_key, ctx->hmac->key_len);
     /*H(PAD(PAD(K) || PAD(M) || (~K)))*/
-    /*Высчитываем дополнение от всего сообщения.*/
+    /*Обчислюємо доповнення для всього повідомлення.*/
     padding(ctx->last_block, ctx->hmac->key_len, ctx->msg_tot_len, ctx->nbytes);
 
-    /*Последний digest. Ключ всегда дополняется в один блок*/
+    /*Останній digest. Ключ завжди доповнюється до одного блока*/
     digest(ctx, ctx->last_block);
 
     DO(output_transformation(ctx, mac));
-    /*Выполняем hmac_init*/
+    /*Виконуємо hmac_init*/
     digest(ctx, ctx->hmac->key);
 
 cleanup:

@@ -36,7 +36,7 @@
 
 static int ec2m_points_to_affine(EcGf2mCtx *ctx, ECPoint **array, int off, int len)
 {
-    /* Получить a0, a0*a1, ..., a0*...*aN. */
+    /* Отримати a0, a0*a1, ..., a0*...*aN. */
     WordArray **k = NULL;
     WordArray *t = NULL;
     int i;
@@ -153,10 +153,10 @@ cleanup:
 }
 
 /**
- * Удваивает точку эллиптической кривой.
+ * Подвоює точку еліптичної кривої.
  *
- * @param ctx контекст группы точек эллиптической кривой
- * @param p точка эллиптической кривой
+ * @param ctx контекст групи точок еліптичної кривої
+ * @param p точка еліптичної кривої
  * @param r = 2*p
  */
 void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
@@ -176,7 +176,7 @@ void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
     ASSERT(ctx->len <= GF2M_MAX_LEN);
 
     if (int_is_zero(p->x)) {
-        /* точка на бесконечности */
+        /* точка на нескінченності */
         ec_point_zero(r);
         return;
     }
@@ -205,12 +205,12 @@ void ec2m_double(const EcGf2mCtx *ctx, const ECPoint *p, ECPoint *r)
 }
 
 /**
- * Складывает две точки эллиптической кривой.
+ * Додає дві точки еліптичної кривої.
  *
- * @param ctx контекст группы точек эллиптической кривой
- * @param p точка эллиптической кривой
- * @param qx X-координата точки Q представленной в аффинных координатах
- * @param qy Y-координата точки Q представленной в аффинных координатах
+ * @param ctx контекст групи точок еліптичної кривої
+ * @param p точка еліптичної кривої
+ * @param qx X-координата точки Q, заданої в афінних координатах
+ * @param qy Y-координата точки Q, заданої в афінних координатах
  * @param sign = -1 або 1
  * @param r  = P + sign * Q
  */
@@ -280,7 +280,7 @@ void ec2m_add(const EcGf2mCtx *ctx, const ECPoint *p, const WordArray *qx, const
         return;
     }
 
-    /* P і Q взаимно обратны. */
+    /* P і Q взаємно обернені. */
     if (int_is_zero(t2)) {
         ec_point_zero(r);
         return;
@@ -357,7 +357,7 @@ void ec2m_mul(EcGf2mCtx *ctx, const ECPoint *p, const WordArray *k, ECPoint *r)
     ASSERT(ctx->len == p->x->len);
     ASSERT(ctx->len == r->x->len);
 
-    /* Оконный NAF: таблица нечетных кратных P, 3P, ..., (2^(w-1)-1)P в аффинных координатах. */
+    /* Віконний NAF: таблиця непарних кратних P, 3P, ..., (2^(w-1)-1)P в афінних координатах. */
     DO(ec2m_calc_win_precomp(ctx, p, EC_MUL_WIN_WIDTH, &precomp));
     win = precomp->ctx.win->precomp;
 
@@ -668,7 +668,7 @@ int ec2m_dual_mul_opt(const EcGf2mCtx *ctx, const EcPrecomp *p_precomp, const Wo
         }
     }
 
-    //Дополнительные операции для размазывания времени у "слабых" naf ключей
+    //Додаткові операції для вирівнювання часу виконання для "слабких" naf-ключів
     ec2m_dual_mul_opt_extra_addition(ctx, p_precomp, m, m_naf, tmp);
     ec2m_dual_mul_opt_extra_addition(ctx, q_precomp, n, n_naf, tmp);
 

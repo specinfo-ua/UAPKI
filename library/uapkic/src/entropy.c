@@ -52,7 +52,7 @@ static int os_prng(void *rnd, size_t size)
     int ret = RET_OK;
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
-    /* Пытаемся использовать CryptGenRandom */
+    /* Намагаємося використати CryptGenRandom */
         HCRYPTPROV hProv;
 
         if (CryptAcquireContextA(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) == 0) {
@@ -66,7 +66,7 @@ static int os_prng(void *rnd, size_t size)
             SET_ERROR(RET_OS_PRNG_ERROR);
         }
 #else
-    /* Пытаемся использовать /dev/urandom */
+    /* Намагаємося використати /dev/urandom */
         size_t readed;
         FILE *fos = fopen("/dev/urandom", "rb");
 

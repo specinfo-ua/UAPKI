@@ -399,11 +399,11 @@ DEFINE_OID(OID_PBE_WITH_SHA1_TDES_CBC,  "1.2.840.113549.1.12.1.3");
 
 //-----------------------------------------------------------------------------------------
 //MEDOC
-DEFINE_OID(OID_MEDOC_DIGEST,            "1.32.113549.1.7.1.524545");  // OID алгоритма хеширования MacData хранилища MEDOC PKCS12
+DEFINE_OID(OID_MEDOC_DIGEST,            "1.32.113549.1.7.1.524545");  // OID алгоритму гешування MacData сховища MEDOC PKCS12
 
 //-----------------------------------------------------------------------------------------
 //IIT
-DEFINE_OID(OID_IIT_KEYSTORE,                     "1.3.6.1.4.1.19398.1.1.1.2"); // OID сховища закритого ключа IIT Key-6.dat
+DEFINE_OID(OID_IIT_KEYSTORE,                     "1.3.6.1.4.1.19398.1.1.1.2"); // OID сховища особистого ключа IIT Key-6.dat
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_RSA_PRIVKEY,    "1.3.6.1.4.1.19398.1.1.1.5"); // RSA ключ ("майже" RSAPrivateKey із RFC 8017)
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_SIGN_KEYID,     "1.3.6.1.4.1.19398.1.1.2.1"); // Subject Key Identifier
 DEFINE_OID(OID_IIT_KEYSTORE_ATTR_KEP_SPKI,       "1.3.6.1.4.1.19398.1.1.2.2"); // Параметри KEP ключа

@@ -33,7 +33,7 @@
 #include "math-int-internal.h"
 #include "macros-internal.h"
 
-/** Параметры для поля GF(2^173). */
+/** Параметри для поля GF(2^173). */
 static const int F_M173_ONB[5] = {173, 10, 2, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M173_ONB[8 * 100] = {
     0x00, 0x56, 0x59, 0xaa, 0x54, 0xe6, 0x0f, 0x1c, 0x27, 0x05, 0x90, 0xc0, 0x10, 0x35, 0x04, 0x0f,
@@ -71,7 +71,7 @@ static const uint8_t ROOT2_M173_ONB[8 * 3] = {
     0x70, 0x82, 0x85, 0xe3, 0x62, 0x0d, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^179). */
+/** Параметри для поля GF(2^179). */
 static const int F_M179_ONB[5] = {179, 4, 2, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M179_ONB[8 * 51] = {
     0x00, 0x62, 0x0d, 0x11, 0x32, 0xc2, 0x50, 0x0e, 0x33, 0x2d, 0xee, 0x34, 0x69, 0x60, 0xa0, 0xd4,
@@ -110,7 +110,7 @@ static const uint8_t ROOT2_M179_ONB[8 * 3] = {
     0x4f, 0x6f, 0x7a, 0x37, 0x3c, 0xbe, 0x06, 0x00
 };
 
-/** Параметры для поля GF(2^191). */
+/** Параметри для поля GF(2^191). */
 static const int F_M191_ONB[5] = {191, 9, 0, 0, 0};
 static const uint8_t COMPRESS_MATRIX_M191_ONB[8 * 54] = {
     0x00, 0x7a, 0xd9, 0xaa, 0x05, 0xa4, 0xd5, 0x94, 0x42, 0x37, 0x4a, 0x64, 0xb0, 0x22, 0x24, 0x00,
@@ -150,7 +150,7 @@ static const uint8_t ROOT2_M191_ONB[8 * 3] = {
     0xa5, 0x34, 0xc0, 0x52, 0x1e, 0x14, 0x16, 0x32
 };
 
-/** Параметры для поля GF(2^233). */
+/** Параметри для поля GF(2^233). */
 static const int F_M233_ONB[5] = {233, 9, 4, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M233_ONB[8 * 66] = {
     0x00, 0xce, 0x5d, 0xb3, 0x66, 0xa2, 0x18, 0x24, 0x17, 0x14, 0x96, 0xdd, 0x69, 0x03, 0xc4, 0x4a,
@@ -196,7 +196,7 @@ static const uint8_t ROOT2_M233_ONB[8 * 4] = {
     0x82, 0x02, 0xc2, 0x40, 0xa9, 0x12, 0x1e, 0xfa, 0x89, 0xfd, 0x28, 0xe6, 0xcd, 0x00, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^239). */
+/** Параметри для поля GF(2^239). */
 static const int F_M239_ONB[5] = {239, 15, 2, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M239_ONB[8 * 68] = {
     0x00, 0xda, 0x5d, 0x70, 0x66, 0x41, 0x8f, 0x8b, 0x72, 0x83, 0xfc, 0x0c, 0x48, 0x65, 0x88, 0xdb,
@@ -243,7 +243,7 @@ static const uint8_t ROOT2_M239_ONB[8 * 4] = {
     0x59, 0xcd, 0xff, 0xcb, 0xd5, 0x80, 0x92, 0x17, 0xd2, 0x63, 0x08, 0x8c, 0x0d, 0x1e, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^251). */
+/** Параметри для поля GF(2^251). */
 static const int F_M251_ONB[5] = {251, 14, 4, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M251_ONB[8 * 71] = {
     0x00, 0xf2, 0x01, 0x7a, 0xf6, 0x67, 0x5d, 0x01, 0x48, 0x54, 0xca, 0x7d, 0x8a, 0xb7, 0x08, 0x59,
@@ -292,7 +292,7 @@ static const uint8_t ROOT2_M251_ONB[8 * 4] = {
     0xa2, 0x1e, 0xc9, 0xf1, 0x42, 0x24, 0xf2, 0xe2, 0x12, 0xd8, 0x1b, 0xed, 0xf4, 0x9c, 0x13, 0x01
 };
 
-/** Параметры для поля GF(2^281). */
+/** Параметри для поля GF(2^281). */
 static const int F_M281_ONB[5] = {281, 9, 4, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M281_ONB[8 * 79]  = {
     0x00, 0x2e, 0xde, 0xb3, 0x07, 0xa7, 0x9a, 0x1f, 0x27, 0x24, 0xd6, 0xb1, 0xda, 0x21, 0x23, 0x0c,
@@ -347,7 +347,7 @@ static const uint8_t ROOT2_M281_ONB[8 * 5] = {
     0x78, 0x24, 0x8d, 0x98, 0x00, 0x00, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^293). */
+/** Параметри для поля GF(2^293). */
 static const int F_M293_ONB[5] = {293, 11, 6, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M293_ONB[8 * 83] = {
     0x00, 0x46, 0xde, 0x52, 0x66, 0x2b, 0x49, 0x0c, 0x2e, 0x21, 0x0c, 0xde, 0x90, 0xb6, 0xa7, 0x21,
@@ -404,7 +404,7 @@ static const uint8_t ROOT2_M293_ONB[8 * 5] = {
     0x67, 0x43, 0x04, 0xaa, 0x1d, 0x00, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^359). */
+/** Параметри для поля GF(2^359). */
 static const int F_M359_ONB[5] = {359, 18, 4, 2, 0};
 static const uint8_t COMPRESS_MATRIX_M359_ONB[8 * 101]  = {
     0x00, 0xca, 0x7a, 0x3b, 0xd8, 0x0d, 0x4e, 0x95, 0x8b, 0x7e, 0xae, 0xae, 0x2c, 0x67, 0xcc, 0x13,
@@ -470,7 +470,7 @@ static const uint8_t ROOT2_M359_ONB[8 * 6] = {
     0x68, 0x1b, 0x06, 0x1a, 0x8d, 0x8c, 0x7c, 0xd5, 0x61, 0x76, 0xd2, 0x48, 0x7c, 0x00, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^419). */
+/** Параметри для поля GF(2^419). */
 static const int F_M419_ONB[5] = {419, 21, 14, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M419_ONB[8 * 118] = {
     0x00, 0x42, 0x8b, 0x0b, 0x47, 0x28, 0x46, 0x08, 0xb3, 0x76, 0x8a, 0x55, 0x7a, 0x35, 0x85, 0xad,
@@ -546,7 +546,7 @@ static const uint8_t ROOT2_M419_ONB[8 * 7] = {
     0xfa, 0xb7, 0xf1, 0xc3, 0x05, 0x00, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^431). */
+/** Параметри для поля GF(2^431). */
 static const int F_M431_ONB[5] = {431, 5, 3, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M431_ONB[8 * 122] = {
     0x00, 0x5a, 0x33, 0xf2, 0xb7, 0x08, 0xe3, 0x39, 0xc5, 0x64, 0xd9, 0x39, 0x40, 0x18, 0x65, 0x59,
@@ -624,7 +624,7 @@ static const uint8_t ROOT2_M431_ONB[8 * 7] = {
     0x51, 0x75, 0x13, 0x0a, 0x02, 0x0a, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^443). */
+/** Параметри для поля GF(2^443). */
 static const int F_M443_ONB[5] = {443, 28, 3, 1, 0};
 static const uint8_t COMPRESS_MATRIX_M443_ONB[8 * 125] = {
     0x00, 0x72, 0x07, 0x04, 0x18, 0xed, 0x08, 0x10, 0x61, 0x17, 0xd2, 0x54, 0x39, 0x88, 0x68, 0x2e,
@@ -704,7 +704,7 @@ static const uint8_t ROOT2_M443_ONB[8 * 7] = {
     0x5c, 0x6d, 0x36, 0x29, 0xe4, 0xc1, 0x94, 0x01
 };
 
-/** Параметры для поля GF(2^491). */
+/** Параметри для поля GF(2^491). */
 static const int F_M491_ONB[5] = {491, 17, 6, 2, 0};
 static const uint8_t COMPRESS_MATRIX_M491_ONB[8 * 138] = {
     0x00, 0xd2, 0x73, 0xdf, 0xae, 0xb7, 0x79, 0xc8, 0xb5, 0x9f, 0x8c, 0x67, 0x26, 0x78, 0x87, 0x32,
@@ -790,7 +790,7 @@ static const uint8_t ROOT2_M491_ONB[8 * 8] = {
     0x21, 0xd4, 0xe0, 0x16, 0x1d, 0x38, 0x2b, 0x2f, 0xab, 0x37, 0xb6, 0x53, 0x97, 0x04, 0x00, 0x00
 };
 
-/** Параметры для поля GF(2^509). */
+/** Параметри для поля GF(2^509). */
 static const int F_M509_ONB[5] = {509, 23, 3, 2, 0};
 static const uint8_t COMPRESS_MATRIX_M509_ONB[8 * 144] = {
     0x00, 0xf6, 0xff, 0xf6, 0x7d, 0x20, 0xf0, 0x59, 0xe3, 0x2b, 0x7c, 0xd6, 0x22, 0xc9, 0xce, 0xb6,
@@ -879,36 +879,36 @@ static const uint8_t ROOT2_M509_ONB[8 * 8] = {
     0xc3, 0x42, 0xe3, 0x6f, 0xcc, 0x73, 0x1c, 0xdd, 0x85, 0x81, 0xff, 0x89, 0xdb, 0x4d, 0xc6, 0x1a
 };
 
-/** Матрицы для умножения в оптимальном нормальном базисе. */
+/** Матриці для множення в оптимальному нормальному базисі. */
 static const uint8_t *all_compress_mulp[14] = {
     COMPRESS_MATRIX_M173_ONB, COMPRESS_MATRIX_M179_ONB, COMPRESS_MATRIX_M191_ONB, COMPRESS_MATRIX_M233_ONB, COMPRESS_MATRIX_M239_ONB,
     COMPRESS_MATRIX_M251_ONB, COMPRESS_MATRIX_M281_ONB, COMPRESS_MATRIX_M293_ONB, COMPRESS_MATRIX_M359_ONB, COMPRESS_MATRIX_M419_ONB,
     COMPRESS_MATRIX_M431_ONB, COMPRESS_MATRIX_M443_ONB, COMPRESS_MATRIX_M491_ONB, COMPRESS_MATRIX_M509_ONB
 };
 
-/** Полиномы образующие полиномиальный базис. */
+/** Поліноми, що утворюють поліноміальний базис. */
 const int *ALL_F_ONB[14] = {
     F_M173_ONB, F_M179_ONB, F_M191_ONB, F_M233_ONB, F_M239_ONB, F_M251_ONB, F_M281_ONB,
     F_M293_ONB, F_M359_ONB, F_M419_ONB, F_M431_ONB, F_M443_ONB, F_M491_ONB, F_M509_ONB
 };
 
-/** Корни в ПБ неприводимых в ОНБ полиномов. */
+/** Корені в ПБ незвідних у ОНБ поліномів. */
 static const uint8_t *ROOT1_ALL_ONB[14] = {
     ROOT1_M173_ONB, ROOT1_M179_ONB, ROOT1_M191_ONB, ROOT1_M233_ONB, ROOT1_M239_ONB, ROOT1_M251_ONB, ROOT1_M281_ONB,
     ROOT1_M293_ONB, ROOT1_M359_ONB, ROOT1_M419_ONB, ROOT1_M431_ONB, ROOT1_M443_ONB, ROOT1_M491_ONB, ROOT1_M509_ONB
 };
 
-/** Корни в ОНБ неприводимых в ПБ полиномов. */
+/** Корені в ОНБ незвідних у ПБ поліномів. */
 static const uint8_t *ROOT2_ALL_ONB[14] = {
     ROOT2_M173_ONB, ROOT2_M179_ONB, ROOT2_M191_ONB, ROOT2_M233_ONB, ROOT2_M239_ONB, ROOT2_M251_ONB, ROOT2_M281_ONB,
     ROOT2_M293_ONB, ROOT2_M359_ONB, ROOT2_M419_ONB, ROOT2_M431_ONB, ROOT2_M443_ONB, ROOT2_M491_ONB, ROOT2_M509_ONB
 };
 
 /**
- * Получает матрицу для умножения в ОНБ из её сжатого представления.
+ * Отримує матрицю для множення в ОНБ з її стислого подання.
  *
- * @param compress_mulp сжатое представление матрицы
- * @param M матрица для умножения в ОНБ размера 2 * m - 1
+ * @param compress_mulp стисле подання матриці
+ * @param mulp матриця для множення в ОНБ розміру 2 * m - 1
  */
 static void decompress_matrix(const WordArray *compress_mulp, uint16_t *mulp)
 {
@@ -939,20 +939,20 @@ static void decompress_matrix(const WordArray *compress_mulp, uint16_t *mulp)
 }
 
 /**
- * Выполняет умножение в поле GF(2^m) в ОНБ.
+ * Виконує множення в полі GF(2^m) в ОНБ.
  *
- * @param x первый множитель
- * @param y второй множитель
- * @param mulp матрица для умножения в ОНБ
- * @param m степень расширения поля GF(2^m)
- * @param r массив для x * y
+ * @param x перший множник
+ * @param y другий множник
+ * @param mulp матриця для множення в ОНБ
+ * @param m степінь розширення поля GF(2^m)
+ * @param r масив для x * y
  */
 static void multiply_onb(const WordArray *x, const WordArray *y, const uint16_t *mulp, size_t m, WordArray *r)
 {
     size_t i, j;
     wa_zero(r);
 
-    /* XXX: очень медленная фукнция */
+    /* XXX: дуже повільна функція */
     for (j = 0; j < m; j++) {
         word_t bit = 0;
         for (i = 0; i < m - 1; i++) {
@@ -963,7 +963,7 @@ static void multiply_onb(const WordArray *x, const WordArray *y, const uint16_t 
         }
 
         bit ^= int_get_bit(y, (mulp[2 * m - 2] + j + 1) % m) & int_get_bit(x, (m - 1 + j + 1) % m);
-        /* XOR j бит у r */
+        /* XOR j-го біта у r */
         r->buf[j >> WORD_BIT_LEN_SHIFT] ^= bit << (j & WORD_BIT_LEN_MASK);
     }
 }
@@ -1012,13 +1012,13 @@ const int *get_defaut_f_onb(size_t m)
 }
 
 /**
- * Инициализирует параметры для ОНБ (полином образующий ПБ,
- * матрицы преобразования ОНБ в ПБ и наоборот).
+ * Ініціалізує параметри для ОНБ (поліном, що утворює ПБ,
+ * матриці перетворення з ОНБ у ПБ і навпаки).
  *
- * @param params параметры криптосистемы
- * @param m степень расширения основного поля
+ * @param params параметри криптосистеми
+ * @param m степінь розширення основного поля
  *
- * @return код ошибки
+ * @return код помилки
  */
 int init_onb_params(EcParamsCtx *params, size_t m)
 {
@@ -1047,14 +1047,14 @@ int init_onb_params(EcParamsCtx *params, size_t m)
     CALLOC_CHECKED(to_pb_prec, m * sizeof(WordArray *));
     CALLOC_CHECKED(to_onb_prec, m * sizeof(WordArray *));
 
-    /* Инициализация U. */
+    /* Ініціалізація U. */
     CHECK_NOT_NULL(to_pb_prec[0] = wa_copy_with_alloc(root1));
     for (i = 1; i < m; i++) {
         CHECK_NOT_NULL(to_pb_prec[i] = wa_alloc(words));
         gf2m_mod_sqr(params->ec2m->gf2m, to_pb_prec[i - 1], to_pb_prec[i]);
     }
 
-    /* Инициализация V. */
+    /* Ініціалізація V. */
     CHECK_NOT_NULL(to_onb_prec[0] = wa_alloc(words));
     memset(to_onb_prec[0]->buf, 0xff, words * sizeof(word_t));
     int_truncate(to_onb_prec[0], m);
@@ -1092,10 +1092,10 @@ cleanup:
 }
 
 /**
- * Преобразовывает элемент из ОНБ в ПБ.
+ * Перетворює елемент з ОНБ у ПБ.
  *
- * @param params Параметры ДСТУ
- * @param x элемент поля
+ * @param params параметри ДСТУ
+ * @param x елемент поля
  */
 int onb_to_pb(const EcParamsCtx *params, WordArray *x)
 {
@@ -1130,10 +1130,10 @@ cleanup:
 }
 
 /**
- * Выполняет преобразование элемента поля GF(2^m) из ПБ в ОНБ.
+ * Виконує перетворення елемента поля GF(2^m) з ПБ у ОНБ.
  *
- * @param params параметры криптосистемы
- * @param x элемент поля
+ * @param params параметри криптосистеми
+ * @param x елемент поля
  */
 int pb_to_onb(const EcParamsCtx *params, WordArray *x)
 {
@@ -1179,7 +1179,7 @@ int ec2m_decompress_point_core(const EcParamsCtx *params, const ByteArray *x, in
     CHECK_NOT_NULL(wa_x = wa_alloc_from_ba(x));
     CHECK_NOT_NULL(wa_y = wa_alloc(params->ec2m->len));
 
-    /* Qc принадлежит GF(2^m). */
+    /* Qc належить GF(2^m). */
     if (int_bit_len(wa_x) > params->m) {
         SET_ERROR(RET_INVALID_PUBLIC_KEY);
     }
@@ -1190,9 +1190,9 @@ int ec2m_decompress_point_core(const EcParamsCtx *params, const ByteArray *x, in
 
     q_len = (params->m + 7) / 8;
 
-    /* Восстановление точки эллиптической кривой. */
+    /* Відновлення точки еліптичної кривої. */
 
-    /* Если Qc = 0, то Qx = 0, Qy = sqrt(b). */
+    /* Якщо Qc = 0, то Qx = 0, Qy = sqrt(b). */
     if (int_is_zero(wa_x)) {
 
         CHECK_NOT_NULL(qx = wa_to_ba(wa_x));
@@ -1203,14 +1203,14 @@ int ec2m_decompress_point_core(const EcParamsCtx *params, const ByteArray *x, in
     }
 
     if (x_out) {
-        /* Запоминаем младший бит сжатого представления открытого ключа. */
+        /* Запам'ятовуємо молодший біт стислого подання відкритого ключа. */
         k = wa_x->buf[0] & 1;
 
-        /* Нахождение X-координаты открытого ключа. */
+        /* Знаходження X-координати відкритого ключа. */
         if (params->is_onb) {
 
-            /* Для ОНБ след элемента поля вычисляется как сумма по модулю 2
-            * всех битов его представления в ОНБ. */
+            /* Для ОНБ слід елемента поля обчислюється як сума за модулем 2
+            * усіх бітів його подання в ОНБ. */
             int trace = 0;
             int i;
 
@@ -1239,7 +1239,7 @@ int ec2m_decompress_point_core(const EcParamsCtx *params, const ByteArray *x, in
         k = compressed_y;
     }
 
-    /* Нахождение свободного члена в уравнении
+    /* Знаходження вільного члена в рівнянні
     * (y/x)^2 + (y/x) = (x^3 + a * x^2 + b) * x^(-2). */
     gf2m = params->ec2m->gf2m;
     gf2m_mod_sqr(gf2m, wa_x, wa_y);
@@ -1250,7 +1250,7 @@ int ec2m_decompress_point_core(const EcParamsCtx *params, const ByteArray *x, in
         wa_y->buf[0] ^= 1;
     }
 
-    /* Нахождение Y-координаты открытого ключа. */
+    /* Знаходження Y-координати відкритого ключа. */
     if (!gf2m_mod_solve_quad(gf2m, wa_y, wa_y)) {
         SET_ERROR(RET_INVALID_PUBLIC_KEY);
     }

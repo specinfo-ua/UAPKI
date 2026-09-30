@@ -35,9 +35,9 @@ extern "C" {
 #endif
 
 /**
- * Заповнює масив випадковими байтами використовуючи системний ГПВЧ.
+ * Заповнює масив випадковими байтами, використовуючи системний ГПВЧ.
  *
- * @param buf масив для розміщення випадкових байт
+ * @param buf масив для розміщення випадкових байтів
  * @return код помилки
  */
 UAPKIC_EXPORT int entropy_std(ByteArray *buf);
@@ -45,7 +45,7 @@ UAPKIC_EXPORT int entropy_std(ByteArray *buf);
 /**
  * Заповнює масив випадковими байтами на основі CPU execution time jitter.
  *
- * @param buf масив для розміщення випадкових байт
+ * @param buf масив для розміщення випадкових байтів
  * @return код помилки
  */
 UAPKIC_EXPORT int entropy_jitter(ByteArray *buf);
@@ -53,7 +53,6 @@ UAPKIC_EXPORT int entropy_jitter(ByteArray *buf);
 /**
  * Виконує самотестування джерел ентропії.
  *
- * @param buf масив для розміщення випадкових байт
  * @return код помилки
  */
 UAPKIC_EXPORT int entropy_self_test(void);

@@ -37,27 +37,27 @@ extern "C" {
 #endif
 
 /**
- * Генерує закритий ключ SM2DSA.
+ * Генерує особистий ключ SM2DSA.
  *
  * @param ctx контекст SM2DSA
- * @param d закритий ключ SM2DSA
+ * @param d особистий ключ SM2DSA
  * @return код помилки
  */
 UAPKIC_EXPORT int sm2dsa_generate_privkey(const EcCtx *ctx, ByteArray **d);
 
 /**
- * Формує відкритий ключ по закритому.
+ * Формує відкритий ключ за особистим.
  *
  * @param ctx контекст SM2DSA
- * @param d закритий ключ
- * @param qx Х-координата відкритого ключа
+ * @param d особистий ключ
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
 UAPKIC_EXPORT int sm2dsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, ByteArray **qy);
 
 /**
- * Формує підпис по гешу.
+ * Формує підпис за гешем.
  *
  * @param ctx контекст SM2DSA
  * @param H геш
@@ -68,21 +68,23 @@ UAPKIC_EXPORT int sm2dsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteAr
 UAPKIC_EXPORT int sm2dsa_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray **s);
 
 /**
- * Виконує перевірку підпису по гешу від даних.
+ * Виконує перевірку підпису за гешем від даних.
  *
  * @param ctx контекст SM2DSA
  * @param H геш
  * @param r частина підпису
  * @param s частина підпису
- * @return код помилки або RET_OK, якщо підпис вірний
+ * @return код помилки або RET_OK, якщо підпис правильний
  */
 UAPKIC_EXPORT int sm2dsa_verify(const EcCtx* ctx, const ByteArray* H, const ByteArray* r, const ByteArray* s);
 
 /**
  * Створює контекст для визначеного алгоритму гешування та гешує відкритий ключ відповідно до вимог SM2DSA.
  *
- * @param alg алгоритм гешування
- * @param qx Х-координата відкритого ключа
+ * @param ctx контекст SM2DSA
+ * @param hash_alg алгоритм гешування
+ * @param id ідентифікатор користувача
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return контекст гешування
  */
@@ -90,7 +92,7 @@ UAPKIC_EXPORT HashCtx* sm2dsa_hash_alloc(const EcCtx* ctx, HashAlg hash_alg, con
 
 /**
  * Виконує самотестування алгоритму SM2DSA.
- * @return код помилки або RET_OK, якщо срмотестування пройдено
+ * @return код помилки або RET_OK, якщо самотестування пройдено
  */
 UAPKIC_EXPORT int sm2dsa_self_test(void);
 

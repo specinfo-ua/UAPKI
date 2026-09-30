@@ -46,35 +46,36 @@ typedef enum {
 typedef struct RipemdCtx_st RipemdCtx;
 
 /**
- * Выделение памяти для режиму RIPEMD128.
+ * Створює контекст RIPEMD.
  *
- * @return повертає указатель на выделенную память.
+ * @param mode варіант алгоритму RIPEMD
+ * @return контекст RIPEMD
  */
 UAPKIC_EXPORT RipemdCtx *ripemd_alloc(RipemdVariant mode);
 
 UAPKIC_EXPORT RipemdCtx* ripemd_copy_with_alloc(const RipemdCtx* ctx);
 
 /**
- * Удаление даних з контексту RIPEMD.
+ * Звільняє контекст RIPEMD.
  *
  * @param ctx контекст RIPEMD.
  */
 UAPKIC_EXPORT void ripemd_free(RipemdCtx *ctx);
 
 /**
- * Добавление даних для геширования.
+ * Модифікує геш-вектор фрагментом даних.
  *
  * @param ctx контекст RIPEMD.
- * @param data дані, які нужно загешировать.
- * @return  - 1 у случае успеха і код помилки у обратном.
+ * @param data дані
+ * @return код помилки
  */
 UAPKIC_EXPORT int ripemd_update(RipemdCtx *ctx, const ByteArray *data);
 
 /**
- * Получение гешавідданих.
+ * Завершує обчислення геша і повертає його значення.
  *
  * @param ctx контекст RIPEMD.
- * @param hash_code геш даних.
+ * @param hash_code геш від даних
  * @return код помилки
  */
 UAPKIC_EXPORT int ripemd_final(RipemdCtx *ctx, ByteArray **hash_code);

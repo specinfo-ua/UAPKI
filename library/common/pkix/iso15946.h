@@ -38,9 +38,9 @@ extern "C" {
 
 
 /**
-* Повертає енкодований SharedInfo. (rfc3278, $8.2)
+* Повертає закодований SharedInfo. (rfc3278, $8.2)
 *
-* @param oid            ідентификатор алгоритму
+* @param oid            ідентифікатор алгоритму
 * @param baEntityInfo   64-байтний масив випадкових чисел
 * @param keySize
 * @param baEncoded

@@ -50,7 +50,7 @@ Dstu7564Ctx* dstu7564_copy_with_alloc(const Dstu7564Ctx* ctx);
  * Ініціалізація контексту DSTU7564.
  *
  * @param ctx контекст ДСТУ 7564
- * @param hash_len байтовий розмір геша, значення у межі 1..64 байт
+ * @param hash_len байтовий розмір геша, значення в межах 1..64 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7564_init(Dstu7564Ctx *ctx, size_t hash_len);
@@ -65,7 +65,7 @@ UAPKIC_EXPORT int dstu7564_init(Dstu7564Ctx *ctx, size_t hash_len);
 UAPKIC_EXPORT int dstu7564_update(Dstu7564Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує вироботку геша і повертає його значення.
+ * Завершує обчислення геша і повертає його значення.
  *
  * @param ctx контекст ДСТУ 7564
  * @param H геш від даних
@@ -82,10 +82,10 @@ UAPKIC_EXPORT int dstu7564_final(Dstu7564Ctx *ctx, ByteArray **H);
 UAPKIC_EXPORT size_t dstu7564_get_block_size(const Dstu7564Ctx* ctx);
 
 /**
- * Ініціалізує контекст ДСТУ 7564 для створення кода аутентификації.
+ * Ініціалізує контекст ДСТУ 7564 для обчислення коду автентифікації.
  *
  * @param ctx контекст ДСТУ 7564
- * @param key ключ аутентификации для режиму kmac
+ * @param key ключ автентифікації для режиму kmac
  * @param mac_len розмір імітовставки (байт), значення 32, 48, 64
  * @return код помилки
  */
@@ -101,10 +101,10 @@ UAPKIC_EXPORT int dstu7564_init_kmac(Dstu7564Ctx *ctx, const ByteArray *key, siz
 UAPKIC_EXPORT int dstu7564_update_kmac(Dstu7564Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершує вироботку геша і повертає його значення.
+ * Завершує обчислення коду автентифікації і повертає його значення.
  *
  * @param ctx контекст ДСТУ 7564
- * @param mac код аутентификации
+ * @param mac код автентифікації
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu7564_final_kmac(Dstu7564Ctx *ctx, ByteArray **mac);

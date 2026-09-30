@@ -51,6 +51,7 @@ typedef enum {
 /**
  * Створює контекст SHA3.
  *
+ * @param variant варіант алгоритму
  * @return контекст SHA3
  */
 UAPKIC_EXPORT Sha3Ctx *sha3_alloc(Sha3Variant variant);

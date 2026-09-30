@@ -12,7 +12,7 @@
 #define CKM_DSTU9311_MAC                   (CKM_VENDOR_DEFINED + 0x00420014UL)
 #define CKM_DSTU9311_MAC_GENERAL           (CKM_VENDOR_DEFINED + 0x00420015UL)
 
-/* Застаріле, ГОСТ 28147 додано в офіціні заголовки, тому потрібно його перевизначити
+/* Застаріле, ГОСТ 28147 додано в офіційні заголовки, тому потрібно його перевизначити
  * надалі замість *GOST28147* використовуйте аналогічні позначення *DSTU9311* */
 #undef CKM_GOST28147_ECB
 #undef CKM_GOST28147_MAC
@@ -24,7 +24,7 @@
 #define CKM_GOST28147_MAC                  CKM_DSTU9311_MAC
 #define CKM_GOST28147_MAC_GENERAL          CKM_DSTU9311_MAC_GENERAL
 
-/* визначені ТЕХНІЧНИМИ СПЕЦИФІКАЦІЯМИ до RFC 5652 затвердженими наказом
+/* визначені ТЕХНІЧНИМИ СПЕЦИФІКАЦІЯМИ до RFC 5652, затвердженими наказом
  * Адміністрації Держспецзв'язку від 27 жовтня 2020 року N 687 */
 #define CKM_DSTU9311_WRAP                   (CKM_VENDOR_DEFINED + 0x00420016UL)
 #define CKM_GOST28147_WRAP                  CKM_DSTU9311_WRAP
@@ -113,7 +113,7 @@ typedef CK_ULONG CK_SKELYA_PARAMETER_SET_TYPE;
 #define CKP_SKELYA_384_192 0x00000002UL
 #define CKP_SKELYA_512_256 0x00000003UL
 
-/* Коди помилок для зворотньої сумісності, в нових реалізаціях рекомендується
+/* Коди помилок для зворотної сумісності, в нових реалізаціях рекомендується
  * максимально використовувати з pkcs11t.h */
 #define CKR_SBOX_NOT_FOUND                  (CKR_VENDOR_DEFINED + 0x00420403UL)
 #define CKR_EC_PARAMS_NOT_FOUND             (CKR_VENDOR_DEFINED + 0x00420406UL)

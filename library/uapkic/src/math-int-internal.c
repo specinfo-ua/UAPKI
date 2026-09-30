@@ -45,12 +45,12 @@ static size_t words_len(const word_t *a, size_t len)
 }
 
 /**
- * Сдвигает большое целое на заданное число бит влево.
+ * Зсуває велике ціле на задану кількість бітів уліво.
  *
- * @param a большое целое длиной len слов
- * @param len длина большого целого числа словах
- * @param shift величина сдвига в битах
- * @param out буфер для результата сдвига длиной len слов
+ * @param a велике ціле довжиною len слів
+ * @param len довжина великого цілого числа в словах
+ * @param shift величина зсуву в бітах
+ * @param out буфер для результату зсуву довжиною len слів
  */
 static void words_lshift(const word_t *a, size_t len, int shift, word_t *out)
 {
@@ -73,13 +73,13 @@ static void words_lshift(const word_t *a, size_t len, int shift, word_t *out)
 }
 
 /**
- * Сдвигает большое целое число на заданное число бит вправо.
+ * Зсуває велике ціле число на задану кількість бітів управо.
  *
- * @param a_hi старшее слово большого целого
- * @param a большое целое  длиной len слов
- * @param len длина большого целого числа a
- * @param shift величина сдвига в битах
- * @param out буфер для результата сдвига длиной len слов
+ * @param a_hi старше слово великого цілого
+ * @param a велике ціле довжиною len слів
+ * @param len довжина великого цілого числа a
+ * @param shift величина зсуву в бітах
+ * @param out буфер для результату зсуву довжиною len слів
  */
 static void words_rshift(word_t a_hi, const word_t *a, size_t len, size_t shift, word_t *out)
 {
@@ -105,10 +105,10 @@ static void words_rshift(word_t a_hi, const word_t *a, size_t len, size_t shift,
 }
 
 /**
- * Возвращает сдвиг числа х влево на shift бит.
+ * Повертає зсув числа a вліво на shift бітів.
  *
- * @param a сдвигаемое число
- * @param shift величина сдвига
+ * @param a число, що зсувається
+ * @param shift величина зсуву
  */
 static void word_lshift_64(word_t a, int shift, Dword *out)
 {
@@ -326,7 +326,7 @@ void words_div(const word_t *a, size_t a_len, const word_t *b, size_t b_len, wor
         return;
     }
 
-    /*Варнинг fdw может быть не проинициализировано.*/
+    /*Попередження компілятора: fdw може бути не ініціалізовано.*/
     fdw.hi = 0;
     fdw.lo = 0;
 
@@ -347,7 +347,7 @@ void words_div(const word_t *a, size_t a_len, const word_t *b, size_t b_len, wor
         memset(r, 0, b_len * sizeof(word_t));
     }
 
-    /* Нормализация. */
+    /* Нормалізація. */
     norm_shift = WORD_BIT_LENGTH - word_bit_len(bb[bb_last_word_off]);
 
     words_lshift(aa, a_act_len + 1, norm_shift, aa);
@@ -355,7 +355,7 @@ void words_div(const word_t *a, size_t a_len, const word_t *b, size_t b_len, wor
 
     rounds = (int)(a_act_len - b_act_len);
     for (j = 0; j <= rounds; j++) {
-        /* Оценка разряда частного. */
+        /* Оцінка розряду частки. */
         c.hi = 0;
         c.lo = 0;
         d.hi = 0;
@@ -407,7 +407,7 @@ void words_div(const word_t *a, size_t a_len, const word_t *b, size_t b_len, wor
         c.lo = aa[aa_last_word_off - j] < d.lo;
         aa[aa_last_word_off - j] -= d.lo;
 
-        /* Проверяем остаток. */
+        /* Перевіряємо остачу. */
         if (c.lo != 0) {
             c.hi = 0;
             c.lo = 0;
@@ -429,7 +429,7 @@ void words_div(const word_t *a, size_t a_len, const word_t *b, size_t b_len, wor
         }
     }
 
-    /* Денормализация. */
+    /* Денормалізація. */
     if (r != NULL) {
         words_rshift(0, aa, b_act_len, norm_shift, r);
     }
@@ -879,18 +879,18 @@ int int_fermat_primary_test(WordArray *num, bool *is_prime)
     CHECK_PARAM(is_prime != NULL);
 
     CHECK_NOT_NULL(num_to_check = wa_copy_with_alloc(num));
-    //Устанавливаем модуль со значенням числа, яке мы проверяем
+    //Встановлюємо модуль, що дорівнює числу, яке ми перевіряємо
     CHECK_NOT_NULL(mod_ctx = gfp_alloc(num_to_check));
     num_to_check->buf[0]--;
 
-    //Генерируем случайное число меньшее чем число, яке мы проверяем.
+    //Генеруємо випадкове число, менше за число, яке ми перевіряємо.
     bits = int_bit_len(num_to_check);
     DO(int_gen_odd(bits - 1, &rnd_num));
 
     CHECK_NOT_NULL(out = wa_alloc_with_zero(mod_ctx->p->len));
 
     wa_change_len(rnd_num, out->len);
-    //Если умножение этого числа по модулю числа, которое мы проверяем, == 1, то ,вероятно, это число простое.
+    //Якщо піднесення цього числа до степеня (n - 1) за модулем числа n, яке ми перевіряємо, == 1, то, ймовірно, це число просте.
     gfp_mod_pow(mod_ctx, rnd_num, num_to_check, out);
 
     *is_prime = int_is_one(out);
@@ -922,11 +922,11 @@ int int_rabin_miller_primary_test(WordArray *num, bool *is_prime)
     size_t bits = 0;
     int ret = RET_OK;
 
-    //Выделяем память под данные
+    //Виділяємо пам'ять під дані
     CHECK_NOT_NULL(pow = wa_alloc(num_to_check->len));
     CHECK_NOT_NULL(pow_two = wa_alloc_with_zero(num_to_check->len));
 
-    //Значение степени двойки
+    //Значення степеня двійки
     pow_two->buf[0] = 1;
     CHECK_NOT_NULL(d = wa_copy_with_alloc(num_to_check));
 
@@ -935,38 +935,38 @@ int int_rabin_miller_primary_test(WordArray *num, bool *is_prime)
     wa_change_len(d, num_to_check->len << 1);
 
     CHECK_NOT_NULL(res = wa_alloc(d->len));
-    //Приводим данные к виду 2^r*d, d == res r == counter
+    //Зводимо дані до вигляду 2^r*d, d == res r == counter
     do {
         ++counter;
         int_lshift(pow_two, 1, pow_two);
         int_div(d, pow_two, res, NULL);
     } while (res->buf[0] % 2 == 0);
 
-    //Уменьшаем размер для использование у gfp функциях.
+    //Зменшуємо розмір для використання в gfp-функціях.
     wa_change_len(res, res->len >> 1);
-    //Генерируем простое случайное число
+    //Генеруємо випадкове непарне число
     bits = int_bit_len(num_to_check);
     DO(int_gen_odd(bits - 2, &rnd_num));
     wa_change_len(rnd_num, num_to_check->len);
 
-    //Создаем контекст gfp с модулем, значение которого является число, которое мы проверяем на простоту.
+    //Створюємо контекст gfp з модулем, значенням якого є число, яке ми перевіряємо на простоту.
     CHECK_NOT_NULL(mod = gfp_alloc(num_to_check));
     wa_free(pow_two);
     CHECK_NOT_NULL(pow_two = wa_alloc_with_zero(num_to_check->len));
     pow_two->buf[0] = 2;
     for (i = 0; i < counter; ++i) {
-        //умножение (2^r) * d, ^ - степень
+        //множення (2^r) * d, ^ - степінь
         CHECK_NOT_NULL(mul = wa_alloc(pow_two->len << 1));
         int_mul(pow_two, res, mul);
-        //Для работы з gfp_pow_mod уменьшаем размер поля в 2 раза.
-        //Так как мы умножаем на 2, количество слов в wa не поменяется.
+        //Для роботи з gfp_mod_pow зменшуємо розмір поля у 2 рази.
+        //Оскільки ми множимо на 2, кількість слів у wa не зміниться.
         mul->len >>= 1;
         CHECK_NOT_NULL(mul_pow = wa_alloc(mod->p->len));
-        //Возводим в степень наше случайное число
+        //Підносимо наше випадкове число до степеня
         gfp_mod_pow(mod, rnd_num, mul, mul_pow);
         --num_to_check->buf[0];
         int_lshift(pow_two, 1, pow_two);
-        //Если на протяжении итераций наше число == 1 или -1, то ,вероятно, оно простое.
+        //Якщо протягом ітерацій наше число == 1 або -1, то, ймовірно, воно просте.
         if (!int_cmp(mul_pow, num_to_check) || int_is_one(mul_pow) == 1) {
             *is_prime = true;
             ++num_to_check->buf[0];
@@ -1013,14 +1013,13 @@ cleanup:
 }
 
 /**
- * Вычисляет факториал.
+ * Обчислює факторіал.
  *
- * Необходимо чтобы размер буфера fac был достаточен для
- * размещения n!
+ * Необхідно, щоб розмір буфера fac був достатнім для
+ * розміщення n!
  *
- * @param n целое число
- * @param fac массив для n!
- * @param len длина массива fac
+ * @param n ціле число
+ * @param fac масив для n!
  */
 void factorial(size_t n, WordArray *fac)
 {
@@ -1032,30 +1031,30 @@ void factorial(size_t n, WordArray *fac)
     wa_one(fac);
 
     for (i = 2; i <= n; i++) {
-        /* По окончанию цикла carry = 0 */
+        /* Після завершення циклу carry = 0 */
         for (j = 0; j < fac->len; j++) {
             word_mul_64(fac->buf[j], i, &product);
             word_add_word_64(&product, carry, &product);
             fac->buf[j] = product.lo;
             carry = product.hi;
         }
-        /* Иначе размер буфера fac недостаточен для размещения n! */
+        /* Інакше розмір буфера fac недостатній для розміщення n! */
         ASSERT(carry == 0);
     }
 }
 
 /**
- * Вычисляет a * b / c.
+ * Обчислює a * b / c.
  *
- * Необходимо чтобы b <= c.
+ * Необхідно, щоб b <= c.
  *
- * @param a большое целое длины n
- * @param b целое
- * @param c целое
- * @param n размер a в словах
- * @param abc массив для результата длины n
+ * @param a велике ціле довжиною n
+ * @param b ціле
+ * @param c ціле
+ * @param n розмір a у словах
+ * @param abc масив для результату довжиною n
  *
- * @return код ошибки в случае ошибки выделения памяти
+ * @return код помилки в разі помилки виділення пам'яті
  */
 int int_mult_and_div(const WordArray *a, word_t b, word_t c, int n, WordArray *abc)
 {
@@ -1474,8 +1473,8 @@ cleanup:
 }
 
 /**
- * @param bits - число бітов для генерации случайного числа
- * @return  - сгенерированное случайное число
+ * @param bits - кількість бітів для генерації випадкового числа
+ * @return  - код помилки; згенероване просте число повертається через out
  */
 int int_gen_prime(const size_t bits, WordArray **out)
 {
@@ -1496,7 +1495,7 @@ int int_gen_prime(const size_t bits, WordArray **out)
 
     CHECK_PARAM(bits >= 8);
 
-    //Генерируем нечетное большое число
+    //Генеруємо непарне велике число
     byte_len = (bits + 7) >> 3;
     CHECK_NOT_NULL(rnd_bytes = ba_alloc_by_len(byte_len));
     DO(drbg_random(rnd_bytes));
@@ -1507,19 +1506,19 @@ int int_gen_prime(const size_t bits, WordArray **out)
     pre_last_byte_idx = ((bits + 6) >> 3) - 1;
     set_bit_num = (bits_mod_8);
 
-    //Сетим младший бит для получение нечетного числа
+    //Встановлюємо молодший біт для отримання непарного числа
     rnd_bytes->buf[0] |= 1;
 
-    //Сетим последний бит
+    //Встановлюємо останній (старший) біт
     rnd_bytes->buf[last_byte_idx] |= 0x01 << set_bit_num;
 
-    //Зануляем все после последнего бита
+    //Обнуляємо все після останнього біта
     rnd_bytes->buf[last_byte_idx] &= (uint8_t) (~(0xff << (bits_mod_8 + 1)));
 
     if (set_bit_num == 0) {
         set_bit_num = 8;
     }
-    //Сетим предпоследний бит
+    //Встановлюємо передостанній біт
     rnd_bytes->buf[pre_last_byte_idx] |= 0x01 << ((set_bit_num - 1) % 8);
 
     CHECK_NOT_NULL(a = wa_alloc_from_ba(rnd_bytes));
@@ -1529,7 +1528,7 @@ int int_gen_prime(const size_t bits, WordArray **out)
 
 again:
     if (bits % 256 == 0) {
-        //Генерируем гамму для получения простого числа
+        //Обчислюємо гаму для отримання простого числа
         if (bits < WORD_BIT_LENGTH) {
             for (i = 0; i < NUMPRIMES && a->buf[0] < PRIMES[i]; i++) {
                 gamma[i] = int_mod_word(a, PRIMES[i]);

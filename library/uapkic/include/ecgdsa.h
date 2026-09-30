@@ -36,27 +36,27 @@ extern "C" {
 #endif
 
 /**
- * Генерує закритий ключ ECGDSA.
+ * Генерує особистий ключ ECGDSA.
  *
  * @param ctx контекст ECGDSA
- * @param d закритий ключ ECGDSA
+ * @param d особистий ключ ECGDSA
  * @return код помилки
  */
 UAPKIC_EXPORT int ecgdsa_generate_privkey(const EcCtx *ctx, ByteArray **d);
 
 /**
- * Формує відкритий ключ по закритому.
+ * Формує відкритий ключ за особистим.
  *
  * @param ctx контекст ECGDSA
- * @param d закритий ключ
- * @param qx Х-координата відкритого ключа
+ * @param d особистий ключ
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
 UAPKIC_EXPORT int ecgdsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteArray **qx, ByteArray **qy);
 
 /**
- * Формує підпис по гешу.
+ * Формує підпис за гешем.
  *
  * @param ctx контекст ECGDSA
  * @param H геш
@@ -67,19 +67,19 @@ UAPKIC_EXPORT int ecgdsa_get_pubkey(const EcCtx *ctx, const ByteArray *d, ByteAr
 UAPKIC_EXPORT int ecgdsa_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray **s);
 
 /**
- * Виконує перевірку підпису по гешу від даних.
+ * Виконує перевірку підпису за гешем від даних.
  *
  * @param ctx контекст ECGDSA
  * @param H геш
  * @param r частина підпису
  * @param s частина підпису
- *  * @return код помилки або RET_OK, якщо підпис вірний
+ * @return код помилки або RET_OK, якщо підпис правильний
  */
 UAPKIC_EXPORT int ecgdsa_verify(const EcCtx* ctx, const ByteArray* H, const ByteArray* r, const ByteArray* s);
 
 /**
  * Виконує самотестування алгоритму ECGDSA.
- * @return код помилки або RET_OK, якщо срмотестування пройдено
+ * @return код помилки або RET_OK, якщо самотестування пройдено
  */
 UAPKIC_EXPORT int ecgdsa_self_test(void);
 

@@ -319,8 +319,8 @@ static void kalyna_xor(void *arg1, void *arg2, size_t len, void *out)
     uint8_t *a8, *b8, *o8;
     size_t i;
 
-    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
-    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
+    // побайтно, бо на деяких платформах не підтримується 32- або 64-бітовий 
+    // доступ до даних, не вирівняних на 4 або 8 байт відповідно
     a8 = (uint8_t *) arg1;
     b8 = (uint8_t *) arg2;
     o8 = (uint8_t *) out;
@@ -2330,7 +2330,7 @@ static int precomputed_rkeys(Dstu7624Ctx *ctx, uint64_t *precompute_keyshifts, u
     wblock_len = block_len >> 3;
     memset(id8, 0, block_len);
 
-    /*Вычисляем четные раундовые ключи.*/
+    /*Обчислюємо парні раундові ключі.*/
     for (i = 0; i <= ctx->rounds >> 1; i++) {
         for (j = 0; j < block_len; j++) {
             shift = ((size_t)1 << i) >> 8;
@@ -2356,7 +2356,7 @@ static int precomputed_rkeys(Dstu7624Ctx *ctx, uint64_t *precompute_keyshifts, u
     }
 
     shift = block_len - (block_len / 4 + 3);
-    /*Вычисляем нечетные раундовые ключи путем смещения четных*/
+    /*Обчислюємо непарні раундові ключі шляхом зсуву парних*/
     for (i = 0; i < ctx->rounds; i += 2) {
         DO(uint64_to_uint8(&ctx->p_rkeys[(i * wblock_len)], block_len >> 3, swap, block_len));
         for (j = 0; j < block_len; j++) {
@@ -2407,7 +2407,7 @@ cleanup:
     return ret;
 }
 
-/*Функция для обчислення зсуву таємного ключа.*/
+/*Функція для обчислення зсуву секретного ключа.*/
 static int p_key_shift(const uint8_t *key, Dstu7624Ctx *ctx, uint64_t **key_shifts)
 {
     uint8_t *key_shift;
@@ -2502,7 +2502,7 @@ static int dstu7624_init(Dstu7624Ctx *ctx, const ByteArray *key, const size_t bl
         p_hrkey[0] = 0x05;
         ctx->subrowcol = subrowcol128; // операція швидкого обчислення s_blocks, srow, mcol
         ctx->basic_transform = basic_transform_128; // операція базового перетворення
-        ctx->subrowcol_dec = subrowcol128_dec; // операція зворотнього базового перетворення
+        ctx->subrowcol_dec = subrowcol128_dec; // операція зворотного базового перетворення
         ctx->rounds = 10; // кількість раундів для генерування раундового ключа
     } else if (key_buf_len == KALINA_256_KEY_LEN && block_size == KALINA_128_BLOCK_LEN) {
         p_hrkey[0] = 0x07;
@@ -2800,7 +2800,7 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (offset != 0) {
         while (offset < ctx->block_len && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
@@ -2823,7 +2823,7 @@ static int encrypt_ctr(Dstu7624Ctx *ctx, const ByteArray *src, ByteArray **dst)
             gamma_gen(feed);
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[offset];
             offset++;
@@ -3128,17 +3128,17 @@ static int encrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     if (padded_len != block_len) {
-        //Дополняем последний блок шифротекстом предпоследнего
+        //Доповнюємо останній блок шифротекстом передостаннього
         i += plain_size % block_len;
         memcpy(&plain_data[i], &plain_data[i - block_len], padded_len);
         i -= plain_size % block_len;
 
-        //Конвертируем а для бе машин.
+        //Оновлюємо tweak: множення на x у GF(2^m).
         DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
         crypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
-        //Меняем n-1 блок и nй местами.
+        //Міняємо місцями (n-1)-й та n-й блоки.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3194,18 +3194,18 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     }
 
     if (padded_len != block_len) {
-        //Если было дополнение, на вход приходят последний и предпоследний блок
-        //Так как при дополнении в шифровании меняются местами последний и предпоследний блоки, расшифровуем последний блок, как предпоследний
+        //Якщо було доповнення, на вхід надходять останній і передостанній блоки
+        //Оскільки при доповненні під час шифрування останній і передостанній блоки міняються місцями, розшифровуємо останній блок як передостанній
         DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, gamma));
         DO(gf2m_double(ctx->mode.xts.gf2m_ctx, block_len, gamma, two));
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], two, block_len, &plain_data[i]);
 
-        //В конце предпоследнего блока хранится дополнение к последнему блоку
+        //У кінці передостаннього блока зберігається доповнення до останнього блока
         i += block_len;
         i += plain_size % block_len;
-        //Записываем полученое дополнение и расшифровуем
+        //Записуємо отримане доповнення і розшифровуємо
         memcpy(&plain_data[i], &plain_data[i - block_len], padded_len);
         i -= plain_size % block_len;
 
@@ -3213,7 +3213,7 @@ static int decrypt_xts(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
         decrypt_basic_transform(ctx, &plain_data[i], &plain_data[i]);
         kalyna_xor(&plain_data[i], gamma, block_len, &plain_data[i]);
 
-        //Меняем n-1 блок и nй местами.
+        //Міняємо місцями (n-1)-й та n-й блоки.
         memcpy(gamma, &plain_data[i - block_len], block_len);
         memcpy(&plain_data[i - block_len], &plain_data[i], block_len);
         memcpy(&plain_data[i], gamma, block_len - padded_len);
@@ -3280,7 +3280,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3303,7 +3303,7 @@ static int encrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = out->buf[data_off];
@@ -3635,7 +3635,7 @@ static int encrypt_ofb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **out)
     gamma = ctx->mode.ofb.gamma;
     used_gamma_len = ctx->mode.ofb.used_gamma_len;
     if (used_gamma_len != 0) {
-        //Если размер пришедших данных меньше чем оставшегося хеша, то шифруем только пришедших данные.
+        //Якщо розмір вхідних даних менший за залишок гами, то шифруємо лише вхідні дані.
         kalyna_xor(plain_data, &gamma[used_gamma_len],
                 (block_len - used_gamma_len) > plain_data_size_byte ? plain_data_size_byte : (block_len - used_gamma_len),
                 plain_data);
@@ -3763,7 +3763,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (offset != 0) {
         while (offset < q && data_off < in->len) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[offset];
@@ -3786,7 +3786,7 @@ static int decrypt_cfb(Dstu7624Ctx *ctx, const ByteArray *in, ByteArray **dst)
 
             crypt_basic_transform(ctx, feed, gamma);
         }
-        /* Шифрування последнйого неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in->len; data_off++) {
             out->buf[data_off] = in->buf[data_off] ^ gamma[ctx->block_len - (in->len - data_off)];
             feed[offset++] = in->buf[data_off];
@@ -4237,13 +4237,13 @@ static int cmac_update(Dstu7624Ctx *ctx, const ByteArray *in)
     plain_data = in->buf;
     plain_data_len = in->len;
 
-    //Если длинна блока и входных данных меньше размера блока, то записываем данные в последний блок и выходим.
+    //Якщо сумарна довжина залишку блока та вхідних даних не перевищує розміру блока, то записуємо дані в останній блок і виходимо.
     if (cmac->lblock_len + plain_data_len <= block_len) {
         memcpy(&cmac->last_block[cmac->lblock_len], plain_data, plain_data_len);
         cmac->lblock_len += plain_data_len;
         goto cleanup;
     }
-    //Ищем преобразование от последнего блока и остальных данных
+    //Обчислюємо перетворення від останнього блока та решти даних
     memcpy(&cmac->last_block[cmac->lblock_len], plain_data, block_len - cmac->lblock_len);
     kalyna_xor(cmac->last_block, cipher_data, block_len, cipher_data);
     crypt_basic_transform(ctx, cipher_data, cipher_data);

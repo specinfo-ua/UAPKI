@@ -200,14 +200,14 @@ static EcParamsCtx* ec_params_alloc_binary(const int* f, size_t f_len, size_t a,
     if (is_onb) {
         init_onb_params(params, f[0]);
 
-        /* b принадлежит GF(2^m). */
+        /* b належить GF(2^m). */
         if (int_bit_len(params->ec2m->b) > params->m) {
             SET_ERROR(RET_INVALID_EC_PARAMS);
         }
         DO(onb_to_pb(params, params->ec2m->b));
     }
 
-    /* Инициализация базовой точки. */
+    /* Ініціалізація базової точки. */
     if (py == NULL) {
         DO(ec2m_decompress_point_core(params, px, 0, &qx, &qy));
         CHECK_NOT_NULL(px_wa = wa_alloc_from_ba(qx));
@@ -1055,7 +1055,7 @@ int ec_init_verify(EcCtx* ctx, const ByteArray* qx, const ByteArray* qy)
         ctx->priv_key = NULL;
     }
 
-    /* Установка открытого ключа. */
+    /* Встановлення відкритого ключа. */
     DO(public_key_to_ec_point(ctx->params, qx, qy, &pub_key));
     if (ctx->pub_key != NULL) {
         if ((wa_cmp(pub_key->x, ctx->pub_key->x) != 0) || 
@@ -1117,9 +1117,9 @@ cleanup:
 }
 
 /**
- * Возвращает кофактор.
+ * Повертає кофактор.
  *
- * @param ctx параметры кривой
+ * @param params параметри кривої
  * @param cofactor кофактор
  */
 static void ec2m_get_cofactor(const EcParamsCtx* params, WordArray* cofactor)
@@ -1173,10 +1173,10 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
     CHECK_PARAM(qy != NULL);
     CHECK_PARAM(zx != NULL);
 
-    /* Инициализация открытого ключа удаленной стороны. */
+    /* Ініціалізація відкритого ключа віддаленої сторони. */
     DO(public_key_to_ec_point(ctx->params, qx, qy, &rq));
 
-    /* Проверка корректности закрытого ключа (0 < d < n). */
+    /* Перевірка коректності особистого ключа (0 < d < n). */
     CHECK_NOT_NULL(x = wa_alloc_from_be(d->buf, d->len));
     if (int_cmp(x, ctx->params->n) >= 0) {
         SET_ERROR(RET_INVALID_PRIVATE_KEY);
@@ -1188,7 +1188,7 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
         len = ((size_t)ctx->params->ec2m->gf2m->f[0] + 7) / 8;
         CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ec2m->len));
 
-        /* Получение общего секрета. */
+        /* Отримання спільного секрету. */
         ec2m_mul(ctx->params->ec2m, rq, x, r);
 
         if (with_cofactor) {
@@ -1207,7 +1207,7 @@ int ec_dh(const EcCtx* ctx, bool with_cofactor, const ByteArray* d, const ByteAr
         len = (int_bit_len(ctx->params->ecp->gfp->p) + 7) / 8;
         CHECK_NOT_NULL(r = ec_point_alloc(ctx->params->ecp->len));
 
-        /* Получение общего секрета. */
+        /* Отримання спільного секрету. */
         ecp_mul(ctx->params->ecp, rq, x, r);
     }
 

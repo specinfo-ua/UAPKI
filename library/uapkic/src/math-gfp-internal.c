@@ -115,7 +115,7 @@ cleanup:
 }
 
 /**
- * Вычисляет обратный элемент в поле GF(p) используется бинарный алгоритм.
+ * Обчислює обернений елемент у полі GF(p) бінарним алгоритмом.
  */
 static WordArray *gfp_mod_inv_binary(const WordArray *x, const WordArray *p)
 {
@@ -137,10 +137,10 @@ static WordArray *gfp_mod_inv_binary(const WordArray *x, const WordArray *p)
     CHECK_NOT_NULL(c = wa_alloc_with_one(x->len));
     CHECK_NOT_NULL(d = wa_alloc_with_zero(x->len));
 
-    /* Пока a != 1 і b != 1. */
+    /* Поки a != 1 і b != 1. */
     while (!int_is_one(a) && !int_is_one(b)) {
 
-        /* Пока a = 0 (mod 2), a = a/2, якщо c = 1 (mod 2), c = (c + p)/2, иначе c = c/2. */
+        /* Поки a = 0 (mod 2), a = a/2, якщо c = 1 (mod 2), c = (c + p)/2, інакше c = c/2. */
         while (int_get_bit(a, 0) == 0) {
             word_t c_hi = 0;
 
@@ -152,7 +152,7 @@ static WordArray *gfp_mod_inv_binary(const WordArray *x, const WordArray *p)
             int_rshift(c_hi, c, 1, c);
         }
 
-        /* Пока b = 0 (mod 2), b = b/2 і якщо d = 1 (mod 2), то d = (d + p) / 2, иначе d = d/2 */
+        /* Поки b = 0 (mod 2), b = b/2 і якщо d = 1 (mod 2), то d = (d + p) / 2, інакше d = d/2 */
         while (int_get_bit(b, 0) == 0) {
             word_t carry = 0;
 
@@ -174,7 +174,7 @@ static WordArray *gfp_mod_inv_binary(const WordArray *x, const WordArray *p)
             }
         } else {
 
-            /* якщо a <= b, то b = b - a і d = (d - c) (mod p) */
+            /* якщо a < b, то b = b - a і d = (d - c) (mod p) */
             int_sub(b, a, b);
             if (int_sub(d, c, d) < 0) {
                 int_add(d, p, d);
@@ -200,14 +200,14 @@ cleanup:
 }
 
 /**
- * Вычисляет обратный элемент в поле GF(p).
+ * Обчислює обернений елемент у полі GF(p).
  */
 WordArray *gfp_mod_inv_core(const WordArray *x, const WordArray *p)
 {
     ASSERT(!int_is_zero(x));
     ASSERT(!int_is_zero(p));
 
-    /* Если p четное - необходимо использовать базовый алгоритм поиска обратного элемента на основе расширенного алгоритма Евклида. */
+    /* Якщо p парне - необхідно використовувати базовий алгоритм пошуку оберненого елемента на основі розширеного алгоритму Евкліда. */
     return ((p->buf[0] & 1) == 0)
             ? gfp_mod_inv_ext_euclid(x, p)
             : gfp_mod_inv_binary(x, p);
@@ -377,7 +377,7 @@ WordArray *gfp_mod_inv(const GfpCtx *ctx, const WordArray *in)
     size_t k = 0;
     size_t len;
 
-    /* Если p четное - необходимо использовать базовый алгоритм поиска обратного элемента на основе расширенного алгоритма Евклида. */
+    /* Якщо p парне - необхідно використовувати базовий алгоритм пошуку оберненого елемента на основі розширеного алгоритму Евкліда. */
     if ((ctx->p->buf[0] & 1) == 0) {
         return gfp_mod_inv_ext_euclid(in, ctx->p);
     }
@@ -404,14 +404,14 @@ WordArray *gfp_mod_inv(const GfpCtx *ctx, const WordArray *in)
             int_rshift(0, a, 1, a);
             int_lshift(d, 1, d);
         } else if (int_cmp(b, a) >= 0) {
-            /* якщо b >= a, b = (b - a)/2, d = d + c, x1 = 2*c. */
+            /* якщо b >= a, b = (b - a)/2, d = d + c, c = 2*c. */
             int_sub(b, a, b);
             int_rshift(0, b, 1, b);
             int_add(d, c, d);
             carry = c->buf[c->len - 1] >> (WORD_BIT_LENGTH - 1);
             int_lshift(c, 1, c);
         } else {
-            /* Иначе a = (a - b)/2, c = d + c, d = 2*d. */
+            /* Інакше a = (a - b)/2, c = d + c, d = 2*d. */
             int_sub(a, b, a);
             int_rshift(0, a, 1, a);
             int_add(d, c, c);
@@ -429,7 +429,7 @@ WordArray *gfp_mod_inv(const GfpCtx *ctx, const WordArray *in)
     while (k > len) {
         carry = 0;
 
-        /* якщо c = 1 (mod 2), c = (c + p) / 2, иначе c = c/2. */
+        /* якщо c = 1 (mod 2), c = (c + p) / 2, інакше c = c/2. */
         if (int_get_bit(c, 0) == 1) {
             carry = int_add(c, ctx->p, c);
         }
@@ -453,8 +453,8 @@ cleanup:
 
 /**
  * @param ctx
- * @param a - Число для вознесения в степень.
- * @param x - Степень.
+ * @param a - Число, яке підноситься до степеня.
+ * @param x - Показник степеня.
  * @param out
  */
 void gfp_mod_pow(const GfpCtx *ctx, const WordArray *a, const WordArray *x, WordArray *out)
@@ -468,7 +468,7 @@ void gfp_mod_pow(const GfpCtx *ctx, const WordArray *a, const WordArray *x, Word
     ASSERT(x != NULL);
     ASSERT(a->len == out->len);
 
-    /* Метод удвоения сложения. */
+    /* Метод піднесення до квадрата та множення. */
     tmp = wa_alloc(ctx->p->len);
     wa_copy(ctx->one, out);
     wa_copy(ctx->one, tmp);
@@ -501,7 +501,7 @@ void gfp_mod_dual_pow(const GfpCtx *ctx, const WordArray *a, const WordArray *x,
     ASSERT(a->len == out->len);
     ASSERT(b->len == out->len);
 
-    /* Метод удвоения сложения. */
+    /* Метод піднесення до квадрата та множення. */
     wa_copy(ctx->one, out);
     wa_copy(ctx->one, tmp);
 
@@ -526,13 +526,13 @@ void gfp_mod_dual_pow(const GfpCtx *ctx, const WordArray *a, const WordArray *x,
 }
 
 /**
- * Генерирует последовательности Лукаса.
+ * Генерує послідовності Люка.
  * c[0] = 2, c[1] = a, c[k] = a * c[k - 1] - b * c[k - 2] (mod p).
  *
- * @param ctx контекст простого конечного поля
- * @param a начальное значение для генерации последовательности
- * @param b начальное значение для генерации последовательности
- * @param k номер элемента последовательности Лукаса
+ * @param ctx контекст простого скінченного поля
+ * @param a початкове значення для генерації послідовності
+ * @param b початкове значення для генерації послідовності
+ * @param k номер елемента послідовності Люка
  * @param ck = c[k] (mod p)
  * @param bk = b^[k/2] (mod p)
  */
@@ -653,13 +653,13 @@ bool gfp_mod_sqrt(const GfpCtx *ctx, const WordArray *a, WordArray *out)
         wa_copy(a, c);
 
         do {
-            /* Генерация случайного числа 1 < b < p. */
+            /* Генерація випадкового числа 1 < b < p. */
             int_prand(ctx->p, b);
 
-            /* d = d[k] (mod p) и ck = c^[k/2] (mod p). */
+            /* d = d[k] (mod p) і ck = c^[k/2] (mod p). */
             gfp_mod_lucas_seq(ctx, b, c, k, d, ck);
 
-            /* Если 1 < ck < p - 1, то g квадратичный невычет. */
+            /* Якщо 1 < ck < p - 1, то a - квадратичний нелишок. */
             if ((int_cmp(ck, ctx->one) > 0) && (int_cmp(ck, e) < 0)) {
                 answ = false;
                 goto cleanup;
@@ -672,7 +672,7 @@ bool gfp_mod_sqrt(const GfpCtx *ctx, const WordArray *a, WordArray *out)
             }
             int_rshift(carry, d, 1, d);
 
-            /* Если d^2 = x (mod p), то вернуть результат. */
+            /* Якщо d^2 = a (mod p), то повернути результат. */
             gfp_mod_sqr(ctx, d, b);
 
             if (int_equals(b, a)) {

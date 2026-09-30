@@ -36,9 +36,9 @@ extern "C" {
 #endif
 
 #define RET_ASN1_ERROR                           100
-/** Ошибка кодирования в байты. */
+/** Помилка кодування в байти. */
 #define RET_ASN1_ENCODE_ERROR                    101
-/** Ошибка декодирования из байт. */
+/** Помилка декодування з байтів. */
 #define RET_ASN1_DECODE_ERROR                    102
 #define RET_ASN1_TIME_ERROR                      103
 

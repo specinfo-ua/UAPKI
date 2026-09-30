@@ -58,12 +58,12 @@ void gfp_mod_dual_pow(const GfpCtx *ctx, const WordArray *a, const WordArray *x,
         const WordArray *b, const WordArray *y, WordArray *out);
 
 /**
- * Вычисляет один из квадратных корней элемента поля GF(p).
+ * Обчислює один із квадратних коренів елемента поля GF(p).
  *
- * @param a элемент поля
- * @param out массив для a^(1/2) (mod p)
+ * @param a елемент поля
+ * @param out масив для a^(1/2) (mod p)
  *
- * @return можно ли получить корень
+ * @return чи можна отримати корінь
  */
 bool gfp_mod_sqrt(const GfpCtx *ctx, const WordArray *a, WordArray *out);
 

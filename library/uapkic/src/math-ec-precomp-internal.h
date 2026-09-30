@@ -51,7 +51,7 @@ typedef struct EcPrecompComb_st {
     int comb_width;
 } EcPrecompComb;
 
-/** Предварительные обчислення. */
+/** Попередні обчислення. */
 typedef struct EcPrecomp_st {
     EcPrecompType type;
     union {
@@ -64,7 +64,7 @@ typedef struct EcPrecomp_st {
 /**
  * Створює копію контексту попередніх обчислень.
  *
- * @param ctx контекст попередні обчислення
+ * @param precomp_p контекст попередніх обчислень
  * @return копія контексту
  */
 EcPrecomp *ec_copy_precomp_with_alloc(EcPrecomp *precomp_p);

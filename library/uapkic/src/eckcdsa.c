@@ -136,7 +136,7 @@ static int eckcdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, HashAlg h
     shift = H->len > r_len ? H->len - r_len : 0;
     CHECK_NOT_NULL(hzm = ba_copy_with_alloc(H, shift, r_len));
 
-    /* Шаг 3. Обчислити точку ЕК C = kP,
+    /* Крок 3. Обчислити точку ЕК C = kP,
      * c = (cx, cy) та визначити r = cx (mod q). */
     if (ctx->params->ec_field == EC_FIELD_PRIME) {
         CHECK_NOT_NULL(C = ec_point_alloc(ctx->params->ecp->len));
@@ -178,7 +178,7 @@ static int eckcdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, HashAlg h
     int_mul(ws, ctx->priv_key, tmp);
     int_div(tmp, q, NULL, ws);
 
-    /* Якщо s = 0, то повернутися до Шагу 2. */
+    /* Якщо s = 0, то повернутися до Кроку 2. */
     if (int_is_zero(ws)) {
         ret = -1;
     }
@@ -231,7 +231,7 @@ int eckcdsa_sign(const EcCtx* ctx, const ByteArray* H, HashAlg hash_alg, ByteArr
     CHECK_NOT_NULL(k = wa_alloc(q->len));
 
     do {
-        /* Шаг 2. Згенерувати випадкове число k (0 < k < q). */
+        /* Крок 2. Згенерувати випадкове число k (0 < k < q). */
         DO(int_rand(q, k));
         ret = eckcdsa_sign_internal(ctx, H, hash_alg, k, r, s);
     } while (ret == -1);

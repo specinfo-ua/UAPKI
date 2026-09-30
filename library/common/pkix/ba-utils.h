@@ -50,20 +50,20 @@ int ba_print(FILE *stream, const ByteArray *ba);
 FILE* fopen_utf8(char const* utf8path, const int is_writemode);
 
 /**
- * Створює контекст масиву байт з файлу.
+ * Створює контекст масиву байтів з файлу.
  *
- * @param path шлях до файлу
- * @param out  контекст масиву байт
+ * @param utf8path шлях до файлу (UTF-8)
+ * @param out      контекст масиву байтів
  * @return код помилки
  */
 int ba_alloc_from_file(const char * utf8path, ByteArray ** out);
 
 /**
- * Записує дані у файл, які зберігають контекст масиву байт.
+ * Записує у файл дані, які зберігає контекст масиву байтів.
  * Не виділяє пам'ять.
  *
- * @param ba   контекст масиву байт
- * @param path шлях до файлу
+ * @param ba       контекст масиву байтів
+ * @param utf8path шлях до файлу (UTF-8)
  * @return код помилки
  */
 int ba_to_file(const ByteArray * ba, const char * utf8path);

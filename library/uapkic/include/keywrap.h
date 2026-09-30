@@ -35,10 +35,10 @@ extern "C" {
 #endif
 
 /**
-* Зашифровує ключ за алгоритмом Dstu7624Wrap згідно ТЕХНІЧНИХ СПЕЦИФІКАЦІЙ до RFC 5652 затверждених наказом Адмiнiстрацiї Дерспецзв'язку 27.10.2020 року N 687
+* Зашифровує ключ за алгоритмом Dstu7624Wrap згідно з ТЕХНІЧНИМИ СПЕЦИФІКАЦІЯМИ до RFC 5652, затвердженими наказом Адміністрації Держспецзв'язку 27.10.2020 року N 687
 *
 * @param kek        ключ шифрування ключа
-* @param key        ключ що шифрується
+* @param key        ключ, що шифрується
 * @param wraped_key зашифрований ключ
 *
 * @return код помилки
@@ -46,7 +46,7 @@ extern "C" {
 UAPKIC_EXPORT int key_wrap_dstu7624(const ByteArray* kek, const ByteArray* key, ByteArray** wraped_key);
 
 /**
-* Розшифровує ключ за алгоритмом Dstu7624Wrap згідно ТЕХНІЧНИХ СПЕЦИФІКАЦІЙ до RFC 5652 затверждених наказом Адмiнiстрацiї Дерспецзв'язку 27.10.2020 року N 687
+* Розшифровує ключ за алгоритмом Dstu7624Wrap згідно з ТЕХНІЧНИМИ СПЕЦИФІКАЦІЯМИ до RFC 5652, затвердженими наказом Адміністрації Держспецзв'язку 27.10.2020 року N 687
 *
 * @param kek        ключ шифрування ключа
 * @param wraped_key зашифрований ключ
@@ -57,11 +57,11 @@ UAPKIC_EXPORT int key_wrap_dstu7624(const ByteArray* kek, const ByteArray* key, 
 UAPKIC_EXPORT int key_unwrap_dstu7624(const ByteArray* kek, const ByteArray* wraped_key, ByteArray** key);
 
 /**
-* Зашифровує ключ за алгоритмом GOST28147Wrap згідно наказу Адмiнiстрацiї Дерспецзв'язку від 14 січня 2013 р. N 108/22640
+* Зашифровує ключ за алгоритмом GOST28147Wrap згідно з наказом Адміністрації Держспецзв'язку від 14 січня 2013 р. N 108/22640
 *
 * @param sbox       ДКЕ
 * @param kek        ключ шифрування ключа
-* @param key        ключ що шифрується
+* @param key        ключ, що шифрується
 * @param wraped_key зашифрований ключ
 *
 * @return код помилки
@@ -69,7 +69,7 @@ UAPKIC_EXPORT int key_unwrap_dstu7624(const ByteArray* kek, const ByteArray* wra
 UAPKIC_EXPORT int key_wrap_gost28147(const ByteArray* sbox, const ByteArray* kek, const ByteArray* key, ByteArray** wraped_key);
 
 /**
-* Розшифровує ключ за алгоритмом GOST28147Wrap згідно наказу Адмiнiстрацiї Дерспецзв'язку від 14 січня 2013 р. N 108/22640
+* Розшифровує ключ за алгоритмом GOST28147Wrap згідно з наказом Адміністрації Держспецзв'язку від 14 січня 2013 р. N 108/22640
 *
 * @param sbox       ДКЕ
 * @param kek        ключ шифрування ключа

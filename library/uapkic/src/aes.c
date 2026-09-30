@@ -1138,8 +1138,8 @@ __inline static void aes_xor(void *arg1, void *arg2, void *out)
     uint8_t*a2 = (uint8_t*) arg2;
     uint8_t*o = (uint8_t*) out;
 
-    // побайтно бо на деяких платформах не підтримується 32 або 64 бітовий 
-    // доступ до даніх не вирівняних на 4 або 8 байт відповідно
+    // побайтно, бо на деяких платформах не підтримується 32- або 64-бітовий 
+    // доступ до даних, не вирівняних на 4 або 8 байт відповідно
     o[0] = a1[0] ^ a2[0];
     o[1] = a1[1] ^ a2[1];
     o[2] = a1[2] ^ a2[2];
@@ -1229,7 +1229,7 @@ static int encrypt_ofb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < AES_BLOCK_LEN && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset++];
@@ -1243,13 +1243,13 @@ static int encrypt_ofb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Шифрование блоками по AES_BLOCK_LEN байт. */
+        /* Шифрування блоками по AES_BLOCK_LEN байт. */
         for (; data_off + AES_BLOCK_LEN <= src->len; data_off += AES_BLOCK_LEN) {
             aes_xor(&src->buf[data_off], ctx->gamma, &out->buf[data_off]);
             block_encrypt(ctx, ctx->gamma, ctx->gamma);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset++];
         }
@@ -1279,7 +1279,7 @@ static int encrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < AES_BLOCK_LEN && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset];
@@ -1293,7 +1293,7 @@ static int encrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Шифрование блоками по AES_BLOCK_LEN байт. */
+        /* Шифрування блоками по AES_BLOCK_LEN байт. */
         for (; data_off + AES_BLOCK_LEN <= src->len; data_off += AES_BLOCK_LEN) {
             aes_xor(&src->buf[data_off], gamma, &out->buf[data_off]);
             memcpy(feed, &out->buf[data_off], AES_BLOCK_LEN);
@@ -1301,7 +1301,7 @@ static int encrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
             block_encrypt(ctx, feed, gamma);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset];
             feed[ctx->offset++] = out->buf[data_off];
@@ -1332,7 +1332,7 @@ static int decrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < AES_BLOCK_LEN && data_off < src->len) {
             feed[ctx->offset] = src->buf[data_off];
@@ -1347,7 +1347,7 @@ static int decrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Расшифрование блоками по AES_BLOCK_LEN байт. */
+        /* Розшифрування блоками по AES_BLOCK_LEN байт. */
         for (; data_off + AES_BLOCK_LEN <= src->len; data_off += AES_BLOCK_LEN) {
             memcpy(feed, &src->buf[data_off], AES_BLOCK_LEN);
             aes_xor(&src->buf[data_off], gamma, &out->buf[data_off]);
@@ -1356,7 +1356,7 @@ static int decrypt_cfb(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
         }
 
 
-        /* Расшифрование последнего неполного блока. */
+        /* Розшифрування останнього неповного блока. */
         for (; data_off < src->len; data_off++) {
             feed[ctx->offset] = src->buf[data_off];
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset++];
@@ -1456,7 +1456,7 @@ static int encrypt_ctr(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(src->len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < AES_BLOCK_LEN && data_off < src->len) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset];
@@ -1472,7 +1472,7 @@ static int encrypt_ctr(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
     }
 
     if (data_off < src->len) {
-        /* Шифрование блоками по 8 байт. */
+        /* Шифрування блоками по 8 байт. */
         for (; data_off + AES_BLOCK_LEN <= src->len; data_off += AES_BLOCK_LEN) {
             aes_xor(&src->buf[data_off], gamma, &out->buf[data_off]);
 
@@ -1480,7 +1480,7 @@ static int encrypt_ctr(AesCtx *ctx, const ByteArray *src, ByteArray **dst)
             gamma_gen(feed, AES_BLOCK_LEN);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < src->len; data_off++) {
             out->buf[data_off] = src->buf[data_off] ^ gamma[ctx->offset++];
         }

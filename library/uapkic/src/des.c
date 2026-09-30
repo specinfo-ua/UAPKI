@@ -1538,7 +1538,7 @@ static int des_encrypt_ofb(DesCtx *ctx, uint32_t *key_shedule, const ByteArray *
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -1553,12 +1553,12 @@ static int des_encrypt_ofb(DesCtx *ctx, uint32_t *key_shedule, const ByteArray *
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по DES_BLOCK_LEN байт. */
+        /* Шифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
             des_crypt(gamma, gamma, key_shedule);
         }
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
             ctx->offset++;
@@ -1583,7 +1583,7 @@ static int des3_encrypt_ofb(DesCtx *ctx, uint32_t *key_shedule, const ByteArray 
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -1598,13 +1598,13 @@ static int des3_encrypt_ofb(DesCtx *ctx, uint32_t *key_shedule, const ByteArray 
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по DES_BLOCK_LEN байт. */
+        /* Шифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
             des3_crypt(gamma, gamma, key_shedule);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
             ctx->offset++;
@@ -1732,7 +1732,7 @@ static int des_encrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -1746,7 +1746,7 @@ static int des_encrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по DES_BLOCK_LEN байт. */
+        /* Шифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
             memcpy(&feed[0], &out->buf[data_off], DES_BLOCK_LEN);
@@ -1754,7 +1754,7 @@ static int des_encrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
             des_crypt(feed, gamma, ctx->enc_key);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
             feed[ctx->offset++] = out->buf[data_off];
@@ -1780,7 +1780,7 @@ static int des3_encrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -1794,14 +1794,14 @@ static int des3_encrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по DES_BLOCK_LEN байт. */
+        /* Шифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
             memcpy(&feed[0], &out->buf[data_off], DES_BLOCK_LEN);
 
             des3_crypt(feed, gamma, ctx->enc_key);
         }
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
             feed[ctx->offset++] = out->buf[data_off];
@@ -1827,7 +1827,7 @@ static int des_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             feed[ctx->offset] = in_buf[data_off];
@@ -1842,7 +1842,7 @@ static int des_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in_len) {
-        /* Расшифрование блоками по DES_BLOCK_LEN байт. */
+        /* Розшифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             memcpy(&feed[0], &in_buf[data_off], DES_BLOCK_LEN);
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
@@ -1851,7 +1851,7 @@ static int des_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
         }
 
 
-        /* Расшифрование последнего неполного блока. */
+        /* Розшифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             feed[ctx->offset] = in_buf[data_off];
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset++];
@@ -1877,7 +1877,7 @@ static int des3_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             feed[ctx->offset] = in_buf[data_off];
@@ -1892,7 +1892,7 @@ static int des3_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
     }
 
     if (data_off < in_len) {
-        /* Расшифрование блоками по DES_BLOCK_LEN байт. */
+        /* Розшифрування блоками по DES_BLOCK_LEN байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             memcpy(&feed[0], &in_buf[data_off], DES_BLOCK_LEN);
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
@@ -1900,7 +1900,7 @@ static int des3_decrypt_cfb(DesCtx *ctx, const ByteArray *in, ByteArray **dst)
             des3_crypt(feed, gamma, ctx->enc_key);
         }
 
-        /* Расшифрование последнего неполного блока. */
+        /* Розшифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             feed[ctx->offset] = in_buf[data_off];
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset++];
@@ -1992,7 +1992,7 @@ static int des_encrypt_ctr(DesCtx *ctx, uint32_t *key_shedule, const ByteArray *
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -2008,14 +2008,14 @@ static int des_encrypt_ctr(DesCtx *ctx, uint32_t *key_shedule, const ByteArray *
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по 8 байт. */
+        /* Шифрування блоками по 8 байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
 
             des3_crypt(feed, gamma, key_shedule);
             gamma_gen(feed, DES_BLOCK_LEN);
         }
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset++];
         }
@@ -2040,7 +2040,7 @@ static int des3_encrypt_ctr(DesCtx *ctx, uint32_t *key_shedule, const ByteArray 
 
     CHECK_NOT_NULL(out = ba_alloc_by_len(in_len));
 
-    /* Использование оставшейся гаммы. */
+    /* Використання залишку гами. */
     if (ctx->offset != 0) {
         while (ctx->offset < DES_BLOCK_LEN && data_off < in_len) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset];
@@ -2056,7 +2056,7 @@ static int des3_encrypt_ctr(DesCtx *ctx, uint32_t *key_shedule, const ByteArray 
     }
 
     if (data_off < in_len) {
-        /* Шифрование блоками по 8 байт. */
+        /* Шифрування блоками по 8 байт. */
         for (; data_off + DES_BLOCK_LEN <= in_len; data_off += DES_BLOCK_LEN) {
             des_xor(&in_buf[data_off], gamma, &out->buf[data_off]);
 
@@ -2064,7 +2064,7 @@ static int des3_encrypt_ctr(DesCtx *ctx, uint32_t *key_shedule, const ByteArray 
             gamma_gen(feed, DES_BLOCK_LEN);
         }
 
-        /* Шифрование последнего неполного блока. */
+        /* Шифрування останнього неповного блока. */
         for (; data_off < in_len; data_off++) {
             out->buf[data_off] = in_buf[data_off] ^ gamma[ctx->offset++];
         }

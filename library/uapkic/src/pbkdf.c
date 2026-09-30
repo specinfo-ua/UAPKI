@@ -104,8 +104,8 @@ static int utf8_to_utf16be(const char* in, unsigned char** out, size_t* out_len)
 
         // 2. Кодування Code Point в UTF-16BE (Big Endian)
         if (cp <= 0xFFFF) {
-            // Захист від виходу за межі буфера (з урахуванням виділення
-            // з припущення на однобайтні символи не має ніколи статись)
+            // Захист від виходу за межі буфера (з урахуванням виділення пам'яті
+            // з розрахунку на однобайтні символи ніколи не має статися)
             if (written_bytes + 2 > max_out_len) {
                 SET_ERROR(RET_INDEX_OUT_OF_RANGE);
             }
@@ -151,7 +151,7 @@ cleanup:
     return ret;
 }
 
- //Це апгрейджений pbkdf1, але немає опису в RFC.
+ //Це вдосконалений pbkdf1, але його опису немає в RFC.
  //https://github.com/openssl/openssl/blob/54c68d35c6b7e7650856beb949b45363ce40ca93/crypto/pkcs12/p12_key.c FUNC: PKCS12_key_gen_uni
  //TESTS: https://github.com/openssl/openssl/blob/76f572ed0469a277d92378848250b7a9705d3071/test/evptests.txt  FIND: # PKCS#12 tests
 int pbkdf1(const char* pass, const ByteArray* salt, uint8_t id, size_t iter, size_t n, HashAlg hash_alg, ByteArray** out_ba)
@@ -336,7 +336,7 @@ int pbkdf2(const char* pass, const ByteArray* salt, size_t iterations, size_t ke
             DO(ba_xor(key, u));
         }
 
-        // Додаємо результат в Т
+        // Додаємо результат до T
         ba_append(key, 0, cplen, out);
 		// Збільшуємо лічильник
         count++;

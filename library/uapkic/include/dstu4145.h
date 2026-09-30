@@ -37,20 +37,20 @@ extern "C" {
 #endif
 
 /**
- * Генерує закритий ключ ДСТУ 4145.
+ * Генерує особистий ключ ДСТУ 4145.
  *
  * @param ctx контекст ДСТУ 4145
- * @param d закритий ключ ДСТУ 4145
+ * @param d особистий ключ ДСТУ 4145
  * @return код помилки
  */
 UAPKIC_EXPORT int dstu4145_generate_privkey(const EcCtx *ctx, ByteArray **d);
 
 /**
- * Формує відкритий ключ за закритим.
+ * Формує відкритий ключ за особистим.
  *
  * @param ctx контекст ДСТУ 4145
- * @param d закритий ключ
- * @param qx Х-координата відкритого ключа
+ * @param d особистий ключ
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
@@ -60,7 +60,7 @@ UAPKIC_EXPORT int dstu4145_get_pubkey(const EcCtx *ctx, const ByteArray *d, Byte
  * Формує стисле представлення відкритого ключа.
  *
  * @param ctx контекст ДСТУ 4145
- * @param qx Х-координата відкритого ключа
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @param q стисле представлення відкритого ключа
  * @return код помилки
@@ -73,7 +73,7 @@ UAPKIC_EXPORT int dstu4145_compress_pubkey(const EcCtx *ctx, const ByteArray *qx
  *
  * @param ctx контекст ДСТУ 4145
  * @param q стисле представлення відкритого ключа
- * @param qx Х-координата відкритого ключа
+ * @param qx X-координата відкритого ключа
  * @param qy Y-координата відкритого ключа
  * @return код помилки
  */
@@ -81,31 +81,31 @@ UAPKIC_EXPORT int dstu4145_decompress_pubkey(const EcCtx *ctx, const ByteArray *
         ByteArray **qy);
 
 /**
- * Формує підпис по гешу.
- *
- * @param ctx контекст ДСТУ 4145
- * @param H геш
- * @param r частина підпису
- * @param s частину підпису
- * @return код помилки
- */
-UAPKIC_EXPORT int dstu4145_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray **s);
-
-/**
- * Виконує перевірку підпису з гешу від даних.
+ * Формує підпис за гешем.
  *
  * @param ctx контекст ДСТУ 4145
  * @param H геш
  * @param r частина підпису
  * @param s частина підпису
- * @return код помилки або RET_OK, якщо підпис вірний
+ * @return код помилки
+ */
+UAPKIC_EXPORT int dstu4145_sign(const EcCtx *ctx, const ByteArray *H, ByteArray **r, ByteArray **s);
+
+/**
+ * Виконує перевірку підпису за гешем від даних.
+ *
+ * @param ctx контекст ДСТУ 4145
+ * @param H геш
+ * @param r частина підпису
+ * @param s частина підпису
+ * @return код помилки або RET_OK, якщо підпис правильний
  */
 UAPKIC_EXPORT int dstu4145_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r,
         const ByteArray *s);
 
 /**
  * Виконує самотестування ДСТУ 4145.
- * @return код помилки або RET_OK, якщо срмотестування пройдено
+ * @return код помилки або RET_OK, якщо самотестування пройдено
  */
 UAPKIC_EXPORT int dstu4145_self_test(void);
 

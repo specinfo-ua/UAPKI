@@ -81,13 +81,13 @@ UAPKIC_EXPORT HashCtx *hash_alloc(HashAlg alg);
 /**
  * Створює контекст для алгоритму гешування ГОСТ 34.311 зі стандартним ДКЕ.
  *
- * @param sbox_id ідентифікатор стандартної ДКЕ для ГОСТ 34.311
+ * @param sbox_id ідентифікатор стандартного ДКЕ для ГОСТ 34.311
  * @return контекст гешування
  */
 UAPKIC_EXPORT HashCtx* hash_alloc_gost34311_with_sbox_id(Gost28147SboxId sbox_id);
 
 /**
- * Створює контекст для алгоритму гешування ГОСТ 34.311 з ДКЕ заданим користувачем.
+ * Створює контекст для алгоритму гешування ГОСТ 34.311 з ДКЕ, заданим користувачем.
  *
  * @param sbox ДКЕ для ГОСТ 34.311
  * @return контекст гешування
@@ -104,7 +104,7 @@ UAPKIC_EXPORT HashCtx* hash_alloc_gost34311_with_sbox(const ByteArray* sbox);
 UAPKIC_EXPORT int hash_update(HashCtx *ctx, const ByteArray *data);
 
 /**
- * Завершує виробку геша і повертає його значення.
+ * Завершує обчислення геша і повертає його значення.
  *
  * @param ctx контекст гешування
  * @param out геш від даних

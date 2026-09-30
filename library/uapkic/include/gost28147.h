@@ -76,7 +76,7 @@ UAPKIC_EXPORT Gost28147Ctx *gost28147_alloc(Gost28147SboxId sbox_id);
 /**
  * Створює контекст ГОСТ 28147 з користувацьким sbox.
  *
- * @param sbox користувацька таблиця замін разміром 128 байт
+ * @param sbox користувацька таблиця замін розміром 128 байт
  * @return контекст ГОСТ 28147
  */
 UAPKIC_EXPORT Gost28147Ctx *gost28147_alloc_user_sbox(const ByteArray *sbox);
@@ -87,16 +87,16 @@ UAPKIC_EXPORT Gost28147Ctx *gost28147_copy_with_alloc(const Gost28147Ctx *ctx);
  * Повертає розгорнуту таблицю замін.
  *
  * @param ctx контекст ГОСТ 28147
- * @param sbox таблиця замін разміром 128 байт
+ * @param sbox таблиця замін розміром 128 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_get_ext_sbox(const Gost28147Ctx *ctx, ByteArray **sbox);
 
 /**
- * Повертає зжату таблицю замін.
+ * Повертає стиснуту таблицю замін.
  *
  * @param ctx контекст ГОСТ 28147
- * @param sbox таблиця замін разміром 128 байт
+ * @param sbox таблиця замін розміром 128 байт
  * @return код помилки
  */
 UAPKIC_EXPORT int gost28147_get_compress_sbox(const Gost28147Ctx *ctx, ByteArray **sbox);
@@ -129,7 +129,7 @@ UAPKIC_EXPORT int gost28147_init_ecb(Gost28147Ctx *ctx, const ByteArray *key);
 UAPKIC_EXPORT int gost28147_init_ctr(Gost28147Ctx *ctx, const ByteArray *key, const ByteArray *iv);
 
 /**
- * Ініціалізує контекст для шифрування у режимі гамування зі зворотнім зв'язком.
+ * Ініціалізує контекст для шифрування у режимі гамування зі зворотним зв'язком.
  *
  * @param ctx контекст ГОСТ 28147
  * @param key ключ шифрування
@@ -169,7 +169,7 @@ UAPKIC_EXPORT int gost28147_encrypt(Gost28147Ctx *ctx, const ByteArray *data, By
 UAPKIC_EXPORT int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *encrypted_data, ByteArray **data);
 
 /**
- * Обновлюемо імітовектор блоком даних.
+ * Оновлює імітовектор блоком даних.
  *
  * @param ctx контекст ГОСТ 28147
  * @param data дані
@@ -178,7 +178,7 @@ UAPKIC_EXPORT int gost28147_decrypt(Gost28147Ctx *ctx, const ByteArray *encrypte
 UAPKIC_EXPORT int gost28147_update_mac(Gost28147Ctx *ctx, const ByteArray *data);
 
 /**
- * Завершуе вироботку імітовектора і повертає його значення.
+ * Завершує вироблення імітовектора і повертає його значення.
  *
  * @param ctx контекст ГОСТ 28147
  * @param mac імітовектор
@@ -188,7 +188,7 @@ UAPKIC_EXPORT int gost28147_update_mac(Gost28147Ctx *ctx, const ByteArray *data)
 UAPKIC_EXPORT int gost28147_final_mac(Gost28147Ctx *ctx, ByteArray **mac);
 
 /**
- * Завершує вироботку імітовектора і повертає його розширене значення.
+ * Завершує вироблення імітовектора і повертає його розширене значення.
  *
  * @param ctx контекст ГОСТ 28147
  * @param mac розширений імітовектор

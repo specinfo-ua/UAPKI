@@ -128,7 +128,7 @@ static int ecdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const WordA
         int_sub(e, q, e);
     }
 
-    /* Шаг 3. Обчислити точку ЕК C = kP,
+    /* Крок 3. Обчислити точку ЕК C = kP,
      * c = (cx, cy) та визначити r = cx (mod q). */
     if (ctx->params->ec_field == EC_FIELD_PRIME) {
         CHECK_NOT_NULL(C = ec_point_alloc(ctx->params->ecp->len));
@@ -144,7 +144,7 @@ static int ecdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const WordA
     wa_copy(C->x, tmp);
     int_div(tmp, q, NULL, wr);
 
-    /* Якщо r = 0, то повернутися до Шагу 2. */
+    /* Якщо r = 0, то повернутися до Кроку 2. */
     if (int_is_zero(wr)) {
         ret = -1;
         goto cleanup;
@@ -162,7 +162,7 @@ static int ecdsa_sign_internal(const EcCtx* ctx, const ByteArray* H, const WordA
     int_mul(ws, t, tmp);
     int_div(tmp, q, NULL, ws);
 
-    /* Якщо r = 0, то повернутися до Шагу 2. */
+    /* Якщо r = 0, то повернутися до Кроку 2. */
     if (int_is_zero(ws)) {
         ret = -1;
     }
@@ -216,7 +216,7 @@ int ecdsa_sign(const EcCtx* ctx, const ByteArray* H, ByteArray** r, ByteArray** 
     CHECK_NOT_NULL(k = wa_alloc(q->len));
 
     do {
-        /* Шаг 2. Згенерувати випадкове число k (0 < k < q). */
+        /* Крок 2. Згенерувати випадкове число k (0 < k < q). */
         DO(int_rand(q, k));
         ret = ecdsa_sign_internal(ctx, H, k, r, s);
     } while (ret == -1);
@@ -286,10 +286,10 @@ int ecdsa_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, const
         int_sub(e, q, e);
     }
 
-    /* Шаг 3. s = s^(-1)(mod q). */
+    /* Крок 3. s = s^(-1)(mod q). */
     CHECK_NOT_NULL(s_inv = gfp_mod_inv_core(ws, q));
 
-    /* Шаг 4. z1 = s*e(mod q), z2 = s*r(mod q). */
+    /* Крок 4. z1 = s*e(mod q), z2 = s*r(mod q). */
     CHECK_NOT_NULL(z1 = wa_alloc(q->len));
     CHECK_NOT_NULL(z2 = wa_alloc(q->len));
     CHECK_NOT_NULL(tmp = wa_alloc(q->len * 2));
@@ -299,7 +299,7 @@ int ecdsa_verify(const EcCtx *ctx, const ByteArray *H, const ByteArray *r, const
     int_mul(s_inv, wr, tmp);
     int_div(tmp, q, NULL, z2);
 
-    /* Шаг 5. Обчислити точку ЕК C = z1*P+z2*Q */
+    /* Крок 5. Обчислити точку ЕК C = z1*P+z2*Q */
     if (ctx->params->ec_field == EC_FIELD_PRIME) {
         CHECK_NOT_NULL(C = ec_point_alloc(ctx->params->ecp->len));
         DO(ecp_dual_mul_opt(ctx->params->ecp, ctx->params->precomp_p, z1, ctx->precomp_q, z2, C));

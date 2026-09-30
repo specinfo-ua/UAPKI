@@ -144,7 +144,7 @@ public class TestLibrary {
                     + "; description = " + provider.getDescription() + "; manufacturer = " + provider.getManufacturer());
             list_providernames.add(provider.getId());
 
-            // Якщо провайдер підтримує отримання переліку доступних сховищ ключів - отримуємо переік сховищ
+            // Якщо провайдер підтримує отримання переліку доступних сховищ ключів - отримуємо перелік сховищ
             if (provider.isSupportListStorages() == true) {
                 final ArrayList<Storages.StorageInfo> storages_info = lib.getStorages(provider.getId());
 
@@ -656,7 +656,7 @@ public class TestLibrary {
 
         PkiData signed_data, original_content;
 
-        // Відкриваємо сховище з ключем для якого вже є сертифікат
+        // Відкриваємо сховище з ключем, для якого вже є сертифікат
         if (USE_PFX_FILE) {
             lib.openStorage(PROVIDER_ID, STORAGE_FILE, PASSWORD, Open.Mode.RO);
         }
@@ -687,7 +687,7 @@ public class TestLibrary {
         System.out.println(" getCertificate: '" + selectkey_result.getCertificate() + "'");
         System.out.println(" isExportable: " + selectkey_result.isExportable());
 
-        // Якщо для обраного ключа знайдено сертифікат виконуємо наступні тести
+        // Якщо для обраного ключа знайдено сертифікат, виконуємо наступні тести
         if (selectkey_result.getCertificate() != null) {
             System.out.println("Certificate present");
 
@@ -696,7 +696,7 @@ public class TestLibrary {
             System.out.println("Certificate info: " + gson.toJson(cert_info) + "\n");
 
             if ((TEST_CASE == 1) || (TEST_CASE == 2)) {
-                // Створюємо запит на формування підпису. Інші параметри встановлені конструктором за замовчанням. Можна змінювати
+                // Створюємо запит на формування підпису. Інші параметри встановлені конструктором за замовчуванням. Можна змінювати
                 Sign.SignParams sign_params = new Sign.SignParams(test_signformat);
                 if (TEST_CASE == 2) {
                     sign_params.SetDetachedData(false);
@@ -729,7 +729,7 @@ public class TestLibrary {
                 original_content = content;
             }
             else {
-                // Створюємо запит на формування підпису. Інші параметри встановлені конструктором за замовчанням. Можна змінювати
+                // Створюємо запит на формування підпису. Інші параметри встановлені конструктором за замовчуванням. Можна змінювати
                 Sign.Parameters sign_parameters  = new Sign.Parameters(test_signformat);
                 if (TEST_CASE == 4) {
                     sign_parameters.getSignParams().SetDetachedData(false);

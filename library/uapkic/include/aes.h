@@ -51,7 +51,7 @@ UAPKIC_EXPORT AesCtx *aes_alloc(void);
 /**
  * Генерує секретний ключ.
  *
- * @param key_len размер ключа 16, 24 или 32
+ * @param key_len розмір ключа 16, 24 або 32
  * @param key секретний ключ
  * @return код помилки
  */
@@ -68,7 +68,7 @@ UAPKIC_EXPORT int aes_init_ecb(AesCtx *ctx, const ByteArray *key);
 
 /**
  * Ініціалізація контексту AES для режиму CBC.
- * Розмір даних при шифруванні/розшифруванні повинет бути кратен розміру блока AES (16 байт),
+ * Розмір даних при шифруванні/розшифруванні повинен бути кратним розміру блоку AES (16 байт),
  * окрім останнього блоку при шифруванні.
  *
  * @param ctx контекст AES
@@ -174,7 +174,7 @@ UAPKIC_EXPORT int aes_encrypt_mac(AesCtx* ctx, const ByteArray* auth_data, const
     ByteArray** mac, ByteArray** encrypted_data);
 
 /**
- * Розшифрування та забезпечення цілосності.
+ * Розшифрування та забезпечення цілісності.
  *
  * @param ctx контекст AES
  * @param auth_data відкритий текст повідомлення

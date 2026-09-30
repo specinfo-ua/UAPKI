@@ -47,6 +47,7 @@ typedef enum {
 /**
  * Створює контекст GOSTR3411_2012.
  *
+ * @param variant варіант алгоритму
  * @return контекст GOSTR3411_2012
  */
 UAPKIC_EXPORT GostR3411Ctx *gostr3411_alloc(GostR3411Variant variant);
