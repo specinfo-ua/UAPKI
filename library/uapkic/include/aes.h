@@ -42,6 +42,14 @@ extern "C" {
 typedef struct AesCtx_st AesCtx;
 
 /**
+ * Метод доповнення даних для CBC-MAC за ISO/IEC 9797-1.
+ */
+typedef enum {
+    AES_CBC_MAC_PADDING_1 = 1,  /* Метод 1: доповнення нульовими бітами до кратності блоку (порожнє повідомлення - один нульовий блок) */
+    AES_CBC_MAC_PADDING_2 = 2   /* Метод 2: додається одиничний біт, далі нульові біти до кратності блоку */
+} AesCbcMacPadding;
+
+/**
  * Створює контекст AES.
  *
  * @return контекст AES
@@ -139,6 +147,61 @@ UAPKIC_EXPORT int aes_init_ccm(AesCtx* ctx, const ByteArray* key, const ByteArra
  * @return код помилки
  */
 UAPKIC_EXPORT int aes_init_wrap(AesCtx* ctx, const ByteArray* key, const ByteArray* iv);
+
+/**
+ * Ініціалізує контекст для обгортання ключа з доповненням (KWP: RFC 5649, NIST SP 800-38F).
+ * Обгортання - aes_encrypt (дані від 1 байта, результат кратний 8 байтам і не коротший за 16),
+ * розгортання - aes_decrypt (RET_INVALID_MAC, якщо перевірка цілісності не пройдена).
+ *
+ * @param ctx контекст AES
+ * @param key ключ шифрування ключа (16, 24 або 32 байти)
+ * @return код помилки
+ */
+UAPKIC_EXPORT int aes_init_wrap_pad(AesCtx* ctx, const ByteArray* key);
+
+/**
+ * Ініціалізує контекст для вироблення імітовставки у режимі CMAC (NIST SP 800-38B, RFC 4493).
+ * Дані подаються функцією aes_update_mac, імітовставка виробляється функцією aes_final_mac.
+ *
+ * @param ctx контекст AES
+ * @param key ключ (16, 24 або 32 байти)
+ * @param mac_len розмір імітовставки в байтах (1..16; рекомендовано не менше 8)
+ * @return код помилки
+ */
+UAPKIC_EXPORT int aes_init_cmac(AesCtx* ctx, const ByteArray* key, const size_t mac_len);
+
+/**
+ * Ініціалізує контекст для вироблення імітовставки у режимі CBC-MAC за ISO/IEC 9797-1
+ * (MAC-алгоритм 1: початкове перетворення 1, вихідне перетворення 1, усічення до mac_len байтів).
+ * Увага: CBC-MAC стійкий лише для повідомлень фіксованої довжини; для повідомлень змінної довжини слід використовувати CMAC.
+ * Дані подаються функцією aes_update_mac, імітовставка виробляється функцією aes_final_mac.
+ *
+ * @param ctx контекст AES
+ * @param key ключ (16, 24 або 32 байти)
+ * @param padding метод доповнення даних (ISO/IEC 9797-1, метод 1 або 2)
+ * @param mac_len розмір імітовставки в байтах (1..16)
+ * @return код помилки
+ */
+UAPKIC_EXPORT int aes_init_cbc_mac(AesCtx* ctx, const ByteArray* key, const AesCbcMacPadding padding, const size_t mac_len);
+
+/**
+ * Додає дані для вироблення імітовставки (режими CMAC та CBC-MAC). Може викликатися кілька разів.
+ *
+ * @param ctx контекст AES
+ * @param data дані
+ * @return код помилки
+ */
+UAPKIC_EXPORT int aes_update_mac(AesCtx* ctx, const ByteArray* data);
+
+/**
+ * Виробляє імітовставку (режими CMAC та CBC-MAC). Після виклику контекст готовий до обробки
+ * наступного повідомлення з тим самим ключем.
+ *
+ * @param ctx контекст AES
+ * @param mac імітовставка
+ * @return код помилки
+ */
+UAPKIC_EXPORT int aes_final_mac(AesCtx* ctx, ByteArray** mac);
 
 /**
  * Шифрування у режимі AES.

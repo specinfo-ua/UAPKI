@@ -49,7 +49,10 @@ typedef enum {
     AES_MODE_CBC,
     AES_MODE_GCM,
     AES_MODE_CCM,
-    AES_MODE_WRAP
+    AES_MODE_WRAP,
+    AES_MODE_WRAP_PAD,
+    AES_MODE_CMAC,
+    AES_MODE_CBC_MAC
 } CipherMode;
 
 struct AesCtx_st {
@@ -63,6 +66,7 @@ struct AesCtx_st {
     size_t key_len;
     size_t rounds_num;
     size_t tag_len;
+    AesCbcMacPadding cbc_mac_padding;
     CipherMode mode_id;
 };
 
@@ -1657,34 +1661,16 @@ cleanup:
     return ret;
 }
 
-static int aes_wrap(AesCtx* ctx, const ByteArray* key, ByteArray** encrypted_key)
+/* Функція обгортання W (SP 800-38F, 6.1): a - 8 байтів значення A (вхід/вихід), r - n >= 2 напівблоків */
+static void kw_w(AesCtx* ctx, uint8_t* a, uint8_t* r, size_t r_len)
 {
-    int ret = RET_OK;
-    const uint8_t* in;
-    uint8_t tmp[16], *ptr, *out;
-    size_t i, j, t, inlen;
+    uint8_t tmp[16], *ptr;
+    size_t i, j, t = 1;
 
-    CHECK_PARAM(ctx != NULL);
-    CHECK_PARAM(key != NULL);
-    CHECK_PARAM(encrypted_key != NULL);
-
-    inlen = key->len;
-    in = key->buf;
-
-    if ((inlen & 0x7) || (inlen < 16) || (inlen > AES_WRAP_MAX)) {
-        SET_ERROR(RET_INVALID_DATA_LEN);
-    }
-
-    CHECK_NOT_NULL(*encrypted_key = ba_alloc_by_len(inlen + 8));
-    out = (*encrypted_key)->buf;
-
-    t = 1;
-    memcpy(out + 8, in, inlen);
-    memcpy(tmp, ctx->iv, 8);
-
+    memcpy(tmp, a, 8);
     for (j = 0; j < 6; j++) {
-        ptr = out + 8;
-        for (i = 0; i < inlen; i += 8, t++, ptr += 8) {
+        ptr = r;
+        for (i = 0; i < r_len; i += 8, t++, ptr += 8) {
             memcpy(tmp + 8, ptr, 8);
             block_encrypt(ctx, tmp, tmp);
             tmp[7] ^= (uint8_t)t;
@@ -1694,44 +1680,20 @@ static int aes_wrap(AesCtx* ctx, const ByteArray* key, ByteArray** encrypted_key
             memcpy(ptr, tmp + 8, 8);
         }
     }
-
-    memcpy(out, tmp, 8);
-
-cleanup:
-    return ret;
+    memcpy(a, tmp, 8);
+    secure_zero(tmp, sizeof(tmp));
 }
 
-static int aes_unwrap(AesCtx* ctx, const ByteArray* encrypted_key, ByteArray** decrypted_key)
+/* Функція розгортання W^-1 (SP 800-38F, 6.1): a - 8 байтів значення A (вхід/вихід), r - n >= 2 напівблоків */
+static void kw_w_inv(AesCtx* ctx, uint8_t* a, uint8_t* r, size_t r_len)
 {
-    int ret = RET_OK;
-    const uint8_t* in;
-    uint8_t tmp[16], *ptr, *out;
-    size_t i, j, t, inlen;
+    uint8_t tmp[16], *ptr;
+    size_t i, j, t = 6 * (r_len >> 3);
 
-    CHECK_PARAM(ctx != NULL);
-    CHECK_PARAM(encrypted_key != NULL);
-    CHECK_PARAM(decrypted_key != NULL);
-
-    inlen = encrypted_key->len - 8;
-    in = encrypted_key->buf;
-
-    *decrypted_key = NULL;
-
-    if ((inlen & 0x7) || (inlen < 16) || (inlen > AES_WRAP_MAX)) {
-        SET_ERROR(RET_INVALID_DATA_LEN);
-    }
-
-    CHECK_NOT_NULL(*decrypted_key = ba_alloc_by_len(inlen));
-    out = (*decrypted_key)->buf;
-
-    t = 6 * (inlen >> 3);
-
-    memcpy(tmp, in, 8);
-    memcpy(out, in + 8, inlen);
-
+    memcpy(tmp, a, 8);
     for (j = 0; j < 6; j++) {
-        ptr = out + inlen - 8;
-        for (i = 0; i < inlen; i += 8, t--, ptr -= 8) {
+        ptr = r + r_len - 8;
+        for (i = 0; i < r_len; i += 8, t--, ptr -= 8) {
             tmp[7] ^= (uint8_t)t;
             tmp[6] ^= (uint8_t)(t >> 8);
             tmp[5] ^= (uint8_t)(t >> 16);
@@ -1741,8 +1703,66 @@ static int aes_unwrap(AesCtx* ctx, const ByteArray* encrypted_key, ByteArray** d
             memcpy(ptr, tmp + 8, 8);
         }
     }
+    memcpy(a, tmp, 8);
+    secure_zero(tmp, sizeof(tmp));
+}
 
-    if (memcmp(ctx->iv, tmp, 8) != 0) {
+static int aes_wrap(AesCtx* ctx, const ByteArray* key, ByteArray** encrypted_key)
+{
+    int ret = RET_OK;
+    uint8_t* out;
+    size_t inlen;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(key != NULL);
+    CHECK_PARAM(encrypted_key != NULL);
+
+    inlen = key->len;
+
+    if ((inlen & 0x7) || (inlen < 16) || (inlen > AES_WRAP_MAX)) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+
+    CHECK_NOT_NULL(*encrypted_key = ba_alloc_by_len(inlen + 8));
+    out = (*encrypted_key)->buf;
+
+    memcpy(out, ctx->iv, 8);
+    memcpy(out + 8, key->buf, inlen);
+    kw_w(ctx, out, out + 8, inlen);
+
+cleanup:
+    return ret;
+}
+
+static int aes_unwrap(AesCtx* ctx, const ByteArray* encrypted_key, ByteArray** decrypted_key)
+{
+    int ret = RET_OK;
+    uint8_t a[8], *out;
+    size_t inlen;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(encrypted_key != NULL);
+    CHECK_PARAM(decrypted_key != NULL);
+
+    *decrypted_key = NULL;
+
+    if (encrypted_key->len < 8) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+    inlen = encrypted_key->len - 8;
+
+    if ((inlen & 0x7) || (inlen < 16) || (inlen > AES_WRAP_MAX)) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+
+    CHECK_NOT_NULL(*decrypted_key = ba_alloc_by_len(inlen));
+    out = (*decrypted_key)->buf;
+
+    memcpy(a, encrypted_key->buf, 8);
+    memcpy(out, encrypted_key->buf + 8, inlen);
+    kw_w_inv(ctx, a, out, inlen);
+
+    if (memcmp(ctx->iv, a, 8) != 0) {
         SET_ERROR(RET_INVALID_MAC);
     }
 
@@ -1751,6 +1771,121 @@ cleanup:
         ba_free(*decrypted_key);
         *decrypted_key = NULL;
     }
+    return ret;
+}
+
+/* Константа ICV2 для KWP (RFC 5649, 3; SP 800-38F, 6.3) */
+static const uint8_t aes_wrap_pad_icv[] = { 0xA6, 0x59, 0x59, 0xA6 };
+
+int aes_init_wrap_pad(AesCtx* ctx, const ByteArray* key)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(key != NULL);
+
+    DO(aes_base_init(ctx, key));
+    init_revert_rkey(ctx);
+
+    ctx->mode_id = AES_MODE_WRAP_PAD;
+
+cleanup:
+    return ret;
+}
+
+/* KWP-AE (SP 800-38F, 6.3, алгоритм 5) */
+static int aes_wrap_pad(AesCtx* ctx, const ByteArray* key, ByteArray** encrypted_key)
+{
+    int ret = RET_OK;
+    uint8_t* out;
+    size_t inlen, padded_len;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(key != NULL);
+    CHECK_PARAM(encrypted_key != NULL);
+
+    inlen = key->len;
+    if ((inlen == 0) || (inlen > AES_WRAP_MAX)) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+    padded_len = (inlen + 7) & ~(size_t)7;
+
+    /* S = ICV2 || [довжина в байтах]32 || P || 0...0 */
+    CHECK_NOT_NULL(*encrypted_key = ba_alloc_by_len(padded_len + 8));
+    out = (*encrypted_key)->buf;
+    memcpy(out, aes_wrap_pad_icv, 4);
+    out[4] = (uint8_t)(inlen >> 24);
+    out[5] = (uint8_t)(inlen >> 16);
+    out[6] = (uint8_t)(inlen >> 8);
+    out[7] = (uint8_t)inlen;
+    memcpy(out + 8, key->buf, inlen);
+    memset(out + 8 + inlen, 0, padded_len - inlen);
+
+    if (padded_len == 8) {
+        /* Один напівблок даних: C = CIPH_K(S) */
+        block_encrypt(ctx, out, out);
+    }
+    else {
+        kw_w(ctx, out, out + 8, padded_len);
+    }
+
+cleanup:
+    return ret;
+}
+
+/* KWP-AD (SP 800-38F, 6.3, алгоритм 6) */
+static int aes_unwrap_pad(AesCtx* ctx, const ByteArray* encrypted_key, ByteArray** decrypted_key)
+{
+    int ret = RET_OK;
+    uint8_t a[8], *out = NULL;
+    uint8_t diff;
+    size_t inlen, mli, i;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(encrypted_key != NULL);
+    CHECK_PARAM(decrypted_key != NULL);
+
+    *decrypted_key = NULL;
+
+    inlen = encrypted_key->len;
+    if ((inlen & 0x7) || (inlen < 16) || (inlen - 8 > AES_WRAP_MAX)) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+    inlen -= 8;
+
+    MALLOC_CHECKED(out, inlen + 8);
+    memcpy(out, encrypted_key->buf, inlen + 8);
+    if (inlen == 8) {
+        block_decrypt(ctx, out, out);
+    }
+    else {
+        kw_w_inv(ctx, out, out + 8, inlen);
+    }
+    memcpy(a, out, 8);
+
+    /* Перевірки ICV2, довжини та нульового доповнення без раннього виходу */
+    mli = ((size_t)a[4] << 24) | ((size_t)a[5] << 16) | ((size_t)a[6] << 8) | (size_t)a[7];
+    diff = (uint8_t)(a[0] ^ aes_wrap_pad_icv[0]) | (uint8_t)(a[1] ^ aes_wrap_pad_icv[1])
+        | (uint8_t)(a[2] ^ aes_wrap_pad_icv[2]) | (uint8_t)(a[3] ^ aes_wrap_pad_icv[3]);
+    if ((mli <= inlen - 8) || (mli > inlen)) {
+        diff |= 1;
+        mli = inlen;
+    }
+    for (i = mli; i < inlen; i++) {
+        diff |= out[8 + i];
+    }
+    if (diff != 0) {
+        SET_ERROR(RET_INVALID_MAC);
+    }
+
+    CHECK_NOT_NULL(*decrypted_key = ba_alloc_from_uint8(out + 8, mli));
+
+cleanup:
+    if (out != NULL) {
+        secure_zero(out, inlen + 8);
+        free(out);
+    }
+    secure_zero(a, sizeof(a));
     return ret;
 }
 
@@ -1780,6 +1915,9 @@ int aes_encrypt(AesCtx *ctx, const ByteArray *in, ByteArray **out)
         break;
     case AES_MODE_WRAP:
         DO(aes_wrap(ctx, in, out));
+        break;
+    case AES_MODE_WRAP_PAD:
+        DO(aes_wrap_pad(ctx, in, out));
         break;
     default:
         SET_ERROR(RET_INVALID_CTX_MODE);
@@ -1816,6 +1954,9 @@ int aes_decrypt(AesCtx *ctx, const ByteArray *in, ByteArray **out)
         break;
     case AES_MODE_WRAP:
         DO(aes_unwrap(ctx, in, out));
+        break;
+    case AES_MODE_WRAP_PAD:
+        DO(aes_unwrap_pad(ctx, in, out));
         break;
     default:
         SET_ERROR(RET_INVALID_CTX_MODE);
@@ -2486,6 +2627,168 @@ static const char* aes_test_key[3] = {
 static const char* aes_test_iv = "000102030405060708090a0b0c0d0e0f";
 static const char* aes_test_data = "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51";
 
+/*
+ * CMAC (NIST SP 800-38B) та CBC-MAC (ISO/IEC 9797-1, MAC-алгоритм 1).
+ * Стан ланцюжка - ctx->gamma, буфер останнього блока - ctx->feed, кількість байтів у буфері - ctx->offset,
+ * розмір імітовставки - ctx->tag_len. Буфер обробляється лише тоді, коли надходять наступні дані,
+ * тому в aes_final_mac останній блок завжди доступний (offset == 0 лише для порожнього повідомлення).
+ */
+
+static void mac_reset(AesCtx* ctx)
+{
+    memset(ctx->gamma, 0, AES_BLOCK_LEN);
+    memset(ctx->feed, 0, AES_BLOCK_LEN);
+    ctx->offset = 0;
+}
+
+static void mac_process_block(AesCtx* ctx, const uint8_t* block)
+{
+    size_t i;
+
+    for (i = 0; i < AES_BLOCK_LEN; i++) {
+        ctx->gamma[i] ^= block[i];
+    }
+    block_encrypt(ctx, ctx->gamma, ctx->gamma);
+}
+
+/* Множення на x у GF(2^128) з поліномом x^128 + x^7 + x^2 + x + 1 (SP 800-38B, 6.1), без розгалужень */
+static void cmac_double(const uint8_t* in, uint8_t* out)
+{
+    const uint8_t mask = (uint8_t)(0 - (in[0] >> 7));
+    size_t i;
+
+    for (i = 0; i < AES_BLOCK_LEN - 1; i++) {
+        out[i] = (uint8_t)((in[i] << 1) | (in[i + 1] >> 7));
+    }
+    out[AES_BLOCK_LEN - 1] = (uint8_t)((in[AES_BLOCK_LEN - 1] << 1) ^ (mask & 0x87));
+}
+
+int aes_init_cmac(AesCtx* ctx, const ByteArray* key, const size_t mac_len)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(mac_len > 0 && mac_len <= AES_BLOCK_LEN);
+
+    DO(aes_base_init(ctx, key));
+
+    ctx->tag_len = mac_len;
+    mac_reset(ctx);
+    ctx->mode_id = AES_MODE_CMAC;
+
+cleanup:
+
+    return ret;
+}
+
+int aes_init_cbc_mac(AesCtx* ctx, const ByteArray* key, const AesCbcMacPadding padding, const size_t mac_len)
+{
+    int ret = RET_OK;
+
+    CHECK_PARAM(padding == AES_CBC_MAC_PADDING_1 || padding == AES_CBC_MAC_PADDING_2);
+    CHECK_PARAM(mac_len > 0 && mac_len <= AES_BLOCK_LEN);
+
+    DO(aes_base_init(ctx, key));
+
+    ctx->tag_len = mac_len;
+    ctx->cbc_mac_padding = padding;
+    mac_reset(ctx);
+    ctx->mode_id = AES_MODE_CBC_MAC;
+
+cleanup:
+
+    return ret;
+}
+
+int aes_update_mac(AesCtx* ctx, const ByteArray* data)
+{
+    int ret = RET_OK;
+    const uint8_t* in;
+    size_t len, n;
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(data != NULL);
+
+    if (ctx->mode_id != AES_MODE_CMAC && ctx->mode_id != AES_MODE_CBC_MAC) {
+        SET_ERROR(RET_INVALID_CTX_MODE);
+    }
+
+    in = data->buf;
+    len = data->len;
+    while (len > 0) {
+        if (ctx->offset == AES_BLOCK_LEN) {
+            mac_process_block(ctx, ctx->feed);
+            ctx->offset = 0;
+        }
+        n = AES_BLOCK_LEN - ctx->offset;
+        if (n > len) {
+            n = len;
+        }
+        memcpy(&ctx->feed[ctx->offset], in, n);
+        ctx->offset += n;
+        in += n;
+        len -= n;
+    }
+
+cleanup:
+
+    return ret;
+}
+
+int aes_final_mac(AesCtx* ctx, ByteArray** mac)
+{
+    int ret = RET_OK;
+    uint8_t subkey[AES_BLOCK_LEN];
+    size_t i;
+
+    memset(subkey, 0, AES_BLOCK_LEN);
+
+    CHECK_PARAM(ctx != NULL);
+    CHECK_PARAM(mac != NULL);
+
+    switch (ctx->mode_id) {
+    case AES_MODE_CMAC:
+        /* Підключі: L = E(0^128), K1 = 2L, K2 = 4L */
+        block_encrypt(ctx, subkey, subkey);
+        cmac_double(subkey, subkey);
+        if (ctx->offset < AES_BLOCK_LEN) {
+            /* Неповний (зокрема порожній) останній блок: доповнення 10...0 та підключ K2 */
+            ctx->feed[ctx->offset] = 0x80;
+            memset(&ctx->feed[ctx->offset + 1], 0, AES_BLOCK_LEN - ctx->offset - 1);
+            cmac_double(subkey, subkey);
+        }
+        for (i = 0; i < AES_BLOCK_LEN; i++) {
+            ctx->feed[i] ^= subkey[i];
+        }
+        mac_process_block(ctx, ctx->feed);
+        break;
+    case AES_MODE_CBC_MAC:
+        if (ctx->cbc_mac_padding == AES_CBC_MAC_PADDING_2) {
+            /* Метод 2 завжди додає одиничний біт: повний останній блок обробляється, далі блок 10...0 */
+            if (ctx->offset == AES_BLOCK_LEN) {
+                mac_process_block(ctx, ctx->feed);
+                ctx->offset = 0;
+            }
+            ctx->feed[ctx->offset++] = 0x80;
+        }
+        /* Доповнення нулями до кратності блоку; порожнє повідомлення за методом 1 - один нульовий блок */
+        memset(&ctx->feed[ctx->offset], 0, AES_BLOCK_LEN - ctx->offset);
+        mac_process_block(ctx, ctx->feed);
+        break;
+    default:
+        SET_ERROR(RET_INVALID_CTX_MODE);
+    }
+
+    CHECK_NOT_NULL(*mac = ba_alloc_from_uint8(ctx->gamma, ctx->tag_len));
+
+cleanup:
+
+    secure_zero(subkey, sizeof(subkey));
+    if (ctx != NULL && (ctx->mode_id == AES_MODE_CMAC || ctx->mode_id == AES_MODE_CBC_MAC)) {
+        mac_reset(ctx);
+    }
+    return ret;
+}
+
 static int aes_ecb_self_test(void)
 {
     static const char* expected[3] = {
@@ -3069,6 +3372,198 @@ cleanup:
     return ret;
 }
 
+static int aes_wrap_pad_self_test(void)
+{
+    // RFC 5649, 6 (перші два вектори); решта - граничні довжини 1, 8, 10, 16, 27 байтів (Python cryptography)
+    static const struct {
+        const char* kek;
+        const char* key;
+        const char* wrapped;
+    } test_data[] = {
+        { "5840DF6E29B02AF1AB493B705BF16EA1AE8338F4DCC176A8", "C37B7E6492584340BED12207808941155068F738",
+            "138BDEAA9B8FA7FC61F97742E72248EE5AE6AE5360D1AE6A5F54F373FA543B6A" },
+        { "5840DF6E29B02AF1AB493B705BF16EA1AE8338F4DCC176A8", "466F7250617369", "AFBEB0F07DFBF5419200F2CCB50BB24F" },
+        { "000102030405060708090A0B0C0D0E0F", "00", "5EBD8ABE5C33ACA1EFA882F092EFA095" },
+        { "000102030405060708090A0B0C0D0E0F", "0011223344556677", "23EA99084E592C2F29F496536C00D5AF" },
+        { "000102030405060708090A0B0C0D0E0F", "00112233445566778899", "BA9989F523A83A5976F95A704D960E446F75B0A8A2F89348" },
+        { "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F", "00112233445566778899AABBCCDDEEFF",
+            "AFC860015FFE2D75BEDF43C444FE58F4AD9D89C4EC71E23B" },
+        { "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F", "00112233445566778899AABBCCDDEEFF0001020304050607080910",
+            "883649917B0535BE4B3F1846AA18B0399FA40B1323DD23032BC515E5F2960E64584012DB65B65BA3" }
+    };
+    int ret = RET_OK;
+    size_t i;
+    AesCtx* ctx = NULL;
+    ByteArray* kek = NULL;
+    ByteArray* key = NULL;
+    ByteArray* exp_wrapped = NULL;
+    ByteArray* act_wrapped = NULL;
+    ByteArray* act_key = NULL;
+
+    CHECK_NOT_NULL(ctx = aes_alloc());
+
+    for (i = 0; i < sizeof(test_data) / sizeof(test_data[0]); i++) {
+        CHECK_NOT_NULL(kek = ba_alloc_from_hex(test_data[i].kek));
+        CHECK_NOT_NULL(key = ba_alloc_from_hex(test_data[i].key));
+        CHECK_NOT_NULL(exp_wrapped = ba_alloc_from_hex(test_data[i].wrapped));
+
+        DO(aes_init_wrap_pad(ctx, kek));
+        DO(aes_encrypt(ctx, key, &act_wrapped));
+        DO(aes_decrypt(ctx, exp_wrapped, &act_key));
+        if ((ba_cmp(exp_wrapped, act_wrapped) != 0) || (ba_cmp(key, act_key) != 0)) {
+            SET_ERROR(RET_SELF_TEST_FAIL);
+        }
+
+        ba_free(kek);
+        kek = NULL;
+        ba_free(key);
+        key = NULL;
+        ba_free(exp_wrapped);
+        exp_wrapped = NULL;
+        ba_free(act_wrapped);
+        act_wrapped = NULL;
+        ba_free(act_key);
+        act_key = NULL;
+    }
+
+cleanup:
+    ba_free(kek);
+    ba_free(key);
+    ba_free(exp_wrapped);
+    ba_free(act_wrapped);
+    ba_free(act_key);
+    aes_free(ctx);
+    return ret;
+}
+
+static int aes_cmac_self_test(void)
+{
+    // NIST SP 800-38B, D.1-D.3 (RFC 4493, 4)
+    static const char* MSG = "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E51"
+        "30C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710";
+    static const struct {
+        const char* key;
+        AesCbcMacPadding padding;   /* для CMAC не використовується */
+        size_t msg_len;
+        const char* mac;
+    } test_data[] = {
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 0, "BB1D6929E95937287FA37D129B756746" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 16, "070A16B46B4D4144F79BDD9DD04A287C" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 40, "DFA66747DE9AE63030CA32611497C827" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 64, "51F0BEBF7E3B9D92FC49741779363CFE" },
+        { "8E73B0F7DA0E6452C810F32B809079E562F8EAD2522C6B7B", AES_CBC_MAC_PADDING_1, 0, "D17DDF46ADAACDE531CAC483DE7A9367" },
+        { "8E73B0F7DA0E6452C810F32B809079E562F8EAD2522C6B7B", AES_CBC_MAC_PADDING_1, 40, "8A1DE5BE2EB31AAD089A82E6EE908B0E" },
+        { "603DEB1015CA71BE2B73AEF0857D77811F352C073B6108D72D9810A30914DFF4", AES_CBC_MAC_PADDING_1, 0, "028962F61B7BF89EFC6B551F4667D983" },
+        { "603DEB1015CA71BE2B73AEF0857D77811F352C073B6108D72D9810A30914DFF4", AES_CBC_MAC_PADDING_1, 64, "E1992190549F6ED5696A2C056C315410" }
+    };
+    int ret = RET_OK;
+    size_t i;
+    AesCtx* ctx = NULL;
+    ByteArray* key = NULL;
+    ByteArray* msg = NULL;
+    ByteArray* data = NULL;
+    ByteArray* exp_mac = NULL;
+    ByteArray* act_mac = NULL;
+
+    CHECK_NOT_NULL(ctx = aes_alloc());
+    CHECK_NOT_NULL(msg = ba_alloc_from_hex(MSG));
+
+    for (i = 0; i < sizeof(test_data) / sizeof(test_data[0]); i++) {
+        CHECK_NOT_NULL(key = ba_alloc_from_hex(test_data[i].key));
+        CHECK_NOT_NULL(data = ba_alloc_from_uint8(ba_get_buf_const(msg), test_data[i].msg_len));
+        CHECK_NOT_NULL(exp_mac = ba_alloc_from_hex(test_data[i].mac));
+
+        DO(aes_init_cmac(ctx, key, 16));
+        DO(aes_update_mac(ctx, data));
+        DO(aes_final_mac(ctx, &act_mac));
+        if (ba_cmp(exp_mac, act_mac) != 0) {
+            SET_ERROR(RET_SELF_TEST_FAIL);
+        }
+
+        ba_free(key);
+        key = NULL;
+        ba_free(data);
+        data = NULL;
+        ba_free(exp_mac);
+        exp_mac = NULL;
+        ba_free(act_mac);
+        act_mac = NULL;
+    }
+
+cleanup:
+    ba_free(key);
+    ba_free(msg);
+    ba_free(data);
+    ba_free(exp_mac);
+    ba_free(act_mac);
+    aes_free(ctx);
+    return ret;
+}
+
+static int aes_cbc_mac_self_test(void)
+{
+    // ISO/IEC 9797-1, MAC-алгоритм 1 (значення - останній блок AES-CBC з нульовою синхропосилкою, OpenSSL)
+    static const char* MSG = "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E51"
+        "30C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710";
+    static const struct {
+        const char* key;
+        AesCbcMacPadding padding;   /* для CMAC не використовується */
+        size_t msg_len;
+        const char* mac;
+    } test_data[] = {
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 0, "7DF76B0C1AB899B33E42F047B91B546F" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 40, "07D192E3E6F099EDCC39FDE6D09C762D" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_1, 64, "A7356E1207BB406639E5E5CEB9A9ED93" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_2, 0, "F6C71EEDC3D99BB183CB5B8D1568E606" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_2, 40, "A5260F98F1ABF2B27562ED5FC1FBEB8D" },
+        { "2B7E151628AED2A6ABF7158809CF4F3C", AES_CBC_MAC_PADDING_2, 64, "5BF82F1FE7483B9A875CAF3DED3A0171" },
+        { "603DEB1015CA71BE2B73AEF0857D77811F352C073B6108D72D9810A30914DFF4", AES_CBC_MAC_PADDING_1, 40, "2BE3FE42C712EB30558341239FD28957" },
+        { "603DEB1015CA71BE2B73AEF0857D77811F352C073B6108D72D9810A30914DFF4", AES_CBC_MAC_PADDING_2, 64, "10D9CF71994F3635D6ABA5AD0727B87F" }
+    };
+    int ret = RET_OK;
+    size_t i;
+    AesCtx* ctx = NULL;
+    ByteArray* key = NULL;
+    ByteArray* msg = NULL;
+    ByteArray* data = NULL;
+    ByteArray* exp_mac = NULL;
+    ByteArray* act_mac = NULL;
+
+    CHECK_NOT_NULL(ctx = aes_alloc());
+    CHECK_NOT_NULL(msg = ba_alloc_from_hex(MSG));
+
+    for (i = 0; i < sizeof(test_data) / sizeof(test_data[0]); i++) {
+        CHECK_NOT_NULL(key = ba_alloc_from_hex(test_data[i].key));
+        CHECK_NOT_NULL(data = ba_alloc_from_uint8(ba_get_buf_const(msg), test_data[i].msg_len));
+        CHECK_NOT_NULL(exp_mac = ba_alloc_from_hex(test_data[i].mac));
+
+        DO(aes_init_cbc_mac(ctx, key, test_data[i].padding, 16));
+        DO(aes_update_mac(ctx, data));
+        DO(aes_final_mac(ctx, &act_mac));
+        if (ba_cmp(exp_mac, act_mac) != 0) {
+            SET_ERROR(RET_SELF_TEST_FAIL);
+        }
+
+        ba_free(key);
+        key = NULL;
+        ba_free(data);
+        data = NULL;
+        ba_free(exp_mac);
+        exp_mac = NULL;
+        ba_free(act_mac);
+        act_mac = NULL;
+    }
+
+cleanup:
+    ba_free(key);
+    ba_free(msg);
+    ba_free(data);
+    ba_free(exp_mac);
+    ba_free(act_mac);
+    aes_free(ctx);
+    return ret;
+}
+
 int aes_self_test(void)
 {
     int ret = RET_OK;
@@ -3081,6 +3576,9 @@ int aes_self_test(void)
     DO(aes_gcm_self_test());
     DO(aes_ccm_self_test());
     DO(aes_wrap_self_test());
+    DO(aes_wrap_pad_self_test());
+    DO(aes_cmac_self_test());
+    DO(aes_cbc_mac_self_test());
 
 cleanup:
     return ret;
