@@ -1659,7 +1659,12 @@ static bool test_shared_memory_gate (
             if (!mutation_ok(memory_api, request_add_cert_permanent(options.signerCertB64), thr_resp, "ADD_CERT")) return;
             if (thr_resp.ok()) {
                 const string cert_id = ParsonHelper::jsonObjectGetString(json_array_get_object(json_object_get_array(thr_resp.result, "added"), 0), "certId");
-                if (!mutation_ok(memory_api, request_remove_cert(cert_id, true), thr_resp, "REMOVE_CERT")) return;
+                //  The certificate file is already on disk: a removal that hits a re-load (NOT_INITIALIZED) is repeated,
+                //  otherwise the next INIT of the shared memory loads the certificate again
+                do {
+                    if (!mutation_ok(memory_api, request_remove_cert(cert_id, true), thr_resp, "REMOVE_CERT")) return;
+                    if (thr_resp.errorCode == ERR_NOT_INITIALIZED) this_thread::yield();
+                } while ((thr_resp.errorCode == ERR_NOT_INITIALIZED) && checker.passed());
             }
             count_mutations++;
         }
