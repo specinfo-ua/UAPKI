@@ -4242,6 +4242,12 @@ static int cmac_final(Dstu7624Ctx *ctx, ByteArray **out)
         SET_ERROR(RET_INVALID_CTX_MODE);
     }
 
+    //CMAC (ДСТУ 7624:2014, розділ 9) не визначено для порожнього повідомлення.
+    //Залишок блока порожній лише тоді, коли не оброблено жодного байта: cmac_update завжди залишає в ньому від 1 до block_len байтів.
+    if (ctx->mode.cmac.lblock_len == 0) {
+        SET_ERROR(RET_INVALID_DATA_LEN);
+    }
+
     block_len = ctx->block_len;
     DO(uint64_to_uint8(ctx->state, block_len >> 3, cipher_data, block_len));
     memset(rkey, 0, 64);
