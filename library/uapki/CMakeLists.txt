@@ -5,7 +5,7 @@ project(uapki VERSION 3.0.0 LANGUAGES C CXX)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../rc-version.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
@@ -90,7 +90,7 @@ add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
 )
 
 if(WIN32)
-    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
+    set(CURL_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../common/curl")
     set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
 
     target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
@@ -110,7 +110,7 @@ if(WIN32)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
+    set(CURL_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../common/curl")
     set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
 
     target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")

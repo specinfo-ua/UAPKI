@@ -5,7 +5,7 @@ project(uapkic VERSION 3.0.0 LANGUAGES C)
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
 configure_file(
-    "${CMAKE_SOURCE_DIR}/rc-version.h.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../rc-version.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/rc-version.h"
     @ONLY
 )
