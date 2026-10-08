@@ -115,6 +115,24 @@ namespace UapkiNet {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Помилка криптобібліотеки.
+        /// </summary>
+        internal static string ErrorPrefix {
+            get {
+                return ResourceManager.GetString("ErrorPrefix", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Код помилки {0}.
+        /// </summary>
+        internal static string ErrorUnknownCode {
+            get {
+                return ResourceManager.GetString("ErrorUnknownCode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Підпис.
         /// </summary>
         internal static string DigitalSignature {

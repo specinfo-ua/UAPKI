@@ -330,4 +330,265 @@
   <data name="KeyAlgo_Unsupported" xml:space="preserve">
     <value>Не підтримується</value>
   </data>
+  <data name="ErrorPrefix" xml:space="preserve">
+    <value>Помилка криптобібліотеки</value>
+  </data>
+  <data name="ErrorUnknownCode" xml:space="preserve">
+    <value>Код помилки {0}</value>
+  </data>
+  <data name="Error_1002" xml:space="preserve">
+    <value>Помилка з'єднання з сервером</value>
+  </data>
+  <data name="Error_1003" xml:space="preserve">
+    <value>Неправильний формат JSON запиту</value>
+  </data>
+  <data name="Error_1004" xml:space="preserve">
+    <value>Неправильний метод</value>
+  </data>
+  <data name="Error_1005" xml:space="preserve">
+    <value>Неправильний параметр</value>
+  </data>
+  <data name="Error_1006" xml:space="preserve">
+    <value>Неправильний тип сховища ключів</value>
+  </data>
+  <data name="Error_1007" xml:space="preserve">
+    <value>Потрібне ім'я файлу як ідентифікатор сховища ключів</value>
+  </data>
+  <data name="Error_1008" xml:space="preserve">
+    <value>Потрібне ім'я користувача як ідентифікатор сховища ключів</value>
+  </data>
+  <data name="Error_1009" xml:space="preserve">
+    <value>Бібліотеку не ініціалізовано</value>
+  </data>
+  <data name="Error_1010" xml:space="preserve">
+    <value>Неправильний ідентифікатор ключа</value>
+  </data>
+  <data name="Error_1017" xml:space="preserve">
+    <value>Метод не дозволено (наприклад, для спільної пам'яті сесій)</value>
+  </data>
+  <data name="Error_1018" xml:space="preserve">
+    <value>Встановлено режим офлайн</value>
+  </data>
+  <data name="Error_1019" xml:space="preserve">
+    <value>Сховище ключів не відкрито</value>
+  </data>
+  <data name="Error_1020" xml:space="preserve">
+    <value>Помилка відкриття файлу</value>
+  </data>
+  <data name="Error_1021" xml:space="preserve">
+    <value>Помилка зчитування файлу</value>
+  </data>
+  <data name="Error_1022" xml:space="preserve">
+    <value>Помилка запису файлу</value>
+  </data>
+  <data name="Error_1024" xml:space="preserve">
+    <value>Помилка видалення файлу</value>
+  </data>
+  <data name="Error_1025" xml:space="preserve">
+    <value>Помилковий статус протоколу HTTP</value>
+  </data>
+  <data name="Error_1030" xml:space="preserve">
+    <value>Неправильна структура ContentInfo</value>
+  </data>
+  <data name="Error_1031" xml:space="preserve">
+    <value>Неправильна структура документу</value>
+  </data>
+  <data name="Error_1032" xml:space="preserve">
+    <value>Неправильна версія структури документу</value>
+  </data>
+  <data name="Error_1033" xml:space="preserve">
+    <value>Відсутні дані</value>
+  </data>
+  <data name="Error_1034" xml:space="preserve">
+    <value>Неправильний атрибут</value>
+  </data>
+  <data name="Error_1035" xml:space="preserve">
+    <value>Відсутній атрибут</value>
+  </data>
+  <data name="Error_1036" xml:space="preserve">
+    <value>Відсутнє розширення</value>
+  </data>
+  <data name="Error_1037" xml:space="preserve">
+    <value>Розширення не позначено як критичне</value>
+  </data>
+  <data name="Error_1039" xml:space="preserve">
+    <value>Неправильне геш-значення</value>
+  </data>
+  <data name="Error_1040" xml:space="preserve">
+    <value>Помилка завантаження сховища сертифікатів</value>
+  </data>
+  <data name="Error_1041" xml:space="preserve">
+    <value>Сертифікат не знайдено</value>
+  </data>
+  <data name="Error_1042" xml:space="preserve">
+    <value>Термін дії сертифікату не настав</value>
+  </data>
+  <data name="Error_1043" xml:space="preserve">
+    <value>Термін дії сертифікату закінчився</value>
+  </data>
+  <data name="Error_1044" xml:space="preserve">
+    <value>Сертифікат видавця не знайдено</value>
+  </data>
+  <data name="Error_1045" xml:space="preserve">
+    <value>Сертифікат відкликано</value>
+  </data>
+  <data name="Error_1046" xml:space="preserve">
+    <value>Статус сертифікату не визначено</value>
+  </data>
+  <data name="Error_1047" xml:space="preserve">
+    <value>Кореневий сертифікат не довірений</value>
+  </data>
+  <data name="Error_1050" xml:space="preserve">
+    <value>Помилка завантаження сховища СВС</value>
+  </data>
+  <data name="Error_1051" xml:space="preserve">
+    <value>У сертифікаті відсутня точка доступу до СВС</value>
+  </data>
+  <data name="Error_1052" xml:space="preserve">
+    <value>Помилка завантаження СВС з сервера</value>
+  </data>
+  <data name="Error_1053" xml:space="preserve">
+    <value>СВС не знайдено</value>
+  </data>
+  <data name="Error_1054" xml:space="preserve">
+    <value>Термін чинності СВС закінчився</value>
+  </data>
+  <data name="Error_1060" xml:space="preserve">
+    <value>У сертифікаті відсутня точка доступу OCSP</value>
+  </data>
+  <data name="Error_1061" xml:space="preserve">
+    <value>Сервер OCSP не відповідає</value>
+  </data>
+  <data name="Error_1062" xml:space="preserve">
+    <value>Відповідь сервера OCSP неуспішна</value>
+  </data>
+  <data name="Error_1063" xml:space="preserve">
+    <value>Відповідь сервера OCSP пошкоджена</value>
+  </data>
+  <data name="Error_1064" xml:space="preserve">
+    <value>Відповідь сервера OCSP неправильна</value>
+  </data>
+  <data name="Error_1065" xml:space="preserve">
+    <value>Відповідь сервера OCSP з неправильним nonce</value>
+  </data>
+  <data name="Error_1066" xml:space="preserve">
+    <value>Неправильна відповідь сервера OCSP</value>
+  </data>
+  <data name="Error_1070" xml:space="preserve">
+    <value>У сертифікаті відсутня точка доступу TSP</value>
+  </data>
+  <data name="Error_1071" xml:space="preserve">
+    <value>Сервер TSP не відповідає</value>
+  </data>
+  <data name="Error_1072" xml:space="preserve">
+    <value>Відповідь сервера TSP "не дозволено"</value>
+  </data>
+  <data name="Error_1073" xml:space="preserve">
+    <value>Відповідь сервера TSP не відповідає запиту</value>
+  </data>
+  <data name="Error_1074" xml:space="preserve">
+    <value>Відповідь сервера TSP пошкоджена</value>
+  </data>
+  <data name="Error_2001" xml:space="preserve">
+    <value>Неправильна відповідь криптографічної бібліотеки</value>
+  </data>
+  <data name="Error_4001" xml:space="preserve">
+    <value>Помилка перевірки підпису після підписання</value>
+  </data>
+  <data name="Error_100A" xml:space="preserve">
+    <value>Повторна ініціалізація бібліотеки</value>
+  </data>
+  <data name="Error_100B" xml:space="preserve">
+    <value>Сховище ключів не відкрито (відсутнє)</value>
+  </data>
+  <data name="Error_100C" xml:space="preserve">
+    <value>Ключ не вибрано</value>
+  </data>
+  <data name="Error_100D" xml:space="preserve">
+    <value>Ключ не може бути використаний для операції за призначенням</value>
+  </data>
+  <data name="Error_100E" xml:space="preserve">
+    <value>Непідтримуваний алгоритм</value>
+  </data>
+  <data name="Error_100F" xml:space="preserve">
+    <value>Неправильний розмір геш-значення</value>
+  </data>
+  <data name="Error_101A" xml:space="preserve">
+    <value>Помилка завантаження бібліотеки роботи зі сховищем ключів</value>
+  </data>
+  <data name="Error_101B" xml:space="preserve">
+    <value>Функція не підтримується бібліотекою роботи зі сховищем ключів</value>
+  </data>
+  <data name="Error_101C" xml:space="preserve">
+    <value>Сховище ключів уже відкрито</value>
+  </data>
+  <data name="Error_101D" xml:space="preserve">
+    <value>Неправильна сесія (сесію звільнено)</value>
+  </data>
+  <data name="Error_101E" xml:space="preserve">
+    <value>Неправильна спільна пам'ять (спільну пам'ять звільнено)</value>
+  </data>
+  <data name="Error_103A" xml:space="preserve">
+    <value>Ключ користувача не може бути застосований для розшифрування цього файлу</value>
+  </data>
+  <data name="Error_0402" xml:space="preserve">
+    <value>Неправильний параметр функції, зверніться до розробника</value>
+  </data>
+  <data name="Error_0403" xml:space="preserve">
+    <value>Бібліотеку роботи зі сховищем ключів не знайдено</value>
+  </data>
+  <data name="Error_0406" xml:space="preserve">
+    <value>Функція не підтримується бібліотекою роботи зі сховищем ключів</value>
+  </data>
+  <data name="Error_0407" xml:space="preserve">
+    <value>Параметр не підтримується бібліотекою роботи зі сховищем ключів</value>
+  </data>
+  <data name="Error_0408" xml:space="preserve">
+    <value>Сховище ключів не відкрито</value>
+  </data>
+  <data name="Error_0409" xml:space="preserve">
+    <value>Алгоритм не підтримується</value>
+  </data>
+  <data name="Error_040B" xml:space="preserve">
+    <value>Неправильний пароль або пошкоджений ключ</value>
+  </data>
+  <data name="Error_0411" xml:space="preserve">
+    <value>Неправильний пароль</value>
+  </data>
+  <data name="Error_0412" xml:space="preserve">
+    <value>Сховище ключів відкрито тільки для читання</value>
+  </data>
+  <data name="Error_0415" xml:space="preserve">
+    <value>Сертифікат не знайдено</value>
+  </data>
+  <data name="Error_0416" xml:space="preserve">
+    <value>Ключ не вибрано</value>
+  </data>
+  <data name="Error_0417" xml:space="preserve">
+    <value>Алгоритм не підтримується</value>
+  </data>
+  <data name="Error_0423" xml:space="preserve">
+    <value>Ключ пошкоджено</value>
+  </data>
+  <data name="Error_0429" xml:space="preserve">
+    <value>Сховище ключів не відкрито</value>
+  </data>
+  <data name="Error_042A" xml:space="preserve">
+    <value>Помилка сховища ключів</value>
+  </data>
+  <data name="Error_042C" xml:space="preserve">
+    <value>У сховищі ключів закінчилось вільне місце</value>
+  </data>
+  <data name="Error_042F" xml:space="preserve">
+    <value>Сховище ключів не знайдено</value>
+  </data>
+  <data name="Error_0436" xml:space="preserve">
+    <value>Помилка встановлення пароля</value>
+  </data>
+  <data name="Error_0437" xml:space="preserve">
+    <value>Неправильний сертифікат</value>
+  </data>
+  <data name="Error_0438" xml:space="preserve">
+    <value>Неправильний ідентифікатор ключа</value>
+  </data>
 </root>

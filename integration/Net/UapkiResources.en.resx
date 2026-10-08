@@ -330,4 +330,265 @@
   <data name="KeyAlgo_Unsupported" xml:space="preserve">
     <value>Unsupported</value>
   </data>
+  <data name="ErrorPrefix" xml:space="preserve">
+    <value>Cryptographic library error</value>
+  </data>
+  <data name="ErrorUnknownCode" xml:space="preserve">
+    <value>Error code {0}</value>
+  </data>
+  <data name="Error_1002" xml:space="preserve">
+    <value>Server connection error</value>
+  </data>
+  <data name="Error_1003" xml:space="preserve">
+    <value>Invalid JSON request format</value>
+  </data>
+  <data name="Error_1004" xml:space="preserve">
+    <value>Invalid method</value>
+  </data>
+  <data name="Error_1005" xml:space="preserve">
+    <value>Invalid parameter</value>
+  </data>
+  <data name="Error_1006" xml:space="preserve">
+    <value>Invalid key storage type</value>
+  </data>
+  <data name="Error_1007" xml:space="preserve">
+    <value>File name is required as the key storage identifier</value>
+  </data>
+  <data name="Error_1008" xml:space="preserve">
+    <value>User name is required as the key storage identifier</value>
+  </data>
+  <data name="Error_1009" xml:space="preserve">
+    <value>Library is not initialized</value>
+  </data>
+  <data name="Error_1010" xml:space="preserve">
+    <value>Invalid key identifier</value>
+  </data>
+  <data name="Error_1017" xml:space="preserve">
+    <value>Method is not allowed (for example, for shared session memory)</value>
+  </data>
+  <data name="Error_1018" xml:space="preserve">
+    <value>Offline mode is set</value>
+  </data>
+  <data name="Error_1019" xml:space="preserve">
+    <value>Key storage is not open</value>
+  </data>
+  <data name="Error_1020" xml:space="preserve">
+    <value>File open error</value>
+  </data>
+  <data name="Error_1021" xml:space="preserve">
+    <value>File read error</value>
+  </data>
+  <data name="Error_1022" xml:space="preserve">
+    <value>File write error</value>
+  </data>
+  <data name="Error_1024" xml:space="preserve">
+    <value>File delete error</value>
+  </data>
+  <data name="Error_1025" xml:space="preserve">
+    <value>HTTP status error</value>
+  </data>
+  <data name="Error_1030" xml:space="preserve">
+    <value>Invalid ContentInfo structure</value>
+  </data>
+  <data name="Error_1031" xml:space="preserve">
+    <value>Invalid document structure</value>
+  </data>
+  <data name="Error_1032" xml:space="preserve">
+    <value>Invalid document structure version</value>
+  </data>
+  <data name="Error_1033" xml:space="preserve">
+    <value>Data is missing</value>
+  </data>
+  <data name="Error_1034" xml:space="preserve">
+    <value>Invalid attribute</value>
+  </data>
+  <data name="Error_1035" xml:space="preserve">
+    <value>Attribute is missing</value>
+  </data>
+  <data name="Error_1036" xml:space="preserve">
+    <value>Extension is missing</value>
+  </data>
+  <data name="Error_1037" xml:space="preserve">
+    <value>Extension is not marked as critical</value>
+  </data>
+  <data name="Error_1039" xml:space="preserve">
+    <value>Invalid hash value</value>
+  </data>
+  <data name="Error_1040" xml:space="preserve">
+    <value>Error loading the certificate store</value>
+  </data>
+  <data name="Error_1041" xml:space="preserve">
+    <value>Certificate not found</value>
+  </data>
+  <data name="Error_1042" xml:space="preserve">
+    <value>Certificate is not yet valid</value>
+  </data>
+  <data name="Error_1043" xml:space="preserve">
+    <value>Certificate has expired</value>
+  </data>
+  <data name="Error_1044" xml:space="preserve">
+    <value>Issuer certificate not found</value>
+  </data>
+  <data name="Error_1045" xml:space="preserve">
+    <value>Certificate is revoked</value>
+  </data>
+  <data name="Error_1046" xml:space="preserve">
+    <value>Certificate status is unknown</value>
+  </data>
+  <data name="Error_1047" xml:space="preserve">
+    <value>Root certificate is not trusted</value>
+  </data>
+  <data name="Error_1050" xml:space="preserve">
+    <value>Error loading the CRL store</value>
+  </data>
+  <data name="Error_1051" xml:space="preserve">
+    <value>Certificate has no CRL distribution point</value>
+  </data>
+  <data name="Error_1052" xml:space="preserve">
+    <value>Error downloading the CRL from the server</value>
+  </data>
+  <data name="Error_1053" xml:space="preserve">
+    <value>CRL not found</value>
+  </data>
+  <data name="Error_1054" xml:space="preserve">
+    <value>CRL has expired</value>
+  </data>
+  <data name="Error_1060" xml:space="preserve">
+    <value>Certificate has no OCSP access point</value>
+  </data>
+  <data name="Error_1061" xml:space="preserve">
+    <value>OCSP server does not respond</value>
+  </data>
+  <data name="Error_1062" xml:space="preserve">
+    <value>OCSP server response is not successful</value>
+  </data>
+  <data name="Error_1063" xml:space="preserve">
+    <value>OCSP server response is corrupted</value>
+  </data>
+  <data name="Error_1064" xml:space="preserve">
+    <value>OCSP server response is invalid</value>
+  </data>
+  <data name="Error_1065" xml:space="preserve">
+    <value>OCSP server response has an invalid nonce</value>
+  </data>
+  <data name="Error_1066" xml:space="preserve">
+    <value>Invalid OCSP server response</value>
+  </data>
+  <data name="Error_1070" xml:space="preserve">
+    <value>Certificate has no TSP access point</value>
+  </data>
+  <data name="Error_1071" xml:space="preserve">
+    <value>TSP server does not respond</value>
+  </data>
+  <data name="Error_1072" xml:space="preserve">
+    <value>TSP server response is "not granted"</value>
+  </data>
+  <data name="Error_1073" xml:space="preserve">
+    <value>TSP server response does not match the request</value>
+  </data>
+  <data name="Error_1074" xml:space="preserve">
+    <value>TSP server response is corrupted</value>
+  </data>
+  <data name="Error_2001" xml:space="preserve">
+    <value>Invalid response from the cryptographic library</value>
+  </data>
+  <data name="Error_4001" xml:space="preserve">
+    <value>Signature verification after signing failed</value>
+  </data>
+  <data name="Error_100A" xml:space="preserve">
+    <value>Library is already initialized</value>
+  </data>
+  <data name="Error_100B" xml:space="preserve">
+    <value>Key storage is not open (absent)</value>
+  </data>
+  <data name="Error_100C" xml:space="preserve">
+    <value>Key is not selected</value>
+  </data>
+  <data name="Error_100D" xml:space="preserve">
+    <value>Key cannot be used for this operation</value>
+  </data>
+  <data name="Error_100E" xml:space="preserve">
+    <value>Unsupported algorithm</value>
+  </data>
+  <data name="Error_100F" xml:space="preserve">
+    <value>Invalid hash value size</value>
+  </data>
+  <data name="Error_101A" xml:space="preserve">
+    <value>Error loading the key storage library</value>
+  </data>
+  <data name="Error_101B" xml:space="preserve">
+    <value>Function is not supported by the key storage library</value>
+  </data>
+  <data name="Error_101C" xml:space="preserve">
+    <value>Key storage is already open</value>
+  </data>
+  <data name="Error_101D" xml:space="preserve">
+    <value>Invalid session (the session has been released)</value>
+  </data>
+  <data name="Error_101E" xml:space="preserve">
+    <value>Invalid shared memory (the shared memory has been released)</value>
+  </data>
+  <data name="Error_103A" xml:space="preserve">
+    <value>The user's key cannot be used to decrypt this file</value>
+  </data>
+  <data name="Error_0402" xml:space="preserve">
+    <value>Invalid function parameter, contact the developer</value>
+  </data>
+  <data name="Error_0403" xml:space="preserve">
+    <value>Key storage library not found</value>
+  </data>
+  <data name="Error_0406" xml:space="preserve">
+    <value>Function is not supported by the key storage library</value>
+  </data>
+  <data name="Error_0407" xml:space="preserve">
+    <value>Parameter is not supported by the key storage library</value>
+  </data>
+  <data name="Error_0408" xml:space="preserve">
+    <value>Key storage is not open</value>
+  </data>
+  <data name="Error_0409" xml:space="preserve">
+    <value>Algorithm is not supported</value>
+  </data>
+  <data name="Error_040B" xml:space="preserve">
+    <value>Invalid password or corrupted key</value>
+  </data>
+  <data name="Error_0411" xml:space="preserve">
+    <value>Invalid password</value>
+  </data>
+  <data name="Error_0412" xml:space="preserve">
+    <value>Key storage is open read-only</value>
+  </data>
+  <data name="Error_0415" xml:space="preserve">
+    <value>Certificate not found</value>
+  </data>
+  <data name="Error_0416" xml:space="preserve">
+    <value>Key is not selected</value>
+  </data>
+  <data name="Error_0417" xml:space="preserve">
+    <value>Algorithm is not supported</value>
+  </data>
+  <data name="Error_0423" xml:space="preserve">
+    <value>Key is corrupted</value>
+  </data>
+  <data name="Error_0429" xml:space="preserve">
+    <value>Key storage is not open</value>
+  </data>
+  <data name="Error_042A" xml:space="preserve">
+    <value>Key storage error</value>
+  </data>
+  <data name="Error_042C" xml:space="preserve">
+    <value>Key storage is out of free space</value>
+  </data>
+  <data name="Error_042F" xml:space="preserve">
+    <value>Key storage not found</value>
+  </data>
+  <data name="Error_0436" xml:space="preserve">
+    <value>Error setting the password</value>
+  </data>
+  <data name="Error_0437" xml:space="preserve">
+    <value>Invalid certificate</value>
+  </data>
+  <data name="Error_0438" xml:space="preserve">
+    <value>Invalid key identifier</value>
+  </data>
 </root>
