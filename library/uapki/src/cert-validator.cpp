@@ -646,7 +646,15 @@ int CertValidator::validateByOcsp (
         }
 
         DO(ocsp_helper.init());
-        DO(ocsp_helper.addCert(cerIssuer, cerSubject));
+        if (!cerIssuer) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(ocsp_helper.addIssuerAndSN(
+            cerIssuer->getAlgoKeyId(),
+            cerIssuer->getSubject(),
+            cerIssuer->getKeyId(),
+            cerSubject->getSerialNumber()
+        ));
         if (ocsp_params.nonceLen > 0) {
             DO(ocsp_helper.genNonce(ocsp_params.nonceLen));
         }
@@ -1146,7 +1154,7 @@ int CertValidator::verifyResponseData (
         }
     }
 
-    ret = ocspHelper.verifyTbsResponseData(resultValidation.cerResponder, status_sign);
+    ret = ocspHelper.verifyTbsResponseData(resultValidation.cerResponder->getSpki(), status_sign);
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "statusSignature", verifyStatusToStr(status_sign)));
     }

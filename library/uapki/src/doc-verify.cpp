@@ -1011,7 +1011,7 @@ int VerifiedSignerInfo::verifyOcspResponse (
 
     if (ret == RET_OK) {
         m_ListAddedCerts.ocsp.push_back(resultValByOcsp.cerResponder);
-        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.cerResponder, resultValByOcsp.statusSignature);
+        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.cerResponder->getSpki(), resultValByOcsp.statusSignature);
         if (ret == RET_VERIFY_FAILED) {
             ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED;
         }

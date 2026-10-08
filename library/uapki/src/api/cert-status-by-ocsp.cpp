@@ -65,7 +65,12 @@ int uapki_cert_status_by_ocsp (Context& context, JSON_Object* joParams, JSON_Obj
     if (!sba_issuercertid.empty()) {
         //  Note: if cert not found the just return RET_UAPKI_CERT_NOT_FOUND without 'expectedCerts'
         DO(cer_store.getCertByCertId(sba_issuercertid.get(), &cer_issuer));
-        DO(ocsp_helper.addIssuerAndSN(cer_issuer, sba_serialnumber.get()));
+        DO(ocsp_helper.addIssuerAndSN(
+            cer_issuer->getAlgoKeyId(),
+            cer_issuer->getSubject(),
+            cer_issuer->getKeyId(),
+            sba_serialnumber.get()
+        ));
     }
     else {
         UapkiNS::AlgorithmIdentifier aid_hashalgo;

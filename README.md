@@ -19,6 +19,7 @@ Fork of [Cryptonite](https://github.com/privat-it/cryptonite).
   + uapki. Main library with JSON that implements interface for message signing and verification, private key and CSR generation, crtificate verification and other.
   + test. Application for testing library and use as examples of library calls.
   + hostapp. Native messaging host for communicate library with web pages in modern browsers.
++ apps. Directory contains applications built on the library (see [apps/README.md](apps/README.md)).
 + integration. Directory contains components for embedding library into applications developed with other programming languages.
 + doc. Directory contains manual for developers.
 

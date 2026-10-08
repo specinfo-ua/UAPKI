@@ -80,7 +80,31 @@ struct ResultValidationByCrl {
 
 };  //  end struct ResultValidationByCrl
 
-struct ResultValidationByOcsp : public Ocsp::ResponseInfo {
+struct OcspResponseInfo {
+    Ocsp::ResponseStatus
+                responseStatus;
+    Ocsp::ResponderIdType
+                responderIdType;
+    SmartBA     baResponderId;
+    uint64_t    msProducedAt;
+    Ocsp::OcspHelper::SingleResponseInfo
+                singleResponseInfo;
+    SignatureVerifyStatus
+                statusSignature;
+    Cert::CerItem*
+                cerResponder;
+
+    OcspResponseInfo (void)
+        : responseStatus(Ocsp::ResponseStatus::UNDEFINED)
+        , responderIdType(Ocsp::ResponderIdType::UNDEFINED)
+        , msProducedAt(0)
+        , statusSignature(SignatureVerifyStatus::UNDEFINED)
+        , cerResponder(nullptr)
+    {}
+
+};  //  end struct OcspResponseInfo
+
+struct ResultValidationByOcsp : public OcspResponseInfo {
     Ocsp::OcspHelper::SingleResponseInfo
                 singleResponseInfo;
     SmartBA     basicOcspResponse;

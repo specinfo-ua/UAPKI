@@ -30,8 +30,7 @@
 
 
 #include "byte-array.h"
-#include "cer-store.h"
-#include "crl-store.h"
+#include "hash.h"
 #include "uapki-ns.h"
 #include "uapkif.h"
 #include "verify-status.h"
@@ -105,18 +104,17 @@ namespace Ocsp {
         void reset (void);
 
         int init (void);
-        int addCert (
-            const Cert::CerItem* cerIssuer,
-            const Cert::CerItem* cerSubject
-        );
         int addCertId (
             const UapkiNS::AlgorithmIdentifier& hashAlgorithm,
             const ByteArray* baIssuerNameHash,
             const ByteArray* baIssuerKeyHash,
             const ByteArray* baSerialNumber
         );
+        //  issuerNameHash = hash(issuerName), issuerKeyHash = issuerKeyId
         int addIssuerAndSN (
-            const Cert::CerItem* cerIssuer,
+            const HashAlg hashAlgo,
+            const ByteArray* baIssuerName,
+            const ByteArray* baIssuerKeyId,
             const ByteArray* baSerialNumber
         );
         int genNonce (
@@ -161,13 +159,16 @@ namespace Ocsp {
             ResponderIdType &responderIdType,
             ByteArray** baResponderId
         );
+        int getSignatureAlgorithm (
+            std::string& signAlgo
+        );
         int getSerialNumberFromCertId (
             const size_t index,
             ByteArray** baSerialNumber
         );
         int scanSingleResponses (void);
         int verifyTbsResponseData (
-            const Cert::CerItem* cerResponder,
+            const ByteArray* baSpki,
             SignatureVerifyStatus& statusSign
         );
 
@@ -198,30 +199,6 @@ namespace Ocsp {
         );
 
     };  //  end class OcspHelper
-
-    struct ResponseInfo {
-        ResponseStatus
-                    responseStatus;
-        ResponderIdType
-                    responderIdType;
-        SmartBA     baResponderId;
-        uint64_t    msProducedAt;
-        OcspHelper::SingleResponseInfo
-                    singleResponseInfo;
-        SignatureVerifyStatus
-                    statusSignature;
-        Cert::CerItem*
-                    cerResponder;
-
-        ResponseInfo (void)
-        : responseStatus(ResponseStatus::UNDEFINED)
-        , responderIdType(ResponderIdType::UNDEFINED)
-        , msProducedAt(0)
-        , statusSignature(SignatureVerifyStatus::UNDEFINED)
-        , cerResponder(nullptr)
-        {}
-
-    };  //  end struct ResponseInfo
 
     int generateOtherHash (
         const ByteArray* baOcspResponseEncoded,

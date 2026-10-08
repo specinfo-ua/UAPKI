@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FILE_MARKER "uapki/ocsp-helper.cpp"
+#define FILE_MARKER "common/pkix/ocsp-helper.cpp"
 
 #include "ocsp-helper.h"
 #include "extension-helper.h"
@@ -106,16 +106,6 @@ int OcspHelper::init (void)
     return (m_OcspRequest) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
 
-int OcspHelper::addCert (
-        const Cert::CerItem* cerIssuer,
-        const Cert::CerItem* cerSubject
-)
-{
-    if (!cerSubject) return RET_UAPKI_INVALID_PARAMETER;
-
-    return addIssuerAndSN(cerIssuer, cerSubject->getSerialNumber());
-}
-
 int OcspHelper::addCertId (
         const UapkiNS::AlgorithmIdentifier& hashAlgorithm,
         const ByteArray* baIssuerNameHash,
@@ -150,25 +140,25 @@ cleanup:
 }
 
 int OcspHelper::addIssuerAndSN (
-        const Cert::CerItem* cerIssuer,
+        const HashAlg hashAlgo,
+        const ByteArray* baIssuerName,
+        const ByteArray* baIssuerKeyId,
         const ByteArray* baSerialNumber
 )
 {
     int ret = RET_OK;
     UapkiNS::AlgorithmIdentifier aid_hashalgo;
-    SmartBA sba_subject, sba_issuernamehash;
+    SmartBA sba_issuernamehash;
 
-    if (!m_OcspRequest || !cerIssuer || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_OcspRequest || !baIssuerName || !baIssuerKeyId || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
 
-    DO(asn_encode_ba(get_Name_desc(), &cerIssuer->getCert()->tbsCertificate.subject, &sba_subject));
-
-    aid_hashalgo.algorithm = string(hash_to_oid(cerIssuer->getAlgoKeyId()));
-    DO(::hash(cerIssuer->getAlgoKeyId(), sba_subject.get(), &sba_issuernamehash));
+    aid_hashalgo.algorithm = string(hash_to_oid(hashAlgo));
+    DO(::hash(hashAlgo, baIssuerName, &sba_issuernamehash));
 
     DO(addCertId(
         aid_hashalgo,
         sba_issuernamehash.get(),
-        cerIssuer->getKeyId(),
+        baIssuerKeyId,
         baSerialNumber
     ));
 
@@ -488,6 +478,15 @@ cleanup:
     return ret;
 }
 
+int OcspHelper::getSignatureAlgorithm (
+        string& signAlgo
+)
+{
+    if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
+
+    return Util::oidFromAsn1(&m_BasicOcspResp->signatureAlgorithm.algorithm, signAlgo);
+}
+
 int OcspHelper::getSerialNumberFromCertId (
         const size_t index,
         ByteArray** baSerialNumber
@@ -571,7 +570,7 @@ cleanup:
 }
 
 int OcspHelper::verifyTbsResponseData (
-        const Cert::CerItem* cerResponder,
+        const ByteArray* baSpki,
         SignatureVerifyStatus& statusSign
 )
 {
@@ -580,7 +579,7 @@ int OcspHelper::verifyTbsResponseData (
     char* s_signalgo = nullptr;
 
     statusSign = SignatureVerifyStatus::UNDEFINED;
-    if (!m_BasicOcspResp) return RET_UAPKI_INVALID_PARAMETER;
+    if (!m_BasicOcspResp || !baSpki) return RET_UAPKI_INVALID_PARAMETER;
 
     DO(asn_oid_to_text(&m_BasicOcspResp->signatureAlgorithm.algorithm, &s_signalgo));
 
@@ -592,7 +591,7 @@ int OcspHelper::verifyTbsResponseData (
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, cerResponder->getSpki(), ba_signature);
+    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, baSpki, ba_signature);
     switch (ret) {
     case RET_OK:
         statusSign = SignatureVerifyStatus::VALID;
