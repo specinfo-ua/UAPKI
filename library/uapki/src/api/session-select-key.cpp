@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -135,13 +135,37 @@ int uapki_session_select_key (JSON_Object* joParams, JSON_Object* joResult)
                 added_ceritems
             ));
         }
+        else if (ret == RET_UAPKI_NOT_SUPPORTED) {
+            //  The certificates of the storage, added to cert-store by OPEN
+            vba_encodedcerts.clear();
+            if (storage->sessionGetCertificates(vba_encodedcerts) == RET_OK) {
+                for (const auto& it : vba_encodedcerts) {
+                    Cert::CerItem* cer_item = nullptr;
+                    if (cer_store->getCertByEncoded(it, &cer_item) == RET_OK) {
+                        added_ceritems.push_back(Cert::CerStore::AddedCerItem(cer_item));
+                    }
+                }
+            }
+        }
 
         //  Get cert from cert-store
         if (!sba_certid.empty()) {
             ret = cer_store->getCertByCertId(sba_certid.get(), &cer_selectedkey);
         }
         else {
-            ret = cer_store->getCertByKeyId(sba_keyid.get(), &cer_selectedkey);
+            //  The certificate from the storage itself: one key may have certificates of several CAs
+            ret = RET_UAPKI_CERT_NOT_FOUND;
+            for (const auto& it : added_ceritems) {
+                if ((it.errorCode == RET_OK) && it.cerItem && it.cerItem->equalKeyId(sba_keyid.get())) {
+                    if (!cer_selectedkey || (it.cerItem->getNotBefore() > cer_selectedkey->getNotBefore())) {
+                        cer_selectedkey = it.cerItem;
+                    }
+                    ret = RET_OK;
+                }
+            }
+            if (ret != RET_OK) {
+                ret = cer_store->getCertByKeyId(sba_keyid.get(), &cer_selectedkey);
+            }
         }
         if (ret == RET_OK) {
             DO(storage->setPairedCertId(cer_selectedkey->getCertId()));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -136,6 +136,11 @@ public:
     int getCount (
         size_t& count,
         size_t& countTrusted
+    );
+    //  All certificates with the key identifier (overlay and base)
+    void getCertsByKeyId (
+        const ByteArray* baKeyId,
+        std::vector<CerItem*>& cerItems
     );
     int getIssuerCert (
         CerItem* cerSubject,
