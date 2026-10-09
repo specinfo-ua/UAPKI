@@ -37,6 +37,7 @@ import java.lang.ref.Cleaner;
 import java.lang.ref.Reference;
 import java.lang.reflect.Type;
 import java.net.ProxySelector;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,7 +80,6 @@ public final class Uapki implements AutoCloseable {
     private static final String MSG_MEMORY_CLOSED = "Помилка. Спільну пам'ять звільнено";
     private static final String MSG_NO_SESSIONS = "Помилка. Бібліотека uapki не підтримує сесії (потрібна версія 3.0 або новіша)";
     private static final String DEFAULT_CONFIG = "{}";
-    private static final long MAX_FILE_SIZE = 512L * 1024 * 1024;
 
     private static final Cleaner CLEANER = Cleaner.create();
     private static final Uapki GLOBAL = new Uapki(Mode.GLOBAL, null);
@@ -375,11 +375,12 @@ public final class Uapki implements AutoCloseable {
     private record EncryptParams(ContentToEncrypt content, List<RecipientInfo> recipientInfos) { }
     private record SignFormat(String signatureFormat, boolean detachedData, boolean includeCert, boolean includeTime,
                               String signAlgo) { }
-    private record DataTbs(String id, byte[] bytes, String file, Boolean isDigest) { }
+    //  ptr/size - data in the memory of this process: the address (hex, big-endian) and the size
+    private record DataTbs(String id, byte[] bytes, String file, Boolean isDigest, String ptr, Long size) { }
     private record SignOptions(boolean ignoreCertStatus) { }
     private record SignParameters(SignFormat signParams, List<DataTbs> dataTbs, SignOptions options) { }
-    private record SignedData(byte[] bytes, byte[] content, String file) { }
-    private record VerifyParams(SignedData signature, ValidationOptions options) { }
+    private record SignedData(byte[] bytes, byte[] content, String file, String ptr, Long size) { }
+    private record VerifyParams(SignedData signature, ValidationOptions options, Boolean returnContent) { }
 
     // ---------------------------------------------------------------------------------------------------------------
     //  INIT, DEINIT, VERSION, PROVIDERS
@@ -1398,7 +1399,7 @@ public final class Uapki implements AutoCloseable {
                              boolean includeCert, boolean ignoreCertStatus, boolean isDigest) {
         List<DataTbs> dataTbs = new ArrayList<>();
         for (int i = 0; i < datas.size(); i++)
-            dataTbs.add(new DataTbs(Integer.toString(i), datas.get(i), null, isDigest));
+            dataTbs.add(new DataTbs(Integer.toString(i), datas.get(i), null, isDigest, null, null));
 
         SignaturesList ret = callSign(dataTbs, algo, signFormat, detachedData, includeCert, ignoreCertStatus);
 
@@ -1422,56 +1423,61 @@ public final class Uapki implements AutoCloseable {
     }
 
     /**
-     * Підписує файли вибраним ключем (метод SIGN) з сертифікатом у підписі; підписи записуються у файли &lt;файл&gt;.p7s
+     * Підписує файли вибраним ключем без інкапсуляції даних, з сертифікатом у підписі (метод SIGN)
+     *
+     * @see #signDetached(List, SignAlgo, SignatureFormat, boolean, boolean)
      */
-    public void signFiles(String[] files, SignAlgo algo, SignatureFormat signFormat, boolean detachedData) {
-        signFiles(files, algo, signFormat, detachedData, true, false);
+    public List<byte[]> signFilesDetached(String[] files, SignAlgo algo, SignatureFormat signFormat) {
+        return signFilesDetached(files, algo, signFormat, true, false);
     }
 
     /**
-     * Підписує файли вибраним ключем (метод SIGN); підписи записуються у файли &lt;файл&gt;.p7s.
-     * Підпис з інкапсуляцією даних підтримується для файлів до 512 МБ
+     * Підписує файли вибраним ключем без інкапсуляції даних (метод SIGN)
      *
-     * @param files            імена файлів
+     * @see #signDetached(List, SignAlgo, SignatureFormat, boolean, boolean)
+     */
+    public List<byte[]> signFilesDetached(String[] files, SignAlgo algo, SignatureFormat signFormat,
+                                          boolean includeCert, boolean ignoreCertStatus) {
+        List<SignSource> sources = new ArrayList<>();
+        for (String file : files)
+            sources.add(SignSource.ofFile(file));
+        return signDetached(sources, algo, signFormat, includeCert, ignoreCertStatus);
+    }
+
+    /**
+     * Підписує файли або дані в пам'яті вибраним ключем без інкапсуляції даних, одним викликом SIGN.
+     * Файли бібліотека читає блоками, дані в пам'яті гешує на місці; нічого не записується на диск.
+     * Підпис з інкапсуляцією даних викликач складає сам, якщо потрібен: дані не входять у підписані
+     * атрибути, тож вкладання їх у підпис значення підпису не змінює
+     *
+     * @param sources          файли або дані в пам'яті ({@link SignSource})
      * @param algo             алгоритм підпису
      * @param signFormat       формат підпису
-     * @param detachedData     підпис без інкапсуляції даних
      * @param includeCert      включити сертифікат підписувача
      * @param ignoreCertStatus не перевіряти статус сертифіката підписувача
+     * @return підписи в порядку sources
      */
-    public void signFiles(String[] files, SignAlgo algo, SignatureFormat signFormat, boolean detachedData,
-                          boolean includeCert, boolean ignoreCertStatus) {
-        try {
-            long totalLen = 0;
-            for (String file : files) {
-                long len = Files.size(Path.of(file));
-                totalLen += len;
-
-                if (len > MAX_FILE_SIZE && !detachedData)
-                    throw new UapkiException("Поточна версія не підтримує підпис з інкапсуляцією даних для файлів, більших за 512 МБ");
-            }
-
-            if (totalLen > MAX_FILE_SIZE) {
-                for (String file : files)
-                    signFiles(new String[] { file }, algo, signFormat, detachedData, includeCert, ignoreCertStatus);
-                return;
-            }
-
-            List<DataTbs> dataTbs = new ArrayList<>();
-            for (int i = 0; i < files.length; i++) {
-                if (detachedData)
-                    dataTbs.add(new DataTbs(Integer.toString(i), null, files[i], null));
-                else
-                    dataTbs.add(new DataTbs(Integer.toString(i), Files.readAllBytes(Path.of(files[i])), null, false));
-            }
-
-            SignaturesList ret = callSign(dataTbs, algo, signFormat, detachedData, includeCert, ignoreCertStatus);
-
-            for (Signature signature : ret.signatures())
-                Files.write(Path.of(files[Integer.parseInt(signature.id())] + ".p7s"), signature.bytes());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    public List<byte[]> signDetached(List<SignSource> sources, SignAlgo algo, SignatureFormat signFormat,
+                                     boolean includeCert, boolean ignoreCertStatus) {
+        List<DataTbs> dataTbs = new ArrayList<>();
+        for (int i = 0; i < sources.size(); i++) {
+            SignSource source = sources.get(i);
+            if (source.file() != null)
+                dataTbs.add(new DataTbs(Integer.toString(i), null, source.file(), null, null, null));
+            else
+                dataTbs.add(new DataTbs(Integer.toString(i), null, null, null, SignSource.hexAddress(source.ptr()), source.size()));
         }
+
+        SignaturesList ret = callSign(dataTbs, algo, signFormat, true, includeCert, ignoreCertStatus);
+
+        byte[][] signatures = new byte[sources.size()][];
+        for (Signature signature : ret.signatures())
+            signatures[Integer.parseInt(signature.id())] = signature.bytes();
+        for (byte[] signature : signatures) {
+            if (signature == null)
+                throw new UapkiException(0x2001);
+        }
+        return List.of(signatures);
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -1497,53 +1503,84 @@ public final class Uapki implements AutoCloseable {
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
     public ValidationResult verify(byte[] signature, byte[] content, String validationType) {
-        VerifyParams parameters = new VerifyParams(new SignedData(signature, content, null), new ValidationOptions(validationType));
+        VerifyParams parameters = new VerifyParams(new SignedData(signature, content, null, null, null), new ValidationOptions(validationType), null);
         return verifyResult(response(requestObject("VERIFY", parameters), ValidationResult.class));
     }
 
     /**
-     * Перевіряє підпис у файлі (метод VERIFY, повна перевірка)
+     * Перевіряє підпис без інкапсуляції даних за даними в пам'яті процесу (метод VERIFY, повна перевірка)
+     *
+     * @see #verifyDetached(byte[], Pointer, long, String)
      */
-    public ValidationResult verify(String file) {
-        return verify(file, "FULL");
+    public ValidationResult verifyDetached(byte[] signature, Pointer content, long size) {
+        return verifyDetached(signature, content, size, "FULL");
     }
 
     /**
-     * Перевіряє підпис у файлі (метод VERIFY). Для файлу .p7s з інкапсульованими даними дані записуються у файл
-     * без розширення .p7s; для підпису без даних використовується файл без розширення .p7s, якщо він є
+     * Перевіряє підпис без інкапсуляції даних за даними в пам'яті процесу (метод VERIFY). Бібліотека гешує
+     * дані на місці: без копій і Base64, один виклик, дані у відповіді не повертаються.
+     * Для підпису з інкапсуляцією даних викликач може передати підпис без даних, а дані - вказівником
+     * (наприклад, у відображений у пам'ять файл підпису)
      *
-     * @param file           ім'я файлу підпису
+     * @param signature      PKCS#7-підпис без інкапсуляції даних
+     * @param content        адреса даних, наприклад з {@code MemorySegment.address()}; пам'ять має бути
+     *                       доступна до кінця виклику
+     * @param size           розмір даних
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
-    public ValidationResult verify(String file, String validationType) {
+    public ValidationResult verifyDetached(byte[] signature, Pointer content, long size, String validationType) {
+        SignedData signed = new SignedData(signature, null, null, SignSource.hexAddress(content), size);
+        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, new ValidationOptions(validationType), false)),
+                ValidationResult.class));
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за даними від position до limit прямого буфера
+     * (метод VERIFY, повна перевірка)
+     *
+     * @see #verifyDetached(byte[], ByteBuffer, String)
+     */
+    public ValidationResult verifyDetached(byte[] signature, ByteBuffer content) {
+        return verifyDetached(signature, content, "FULL");
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за даними від position до limit прямого буфера, наприклад
+     * {@code FileChannel.map(...)} (метод VERIFY). Бібліотека гешує дані на місці
+     *
+     * @param signature      PKCS#7-підпис без інкапсуляції даних
+     * @param content        прямий буфер із даними
+     * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
+     */
+    public ValidationResult verifyDetached(byte[] signature, ByteBuffer content, String validationType) {
         try {
-            Path path = Path.of(file);
-            if (Files.size(path) > MAX_FILE_SIZE)
-                throw new UapkiException("Поточна версія не підтримує підпис з інкапсуляцією даних для файлів, більших за 512 МБ");
-
-            byte[] signature = Files.readAllBytes(path);
-            boolean p7s = Util.extension(file).equals(".p7s");
-            String dataFile = p7s ? file.substring(0, file.length() - 4) : null;
-
-            VerifyParams parameters = new VerifyParams(new SignedData(signature, null, null), new ValidationOptions(validationType));
-            Json.Response<ValidationResult> ret = response(requestObject("VERIFY", parameters), ValidationResult.class);
-
-            if (p7s && ret.result != null && ret.result.content() != null && ret.result.content().bytes().length > 0) {
-                //  try store incapsulated content
-                try {
-                    Files.write(Path.of(dataFile), ret.result.content().bytes());
-                } catch (IOException | RuntimeException e) {
-                    //  do nothing
-                }
-            } else if (ret.errorCode == 0x1033 && p7s && Files.exists(Path.of(dataFile))) {
-                VerifyParams parameters2 = new VerifyParams(new SignedData(signature, null, dataFile), new ValidationOptions(validationType));
-                ret = response(requestObject("VERIFY", parameters2), ValidationResult.class);
-            }
-
-            return verifyResult(ret);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            return verifyDetached(signature, SignSource.address(content), content.remaining(), validationType);
+        } finally {
+            Reference.reachabilityFence(content);
         }
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за файлом даних (метод VERIFY, повна перевірка)
+     *
+     * @see #verifyDetached(byte[], String, String)
+     */
+    public ValidationResult verifyDetached(byte[] signature, String contentFile) {
+        return verifyDetached(signature, contentFile, "FULL");
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за файлом даних (метод VERIFY). Бібліотека читає файл блоками;
+     * один виклик, нічого не записується на диск
+     *
+     * @param signature      PKCS#7-підпис без інкапсуляції даних
+     * @param contentFile    файл даних
+     * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
+     */
+    public ValidationResult verifyDetached(byte[] signature, String contentFile, String validationType) {
+        SignedData signed = new SignedData(signature, null, contentFile, null, null);
+        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, new ValidationOptions(validationType), false)),
+                ValidationResult.class));
     }
 
     private static ValidationResult verifyResult(Json.Response<ValidationResult> ret) {

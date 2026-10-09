@@ -140,8 +140,31 @@ Main methods: `init`, `deinit`, `getVersion`, `getKeyStorages`, `openKeyStorage`
 `deleteKey`, `generateKey`, `getCertInfo`, `getCertsShortInfoList`, `getCerts`, `getCert`, `removeCert`,
 `importCerts`, `importCert`, `importCertBundle`, `verifyCert`, `getCertByOcsp`, `getCrlInfo`, `importCrl`,
 `removeCrl`, `getAllCrls`, `getCsr`, `verifyCsr`, `getDigest`, `getFileDigest`, `getRandomBytes`, `encrypt`,
-`decrypt`, `modifyCms`, `sign`, `signFiles`, `verify`, `process` and the static `cmp`/`cmpAsync` (certificates
-from the CMP servers of a CA by key identifiers).
+`decrypt`, `modifyCms`, `sign`, `signDetached`, `signFilesDetached`, `verify`, `verifyDetached`, `process` and the
+static `cmp`/`cmpAsync` (certificates from the CMP servers of a CA by key identifiers).
+
+### Files and large data
+
+`signFilesDetached` and `signDetached` sign many files or buffers in one call: the library reads files in blocks and
+hashes data in memory in place (`SignSource.ofFile`, `ofBuffer` for a direct or mapped `ByteBuffer`, `ofMemory` for a
+JNA `Pointer`, e.g. from `MemorySegment.address()`), so there is no size limit and nothing goes through Base64. The
+signatures are detached and nothing is written to disk.
+
+`verifyDetached` verifies a signature without the content against a file, a direct or mapped buffer or a pointer, in
+one call, without returning the content. For a signature with encapsulated content the caller can pass the signature
+without the content and point to the content inside the memory-mapped signature file: the content is not part of
+the signed data, so the signature stays valid.
+
+```java
+List<byte[]> signatures = uapki.signFilesDetached(new String[] { "contract.pdf" },
+        SignAlgo.DSTU4145_GOST34311, SignatureFormat.CADES_BES);
+ValidationResult byFile = uapki.verifyDetached(signatures.get(0), "contract.pdf");
+
+try (FileChannel channel = FileChannel.open(Path.of("contract.pdf"))) {
+    MappedByteBuffer content = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+    ValidationResult byMemory = uapki.verifyDetached(signatures.get(0), content);
+}
+```
 
 ## Migration from the old API (com.sit.uapki)
 
@@ -162,8 +185,8 @@ entirely; it is not source compatible.
 | `lib.selectKey(KeyId)` | `uapki.selectKey(Key)` / `selectKey(String keyId)`; `getSelectedKey()` |
 | `lib.createKey(...)`, `deleteKey(KeyId)` | `uapki.generateKey(...)`, `deleteKey(Key)` |
 | `lib.changePassword(password, newPassword)` | `uapki.changePassword(newPassword)` (storage opened for writing) |
-| `lib.sign(Sign.Parameters)` returning `Document`s | `uapki.sign(List<byte[]>, SignAlgo, SignatureFormat, detached, ...)` returning `byte[]` signatures; `signFiles(...)` |
-| `lib.verify(PkiData[, content])` | `uapki.verify(byte[] signature, byte[] content)`, `verify(String file)` |
+| `lib.sign(Sign.Parameters)` returning `Document`s | `uapki.sign(List<byte[]>, SignAlgo, SignatureFormat, detached, ...)` returning `byte[]` signatures; `signFilesDetached(...)`, `signDetached(...)` |
+| `lib.verify(PkiData[, content])` | `uapki.verify(byte[] signature, byte[] content)`, `verifyDetached(signature, file / buffer / pointer)` |
 | `PkiData`, `PkiOid`, `PkiTime`, ... wrappers | `byte[]`, `String` OIDs and enums with `oid()`, `java.time.Instant` |
 | checked `com.sit.uapki.UapkiException` | unchecked `com.specinfosystems.uapki.UapkiException` with `getErrorCode()` |
 | `lib.processJson(request)` | `uapki.process(request)` |
