@@ -241,6 +241,9 @@ public partial class Uapki
         public byte[] Bytes { get; init; } = Array.Empty<byte>();
         public byte[]? Content { get; init; }
         public string? File { get; init; }
+        // Content in the memory of this process: address (hex, big-endian) and size
+        public string? Ptr { get; init; }
+        public ulong? Size { get; init; }
     }
 
     public class ValidationOptions
@@ -252,6 +255,7 @@ public partial class Uapki
     {
         public SignedData? Signature { get; init; }
         public ValidationOptions? Options {get; init; }
+        public bool? ReturnContent { get; init; }
     }
 
     public ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
@@ -283,55 +287,48 @@ public partial class Uapki
         }
     }
 
-    public ValidationResult Verify(string file, string validationType = "FULL")
+    /// <summary>
+    /// Verifies a signature without encapsulated content against content in the memory of this process.
+    /// The library hashes the content in place: no copies, no base64. One VERIFY call; the content is not returned
+    /// </summary>
+    public ValidationResult Verify(byte[] signature, IntPtr content, ulong contentSize, string validationType = "FULL")
     {
-        var fi = new FileInfo(file);
-        if (fi.Length > 512 * 1024 * 1024)
-            throw new UapkiException("Поточна версія не підтримує підпис з інкапсуляцією даних для файлів, більших за 512 МБ");
+        var address = (ulong)content.ToInt64();
+        var ptr = IntPtr.Size == 8 ? address.ToString("X16") : ((uint)address).ToString("X8");
 
-        var signature = File.ReadAllBytes(file);
-        var ext = fi.Extension;
-
-        var parameters = new VerifyParams()
+        return VerifyRequest(new VerifyParams()
         {
-            Signature = new() { Bytes = signature },
-            Options = new() { ValidationType = validationType }
-        };
+            Signature = new SignedData() { Bytes = signature, Ptr = ptr, Size = contentSize },
+            Options = new() { ValidationType = validationType },
+            ReturnContent = false
+        });
+    }
 
+    /// <summary>
+    /// Verifies a detached signature against a content file; the library reads the file in blocks.
+    /// One VERIFY call; nothing is written to disk
+    /// </summary>
+    public ValidationResult VerifyDetached(byte[] signature, string contentFile, string validationType = "FULL")
+    {
+        return VerifyRequest(new VerifyParams()
+        {
+            Signature = new SignedData() { Bytes = signature, File = contentFile },
+            Options = new() { ValidationType = validationType },
+            ReturnContent = false
+        });
+    }
+
+    private ValidationResult VerifyRequest(VerifyParams parameters)
+    {
         string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
 
         var ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
-        if (ext == ".p7s" && ret.Result?.Content?.Bytes is not null)
-        {
-            // try store incapsulated content
-            try { File.WriteAllBytes(file.Substring(0, file.Length - 4), ret.Result.Content.Bytes); } catch { /*do nothing*/ }
-        }
-        else if ((ret.ErrorCode == 0x1033) && (ext == ".p7s") && File.Exists(file.Substring(0, file.Length - 4)))
-        {
-            var f = file.Substring(0, file.Length - 4);
-
-            var parameters2 = new VerifyParams()
-            {
-                Signature = new() { Bytes = signature, File = f },
-                Options = new() { ValidationType = validationType }
-            };
-
-            verify_cmd = Request("VERIFY", parameters2, jsonCtx.VerifyParams);
-
-            ret = JsonSerializer.Deserialize(Process(verify_cmd), jsonCtx.VerifyResult) ?? throw new UapkiException(0x2001);
-        }
-
         if (ret.Result?.SignatureInfos is not null)
-        {
-            // add signer cert info?
             return ret.Result;
-        }
-        else
-        {
-            if (ret.ErrorCode != 0)
-                throw new UapkiException(ret.ErrorCode);
 
-            return ret.Result!;
-        }
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        return ret.Result!;
     }
 }

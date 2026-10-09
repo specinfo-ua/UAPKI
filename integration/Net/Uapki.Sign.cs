@@ -64,6 +64,20 @@ public partial class Uapki
         public byte[]? Bytes { get; init; }
         public string? File { get; init; }
         public bool? IsDigest { get; init; }
+        // Content in the memory of this process: address (hex, big-endian) and size
+        public string? Ptr { get; init; }
+        public ulong? Size { get; init; }
+    }
+
+    /// <summary>
+    /// Data to sign: a file (read by the library in blocks) or content in the memory of this process
+    /// (hashed by the library in place). The memory must stay valid for the duration of the call
+    /// </summary>
+    public class SignSource
+    {
+        public string? File { get; init; }
+        public IntPtr Ptr { get; init; }
+        public ulong Size { get; init; }
     }
 
     private class SignOptions
@@ -131,37 +145,35 @@ public partial class Uapki
         return signatures;
     }
 
-    public void SignFiles(string[] files, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false)
+    /// <summary>
+    /// Detached signatures of files in one SIGN call; the library reads the files in blocks.
+    /// Returns the signatures in the order of the files; nothing is written to disk
+    /// </summary>
+    public List<byte[]> SignFilesDetached(string[] files, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false)
+    {
+        return SignDetached(files.Select(file => new SignSource() { File = file }).ToList(), algo, signFormat, includeCert, ignoreCertStatus);
+    }
+
+    /// <summary>
+    /// Detached signatures of files or content in memory in one SIGN call.
+    /// Returns the signatures in the order of the sources; nothing is written to disk
+    /// </summary>
+    public List<byte[]> SignDetached(IReadOnlyList<SignSource> sources, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false)
     {
         var dataTbs = new List<DataTbs>();
-        long totalLen = 0;
-
-        for (int i = 0; i < files.Length; i++)
+        for (int i = 0; i < sources.Count; i++)
         {
-            var len = new FileInfo(files[i]).Length;
-            totalLen += len;
-
-            if ((len > 512 * 1024 * 1024) && !detachedData)
-                throw new UapkiException("Поточна версія не підтримує підпис з інкапсуляцією даних для файлів, більших за 512 МБ");
-        }
-
-        if (totalLen > 512 * 1024 * 1024)
-        {
-            var f = new string[1];
-            for (int i = 0; i < files.Length; i++)
+            var source = sources[i];
+            if (source.File is not null)
             {
-                f[0] = files[i];
-                SignFiles(f, algo, signFormat, detachedData, includeCert, ignoreCertStatus);
+                dataTbs.Add(new DataTbs() { Id = i.ToString(), File = source.File });
             }
-            return;
-        }
-
-        for (int i = 0; i < files.Length; i++)
-        {
-            if (detachedData)
-                dataTbs.Add(new DataTbs() { Id = i.ToString(), File = files[i] });
             else
-                dataTbs.Add(new DataTbs() { Id = i.ToString(), Bytes = File.ReadAllBytes(files[i]), IsDigest = false });
+            {
+                var address = (ulong)source.Ptr.ToInt64();
+                var ptr = IntPtr.Size == 8 ? address.ToString("X16") : ((uint)address).ToString("X8");
+                dataTbs.Add(new DataTbs() { Id = i.ToString(), Ptr = ptr, Size = source.Size });
+            }
         }
 
         var parameters = new SignParameters()
@@ -169,7 +181,7 @@ public partial class Uapki
             SignParams = new()
             {
                 SignatureFormat = SignatureFormatString(signFormat),
-                DetachedData = detachedData,
+                DetachedData = true,
                 IncludeCert = includeCert,
                 IncludeTime = true,
                 SignAlgo = algo.Oid(),
@@ -184,10 +196,13 @@ public partial class Uapki
         if (ret.ErrorCode != 0)
             throw new UapkiException(ret.ErrorCode);
 
+        var signatures = new byte[sources.Count][];
         foreach (var signature in ret.Result!.Signatures)
-        {
-            var file = files[Convert.ToInt32(signature.Id)] + ".p7s";
-            File.WriteAllBytes(file, signature.Bytes);
-        }
+            signatures[Convert.ToInt32(signature.Id)] = signature.Bytes;
+
+        if (signatures.Any(signature => signature is null))
+            throw new UapkiException(0x2001);
+
+        return signatures.ToList();
     }
 }
