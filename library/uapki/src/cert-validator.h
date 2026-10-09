@@ -457,15 +457,54 @@ public:
         Cert::CerItem** cerCrlSigner,
         JSON_Object* joResult = nullptr
     );
+    //  The one way a CRL gets into the cache (ADD_CRL, a download): signed by its issuer
+    //  (verifyCrlIssuer), and if it is for cerSubject - by the key that signed cerSubject
+    int addCrlToStore (
+        Crl::CrlStore& crlStore,
+        Cert::CerStore& cerStore,
+        const ByteArray* baEncoded,
+        const bool permanent,
+        const Cert::CerItem* cerSubject,
+        bool& isUnique,
+        Crl::CrlItem** crlItem
+    );
+    //  The CRL is signed by the certificate of its issuer (name, key id) having cRLSign
+    int verifyCrlIssuer (
+        Crl::CrlItem& crlItem,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+    );
+    //  The CRL is signed by the issuer of cerSubject (same name and key) having cRLSign
+    int verifyCrlSigner (
+        Crl::CrlItem& crlItem,
+        const Cert::CerItem* cerSubject,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+    );
     int processResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        const ByteArray* baSerialNumber,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
+        std::vector<Cert::CerItem*>* addedCerts = nullptr,
         JSON_Object* joResult = nullptr
     );
     int verifyResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult = nullptr
+    );
+    //  Public key from SubjectPublicKeyInfo: the content of subjectPublicKey without the unused-bits octet
+    static int publicKeyFromSpki (
+        const ByteArray* baSpki,
+        ByteArray** baPublicKey
+    );
+    //  RFC 6960, 4.2.2.2: the issuer itself or a certificate issued by it with id-kp-OCSPSigning
+    int authorizeOcspResponder (
+        Cert::CerItem* cerResponder,
+        Cert::CerItem* cerIssuer,
+        const uint64_t producedAt
     );
     int verifySignatureSignerInfo (
         const CertEntity certEntity,

@@ -72,7 +72,8 @@ static int parse_verify_options (
             ParsonHelper::jsonObjectGetString(joParams, "validationType")
         );
         if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
-        verifyOptions.onlyCrl = ParsonHelper::jsonObjectGetBoolean(joParams, "onlyCrl", false);
+        //  By default as in the library config (INIT: validationByCrl)
+        verifyOptions.onlyCrl = ParsonHelper::jsonObjectGetBoolean(joParams, "onlyCrl", verifyOptions.onlyCrl);
         verifyOptions.verifySignerInfoIndex = ParsonHelper::jsonObjectGetInt32(joParams, "verifySignerInfoIndex", -1);
         if (verifyOptions.verifySignerInfoIndex < 0) {
             verifyOptions.verifySignerInfoIndex = -1;
@@ -561,25 +562,18 @@ static int validate_by_ocsp (
 )
 {
     int ret = RET_OK;
-    Ocsp::OcspHelper ocsp_helper;
-    SmartBA sba_sn;
+    CertValidator::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
 
+    //  The response is checked by validateByOcsp(): CertID of this certificate, signature, responder authority
     DO(verifiedSignerInfo.validateByOcsp(
         certChainItem.getSubject(),
         certChainItem.getIssuer(),
-        certChainItem.getResultValidationByOcsp()
+        result_valbyocsp
     ));
-
-    DO(ocsp_helper.parseBasicOcspResponse(certChainItem.getResultValidationByOcsp().basicOcspResponse.get()));
-    DO(ocsp_helper.scanSingleResponses());
-    DO(ocsp_helper.getSerialNumberFromCertId(0, &sba_sn));  //  Work with one OCSP request that has one certificate
-    if (ba_cmp(sba_sn.get(), certChainItem.getSubject()->getSerialNumber()) == 0) {
-        CertValidator::ResultValidationByOcsp& result_valbyocsp = certChainItem.getResultValidationByOcsp();
-        result_valbyocsp.dataSource = CertValidator::DataSource::STORE;
-        result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
-        result_valbyocsp.statusSignature = SignatureVerifyStatus::VALID; // Previous check is passed
-        result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
-        result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
+    result_valbyocsp.dataSource = CertValidator::DataSource::STORE;
+    result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
+    if (result_valbyocsp.cerResponder) {
+        verifiedSignerInfo.getListAddedCerts().ocsp.push_back(result_valbyocsp.cerResponder);
     }
     certChainItem.setValidationType(Cert::ValidationType::OCSP);
 
@@ -724,7 +718,7 @@ static int verify_p7s (
             DO(verified_sinfo.verifyContentTimeStamp(*verify_sdoc.refContentHasher));
             DO(verified_sinfo.verifySignatureTimeStamp());
             DO(verified_sinfo.verifyCertificateRefs());
-            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.addedCrls));
+            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.sdataParser.getCrls()));
 
             verified_sinfo.validateSignFormat(verify_sdoc.validateTime, verify_sdoc.refContentHasher->isPresent());
             if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {

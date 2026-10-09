@@ -86,6 +86,8 @@ struct AttrTimeStamp {
     int parse (
         const ByteArray* baEncoded
     );
+    //  TSTInfo is the content the TSA signed (its hash is the messageDigest of the token)
+    int verifyTstInfo (void);
     int verifyDigest (
         ContentHasher& contentHasher,
         const bool isDigest = false
@@ -254,7 +256,7 @@ public:
     );
     int verifyArchiveTimeStamp (
         const std::vector<Cert::CerItem*>& certs,
-        const std::vector<Crl::CrlItem*>& crls
+        const VectorBA& crls
     );
     int verifyCertificateRefs (void);
     int verifyContentTimeStamp (
@@ -262,10 +264,6 @@ public:
     );
     int verifyMessageDigest (
         ContentHasher& contentHasher
-    );
-    int verifyOcspResponse (
-        Ocsp::OcspHelper& ocspClient,
-        ResultValidationByOcsp& resultValByOcsp
     );
     int verifySignatureTimeStamp (void);
     int verifySignedAttribute (void);

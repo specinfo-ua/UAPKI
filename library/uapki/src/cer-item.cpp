@@ -448,6 +448,46 @@ cleanup:
     return ret;
 }
 
+int CerItem::verifySignatureBy (
+        const ByteArray* baIssuerSpki
+) const
+{
+    int ret = RET_OK;
+    SmartBA sba_signvalue, sba_tbs;
+    string s_signalgo;
+
+    X509Tbs_t* x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), m_Encoded);
+    if (!x509_tbs) {
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+    if (!sba_tbs.set(ba_alloc_from_uint8(x509_tbs->tbsData.buf, x509_tbs->tbsData.size))) {
+        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    }
+
+    DO(Util::oidFromAsn1(&m_Cert->signatureAlgorithm.algorithm, s_signalgo));
+    if (
+        oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_signalgo.c_str()) ||
+        oid_is_parent(OID_DSTU4145_WITH_GOST3411, s_signalgo.c_str())
+    ) {
+        DO(Util::bitStringEncapOctetFromAsn1(&m_Cert->signature, &sba_signvalue));
+    }
+    else {
+        DO(asn_BITSTRING2ba(&m_Cert->signature, &sba_signvalue));
+    }
+
+    ret = Verify::verifySignature(
+        s_signalgo.c_str(),
+        sba_tbs.get(),
+        false,
+        baIssuerSpki,
+        sba_signvalue.get()
+    );
+
+cleanup:
+    asn_free(get_X509Tbs_desc(), x509_tbs);
+    return ret;
+}
+
 int CerItem::checkValidity (
         const uint64_t validateTime
 ) const

@@ -502,6 +502,52 @@ int OcspHelper::getSerialNumberFromCertId (
     return asn_INTEGER2ba(&resp->certID.serialNumber, baSerialNumber);
 }
 
+int OcspHelper::findSingleResponse (
+        const ByteArray* baIssuerName,
+        const ByteArray* baIssuerKeyId,
+        const ByteArray* baIssuerPublicKey,
+        const ByteArray* baSerialNumber,
+        size_t& index
+) const
+{
+    if (!m_BasicOcspResp || !baIssuerName || !baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
+
+    const ResponseData_t* tbs_respdata = &m_BasicOcspResp->tbsResponseData;
+    for (int i = 0; i < tbs_respdata->responses.list.count; i++) {
+        const CertID_t& cert_id = tbs_respdata->responses.list.array[i]->certID;
+        SmartBA sba_serialnumber, sba_namehash, sba_keyhash;
+        string s_hashalgo;
+
+        if (asn_INTEGER2ba(&cert_id.serialNumber, &sba_serialnumber) != RET_OK) continue;
+        if (ba_cmp(sba_serialnumber.get(), baSerialNumber) != 0) continue;
+
+        if (Util::oidFromAsn1(&cert_id.hashAlgorithm.algorithm, s_hashalgo) != RET_OK) continue;
+        const HashAlg hash_alg = hash_from_oid(s_hashalgo.c_str());
+        if (hash_alg == HASH_ALG_UNDEFINED) continue;
+
+        if (::hash(hash_alg, baIssuerName, &sba_namehash) != RET_OK) continue;
+        if (
+            ((size_t)cert_id.issuerNameHash.size != sba_namehash.size()) ||
+            (memcmp(cert_id.issuerNameHash.buf, sba_namehash.buf(), sba_namehash.size()) != 0)
+        ) continue;
+
+        //  The issuer key hash is the hash of its public key (RFC 6960); UAPKI itself sends the key id
+        bool key_matches = baIssuerKeyId &&
+            ((size_t)cert_id.issuerKeyHash.size == ba_get_len(baIssuerKeyId)) &&
+            (memcmp(cert_id.issuerKeyHash.buf, ba_get_buf_const(baIssuerKeyId), ba_get_len(baIssuerKeyId)) == 0);
+        if (!key_matches && baIssuerPublicKey && (::hash(hash_alg, baIssuerPublicKey, &sba_keyhash) == RET_OK)) {
+            key_matches = ((size_t)cert_id.issuerKeyHash.size == sba_keyhash.size()) &&
+                (memcmp(cert_id.issuerKeyHash.buf, sba_keyhash.buf(), sba_keyhash.size()) == 0);
+        }
+        if (!key_matches) continue;
+
+        index = (size_t)i;
+        return RET_OK;
+    }
+
+    return RET_UAPKI_OCSP_RESPONSE_INVALID;
+}
+
 int OcspHelper::scanSingleResponses (void)
 {
     int ret = RET_OK;

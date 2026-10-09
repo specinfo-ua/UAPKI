@@ -1,12 +1,12 @@
 # UAPKI. Programmer's Manual
 
-Languages: [Українська](UAPKI-PM-2.0.16.md) | **English**
+Languages: [Українська](UAPKI-PM-2.0.18.md) | **English**
 
 | | |
 | ------------------- | ---------- |
-| Library version     | 2.0.16     |
-| Document revision   | 2          |
-| Revision date       | 2026-07-16 |
+| Library version     | 2.0.18     |
+| Document revision   | 3          |
+| Revision date       | 2026-10-10 |
 
 The version number in the document title corresponds to the version of the uapki library it describes (`project(uapki VERSION ...)` in `library/uapki/CMakeLists.txt`; returned by the VERSION method). The document revision is incremented when the description is edited without a change of the library version.
 
@@ -16,6 +16,7 @@ The version number in the document title corresponds to the version of the uapki
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
+| 3       | 2026-10-10 | Library version 2.0.18: the ADD_CRL method adds a CRL only with the certificate of its issuer in the cache and a valid signature; "options.onlyCrl" of the VERIFY method defaults to "validationByCrl" |
 
 # General information
 
@@ -168,9 +169,9 @@ The method is intended for determining the library version. Input parameters: no
   "method": "VERSION",
   "result": {
     "name": "UAPKI",
-    "version": "2.0.16",
-    "uapkicVersion": "2.0.2",
-    "uapkifVersion": "2.0.2"
+    "version": "2.0.18",
+    "uapkicVersion": "2.0.3",
+    "uapkifVersion": "2.0.3"
   }
 }
 ```
@@ -1852,7 +1853,7 @@ During full signature validation, the following logic is used to determine the c
 | "CAdES-C",               | The CRL is used first; if the CRL cannot be obtained, the       |
 | "CAdES-XL",<br>"CAdES-A" | OCSP service is used                                            |
 
-To forbid the use of the OCSP service, the "options.onlyCrl" parameter must be set to true (default — false) or the library must be initialized with the "validationByCrl" parameter set to true. The "options.onlyCrl" parameter has higher priority than the (global) "validationByCrl".
+To forbid the use of the OCSP service, the "options.onlyCrl" parameter must be set to true (default — as "validationByCrl" at initialization) or the library must be initialized with the "validationByCrl" parameter set to true. The "options.onlyCrl" parameter has higher priority than the (global) "validationByCrl".
 
 Validating a RAW-format signature requires more parameters:
 
@@ -1902,7 +1903,7 @@ Validating a RAW-format signature requires more parameters:
 | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | validationType        | String  | Signature validation type:<br>"STRUCT", "CHAIN", "FULL".<br>Optional, defaults to "STRUCT"                                                                       |
 | verifySignerInfoIndex | Integer | Verify an individual user (the first index<br>equals 0). If the index equals -1, all<br>users are verified.<br>Optional, defaults to -1                          |
-| onlyCrl               | Boolean | Use CRLs exclusively. Optional, defaults to<br>false                                                                                                             |
+| onlyCrl               | Boolean | Use CRLs exclusively. Optional, defaults to<br>"validationByCrl" of the initialization                                                                           |
 
 Depending on the format of the signed data, the structure of the result field in the response differs.
 
@@ -3033,6 +3034,8 @@ The method is intended for forming an OCSP request and obtaining an OCSP respons
 The method is intended for adding a CRL (certificate revocation list) to the CRL cache. It returns the CRL identifier in the CRL cache. CRLs may be added to the CRL cache permanently (with storage on disk) or temporarily (only for the duration of the current session until DEINIT is executed or the application is restarted). If the permanent CRL cache is not initialized (the path to the corresponding directory was not specified when initializing the library), only temporary addition of CRLs is possible.
 
 The CRL must conform to the x.509 standard.
+
+A CRL is added only if the certificate cache holds the certificate of its issuer (with the key identifier given in the CRL and the cRLSign bit of keyUsage) and the signature of the CRL is valid. Otherwise an error is returned (for example CERT_NOT_FOUND or VERIFY_FAILED).
 
 ### Structure of the parameters field in the request
 

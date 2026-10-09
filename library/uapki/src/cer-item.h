@@ -351,6 +351,11 @@ public:
         const CerItem* cerIssuer,
         const bool force = false
     );
+    //  The signature of this certificate made by the key baIssuerSpki (no cached verdict):
+    //  RET_OK, RET_VERIFY_FAILED or an error
+    int verifySignatureBy (
+        const ByteArray* baIssuerSpki
+    ) const;
 
 public:
     int checkValidity (
