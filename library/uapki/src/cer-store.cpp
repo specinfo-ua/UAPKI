@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -187,26 +187,32 @@ int CerStore::addCerts (
 
     lock_guard<mutex> lock(m_Mutex);
     for (size_t i = 0; i < addedCerItems.size(); i++) {
-        if (!parsed[i]) continue;
         AddedCerItem& it = addedCerItems[i];
-        if (it.errorCode != RET_OK) continue;
+        if ((it.errorCode != RET_OK) || !it.cerItem) continue;
 
-        CerItem* added_ceritem = addItem(it.cerItem);
-        it.isUnique = (it.cerItem == added_ceritem);
-        if (it.isUnique) {
-            it.cerItem->setTrusted(trusted);
-            it.cerItem->markToRemove(!trusted && !permanent);
-        }
-        else {
+        if (parsed[i]) {
+            CerItem* added_ceritem = addItem(it.cerItem);
+            it.isUnique = (it.cerItem == added_ceritem);
+            if (it.isUnique) {
+                it.cerItem->setTrusted(trusted);
+                it.cerItem->markToRemove(!trusted && !permanent);
+                continue;
+            }
             //  Delete parsed CerItem and set existing CerItem
             delete it.cerItem;
             it.cerItem = added_ceritem;
+        }
+
+        //  The certificate is already in the store: a permanent addition keeps a temporary one
+        if (permanent) {
+            it.cerItem->markToRemove(false);
         }
     }
 
     if (permanent && !m_Path.empty()) {
         for (auto& it : addedCerItems) {
-            if ((it.errorCode == RET_OK) && it.isUnique) {
+            //  A new certificate or one that was temporary (not saved yet)
+            if ((it.errorCode == RET_OK) && it.cerItem && it.cerItem->getFileName().empty()) {
                 CerItem& cer_item = *it.cerItem;
                 if (cer_item.setFileName(cer_item.generateFileName())) {
                     const string s_fullpath = m_Path + cer_item.getFileName();
@@ -595,6 +601,26 @@ int CerStore::getIssuerCert (
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
         }
+        else if (ret == RET_OK) {
+            //  Several certificates with this key identifier (re-issued by another CA, or another key):
+            //  the issuer is the newest of those whose key signed the certificate
+            vector<CerItem*> cer_candidates;
+            getCertsByKeyId(cerSubject->getAuthorityKeyId(), cer_candidates);
+            if (cer_candidates.size() > 1) {
+                CerItem* cer_signer = nullptr;
+                for (const auto& it : cer_candidates) {
+                    if (
+                        (!cer_signer || (it->getNotBefore() > cer_signer->getNotBefore())) &&
+                        (cerSubject->verifySignatureBy(it->getSpki()) == RET_OK)
+                    ) {
+                        cer_signer = it;
+                    }
+                }
+                if (cer_signer) {
+                    *cerIssuer = cer_signer;
+                }
+            }
+        }
     }
     else {
         *cerIssuer = cerSubject;
@@ -685,34 +711,45 @@ CerItem* CerStore::addItem (
 )
 {
     for (auto& it : m_Items) {
-        int ret = ba_cmp(item->getKeyId(), it->getKeyId());
-        if (ret != 0) continue;
+        if (ba_cmp(item->getKeyId(), it->getKeyId()) != 0) continue;
 
-        ret = ba_cmp(item->getAuthorityKeyId(), it->getAuthorityKeyId());
-        if (ret != 0) continue;
-
-        DEBUG_OUTCON(
-        printf("CerStore::addItem(), cert is found. keyId: "); ba_print(stdout, it->getKeyId());
-        printf("  authorityKeyId: "); ba_print(stdout, it->getAuthorityKeyId());
-        printf("  notBefore: %08X", uint32_t(it->getNotBefore()));
-        );
-
-        if (item->getNotBefore() != it->getNotBefore()) {
-            DEBUG_OUTCON(puts("  detected duplicate keyId, reset flag for both"));
-            item->setUniqueKeyId(false);
-            if (it->isUniqueKeyId()) {
-                it->setUniqueKeyId(false);
-            }
-            continue;
+        //  The same certificate is only the same encoded certificate
+        if (ba_cmp(item->getEncoded(), it->getEncoded()) == 0) {
+            DEBUG_OUTCON(printf("CerStore::addItem(), cert is found. keyId: "); ba_print(stdout, it->getKeyId()));
+            return it;
         }
-        DEBUG_OUTCON(puts(""));
 
-        return it;
+        //  Another certificate with this keyId (any authorityKeyId and notBefore)
+        DEBUG_OUTCON(printf("CerStore::addItem(), detected duplicate keyId, reset flag for both. keyId: "); ba_print(stdout, it->getKeyId()));
+        item->setUniqueKeyId(false);
+        if (it->isUniqueKeyId()) {
+            it->setUniqueKeyId(false);
+        }
     }
 
     m_Items.push_back(item);
     DEBUG_OUTCON(printf("CerStore::addItem(), cert is unique - add it. keyId: "); ba_print(stdout, item->getKeyId()));
     return item;
+}
+
+void CerStore::getCertsByKeyId (
+        const ByteArray* baKeyId,
+        vector<CerItem*>& cerItems
+)
+{
+    if (m_Overlay) {
+        m_Overlay->getCertsByKeyId(baKeyId, cerItems);
+        m_Base->getCertsByKeyId(baKeyId, cerItems);
+        return;
+    }
+
+    lock_guard<mutex> lock(m_Mutex);
+
+    for (const auto& it : m_Items) {
+        if (it->equalKeyId(baKeyId)) {
+            cerItems.push_back(it);
+        }
+    }
 }
 
 int CerStore::loadDir (void)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -437,6 +437,7 @@ DEFINE_OID(OID_PKCS9_X509_CRL,              "1.2.840.113549.1.9.23.1");
 //-----------------------------------------------------------------------------------------
 //PKCS9/SMIME
 DEFINE_OID(OID_PKCS9_TST_INFO,              "1.2.840.113549.1.9.16.1.4");
+DEFINE_OID(OID_PKCS9_SIGNING_CERTIFICATE,   "1.2.840.113549.1.9.16.2.12");
 DEFINE_OID(OID_PKCS9_TIMESTAMP_TOKEN,       "1.2.840.113549.1.9.16.2.14");
 DEFINE_OID(OID_PKCS9_SIG_POLICY_ID,         "1.2.840.113549.1.9.16.2.15");
 DEFINE_OID(OID_PKCS9_COMMITMENT_TYPE,       "1.2.840.113549.1.9.16.2.16");

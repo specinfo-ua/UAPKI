@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -42,6 +42,7 @@
 #include "uapki-errors.h"
 #include "uapki-ns-util.h"
 #include "uapki-ns-verify.h"
+#include <algorithm>
 
 
 #define DEBUG_OUTCON(expression)
@@ -123,7 +124,8 @@ public:
         }
     }
     void setByCertChainItem (
-        const CertChainItem& certChainItem
+        const CertChainItem& certChainItem,
+        const uint64_t bestSignatureTime
     )
     {
         if (certChainItem.getVerifyStatus() == Cert::VerifyStatus::VALID) {
@@ -137,7 +139,13 @@ public:
             case Cert::ValidationType::OCSP:
                 //  An OCSP response with an invalid signature or from an unauthorized responder says nothing
                 if (certChainItem.getResultValidationByOcsp().statusSignature == SignatureVerifyStatus::VALID) {
-                    setByCertStatus(certChainItem.getResultValidationByOcsp().singleResponseInfo.certStatus);
+                    const Ocsp::OcspHelper::SingleResponseInfo& single_resp = certChainItem.getResultValidationByOcsp().singleResponseInfo;
+                    //  Revoked after the best signature time: the certificate was valid when signed (as by a CRL at that time)
+                    if (
+                        (single_resp.certStatus == UapkiNS::CertStatus::REVOKED) && (bestSignatureTime > 0) &&
+                        (single_resp.msRevocationTime > bestSignatureTime)
+                    ) break;
+                    setByCertStatus(single_resp.certStatus);
                 }
                 else {
                     setIndeterminate();
@@ -586,17 +594,20 @@ int VerifiedSignerInfo::certValuesToStore (void)
 
 void VerifiedSignerInfo::determineSignFormat (void)
 {
+    //  Each level by its own attributes: T - signature time-stamp (content time-stamp is optional),
+    //  C - complete references, XL - certificate and revocation values (baseline LT has them without references),
+    //  A - archive time-stamp (baseline LTA)
     if (m_SignatureFormat == SignatureFormat::CADES_BES) {
-        if (m_ContentTS.isPresent() && m_SignatureTS.isPresent()) {
+        if (m_SignatureTS.isPresent()) {
             m_SignatureFormat = SignatureFormat::CADES_T;
             if (m_CadesXlInfo.isPresentCadesC()) {
                 m_SignatureFormat = SignatureFormat::CADES_C;
-                if (m_CadesXlInfo.isPresentCadesXL()) {
-                    m_SignatureFormat = SignatureFormat::CADES_XL;
-                    if (m_ArchiveTS.isPresent()) {
-                        m_SignatureFormat = SignatureFormat::CADES_A;
-                    }
-                }
+            }
+            if (m_CadesXlInfo.isPresentCadesXL()) {
+                m_SignatureFormat = SignatureFormat::CADES_XL;
+            }
+            if (m_ArchiveTS.isPresent()) {
+                m_SignatureFormat = SignatureFormat::CADES_A;
             }
         }
     }
@@ -734,9 +745,10 @@ void VerifiedSignerInfo::validateSignFormat (
     //  Check mandatory elements
     bool sign_is_valid = collect_signatures.set(getStatusSignature());
     bool digest_is_valid = collect_digests.set(getStatusMessageDigest());
+    //  The signingTime attribute is a claim of the signer, not a proof of time
     if (sign_is_valid) {
         if ((contentIsPresent && digest_is_valid) || !contentIsPresent) {
-            m_BestSignatureTime = (m_SigningTime > 0) ? m_SigningTime : validateTime;
+            m_BestSignatureTime = validateTime;
         }
     }
 
@@ -747,33 +759,35 @@ void VerifiedSignerInfo::validateSignFormat (
 
     //  Check Content-Timestamp
     if (m_ContentTS.isPresent()) {
-        sign_is_valid = collect_signatures.set(m_ContentTS.statusSignature);
-        digest_is_valid = collect_digests.set(m_ContentTS.statusDigest);
-        if (sign_is_valid) {
-            if ((contentIsPresent && digest_is_valid) || !contentIsPresent) {
-                m_BestSignatureTime = m_ContentTS.msGenTime;
-            }
-        }
+        //  It proves the time of the data, not of the signature
+        collect_signatures.set(m_ContentTS.statusSignature);
+        collect_digests.set(m_ContentTS.statusDigest);
     }
 
-    //  Check Signature-Timestamp
+    //  Check Signature-Timestamp: the earliest proof of the signature time
+    bool time_proven = false;
     if (m_SignatureTS.isPresent()) {
         sign_is_valid = collect_signatures.set(m_SignatureTS.statusSignature);
         digest_is_valid = collect_digests.set(m_SignatureTS.statusDigest);
         if (sign_is_valid && digest_is_valid) {
             m_BestSignatureTime = m_SignatureTS.msGenTime;
+            time_proven = true;
         }
     }
 
-    //  Check attributes for CADES-C and higher
-    if (m_SignatureFormat >= SignatureFormat::CADES_C) {
+    //  Check complete-certificate-references (if present)
+    if (m_CadesXlInfo.isPresentCertRefs) {
         collect_digests.set(m_CadesXlInfo.statusCertRefs);
     }
 
     //  Check Archive-Timestamp
     if (m_ArchiveTS.isPresent()) {
-        collect_signatures.set(m_ArchiveTS.statusSignature);
-        collect_digests.set(m_ArchiveTS.statusDigest);
+        sign_is_valid = collect_signatures.set(m_ArchiveTS.statusSignature);
+        digest_is_valid = collect_digests.set(m_ArchiveTS.statusDigest);
+        //  A later proof, when the signature time-stamp gives none
+        if (!time_proven && sign_is_valid && digest_is_valid) {
+            m_BestSignatureTime = m_ArchiveTS.msGenTime;
+        }
     }
 
     m_IsValidSignatures = collect_signatures.isValid();
@@ -799,7 +813,7 @@ void VerifiedSignerInfo::validateStatusCerts (void)
     for (const auto& it : m_CertChainItems) {
         switch (it->getVerifyStatus()) {
         case Cert::VerifyStatus::VALID:
-            validation_status.setByCertChainItem(*it);
+            validation_status.setByCertChainItem(*it, m_BestSignatureTime);
             //  A chain proves nothing unless it ends in a trusted root
             if ((it->getCertEntity() == CertEntity::ROOT) && !it->isTrusted()) {
                 validation_status.setIndeterminate();
@@ -854,7 +868,7 @@ int VerifiedSignerInfo::verifyArchiveTimeStamp (
 {
     int ret = RET_OK;
 
-    if (m_SignatureFormat == SignatureFormat::CADES_A) {
+    if (m_ArchiveTS.isPresent()) {
         //  genTime and messageImprint of the token count only if TSTInfo is the one the TSA signed
         if (m_ArchiveTS.verifyTstInfo() != RET_OK) {
             m_LastError = RET_UAPKI_INVALID_DIGEST;
@@ -904,7 +918,7 @@ cleanup:
 
 int VerifiedSignerInfo::verifyCertificateRefs (void)
 {
-    if (m_SignatureFormat < SignatureFormat::CADES_C) return RET_OK;
+    if (!m_CadesXlInfo.isPresentCertRefs) return RET_OK;
 
     int ret = m_CadesXlInfo.verifyCertRefs(getCerStore());
     if (ret != RET_OK) {
@@ -1003,23 +1017,29 @@ int VerifiedSignerInfo::verifySignatureTimeStamp (void)
     return ret;
 }
 
-int VerifiedSignerInfo::verifySignedAttribute (void)
+int VerifiedSignerInfo::verifySignedAttribute (
+        const vector<Cert::CerItem*>& signatureCerts
+)
 {
     int ret = RET_OK;
 
-    //  Get signer certificate
+    //  CAdES is the signature with the signing certificate attribute, the SID may be of any type
     switch (m_SignerInfo.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
+    case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
         m_SignatureFormat = (m_StatusEssCert == DataVerifyStatus::INDETERMINATE)
             ? SignatureFormat::CADES_BES : SignatureFormat::CMS_SID_KEYID;
-        break;
-    case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        m_SignatureFormat = SignatureFormat::CMS_SID_KEYID;
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
+
+    //  Get signer certificate
     ret = getCerStore()->getCertBySID(m_SignerInfo.getSidEncoded(), &m_CerSigner);
+    if ((ret == RET_OK) && (m_SignerInfo.getSidType() == Pkcs7::SignerIdentifierType::SUBJECT_KEYID)) {
+        //  One key may have certificates of several CAs (re-issued on the same key)
+        selectSignerByKeyId(signatureCerts);
+    }
 
     //  Verify signed attributes
     if (ret == RET_OK) {
@@ -1051,6 +1071,45 @@ cleanup:
     return ret;
 }
 
+void VerifiedSignerInfo::selectSignerByKeyId (
+        const vector<Cert::CerItem*>& signatureCerts
+)
+{
+    vector<Cert::CerItem*> cer_candidates;
+    getCerStore()->getCertsByKeyId(m_CerSigner->getKeyId(), cer_candidates);
+    if (cer_candidates.size() < 2) return;
+
+    //  The certificate of the signing certificate attribute
+    if (!m_EssCerts.empty()) {
+        const UapkiNS::EssCertId& doc_esscertid = m_EssCerts[0];
+        for (const auto& it : cer_candidates) {
+            const UapkiNS::EssCertId* cer_esscertid = nullptr;
+            if (
+                (it->generateEssCertId(doc_esscertid.hashAlgorithm, &cer_esscertid) == RET_OK) &&
+                (ba_cmp(doc_esscertid.baHashValue, cer_esscertid->baHashValue) == 0)
+            ) {
+                m_CerSigner = it;
+                return;
+            }
+        }
+        return;
+    }
+
+    //  Without it: the newest of the certificates in the signature, else the newest one (getCertBySID)
+    Cert::CerItem* cer_signer = nullptr;
+    for (const auto& it : cer_candidates) {
+        if (
+            (std::find(signatureCerts.begin(), signatureCerts.end(), it) != signatureCerts.end()) &&
+            (!cer_signer || (it->getNotBefore() > cer_signer->getNotBefore()))
+        ) {
+            cer_signer = it;
+        }
+    }
+    if (cer_signer) {
+        m_CerSigner = cer_signer;
+    }
+}
+
 int VerifiedSignerInfo::verifySigningCertificateV2 (void)
 {
     if (m_StatusEssCert == DataVerifyStatus::NOT_PRESENT) return RET_OK;
@@ -1072,6 +1131,16 @@ int VerifiedSignerInfo::verifySigningCertificateV2 (void)
         }
         m_StatusEssCert = (ba_cmp(doc_esscertid.baHashValue, cer_esscertid->baHashValue) == 0)
             ? DataVerifyStatus::VALID : DataVerifyStatus::INVALID;
+        //  issuerSerial (optional) identifies the same certificate
+        if (
+            (m_StatusEssCert == DataVerifyStatus::VALID) &&
+            doc_esscertid.issuerSerial.baIssuer && doc_esscertid.issuerSerial.baSerialNumber && (
+                (ba_cmp(doc_esscertid.issuerSerial.baIssuer, cer_esscertid->issuerSerial.baIssuer) != 0) ||
+                (ba_cmp(doc_esscertid.issuerSerial.baSerialNumber, cer_esscertid->issuerSerial.baSerialNumber) != 0)
+            )
+        ) {
+            m_StatusEssCert = DataVerifyStatus::INVALID;
+        }
     }
     else {
         m_StatusEssCert = DataVerifyStatus::INDETERMINATE;
@@ -1099,6 +1168,17 @@ int VerifiedSignerInfo::parseSignedAttrs (
         }
         else if (it.type == string(OID_PKCS9_SIGNING_CERTIFICATE_V2)) {
             DO(AttributeHelper::decodeSigningCertificate(it.baValues, m_EssCerts));
+            m_StatusEssCert = DataVerifyStatus::INDETERMINATE;
+        }
+        else if (
+            (it.type == string(OID_PKCS9_SIGNING_CERTIFICATE)) &&
+            (m_StatusEssCert == DataVerifyStatus::NOT_PRESENT)
+        ) {
+            //  ESSCertID (RFC 2634) is ESSCertIDv2 without hashAlgorithm, the hash is SHA-1
+            DO(AttributeHelper::decodeSigningCertificate(it.baValues, m_EssCerts));
+            for (auto& it_esscertid : m_EssCerts) {
+                it_esscertid.hashAlgorithm.algorithm = string(OID_SHA1);
+            }
             m_StatusEssCert = DataVerifyStatus::INDETERMINATE;
         }
     }

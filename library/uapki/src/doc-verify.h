@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -271,8 +271,15 @@ public:
         ContentHasher& contentHasher
     );
     int verifySignatureTimeStamp (void);
-    int verifySignedAttribute (void);
+    //  signatureCerts - the certificates of the signature (a signer with the same key in other certificates)
+    int verifySignedAttribute (
+        const std::vector<Cert::CerItem*>& signatureCerts
+    );
     int verifySigningCertificateV2 (void);
+private:
+    void selectSignerByKeyId (
+        const std::vector<Cert::CerItem*>& signatureCerts
+    );
 
 public:
     const AttrTimeStamp& getArchiveTS (void) const {

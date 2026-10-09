@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -179,6 +179,7 @@ cleanup:
 static int result_certchainitem_valbyocsp_to_json (
         JSON_Object* joResult,
         const Doc::Verify::ResultValidationByOcsp& resultValByOcsp,
+        const uint64_t bestSignatureTime,
         string& statusValidation
 )
 {
@@ -204,9 +205,15 @@ static int result_certchainitem_valbyocsp_to_json (
         DO_JSON(json_object_set_string(joResult, "revocationTime", TimeUtil::mtimeToFtime(singleresp_info.msRevocationTime).c_str()));
     }
 
+    //  Revoked after the best signature time: valid when signed (as by a CRL at that time)
     statusValidation = verifyStatusToStr((
-        (resultValByOcsp.statusSignature == SignatureVerifyStatus::VALID) &&
-        (singleresp_info.certStatus == UapkiNS::CertStatus::GOOD)
+        (resultValByOcsp.statusSignature == SignatureVerifyStatus::VALID) && (
+            (singleresp_info.certStatus == UapkiNS::CertStatus::GOOD) || (
+                (singleresp_info.certStatus == UapkiNS::CertStatus::REVOKED) &&
+                (bestSignatureTime > 0) &&
+                (singleresp_info.msRevocationTime > bestSignatureTime)
+            )
+        )
     ) ? SignatureVerifyStatus::VALID : SignatureVerifyStatus::INVALID);
 
 cleanup:
@@ -216,7 +223,8 @@ cleanup:
 static int result_certchainitem_to_json (
         JSON_Object* joResult,
         const Doc::Verify::CertChainItem& certChainItem,
-        const Doc::Verify::VerifyOptions& verifyOptions
+        const Doc::Verify::VerifyOptions& verifyOptions,
+        const uint64_t bestSignatureTime
 )
 {
     (void)verifyOptions;
@@ -257,6 +265,7 @@ static int result_certchainitem_to_json (
             DO(result_certchainitem_valbyocsp_to_json(
                 json_object_get_object(joResult, "validateByOCSP"),
                 certChainItem.getResultValidationByOcsp(),
+                bestSignatureTime,
                 s_statusvalidation
             ));
             break;
@@ -457,7 +466,7 @@ static int result_verifyinfo_to_json (
         size_t idx = 0;
         for (const auto& it : verifyInfo.getCertChainItems()) {
             DO_JSON(json_array_append_value(ja_certchainitems, json_value_init_object()));
-            DO(result_certchainitem_to_json(json_array_get_object(ja_certchainitems, idx++), *it, verifyOptions));
+            DO(result_certchainitem_to_json(json_array_get_object(ja_certchainitems, idx++), *it, verifyOptions, verifyInfo.getBestSignatureTime()));
         }
     }
 
@@ -597,7 +606,18 @@ static int validate_certs (
         }
     }
     else if (verify_options.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL) {
-        switch (verifiedSignerInfo.getSignatureFormat()) {
+        //  By the revocation data the signature has: values (XL, baseline LT/LTA), references (C)
+        SignatureFormat sign_format = verifiedSignerInfo.getSignatureFormat();
+        if (verifiedSignerInfo.getCadesXlInfo().isPresentCadesXL()) {
+            sign_format = SignatureFormat::CADES_XL;
+        }
+        else if (verifiedSignerInfo.getCadesXlInfo().isPresentCadesC()) {
+            sign_format = SignatureFormat::CADES_C;
+        }
+        else if (sign_format > SignatureFormat::CADES_T) {
+            sign_format = SignatureFormat::CADES_T;
+        }
+        switch (sign_format) {
         case SignatureFormat::CMS_SID_KEYID:
         case SignatureFormat::CADES_BES:
         case SignatureFormat::CADES_T:
@@ -710,7 +730,7 @@ static int verify_p7s (
             (verifyOptions.verifySignerInfoIndex < 0) ||
             (verifyOptions.verifySignerInfoIndex == (int)idx)
         ) {
-            DO(verified_sinfo.verifySignedAttribute());
+            DO(verified_sinfo.verifySignedAttribute(verify_sdoc.addedCerts));
             DO(verified_sinfo.verifyMessageDigest(*verify_sdoc.refContentHasher));
             DO(verified_sinfo.verifySigningCertificateV2());
 
