@@ -28,7 +28,7 @@
 #ifndef UAPKIF_H
 #define UAPKIF_H
 
-#define UAPKIF_VERSION 2002
+#define UAPKIF_VERSION 2003
 
 #include "uapkif-export.h"
 #include "AccessDescription.h"

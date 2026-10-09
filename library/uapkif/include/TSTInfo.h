@@ -38,6 +38,7 @@
 #include "MessageImprint.h"
 #include "INTEGER.h"
 #include "GeneralizedTime.h"
+#include "BOOLEAN.h"
 #include "constr_SEQUENCE.h"
 
 #ifdef __cplusplus
@@ -57,6 +58,7 @@ typedef struct TSTInfo {
     INTEGER_t     serialNumber;
     GeneralizedTime_t     genTime;
     struct Accuracy    *accuracy    /* OPTIONAL */;
+    BOOLEAN_t    *ordering    /* DEFAULT FALSE */;
     INTEGER_t    *nonce    /* OPTIONAL */;
     struct GeneralName    *tsa    /* OPTIONAL */;
     struct Extensions    *extensions    /* OPTIONAL */;

@@ -36,7 +36,7 @@
 #include "rc-version.h"
 #else
  //  See uapki\CMakeLists.txt
-#define STR_FILEVERSION "2.0.17"
+#define STR_FILEVERSION "2.0.18"
 #endif
 
 
