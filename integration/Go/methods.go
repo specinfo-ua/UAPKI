@@ -270,6 +270,7 @@ func (s Source) params() map[string]any {
 // SignOptions is the "options" object of the SIGN method.
 type SignOptions struct {
 	IgnoreCertStatus bool `json:"ignoreCertStatus,omitempty"` // do not check the status of the signer certificate
+	CheckTrustedRoot bool `json:"checkTrustedRoot,omitempty"` // the chain of the signer must end in a trusted root (with the status check)
 }
 
 // SignDetached signs files or data in memory with the selected key in one call

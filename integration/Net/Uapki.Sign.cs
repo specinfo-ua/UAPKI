@@ -83,6 +83,8 @@ public partial class Uapki
     private class SignOptions
     {
         public bool IgnoreCertStatus { get; init; }
+        //  Sent only when true: the chain of the signer must end in a trusted root (SIGN options.checkTrustedRoot)
+        public bool? CheckTrustedRoot { get; init; }
     }
 
     private class SignParameters
@@ -109,7 +111,8 @@ public partial class Uapki
         };
     }
 
-    public List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false)
+    /// <param name="checkTrustedRoot">the chain of the signer certificate must end in a trusted root (with the certificate status check)</param>
+    public List<byte[]> Sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, bool detachedData, bool includeCert = true, bool ignoreCertStatus = false, bool isDigest = false, bool checkTrustedRoot = false)
     {
         var dataTbs = new List<DataTbs>();
 
@@ -127,7 +130,7 @@ public partial class Uapki
                 SignAlgo = algo.Oid(),
             },
             DataTbs = dataTbs,
-            Options = new() { IgnoreCertStatus = ignoreCertStatus }
+            Options = new() { IgnoreCertStatus = ignoreCertStatus, CheckTrustedRoot = checkTrustedRoot ? true : null }
         };
 
 
@@ -149,16 +152,16 @@ public partial class Uapki
     /// Detached signatures of files in one SIGN call; the library reads the files in blocks.
     /// Returns the signatures in the order of the files; nothing is written to disk
     /// </summary>
-    public List<byte[]> SignFilesDetached(string[] files, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false)
+    public List<byte[]> SignFilesDetached(string[] files, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false, bool checkTrustedRoot = false)
     {
-        return SignDetached(files.Select(file => new SignSource() { File = file }).ToList(), algo, signFormat, includeCert, ignoreCertStatus);
+        return SignDetached(files.Select(file => new SignSource() { File = file }).ToList(), algo, signFormat, includeCert, ignoreCertStatus, checkTrustedRoot);
     }
 
     /// <summary>
     /// Detached signatures of files or content in memory in one SIGN call.
     /// Returns the signatures in the order of the sources; nothing is written to disk
     /// </summary>
-    public List<byte[]> SignDetached(IReadOnlyList<SignSource> sources, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false)
+    public List<byte[]> SignDetached(IReadOnlyList<SignSource> sources, SignAlgo algo, SignatureFormat signFormat, bool includeCert = true, bool ignoreCertStatus = false, bool checkTrustedRoot = false)
     {
         var dataTbs = new List<DataTbs>();
         for (int i = 0; i < sources.Count; i++)
@@ -187,7 +190,7 @@ public partial class Uapki
                 SignAlgo = algo.Oid(),
             },
             DataTbs = dataTbs,
-            Options = new() { IgnoreCertStatus = ignoreCertStatus }
+            Options = new() { IgnoreCertStatus = ignoreCertStatus, CheckTrustedRoot = checkTrustedRoot ? true : null }
         };
 
         string sign_cmd = Request("SIGN", parameters, jsonCtx.SignParameters);

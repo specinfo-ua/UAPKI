@@ -63,6 +63,40 @@ using namespace std;
 static const char* DATA_TBS_B64 = "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==";
 static const char* OID_RSA_MECHANISM = "1.2.840.113549.1.1.1";
 static const char* OID_SHA256_WITH_RSA = "1.2.840.113549.1.1.11";
+static const char* OID_ECDSA_WITH_SHA256 = "1.2.840.10045.4.3.2";
+
+//  The issuer of the synthetic CRLs: ADD_CRL accepts a CRL only if it is signed by its issuer, whose
+//  certificate is in the store. A test root (ECDSA P-256, CN=UAPKI test CRL root, keyCertSign and cRLSign,
+//  valid until 2036-10-09) made once with OpenSSL; its key is in the PKCS#12 container below
+//  (password CRL_ISSUER_P12_PASSWORD). The certificate goes to the shared certificate base
+static const char* CRL_ISSUER_CERT_B64 =
+    "MIIBgDCCASagAwIBAgIUTfjxBzknZxwyzxXB4ZFXSufM5UwwCgYIKoZIzj0EAwIwHjEcMBoGA1UEAwwTVUFQS0kgdGVzdCBDUkwg"
+    "cm9vdDAeFw0yNjEwMDkyMDI5NDBaFw0zNjEwMDkyMDI5NDBaMB4xHDAaBgNVBAMME1VBUEtJIHRlc3QgQ1JMIHJvb3QwWTATBgcq"
+    "hkjOPQIBBggqhkjOPQMBBwNCAASChM+FDynYfaIkW9GOTZE105sv/NVyxf0MWjHONqFbeAhLt4f14DZXSC5VBq0xjsuAGVnAdD/E"
+    "ey3Ms4YFxKXKo0IwQDAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUjZCvCRkxet79HBdblK37PAe8"
+    "zTQwCgYIKoZIzj0EAwIDSAAwRQIgD//7/fVB/oZBfb2w9EmP1oupYRCDKsgmaAqYU5ZLFEcCIQD0eK9jmwizyQfrNDT3dfEppdUO"
+    "QNvQTM6qleFaUyGjYg==";
+static const char* CRL_ISSUER_P12_B64 =
+    "MIIESwIBAzCCBAEGCSqGSIb3DQEHAaCCA/IEggPuMIID6jCCAoIGCSqGSIb3DQEHBqCCAnMwggJvAgEAMIICaAYJKoZIhvcNAQcB"
+    "MFcGCSqGSIb3DQEFDTBKMCkGCSqGSIb3DQEFDDAcBAjgHAfeF8xz5QICCAAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEELV4"
+    "P2XsuahdVCt1ccdmLl6AggIAqBiSgvpK1FKKMWtJd/S/6D7Pd4q0BX1OFkCggtzcS55B85+3UrPGFCFgXSPu0S8chd/29L6VaXcj"
+    "IlBLIPnByChvkO0+bfJ4EQaaNasm1ouCfAxCl6qRjTb1fMRT9sAE/SCo6MkYCvvTbw4CtEbjPu5CJ+9zFzr7hG1xqKISoiRtFbNp"
+    "0p2TS/qYO8GFlGCQ2a0JdIzI0Ye+G9mkoVYxsGj+TelfW0WeygKlCS0pd8dkB/pIcbENLErtAHL5LRO7M1WC1vT6AJsLDpSHtX0o"
+    "0eFDC807Bq3BjHvULAsNOG0mt1IA+EL7GKk3ZZ63M677ClT/F4LNsCr17yTOw2Khmd097y+FK1umLCl1yASEBBoxZCLpSWq8hgJV"
+    "9XnY33nRp95E3NLsbQOcRNq3ndcF0qsunwIlbK/dAUIK+U9ggOX5fCDWSrYieFTzEV6Jg1gp4ipJgqDC8IDEIbUYHffZWlhuoLLI"
+    "fpI551JUDcXz1xB4anbHv8x3tmwl+mEDUkR+TiTHSn8fwiua5elIDORpTSGzYZ8XFepHIeLBH90Mmh68oMpgyQpJEXD+NQEJQ6Lf"
+    "gAbV+DcJawLp0z+5wZotm9E1aHK+6yeSkqN5c81ZK/dvp9APROXM4Z5ao4CK4yImvNbVLRNOsqC82oOTmNdBWhb+uyTx6STarqP4"
+    "yHaswIQwggFgBgkqhkiG9w0BBwGgggFRBIIBTTCCAUkwggFFBgsqhkiG9w0BDAoBAqCB7zCB7DBXBgkqhkiG9w0BBQ0wSjApBgkq"
+    "hkiG9w0BBQwwHAQIkQ/A9Sj0leICAggAMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBCOWZMmA44I1zRrlQ6y+OoCBIGQct0e"
+    "WH/dNQnskyuBktrTseTO2FR8Bi40N+xTPWRBfHnH9lnc8MMmkXBBPr79YWtkOFKULbzpdhGCsq1miTMNZ8/X6RpQDzpm0zcq7qC1"
+    "a0ihKAgHb9Bi/km/GB1Zf2Z+H8aMt3GE2HaSnTFafFPg3C8sNAs4R/b6l5xXDPrgR5gC0nc3UCdESSM77dARnoaOMUQwHQYJKoZI"
+    "hvcNAQkUMRAeDgBjAHIAbAByAG8AbwB0MCMGCSqGSIb3DQEJFTEWBBTKviwBhUJKXxUHLYJs8Exhi2unhzBBMDEwDQYJYIZIAWUD"
+    "BAIBBQAEIKvktDpCOeNk+d4gDh5kioq6oLPVKGnEpwWSr7YT8ljzBAjCTvaRZPpw+AICCAA=";
+static const char* CRL_ISSUER_P12_PASSWORD = "testpassword";
+static const char* CRL_ISSUER_NAME = "UAPKI test CRL root";
+static const uint8_t CRL_ISSUER_KEY_ID[20] = {
+    0x8D, 0x90, 0xAF, 0x09, 0x19, 0x31, 0x7A, 0xDE, 0xFD, 0x1C, 0x17, 0x5B, 0x94, 0xAD, 0xFB, 0x3C, 0x07, 0xBC, 0xCD, 0x34
+};
 static const int ERR_CONNECTION_ERROR = 0x1002;
 static const int ERR_NOT_INITIALIZED = 0x1009;
 static const int ERR_KEY_NOT_SELECTED = 0x100C;
@@ -374,6 +408,29 @@ static string base64_encode (const vector<uint8_t>& data)
     return rv;
 }
 
+static vector<uint8_t> base64_decode (const string& text)
+{
+    vector<uint8_t> rv;
+    uint32_t acc = 0;
+    int bits = 0;
+    for (const char c : text) {
+        int v;
+        if ((c >= 'A') && (c <= 'Z')) v = c - 'A';
+        else if ((c >= 'a') && (c <= 'z')) v = c - 'a' + 26;
+        else if ((c >= '0') && (c <= '9')) v = c - '0' + 52;
+        else if (c == '+') v = 62;
+        else if (c == '/') v = 63;
+        else continue;
+        acc = (acc << 6) | (uint32_t)v;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            rv.push_back((uint8_t)((acc >> bits) & 0xFF));
+        }
+    }
+    return rv;
+}
+
 //  Minimal DER writer, enough to build a CertificateList the library accepts
 struct Der {
     typedef vector<uint8_t> Bytes;
@@ -457,12 +514,16 @@ struct Der {
     }
 };  //  end struct Der
 
-//  A CRL v2 with the extensions the library requires (AuthorityKeyId, CRLNumber) and a dummy signature:
-//  it parses and is cached exactly like a real one, which is all the memory measurement needs
-static Der::Bytes synthetic_crl (const unsigned index, const unsigned countRevoked)
+//  Signs data by the key of the test CRL root (SIGN RAW in a session of its own)
+using CrlSigner = function<Der::Bytes(const Der::Bytes&)>;
+
+//  A CRL v2 of the test CRL root with the extensions the library requires (AuthorityKeyId, CRLNumber):
+//  each CRL is a segment of its own (issuingDistributionPoint), so the store keeps all of them as different
+//  CRLs of one issuer; signed by the root, as ADD_CRL requires
+static Der::Bytes synthetic_crl (const unsigned index, const unsigned countRevoked, const CrlSigner& sign)
 {
-    const Der::Bytes sign_algo = Der::sequence(Der::concat(Der::oid(OID_SHA256_WITH_RSA), Der::null()));
-    const Der::Bytes issuer = Der::sequence(Der::set(Der::sequence(Der::concat(Der::oid("2.5.4.3"), Der::utf8String("Synthetic CA " + to_string(index))))));
+    const Der::Bytes sign_algo = Der::sequence(Der::oid(OID_ECDSA_WITH_SHA256));
+    const Der::Bytes issuer = Der::sequence(Der::set(Der::sequence(Der::concat(Der::oid("2.5.4.3"), Der::utf8String(CRL_ISSUER_NAME)))));
 
     Der::Bytes revoked;
     for (unsigned i = 0; i < countRevoked; i++) {
@@ -471,17 +532,21 @@ static Der::Bytes synthetic_crl (const unsigned index, const unsigned countRevok
         revoked.insert(revoked.end(), seq.begin(), seq.end());
     }
 
-    Der::Bytes key_id(20, 0);
-    for (size_t i = 0; i < key_id.size(); i++) key_id[i] = (uint8_t)(index >> (8 * (i % 4)));
+    const Der::Bytes key_id(CRL_ISSUER_KEY_ID, CRL_ISSUER_KEY_ID + sizeof(CRL_ISSUER_KEY_ID));
     const Der::Bytes ext_akid = Der::sequence(Der::concat(Der::oid("2.5.29.35"), Der::octetString(Der::sequence(Der::tlv(0x80, key_id)))));
     const Der::Bytes ext_crlnumber = Der::sequence(Der::concat(Der::oid("2.5.29.20"), Der::octetString(Der::integer(index + 1))));
-    const Der::Bytes extensions = Der::explicit0(Der::sequence(Der::concat(ext_akid, ext_crlnumber)));
+    //  IssuingDistributionPoint { distributionPoint [0] { fullName [0] { uniformResourceIdentifier [6] } } }, critical
+    const string segment_uri = "http://synthetic.test/segment-" + to_string(index) + ".crl";
+    const Der::Bytes idp = Der::sequence(Der::explicit0(Der::explicit0(Der::tlv(0x86, Der::Bytes(segment_uri.begin(), segment_uri.end())))));
+    const Der::Bytes ext_idp = Der::sequence(Der::concat(Der::concat(Der::oid("2.5.29.28"), Der::tlv(0x01, Der::Bytes(1, 0xFF))), Der::octetString(idp)));
+    const Der::Bytes extensions = Der::explicit0(Der::sequence(Der::concat(Der::concat(ext_akid, ext_crlnumber), ext_idp)));
 
     Der::Bytes tbs;
     for (const Der::Bytes& part : { Der::integer(1), sign_algo, issuer, Der::utcTime("260101000000Z"), Der::utcTime("351231235959Z"), Der::sequence(revoked), extensions }) {
         tbs.insert(tbs.end(), part.begin(), part.end());
     }
-    return Der::sequence(Der::concat(Der::concat(Der::sequence(tbs), sign_algo), Der::bitString(Der::Bytes(256, 0x5A))));
+    const Der::Bytes tbs_seq = Der::sequence(tbs);
+    return Der::sequence(Der::concat(Der::concat(tbs_seq, sign_algo), Der::bitString(sign(tbs_seq))));
 }
 
 static bool write_file (const string& fileName, const vector<uint8_t>& data)
@@ -1251,8 +1316,9 @@ struct SharedMemorySetup {
 };  //  end struct SharedMemorySetup
 
 //  The shared certificate base holds every certificate of the test data except the signer certificate,
-//  which the tests add to sessions on purpose to show the session-private overlay
+//  which the tests add to sessions on purpose to show the session-private overlay, and the test CRL root
 static bool prepare_shared_memory_data (
+        UapkiSessionLoader& loader,
         const Options& options,
         const string& certSourceDir,
         SharedMemorySetup& setup
@@ -1276,17 +1342,49 @@ static bool prepare_shared_memory_data (
             return false;
         }
     }
+    if (!write_file(setup.certDir + "crl-root.cer", base64_decode(CRL_ISSUER_CERT_B64))) return false;
+
+    //  The key of the CRL root in a session of its own: SIGN RAW for every CRL
+    const string p12_file = options.workDir + "/crl-root.p12";
+    if (!write_file(p12_file, base64_decode(CRL_ISSUER_P12_B64))) return false;
+    UapkiSession session(loader);
+    Api api(loader, session.getHandle());
+    Checker checker;
+    Response resp;
+    if (!session.isCreated()
+        || !call_ok(api, request_init(true), resp, checker, "INIT")
+        || !call_ok(api, request_open(p12_file, CRL_ISSUER_P12_PASSWORD, "RO"), resp, checker, "OPEN")
+        || select_first_key(api, resp, checker).empty()) {
+        printf("Can't open the key of the test CRL root\n");
+        return false;
+    }
+    bool signed_ok = true;
+    const CrlSigner sign = [&](const Der::Bytes& tbs) {
+        const string request = string("{\"method\":\"SIGN\",\"parameters\":{"
+            "\"signParams\":{\"signatureFormat\":\"RAW\",\"signAlgo\":\"") + OID_ECDSA_WITH_SHA256 + "\"},"
+            "\"dataTbs\":[{\"id\":\"crl\",\"bytes\":\"" + base64_encode(tbs) + "\"}]}}";
+        Response sign_resp;
+        if (!call_ok(api, request, sign_resp, checker, "SIGN")) {
+            signed_ok = false;
+            return Der::Bytes();
+        }
+        return base64_decode(sign_resp.signatureBytes());
+    };
 
     for (unsigned i = 0; i < options.countCrls; i++) {
-        const Der::Bytes crl = synthetic_crl(i, options.countCrlEntries);
+        const Der::Bytes crl = synthetic_crl(i, options.countCrlEntries, sign);
         if (!write_file(setup.crlDir + "synthetic-" + to_string(i) + ".crl", crl)) return false;
         if (i < 4) setup.crlsB64.push_back(base64_encode(crl));
     }
     //  CRLs that are not in the directory: added and removed by concurrent writers
     for (unsigned i = 0; i < 4 * options.countSessions; i++) {
-        setup.extraCrlsB64.push_back(base64_encode(synthetic_crl(options.countCrls + i, 16)));
+        setup.extraCrlsB64.push_back(base64_encode(synthetic_crl(options.countCrls + i, 16, sign)));
     }
-    return true;
+    api.call(request_method("CLOSE"));
+    api.call(request_method("DEINIT"));
+    remove(p12_file.c_str());
+    if (!signed_ok) printf("Can't sign the synthetic CRLs\n");
+    return signed_ok;
 }
 
 static vector<string> list_dir (const string& dir)
@@ -1466,7 +1564,8 @@ static bool test_shared_memory_layers (
     string base_certid;
     if (call_ok(memory_api, request_method("LIST_CERTS"), resp, checker, "LIST_CERTS on shared memory")) {
         JSON_Array* ja_certids = json_object_get_array(resp.result, "certIds");
-        checker.check(json_array_get_count(ja_certids) == 5, "shared memory holds " + to_string(json_array_get_count(ja_certids)) + " certificates instead of 5");
+        //  The 5 certificates of the test data and the test CRL root
+        checker.check(json_array_get_count(ja_certids) == 6, "shared memory holds " + to_string(json_array_get_count(ja_certids)) + " certificates instead of 6");
         base_certid = ParsonHelper::jsonArrayGetString(ja_certids, 0);
     }
 
@@ -1608,8 +1707,13 @@ static bool test_shared_memory_gate (
                     break;
                 }
                 if (thr_resp.ok()) {
+                    //  All synthetic CRLs have one issuer (segments of the test CRL root): the CRL number tells them apart
+                    string crl_number = ParsonHelper::jsonObjectGetString(thr_resp.result, "crlNumber");
+                    for (char& c : crl_number) c = (char)toupper((unsigned char)c);
+                    char expected_number[16];
+                    snprintf(expected_number, sizeof(expected_number), "%02X", (unsigned)(idx + 1));
                     const bool same_crl = (ParsonHelper::jsonObjectGetUint32(thr_resp.result, "countRevokedCerts", 0) == options.countCrlEntries)
-                        && (ParsonHelper::jsonObjectGetString(json_object_get_object(thr_resp.result, "issuer"), "CN") == "Synthetic CA " + to_string(idx));
+                        && (crl_number == expected_number);
                     checker.check(same_crl, "CRL_INFO returned the wrong CRL");
                     count_reads++;
                 }
@@ -1696,7 +1800,7 @@ static bool test_shared_memory_gate (
     //  the CRLs used by the storm are the first ones of the directory and the certificate was removed again
     checker.check(list_crls_count(memory_api, checker, "LIST_CRLS") == options.countCrls, "CRL count changed after the storm");
     if (call_ok(memory_api, request_method("LIST_CERTS"), resp, checker, "LIST_CERTS")) {
-        checker.check(json_array_get_count(json_object_get_array(resp.result, "certIds")) == 5, "certificate count changed after the storm");
+        checker.check(json_array_get_count(json_object_get_array(resp.result, "certIds")) == 6, "certificate count changed after the storm");
     }
     memory_api.call(request_method("DEINIT"));
     checker.report("shared memory: readers in sessions vs deletions, re-loads and session restarts");
@@ -1806,7 +1910,8 @@ static bool test_shared_memory_concurrent_writers (
     writers.clear();
     checker.check(list_crls_count(memory_api, checker, "LIST_CRLS") == options.countCrls + count_writers * extras_per_writer, "CRL count after concurrent adds");
     if (call_ok(memory_api, request_method("LIST_CERTS"), resp, checker, "LIST_CERTS")) {
-        checker.check(json_array_get_count(json_object_get_array(resp.result, "certIds")) == 6, "the same certificate added by every writer must be stored once");
+        //  The 5 certificates of the test data, the test CRL root and the signer certificate
+        checker.check(json_array_get_count(json_object_get_array(resp.result, "certIds")) == 7, "the same certificate added by every writer must be stored once");
     }
 
     //  phase 2: every writer removes what it added (exclusive access, serialized with the readers)
@@ -1996,7 +2101,7 @@ int main (int argc, char* argv[])
 
     SharedMemorySetup shared_setup;
     const string cert_source_dir = cert_file.substr(0, cert_file.find_last_of("/\\") + 1);
-    if (!prepare_shared_memory_data(options, cert_source_dir, shared_setup)) {
+    if (!prepare_shared_memory_data(loader, options, cert_source_dir, shared_setup)) {
         return show_usage("Can't prepare the shared memory test data");
     }
 

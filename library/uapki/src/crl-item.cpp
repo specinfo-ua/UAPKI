@@ -401,8 +401,107 @@ string CrlItem::generateFileName (void) const
     default:          s_crltype = "-";       break;
     }
 
-    rv_s = s_authkeyid + s_crltype + s_crlnumber + string(CRL_EXT);
+    string s_segment;
+    if (m_Idp.present) {
+        //  FNV-1a of issuingDistributionPoint: stable between builds and platforms
+        uint32_t h = 2166136261u;
+        for (const unsigned char c : m_Idp.encoded) {
+            h = (h ^ c) * 16777619u;
+        }
+        static const char HEX[] = "0123456789ABCDEF";
+        for (int shift = 28; shift >= 0; shift -= 4) {
+            s_segment.push_back(HEX[(h >> shift) & 0x0F]);
+        }
+        s_segment.push_back('-');
+    }
+
+    rv_s = s_authkeyid + s_crltype + s_segment + s_crlnumber + string(CRL_EXT);
     return rv_s;
+}
+
+bool CrlItem::coversCert (
+        const Cert::CerItem* cerSubject
+) const
+{
+    if (!cerSubject) return false;
+    if (!m_Idp.present) return true;    //  A complete CRL of the issuer
+
+    if (m_Idp.indirectCrl || m_Idp.onlySomeReasons || m_Idp.onlyContainsAttributeCerts) return false;
+
+    const bool is_ca = cerSubject->getCertExtKeyUsage().isCa();
+    if (m_Idp.onlyContainsUserCerts && is_ca) return false;
+    if (m_Idp.onlyContainsCaCerts && !is_ca) return false;
+
+    if (m_Idp.nameRelativeToCrlIssuer) return false;
+    if (m_Idp.uris.empty()) return true;    //  No distributionPoint: the segment is only by the kind
+
+    //  One of the distribution points of the certificate is the one of this CRL
+    const vector<string>& cert_uris = (m_Type == Type::DELTA) ? cerSubject->getUris().deltaCrl : cerSubject->getUris().fullCrl;
+    for (const auto& it_crl : m_Idp.uris) {
+        for (const auto& it_cert : cert_uris) {
+            if (it_crl == it_cert) return true;
+        }
+    }
+    return false;
+}
+
+//  IssuingDistributionPoint ::= SEQUENCE {
+//      distributionPoint [0] DistributionPointName OPTIONAL, onlyContainsUserCerts [1] BOOLEAN DEFAULT FALSE,
+//      onlyContainsCACerts [2] BOOLEAN DEFAULT FALSE, onlySomeReasons [3] ReasonFlags OPTIONAL,
+//      indirectCRL [4] BOOLEAN DEFAULT FALSE, onlyContainsAttributeCerts [5] BOOLEAN DEFAULT FALSE }
+static int parse_idp (
+        const ByteArray* baEncoded,
+        CrlItem::IssuingDistributionPoint& idp
+)
+{
+    const uint8_t* buf = ba_get_buf_const(baEncoded);
+    size_t len = ba_get_len(baEncoded);
+    uint32_t tag = 0;
+    size_t hlen = 0, vlen = 0;
+
+    if (!buf || !Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen != len)) return RET_UAPKI_INVALID_STRUCT;
+    idp.present = true;
+    idp.encoded.assign((const char*)buf, len);
+    buf += hlen;
+    len = vlen;
+
+    while (len > 0) {
+        if (!Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (hlen + vlen > len)) return RET_UAPKI_INVALID_STRUCT;
+        const uint8_t* value = buf + hlen;
+        const bool is_true = (vlen == 1) && (value[0] != 0);
+        switch (tag) {
+        case 0xA0: {
+            DistributionPointName_t* dp_name = (DistributionPointName_t*)asn_decode_with_alloc(get_DistributionPointName_desc(), value, vlen);
+            if (!dp_name) return RET_UAPKI_INVALID_STRUCT;
+            if (dp_name->present == DistributionPointName_PR_fullName) {
+                for (int i = 0; i < dp_name->choice.fullName.list.count; i++) {
+                    const GeneralName_t* general_name = dp_name->choice.fullName.list.array[i];
+                    if ((general_name->present == GeneralName_PR_uniformResourceIdentifier) &&
+                        (general_name->choice.uniformResourceIdentifier.size > 0)) {
+                        idp.uris.push_back(string(
+                            (const char*)general_name->choice.uniformResourceIdentifier.buf,
+                            (size_t)general_name->choice.uniformResourceIdentifier.size
+                        ));
+                    }
+                }
+            }
+            else {
+                idp.nameRelativeToCrlIssuer = true;
+            }
+            asn_free(get_DistributionPointName_desc(), dp_name);
+            break;
+        }
+        case 0x81: idp.onlyContainsUserCerts = is_true; break;
+        case 0x82: idp.onlyContainsCaCerts = is_true; break;
+        case 0x83: idp.onlySomeReasons = true; break;
+        case 0x84: idp.indirectCrl = is_true; break;
+        case 0x85: idp.onlyContainsAttributeCerts = is_true; break;
+        default: return RET_UAPKI_INVALID_STRUCT;
+        }
+        buf += hlen + vlen;
+        len -= hlen + vlen;
+    }
+    return RET_OK;
 }
 
 int CrlItem::parsedRevokedCert (
@@ -550,7 +649,7 @@ const RevokedCertItem* findNearBefore (
                 if (it != rv_item) {
                     const uint64_t cur_date = it->getDate();
                     if ((validateTime > cur_date) && (cur_date > near_date)) {
-                        near_date = rv_item->getDate();
+                        near_date = cur_date;
                         rv_item = it;
                     }
                 }
@@ -576,20 +675,17 @@ bool findRevokedCert (
         if (revcert_before) {
             DEBUG_OUTCON(printf("revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n",
                 revcert_before->revocationDate, revcert_before->crlReason, revcert_before->invalidityDate));
+            //  RFC 5280: a certificate listed in a CRL is revoked, the reason code is optional;
+            //  removeFromCRL (delta CRL) takes it off the list
             switch (revcert_before->crlReason) {
             case UapkiNS::CrlReason::REMOVE_FROM_CRL:
                 status = UapkiNS::CertStatus::GOOD;
                 break;
-            case UapkiNS::CrlReason::UNDEFINED:
-                status = UapkiNS::CertStatus::UNDEFINED;
-                break;
-            case UapkiNS::CrlReason::UNSPECIFIED:
-                status = UapkiNS::CertStatus::UNKNOWN;
-                break;
             default:
                 status = UapkiNS::CertStatus::REVOKED;
                 revokedCertItem.revocationDate = revcert_before->revocationDate;
-                revokedCertItem.crlReason = revcert_before->crlReason;
+                revokedCertItem.crlReason = (revcert_before->crlReason == UapkiNS::CrlReason::UNDEFINED)
+                    ? UapkiNS::CrlReason::UNSPECIFIED : revcert_before->crlReason;
                 revokedCertItem.invalidityDate = revcert_before->invalidityDate;
                 break;
             }
@@ -680,6 +776,7 @@ int parseCrl (
     uint64_t this_update = 0, next_update = 0;
     vector<RevokedCertOffset> revcert_offsets;
     CrlItem::Uris uris;
+    CrlItem::IssuingDistributionPoint idp;
 
     TBSCertListAlt_t* tbs = (TBSCertListAlt_t*)asn_decode_with_alloc(get_TBSCertListAlt_desc(), x509_tbs->tbsData.buf, x509_tbs->tbsData.size);
     if (!tbs) {
@@ -699,6 +796,25 @@ int parseCrl (
     DO(Util::pkixTimeFromAsn1(&tbs->thisUpdate, this_update));
     DO(Util::pkixTimeFromAsn1(&tbs->nextUpdate, next_update));
 
+    if (
+        !tbs->crlExtensions && (tbs->revokedCertificates.size > 0) &&
+        (tbs->revokedCertificates.buf[0] == 0xA0)
+    ) {
+        //  No revoked certificates (revokedCertificates is OPTIONAL, RFC 5280): the ANY took [0] crlExtensions
+        uint32_t tag = 0;
+        size_t hlen = 0, vlen = 0;
+        if (
+            !Util::decodeAsn1Header(tbs->revokedCertificates.buf, (size_t)tbs->revokedCertificates.size, tag, hlen, vlen) ||
+            (hlen + vlen != (size_t)tbs->revokedCertificates.size)
+        ) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+        tbs->crlExtensions = (Extensions_t*)asn_decode_with_alloc(get_Extensions_desc(), tbs->revokedCertificates.buf + hlen, vlen);
+        if (!tbs->crlExtensions) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+        tbs->revokedCertificates.size = 0;
+    }
     DO(parseRevokedCerts(revcert_offsets, tbs->revokedCertificates.buf, (size_t)tbs->revokedCertificates.size));
 
     extns = tbs->crlExtensions;
@@ -725,6 +841,16 @@ int parseCrl (
     if ((ret != RET_OK) && (ret != RET_UAPKI_EXTENSION_NOT_PRESENT)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
+    {
+        SmartBA sba_idp;
+        ret = Util::extnValueFromExtensions(extns, OID_X509v3_CRLIssuingDistributionPoint, nullptr, &sba_idp);
+        if (ret == RET_OK) {
+            DO(parse_idp(sba_idp.get(), idp));
+        }
+        else if (ret != RET_UAPKI_EXTENSION_NOT_PRESENT) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+    }
     ret = RET_OK;
 
     crl_item = new CrlItem(crl_type);
@@ -742,6 +868,7 @@ int parseCrl (
         crl_item->m_DeltaCrl = sba_deltacrl.pop();
         crl_item->m_CrlIdentifier = sba_crlident.pop();
         crl_item->m_Uris = uris;
+        crl_item->m_Idp = idp;
 
         tbs = nullptr;
 

@@ -185,7 +185,8 @@ std::shared_ptr<std::mutex> CrlStore::getDownloadMutex(const ByteArray* authorit
 CrlItem* CrlStore::getCrl (
         const ByteArray* baAuthorityKeyId,
         const Type crlType,
-        const vector<string>& urisDeltaFromCert
+        const vector<string>& urisDeltaFromCert,
+        const Cert::CerItem* cerSubject
 )
 {
     lock_guard<mutex> lock(m_Mutex);
@@ -207,11 +208,16 @@ CrlItem* CrlStore::getCrl (
             printf("   actuality=%d, crlType=%d, count deltaCrl=%zu\n", (int)it->getActuality(), (int)it->getType(), it->getUris().deltaCrl.size());
             if (!it->getUris().deltaCrl.empty()) printf("   deltaCrl[0]='%s'\n", it->getUris().deltaCrl[0].c_str());
         );
+        //  By the key of the issuer, or (a delegated CRL signer) by the name of the issuer of the certificate
         if (
-            (ba_cmp(it->getAuthorityKeyId(), baAuthorityKeyId) == 0) &&
+            (
+                (ba_cmp(it->getAuthorityKeyId(), baAuthorityKeyId) == 0) ||
+                (cerSubject && (ba_cmp(it->getIssuer(), cerSubject->getIssuer()) == 0))
+            ) &&
             (it->getActuality() != CrlItem::Actuality::OBSOLETE) &&
             (it->getType() == crlType) &&
-            check_uris_delta(crlType, it->getUris().deltaCrl, urisDeltaFromCert)
+            check_uris_delta(crlType, it->getUris().deltaCrl, urisDeltaFromCert) &&
+            (!cerSubject || it->coversCert(cerSubject))
         ) {
             DEBUG_OUTCON(printf("   *** FOUND CrlItem: ThisUpdate %lld, NextUpdate %lld\n", it->getThisUpdate(), it->getNextUpdate()));
             crl_items.push_back(it);
@@ -221,8 +227,11 @@ CrlItem* CrlStore::getCrl (
     CrlItem* rv_item = find_last_available(crl_items);
     if (rv_item) {
         DEBUG_OUTCON(printf(" Last AVAILABLE CrlItem: ThisUpdate %lld, NextUpdate %lld\n", rv_item->getThisUpdate(), rv_item->getNextUpdate()));
+        //  Obsolete are only the older CRLs of the same segment
         for (auto& it : crl_items) {
-            it->setActuality((it == rv_item) ? CrlItem::Actuality::LAST_AVAILABLE : CrlItem::Actuality::OBSOLETE);
+            if (it->sameScope(*rv_item)) {
+                it->setActuality((it == rv_item) ? CrlItem::Actuality::LAST_AVAILABLE : CrlItem::Actuality::OBSOLETE);
+            }
         }
     }
     else {
@@ -341,7 +350,8 @@ CrlItem* CrlStore::addItem (
     for (auto& it : m_Items) {
         const bool authoritykeyid_is_equal = (ba_cmp(item->getAuthorityKeyId(), it->getAuthorityKeyId()) == 0);
         const bool crlnumber_is_equal = (ba_cmp(item->getCrlNumber(), it->getCrlNumber()) == 0);
-        if (authoritykeyid_is_equal && crlnumber_is_equal) {
+        //  Segments of one issuer may have the same numbers
+        if (authoritykeyid_is_equal && crlnumber_is_equal && item->sameScope(*it) && (item->getType() == it->getType())) {
             DEBUG_OUTCON(
                 printf("CrlStore::addItem(), CRL is found. AuthorityKeyId and CrlNumber: ");
                 ba_print(stdout, it->getAuthorityKeyId());
@@ -431,6 +441,10 @@ int CrlStore::removeObsolete (void)
     for (const auto& it : m_Items) {
         string s_id = Util::baToHex(it->getAuthorityKeyId());
         if (s_id.empty()) continue;
+        //  Each segment of a segmented CRL keeps its own freshest CRL
+        if (it->getIdp().present) {
+            s_id += "-" + it->getIdp().encoded;
+        }
 
         if (it->getType() == Type::FULL) {
             //  Check unique CRL-files

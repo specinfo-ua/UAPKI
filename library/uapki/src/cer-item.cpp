@@ -454,6 +454,35 @@ int CerItem::verify (
     // INDETERMINATE value while another request rechecks this certificate.
     VerifyStatus status = VerifyStatus::FAILED;
 
+    int ret = verifySignatureBy(cerIssuer->getSpki());
+    switch (ret) {
+    case RET_OK:
+        status = VerifyStatus::VALID;
+        break;
+    case RET_VERIFY_FAILED:
+        status = VerifyStatus::INVALID;
+        break;
+    default:
+        status = VerifyStatus::FAILED;
+        break;
+    }
+
+    if (status == VerifyStatus::VALID) {
+        if (!cerIssuer->keyUsageByBit(KeyUsage_keyCertSign)) {
+            status = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
+        }
+    }
+
+    m_VerifyIssuer = issuerKey;
+    m_VerifyError = ret;
+    m_VerifyStatus.store(status);
+    return ret;
+}
+
+int CerItem::verifySignatureBy (
+        const ByteArray* baIssuerSpki
+) const
+{
     int ret = RET_OK;
     SmartBA sba_signvalue, sba_tbs;
     string s_signalgo;
@@ -481,31 +510,11 @@ int CerItem::verify (
         s_signalgo.c_str(),
         sba_tbs.get(),
         false,
-        cerIssuer->getSpki(),
+        baIssuerSpki,
         sba_signvalue.get()
     );
-    switch (ret) {
-    case RET_OK:
-        status = VerifyStatus::VALID;
-        break;
-    case RET_VERIFY_FAILED:
-        status = VerifyStatus::INVALID;
-        break;
-    default:
-        status = VerifyStatus::FAILED;
-        break;
-    }
-
-    if (status == VerifyStatus::VALID) {
-        if (!cerIssuer->keyUsageByBit(KeyUsage_keyCertSign)) {
-            status = VerifyStatus::VALID_WITHOUT_KEYUSAGE;
-        }
-    }
 
 cleanup:
-    m_VerifyIssuer = issuerKey;
-    m_VerifyError = ret;
-    m_VerifyStatus.store(status);
     asn_free(get_X509Tbs_desc(), x509_tbs);
     return ret;
 }

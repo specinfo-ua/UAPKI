@@ -166,6 +166,16 @@ namespace Ocsp {
             const size_t index,
             ByteArray** baSerialNumber
         );
+        //  Index of the SingleResponse whose CertID is the certificate baSerialNumber of the issuer:
+        //  issuerNameHash = hash(baIssuerName), issuerKeyHash = baIssuerKeyId or hash(baIssuerPublicKey)
+        //  (RFC 6960, 4.1.1). RET_UAPKI_OCSP_RESPONSE_INVALID if there is none
+        int findSingleResponse (
+            const ByteArray* baIssuerName,
+            const ByteArray* baIssuerKeyId,
+            const ByteArray* baIssuerPublicKey,
+            const ByteArray* baSerialNumber,
+            size_t& index
+        ) const;
         int scanSingleResponses (void);
         int verifyTbsResponseData (
             const ByteArray* baSpki,

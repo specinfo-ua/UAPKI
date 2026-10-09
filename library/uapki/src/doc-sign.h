@@ -57,9 +57,13 @@ enum class TsAttr : uint32_t {
 
 struct Options {
     bool ignoreCertStatus;
+    //  The root of the signer (and TSA) chain must be trusted. Off by default: who to trust is
+    //  decided by the one who verifies the signature
+    bool checkTrustedRoot;
 
     Options (void)
         : ignoreCertStatus(false)
+        , checkTrustedRoot(false)
     {
     }
 

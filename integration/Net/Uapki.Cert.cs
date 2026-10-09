@@ -740,6 +740,8 @@ public partial class Uapki
         public string? CertId { get; init; }
         public string? ValidationType { get; init; }
         public string? ValidateTime { get; init; }
+        //  Sent only when true: the chain must end in a trusted root
+        public bool? CheckTrustedRoot { get; init; }
     }
 
     public class CrlShortInfo
@@ -823,7 +825,8 @@ public partial class Uapki
         public CertValidation? Result { get; init; }
     }
 
-    public CertValidation VerifyCert(byte[] cert, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
+    /// <param name="checkTrustedRoot">the chain of the certificate must end in a trusted root (error CERT_NOT_TRUSTED otherwise)</param>
+    public CertValidation VerifyCert(byte[] cert, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null, bool checkTrustedRoot = false)
     {
         string? validationType = null;
         if (validateTime != null || useCRL)
@@ -835,7 +838,8 @@ public partial class Uapki
         {
             Bytes = cert,
             ValidationType = validationType,
-            ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+            ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+            CheckTrustedRoot = checkTrustedRoot ? true : null
         };
 
         string verify_cert_cmd = Request("VERIFY_CERT", parameters, jsonCtx.CertVerifyParams);
@@ -850,7 +854,8 @@ public partial class Uapki
         return ret.Result;
     }
 
-    public CertValidation VerifyCert(string certId, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null)
+    /// <param name="checkTrustedRoot">the chain of the certificate must end in a trusted root (error CERT_NOT_TRUSTED otherwise)</param>
+    public CertValidation VerifyCert(string certId, bool useOCSP = false, bool useCRL = false, DateTime? validateTime = null, bool checkTrustedRoot = false)
     {
         string? validationType = null;
         if (validateTime is not null || useCRL)
@@ -862,7 +867,8 @@ public partial class Uapki
         {
             CertId = certId,
             ValidationType = validationType,
-            ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+            ValidateTime = validateTime?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+            CheckTrustedRoot = checkTrustedRoot ? true : null
         };
 
         string verify_cert_cmd = Request("VERIFY_CERT", parameters, jsonCtx.CertVerifyParams);

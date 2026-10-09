@@ -135,7 +135,13 @@ public:
                 setByCertStatus(certChainItem.getResultValidationByCrl().certStatus);
                 break;
             case Cert::ValidationType::OCSP:
-                setByCertStatus(certChainItem.getResultValidationByOcsp().singleResponseInfo.certStatus);
+                //  An OCSP response with an invalid signature or from an unauthorized responder says nothing
+                if (certChainItem.getResultValidationByOcsp().statusSignature == SignatureVerifyStatus::VALID) {
+                    setByCertStatus(certChainItem.getResultValidationByOcsp().singleResponseInfo.certStatus);
+                }
+                else {
+                    setIndeterminate();
+                }
                 break;
             default:
                 //  Other cases (ValidationType::NONE and ValidationType::CHAIN) - no action
@@ -212,21 +218,17 @@ int AttrTimeStamp::parse (
     return RET_OK;
 }
 
-int AttrTimeStamp::verifyDigest (
-        ContentHasher& contentHasher,
-        const bool isDigest
-)
+int AttrTimeStamp::verifyTstInfo (void)
 {
-    int ret = RET_OK;
     SmartBA sba_hashtstinfo;
-    HashAlg hash_alg = hash_from_oid(signerInfo.getDigestAlgorithm().algorithm.c_str());
+    const HashAlg hash_alg = hash_from_oid(signerInfo.getDigestAlgorithm().algorithm.c_str());
 
     if (hash_alg == HASH_ALG_UNDEFINED) {
         statusDigest = DigestVerifyStatus::FAILED;
         return RET_UAPKI_UNSUPPORTED_ALG;
     }
 
-    ret = ::hash(hash_alg, tsTokenParser.getSignedDataParser().getEncapContentInfo().baEncapContent, &sba_hashtstinfo);
+    const int ret = ::hash(hash_alg, tsTokenParser.getSignedDataParser().getEncapContentInfo().baEncapContent, &sba_hashtstinfo);
     if (ret != RET_OK) {
         statusDigest = DigestVerifyStatus::FAILED;
         return ret;
@@ -236,6 +238,18 @@ int AttrTimeStamp::verifyDigest (
         statusDigest = DigestVerifyStatus::INVALID;
         return RET_UAPKI_INVALID_DIGEST;
     }
+
+    return RET_OK;
+}
+
+int AttrTimeStamp::verifyDigest (
+        ContentHasher& contentHasher,
+        const bool isDigest
+)
+{
+    int ret = verifyTstInfo();
+    if (ret != RET_OK) return ret;
+    HashAlg hash_alg = HASH_ALG_UNDEFINED;
 
     if (!contentHasher.isPresent()) {
         statusDigest = DigestVerifyStatus::INDETERMINATE;
@@ -369,6 +383,7 @@ int CadesXlInfo::verifyCertRefs (
 
                 status = DigestVerifyStatus::INDETERMINATE;
                 expectedCertsByIssuerAndSN.push_back(ba_iasn);
+                idx++;
                 continue;
             }
             else {
@@ -443,7 +458,7 @@ int VerifiedSignerInfo::addCertChainItem (
 )
 {
     bool is_newitem;
-    return addCertChainItem(certEntity, cerItem, certChainItem, is_newitem);
+    return addChainItem(m_CertChainItems, certEntity, cerItem, certChainItem, is_newitem);
 }
 
 int VerifiedSignerInfo::addCertChainItem (
@@ -453,21 +468,36 @@ int VerifiedSignerInfo::addCertChainItem (
         bool& isNewItem
 )
 {
-    for (const auto& it : m_CertChainItems) {
-        if (ba_cmp(cerItem->getCertId(), it->getSubjectCertId()) == 0) {
-            *certChainItem = it;
-            isNewItem = false;
-            return RET_OK;
-        }
+    return addChainItem(m_CertChainItems, certEntity, cerItem, certChainItem, isNewItem);
+}
+
+int VerifiedSignerInfo::addSignerOfStatusToChain (
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem,
+        const uint64_t validateTime
+)
+{
+    //  The signer of a CRL or an OCSP response with its own chain: shown, its validity and the trust of
+    //  its root count, its own status is not checked
+    const size_t first_new = m_CertChainItems.size();
+    CertChainItem* added_cci = nullptr;
+    bool is_newitem = false;
+
+    int ret = addChainItem(m_CertChainItems, certEntity, cerItem, &added_cci, is_newitem);
+    if ((ret != RET_OK) || !is_newitem) return ret;
+
+    ret = CertValidator::buildCertChain(certEntity, cerItem, m_CertChainItems);
+    if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
+        m_LastError = ret;
+        ret = RET_OK;
     }
+    if (ret != RET_OK) return ret;
 
-    CertChainItem* certchain_item = new CertChainItem(certEntity, cerItem);
-    *certChainItem = certchain_item;
-    if (!certchain_item) return RET_UAPKI_GENERAL_ERROR;
-
-    isNewItem = true;
-    m_CertChainItems.push_back(certchain_item);
-    return certchain_item->decodeName();
+    added_cci->setValidationType(Cert::ValidationType::NONE);
+    for (size_t i = first_new; i < m_CertChainItems.size(); i++) {
+        (void)m_CertChainItems[i]->checkValidityTime(validateTime);
+    }
+    return RET_OK;
 }
 
 int VerifiedSignerInfo::addCrlCertsToChain (
@@ -480,21 +510,8 @@ int VerifiedSignerInfo::addCrlCertsToChain (
     }
 
     for (const auto& it_cer : crl_certs) {
-        CertChainItem* added_cci = nullptr;
-        bool is_newitem;
-        int ret = addCertChainItem(CertEntity::CRL, it_cer, &added_cci, is_newitem);
+        const int ret = addSignerOfStatusToChain(CertEntity::CRL, it_cer, validateTime);
         if (ret != RET_OK) return ret;
-
-        if (is_newitem) {
-            vector<Cert::CerItem*> chain_certs;
-            added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(Cert::ValidationType::NONE);
-            ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
-            if ((ret == RET_OK) && !chain_certs.empty()) {
-                //  Add one cert - issuer
-                added_cci->setIssuer(chain_certs[0]);
-            }
-        }
     }
     return RET_OK;
 }
@@ -509,21 +526,8 @@ int VerifiedSignerInfo::addOcspCertsToChain (
     }
 
     for (const auto& it_cer : ocsp_certs) {
-        CertChainItem* added_cci = nullptr;
-        bool is_newitem;
-        int ret = addCertChainItem(CertEntity::OCSP, it_cer, &added_cci, is_newitem);
+        const int ret = addSignerOfStatusToChain(CertEntity::OCSP, it_cer, validateTime);
         if (ret != RET_OK) return ret;
-
-        if (is_newitem) {
-            vector<Cert::CerItem*> chain_certs;
-            added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(Cert::ValidationType::NONE);
-            ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
-            if ((ret == RET_OK) && !chain_certs.empty()) {
-                //  Add one cert - issuer
-                added_cci->setIssuer(chain_certs[0]);
-            }
-        }
     }
     return RET_OK;
 }
@@ -533,32 +537,14 @@ int VerifiedSignerInfo::buildCertChain (void)
     int ret = RET_OK;
     vector<Cert::CerItem*> tsp_certs;
 
-    //  Build chain for Singer
+    //  Build chain for Signer
     if (m_CerSigner) {
-        const ByteArray* ba_authkeyid_notfound = nullptr;
-        vector<Cert::CerItem*> chain_certs;
-        CertChainItem* added_cci = nullptr;
-
-        (void)m_CerSigner->verify(nullptr);
-        DO(addCertChainItem(CertEntity::SIGNER, m_CerSigner, &added_cci));
-        ret = getCerStore()->getChainCerts(m_CerSigner, chain_certs, &ba_authkeyid_notfound);
-        if (ret == RET_OK) {
-            for (const auto& it : chain_certs) {
-                added_cci->setIssuer(it);
-                DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
-            }
-            added_cci->isSelfSigned() ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
-        }
-        else {
+        ret = CertValidator::buildCertChain(CertEntity::SIGNER, m_CerSigner, m_CertChainItems);
+        if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
             m_LastError = ret;
-            if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
-                DO(addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound));
-                for (const auto& it : chain_certs) {
-                    added_cci->setIssuer(it);
-                    DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
-                }
-            }
+            ret = RET_OK;
         }
+        DO(ret);
     }
 
     //  Build chain for TSP
@@ -566,29 +552,12 @@ int VerifiedSignerInfo::buildCertChain (void)
         (void)Cert::addCertIfUnique(tsp_certs, it);
     }
     for (const auto& it_tsp : tsp_certs) {
-        const ByteArray* ba_authkeyid_notfound = nullptr;
-        vector<Cert::CerItem*> chain_certs;
-        CertChainItem* added_cci = nullptr;
-
-        DO(addCertChainItem(CertEntity::TSP, it_tsp, &added_cci));
-        ret = getCerStore()->getChainCerts(it_tsp, chain_certs, &ba_authkeyid_notfound);
-        if (ret == RET_OK) {
-            for (const auto& it : chain_certs) {
-                added_cci->setIssuer(it);
-                DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
-            }
-            added_cci->isSelfSigned() ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
-        }
-        else {
+        ret = CertValidator::buildCertChain(CertEntity::TSP, it_tsp, m_CertChainItems);
+        if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
             m_LastError = ret;
-            if (ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) {
-                DO(addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound));
-                for (const auto& it : chain_certs) {
-                    added_cci->setIssuer(it);
-                    DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
-                }
-            }
+            ret = RET_OK;
         }
+        DO(ret);
     }
 
 cleanup:
@@ -679,33 +648,52 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
 
     for (const auto& it_ocspval : m_CadesXlInfo.revocationValuesParser.getOcspVals()) {
         Ocsp::OcspHelper ocsp_helper;
-        ret = ocsp_helper.parseBasicOcspResponse(it_ocspval);
-        if (ret == RET_OK) {
-            SmartBA sba_sn;
-            DO(ocsp_helper.scanSingleResponses());
-            DO(ocsp_helper.getSerialNumberFromCertId(0, &sba_sn));  //  Work with one OCSP request that has one certificate
+        if (ocsp_helper.parseBasicOcspResponse(it_ocspval) != RET_OK) continue;
 
-            for (const auto& it_cci : m_CertChainItems) {
-                if (ba_cmp(sba_sn.get(), it_cci->getSubject()->getSerialNumber()) == 0) {
-                    ResultValidationByOcsp& result_valbyocsp = it_cci->getResultValidationByOcsp();
-                    result_valbyocsp.dataSource = DataSource::SIGNATURE;
-                    result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
-                    (void)verifyOcspResponse(ocsp_helper, result_valbyocsp);
-                    result_valbyocsp.msProducedAt = ocsp_helper.getProducedAt();
-                    result_valbyocsp.singleResponseInfo = ocsp_helper.getSingleResponseInfo(0); //  Work with one OCSP request that has one certificate
-                    it_cci->setValidationType(Cert::ValidationType::OCSP);
-                    break;
-                }
+        for (const auto& it_cci : m_CertChainItems) {
+            Cert::CerItem* cer_issuer = it_cci->getIssuer();
+            if (
+                !cer_issuer ||
+                (it_cci->getCertEntity() == CertEntity::ROOT) ||
+                (it_cci->getValidationType() != Cert::ValidationType::UNDEFINED)
+            ) continue;
+
+            //  The response is about this certificate of this issuer (CertID), not just its serial number
+            SmartBA sba_publickey;
+            size_t idx = 0;
+            (void)publicKeyFromSpki(cer_issuer->getSpki(), &sba_publickey);
+            if (ocsp_helper.findSingleResponse(
+                cer_issuer->getSubject(),
+                cer_issuer->getKeyId(),
+                sba_publickey.get(),
+                it_cci->getSubject()->getSerialNumber(),
+                idx
+            ) != RET_OK) continue;
+
+            ResultValidationByOcsp& result_valbyocsp = it_cci->getResultValidationByOcsp();
+            result_valbyocsp.dataSource = DataSource::SIGNATURE;
+            result_valbyocsp.responseStatus = Ocsp::ResponseStatus::SUCCESSFUL;
+            //  Verdict in statusSignature: invalid or unauthorized responses do not count (validateStatusCerts)
+            ret = processResponseData(
+                ocsp_helper,
+                it_cci->getSubject()->getSerialNumber(),
+                cer_issuer,
+                result_valbyocsp,
+                &m_ListAddedCerts.fromSignature
+            );
+            if (ret != RET_OK) {
+                m_LastError = ret;
             }
+            if (result_valbyocsp.cerResponder) {
+                m_ListAddedCerts.ocsp.push_back(result_valbyocsp.cerResponder);
+            }
+            it_cci->setValidationType(Cert::ValidationType::OCSP);
+            break;
         }
     }
 
-    for (const auto& it_cci : m_CertChainItems) {
-        (void)it_cci->checkValidityTime(validateTime);
-    }
-
-cleanup:
-    return ret;
+    validateValidityTimeCerts(validateTime);
+    return RET_OK;
 }
 
 int VerifiedSignerInfo::tspCertToStore() {
@@ -812,14 +800,20 @@ void VerifiedSignerInfo::validateStatusCerts (void)
         switch (it->getVerifyStatus()) {
         case Cert::VerifyStatus::VALID:
             validation_status.setByCertChainItem(*it);
+            //  A chain proves nothing unless it ends in a trusted root
+            if ((it->getCertEntity() == CertEntity::ROOT) && !it->isTrusted()) {
+                validation_status.setIndeterminate();
+            }
             break;
+        case Cert::VerifyStatus::UNDEFINED:
+            //  Not verified: the issuer is missing (expected certificate)
         case Cert::VerifyStatus::INDETERMINATE:
         case Cert::VerifyStatus::VALID_WITHOUT_KEYUSAGE:
             validation_status.setIndeterminate();
             DEBUG_OUTCON(printf("VerifiedSignerInfo::validateStatusCerts() set INDETERMINATE for cert (CommonName: '%s')", it->getCommonName().c_str()));
             break;
         default:
-            //  Other cases (VerifyStatus::INVALID, VerifyStatus::FAILED and VerifyStatus::UNDEFINED)
+            //  Other cases (VerifyStatus::INVALID and VerifyStatus::FAILED)
             validation_status.setTotalFailed();
             break;
         }
@@ -845,18 +839,29 @@ void VerifiedSignerInfo::validateValidityTimeCerts (
 )
 {
     for (auto& it : m_CertChainItems) {
-        (void)it->checkValidityTime(validateTime);
+        //  The archive time-stamp is made later than the signature, by a TSA certificate of its own time
+        const bool is_archivetsa = m_ArchiveTS.isPresent() && (m_ArchiveTS.msGenTime > 0) &&
+            (it->getSubject() == m_ArchiveTS.cerSigner) &&
+            (it->getSubject() != m_ContentTS.cerSigner) && (it->getSubject() != m_SignatureTS.cerSigner);
+        (void)it->checkValidityTime(is_archivetsa ? m_ArchiveTS.msGenTime : validateTime);
     }
 }
 
 int VerifiedSignerInfo::verifyArchiveTimeStamp (
         const vector<Cert::CerItem*>& certs,
-        const vector<Crl::CrlItem*>& crls
+        const VectorBA& crls
 )
 {
     int ret = RET_OK;
 
     if (m_SignatureFormat == SignatureFormat::CADES_A) {
+        //  genTime and messageImprint of the token count only if TSTInfo is the one the TSA signed
+        if (m_ArchiveTS.verifyTstInfo() != RET_OK) {
+            m_LastError = RET_UAPKI_INVALID_DIGEST;
+            (void)verifyAttrTimestamp(m_ArchiveTS);
+            return RET_OK;
+        }
+
         DO(m_ArchiveTsHelper.init((const AlgorithmIdentifier*)&m_SignerInfo.getDigestAlgorithm()));
 
         DO(m_ArchiveTsHelper.setHashContent(m_SignerInfo.getContentType(), m_SignerInfo.getMessageDigest()));
@@ -867,7 +872,7 @@ int VerifiedSignerInfo::verifyArchiveTimeStamp (
             DO(m_ArchiveTsHelper.addCertificate(it->getEncoded()));
         }
         for (const auto& it : crls) {
-            DO(m_ArchiveTsHelper.addCrl(it->getEncoded()));
+            DO(m_ArchiveTsHelper.addCrl(it));
         }
         for (const auto& it : m_SignerInfo.getUnsignedAttrs()) {
             if (it.type != string(OID_ETSI_ARCHIVE_TIMESTAMP_V3)) {
@@ -976,57 +981,6 @@ int VerifiedSignerInfo::verifyMessageDigest (
     return RET_OK;
 }
 
-int VerifiedSignerInfo::verifyOcspResponse (
-        Ocsp::OcspHelper& ocspClient,
-        ResultValidationByOcsp& resultValByOcsp
-)
-{
-    int ret = RET_OK;
-    VectorBA vba_encodedcerts;
-    vector<Cert::CerItem*>& added_certs = (resultValByOcsp.dataSource == DataSource::SIGNATURE)
-        ? m_ListAddedCerts.fromSignature : m_ListAddedCerts.fromOnline;
-    vector<Cert::CerStore::AddedCerItem> added_ceritems;
-
-    DO(ocspClient.getCerts(vba_encodedcerts));
-    DO(getCerStore()->addCerts(
-        Cert::NOT_TRUSTED,
-        Cert::NOT_PERMANENT,
-        vba_encodedcerts,
-        added_ceritems
-    ));
-    for (const auto& it : added_ceritems) {
-        if (it.cerItem) {
-            added_certs.push_back(it.cerItem);
-        }
-    }
-
-    DO(ocspClient.getResponderId(resultValByOcsp.responderIdType, &resultValByOcsp.baResponderId));
-    if (resultValByOcsp.responderIdType == Ocsp::ResponderIdType::BY_NAME) {
-        ret = getCerStore()->getCertBySubject(resultValByOcsp.baResponderId.get(), &resultValByOcsp.cerResponder);
-    }
-    else {
-        //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        ret = getCerStore()->getCertByKeyId(resultValByOcsp.baResponderId.get(), &resultValByOcsp.cerResponder);
-    }
-
-    if (ret == RET_OK) {
-        m_ListAddedCerts.ocsp.push_back(resultValByOcsp.cerResponder);
-        ret = ocspClient.verifyTbsResponseData(resultValByOcsp.cerResponder->getSpki(), resultValByOcsp.statusSignature);
-        if (ret == RET_VERIFY_FAILED) {
-            ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED;
-        }
-        else if (ret != RET_OK) {
-            ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_ERROR;
-        }
-    }
-    else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
-        resultValByOcsp.statusSignature = UapkiNS::VerifyStatus::INDETERMINATE;
-    }
-
-cleanup:
-    return ret;
-}
-
 int VerifiedSignerInfo::verifySignatureTimeStamp (void)
 {
     int ret = RET_OK;
@@ -1100,6 +1054,12 @@ cleanup:
 int VerifiedSignerInfo::verifySigningCertificateV2 (void)
 {
     if (m_StatusEssCert == DataVerifyStatus::NOT_PRESENT) return RET_OK;
+
+    if (m_EssCerts.empty()) {
+        //  The attribute is present, but has no ESSCertIDv2
+        m_StatusEssCert = DataVerifyStatus::INVALID;
+        return RET_OK;
+    }
 
     if (m_CerSigner) {
         //  Process simple case: present only the one ESSCertIDv2
@@ -1202,10 +1162,8 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
 
     switch (signer_info.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        ret = getCerStore()->getCertBySID(signer_info.getSidEncoded(), &attrTS.cerSigner);
-        break;
     case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        ret = getCerStore()->getCertByKeyId(signer_info.getSidEncoded(), &attrTS.cerSigner);
+        ret = getCerStore()->getCertBySID(signer_info.getSidEncoded(), &attrTS.cerSigner);
         break;
     default:
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);

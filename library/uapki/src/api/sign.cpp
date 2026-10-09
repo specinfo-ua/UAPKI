@@ -104,6 +104,7 @@ static int parse_sign_params (
     ) {
         sharedData.options.ignoreCertStatus = ParsonHelper::jsonObjectGetBoolean(joSignOptions, "ignoreCertStatus", false);
     }
+    sharedData.options.checkTrustedRoot = ParsonHelper::jsonObjectGetBoolean(joSignOptions, "checkTrustedRoot", false);
 
     DO(sharedData.paramsBySignatureFormat());
 
@@ -313,6 +314,7 @@ int uapki_sign (
                         ((shared_data.signatureFormat == SignatureFormat::CADES_BES) && config.getOffline())
                     ) ? Cert::ValidationType::CRL : Cert::ValidationType::OCSP;
                 cert_validator.setValidationType(validation_type);
+                cert_validator.setCheckTrustedRoot(shared_data.options.checkTrustedRoot);
             }
             DO(cert_validator.getStatus(
                 shared_data.cerSigner,

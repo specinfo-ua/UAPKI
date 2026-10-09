@@ -136,7 +136,10 @@ int uapki_cert_status_by_ocsp (Context& context, JSON_Object* joParams, JSON_Obj
             CertValidator::ResultValidationByOcsp result_validation;
             DO(cert_validator.processResponseData(
                 ocsp_helper,
+                sba_serialnumber.get(),
+                cer_issuer,
                 result_validation,
+                nullptr,
                 joResult
             ));
 

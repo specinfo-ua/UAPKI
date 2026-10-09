@@ -1552,6 +1552,8 @@ Additional signature parameters can be specified in the options (the "options" f
 
 When the "ignoreCertStatus" parameter is set to true, the status of the key owner's certificate will not be checked during signing. This option is available only for the CAdES-BES and CAdES-T signature formats; for other signature formats it will be ignored.
 
+When the "checkTrustedRoot" parameter is set to true, the status check of the key owner's certificate (and of the time-stamp certificate) requires the certificate chain to end in a trusted root certificate, otherwise the error CERT_NOT_TRUSTED is returned. Default false: whether to trust is decided by the one who verifies the signature. If the status is not checked ("ignoreCertStatus"), the parameter has no effect.
+
 Signature formats are described in Appendix B. The signature format names "CAdES-LT" and "CAdES-LTA" are synonyms for "CAdES-XL" and "CAdES-A" respectively.
 
 ### Structure of the parameters field in the request
@@ -1601,6 +1603,7 @@ Signature formats are described in Appendix B. The signature format names "CAdES
 | **Field name**   | **Type** | **Description**                                                                        |
 | ---------------- | ------- | ------------------------------------------------------------------------------------- |
 | ignoreCertStatus | Boolean | Do not check the status of the key owner's certificate.<br>Optional, default false     |
+| checkTrustedRoot | Boolean | The chain of the key owner's certificate must end in<br>a trusted root certificate.<br>Optional, default false |
 
 ### Structure of the result field in the response
 
@@ -2022,6 +2025,15 @@ The method supports three types of validation of a CMS/CAdES-format signature (t
 
 3. "FULL" — full validation of the signature, includes item 2 and validation of the validity of all certificates in the chain at the moment the signature was created.
 
+For the "CHAIN" and "FULL" types the certificate chain must end in a trusted root certificate (the "trustedCerts" field at initialization or certificates marked as trusted in the certificate cache). If the root certificate is not trusted, or a certificate needed to build the chain is missing (the "expectedCerts" field), the status of the signature is "INDETERMINATE".
+
+Certificate status data (the same rules for VERIFY, VERIFY_CERT and the certificate check before signing):
+
+- An OCSP response counts only if it is about this certificate of this issuer (CertID: hashes of the issuer name and key, the serial number), its signature is valid and the responder is authorized (RFC 6960, 4.2.2.2): the issuer of the certificate itself or a delegated responder with the extended key usage id-kp-OCSPSigning whose certificate is issued by the same key that signed the certificate being checked. A response from a responder issued by another key (even of the same CA) does not count.
+- A CRL counts if its issuer (name) is the issuer of the certificate and its signer has a certificate with that name, the cRLSign bit of keyUsage and a path to the same root certificate (RFC 5280, 6.3.3 f). Delegated CRL signers (another key of the same CA) are supported.
+- Segmented CRLs (the issuingDistributionPoint extension): a CRL counts only if it covers the segment of the certificate - the distribution point of the CRL is one of the cRLDistributionPoints of the certificate (freshestCRL for a delta CRL), onlyContainsUserCerts/onlyContainsCACerts match the certificate. Indirect CRLs (indirectCRL) and CRLs for some revocation reasons only (onlySomeReasons) are not supported. The CRL cache keeps the freshest CRL of every segment.
+- A downloaded CRL gets into the cache only after its signer is checked (as in the ADD_CRL method).
+
 To simplify the analysis of the signature validation results, the result fields "validSignatures", "validDigests" and "bestSignatureTime" can be used. The "bestSignatureTime" field contains the best trusted signature time (in order of priority: "signingTime", "contentTS.genTime" and "signatureTS.genTime").
 
 When the "CHAIN" or "FULL" validation type is used, the "certificateChain" field stores information about the certificate chain (an array of CERT_CHAIN_INFO records).
@@ -2040,7 +2052,7 @@ During full signature validation, the following logic is used to determine the c
 | "CAdES-C",               | The CRL is used first; if the CRL cannot be obtained, the       |
 | "CAdES-XL",<br>"CAdES-A" | OCSP service is used                                            |
 
-To forbid the use of the OCSP service, the "options.onlyCrl" parameter must be set to true (default — false) or the library must be initialized with the "validationByCrl" parameter set to true. The "options.onlyCrl" parameter has higher priority than the (global) "validationByCrl".
+To forbid the use of the OCSP service, the "options.onlyCrl" parameter must be set to true (default — as "validationByCrl" at initialization) or the library must be initialized with the "validationByCrl" parameter set to true. The "options.onlyCrl" parameter has higher priority than the (global) "validationByCrl".
 
 Validating a RAW-format signature requires more parameters:
 
@@ -2090,7 +2102,7 @@ Validating a RAW-format signature requires more parameters:
 | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | validationType        | String  | Signature validation type:<br>"STRUCT", "CHAIN", "FULL".<br>Optional, defaults to "STRUCT"                                                                       |
 | verifySignerInfoIndex | Integer | Verify an individual user (the first index<br>equals 0). If the index equals -1, all<br>users are verified.<br>Optional, defaults to -1                          |
-| onlyCrl               | Boolean | Use CRLs exclusively. Optional, defaults to<br>false                                                                                                             |
+| onlyCrl               | Boolean | Use CRLs exclusively. Optional, defaults to<br>"validationByCrl" of the initialization                                                                           |
 
 Depending on the format of the signed data, the structure of the result field in the response differs.
 
@@ -2986,6 +2998,10 @@ The method is intended for certificate validation. If the certificate is self-si
 
 The validateTime field sets the time value at which the certificate's validity must be determined. If this field is present, validation is performed only by CRL. If this field is absent, the current time is used.
 
+When the checkTrustedRoot parameter is set to true, the certificate chain up to the root is built (as when verifying a signature); if it does not end in a trusted root certificate, the error CERT_NOT_TRUSTED is returned, and if a certificate is missing, the information to find it is in the "expectedCerts" field. Default false: only the certificate and its issuer are checked.
+
+OCSP responses and CRLs are checked by the rules given in the description of the VERIFY method.
+
 ### Structure of the parameters field in the request
 
 | **Field name** | **Type** | **Description**                                                                                                |
@@ -2994,6 +3010,7 @@ The validateTime field sets the time value at which the certificate's validity m
 | certId         | Base64  | Key identifier. Mutually exclusive with the<br>certificate field                                                    |
 | validationType | String  | Types of certificate validation by revocation status.<br>Has the following values: "CRL" and "OCSP".<br>Optional |
 | validateTime   | Time    | Validation time value. Optional                                                                          |
+| checkTrustedRoot | Boolean | The certificate chain must end in a trusted<br>root certificate. Optional, default false |
 
 ### Structure of the result field in the response
 
@@ -3221,6 +3238,8 @@ The method is intended for forming an OCSP request and obtaining an OCSP respons
 The method is intended for adding a CRL (certificate revocation list) to the CRL cache. It returns the CRL identifier in the CRL cache. CRLs may be added to the CRL cache permanently (with storage on disk) or temporarily (only for the duration of the current session until DEINIT is executed or the application is restarted). If the permanent CRL cache is not initialized (the path to the corresponding directory was not specified when initializing the library), only temporary addition of CRLs is possible.
 
 The CRL must conform to the x.509 standard.
+
+A CRL is added only if it is signed by its issuer: the certificate cache must hold a certificate with the key identifier of the CRL (authorityKeyIdentifier) and the name of the CRL issuer, with the cRLSign bit of keyUsage, and the signature of the CRL must be valid. Otherwise an error is returned (CERT_NOT_FOUND, VERIFY_FAILED, INVALID_KEY_USAGE or CRL_NOT_FOUND). The same checks apply to a CRL the library downloads itself. The CRL cache keeps the freshest CRL of every issuer, for segmented CRLs - of every segment.
 
 ### Structure of the parameters field in the request
 

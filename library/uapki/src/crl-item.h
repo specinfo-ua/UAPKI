@@ -102,6 +102,30 @@ public:
                     deltaCrl;
     };  //  end struct Uris
 
+    //  issuingDistributionPoint (RFC 5280, 5.2.5): the scope of a segmented (partitioned) CRL
+    struct IssuingDistributionPoint {
+        bool        present;
+        std::string encoded;            //  The extension value: a CRL of another segment differs in it
+        std::vector<std::string>
+                    uris;               //  distributionPoint fullName URIs
+        bool        nameRelativeToCrlIssuer;
+        bool        onlyContainsUserCerts;
+        bool        onlyContainsCaCerts;
+        bool        onlySomeReasons;
+        bool        indirectCrl;
+        bool        onlyContainsAttributeCerts;
+
+        IssuingDistributionPoint (void)
+            : present(false)
+            , nameRelativeToCrlIssuer(false)
+            , onlyContainsUserCerts(false)
+            , onlyContainsCaCerts(false)
+            , onlySomeReasons(false)
+            , indirectCrl(false)
+            , onlyContainsAttributeCerts(false)
+        {}
+    };  //  end struct IssuingDistributionPoint
+
 private:
     std::mutex  m_Mutex;
     std::string m_FileName;
@@ -126,6 +150,8 @@ private:
     const ByteArray*
                 m_DeltaCrl;
     Uris        m_Uris;
+    IssuingDistributionPoint
+                m_Idp;
     std::atomic<Cert::VerifyStatus>
                 m_StatusSign;
     int         m_VerifyError;
@@ -194,6 +220,21 @@ public:
     const Uris& getUris (void) const {
         return m_Uris;
     }
+    const IssuingDistributionPoint& getIdp (void) const {
+        return m_Idp;
+    }
+    //  The same issuer and the same segment (issuingDistributionPoint)
+    bool sameScope (
+        const CrlItem& other
+    ) const {
+        return (ba_cmp(m_AuthorityKeyId, other.m_AuthorityKeyId) == 0) && (m_Idp.encoded == other.m_Idp.encoded);
+    }
+    //  The CRL is for this certificate (RFC 5280, 6.3.3 b): the segment of the certificate (its
+    //  cRLDistributionPoints, or freshestCRL for a delta CRL) and the kind of the certificate.
+    //  Indirect CRLs and CRLs of some reasons only are not supported - they do not cover it
+    bool coversCert (
+        const Cert::CerItem* cerSubject
+    ) const;
     uint32_t getVersion (void) const {
         return m_Version;
     }

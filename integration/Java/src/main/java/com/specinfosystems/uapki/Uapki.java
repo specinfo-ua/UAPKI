@@ -368,7 +368,8 @@ public final class Uapki implements AutoCloseable {
                                    List<String> subjectKeyIdentifiers) { }
     private record CertRemoveParams(String certId, Boolean storage, Boolean permanent) { }
     private record CertsAddParams(List<byte[]> certificates, byte[] bundle, Boolean storage, Boolean permanent) { }
-    private record CertVerifyParams(byte[] bytes, String certId, String validationType, String validateTime) { }
+    //  checkTrustedRoot: null (not sent) or true
+    private record CertVerifyParams(byte[] bytes, String certId, String validationType, String validateTime, Boolean checkTrustedRoot) { }
     private record DigestParams(String hashAlgo, String signAlgo, byte[] bytes, String file) { }
     private record ContentToEncrypt(byte[] bytes, String encryptionAlgo) { }
     private record RecipientInfo(String certId, String kdfAlgo) { }
@@ -377,7 +378,8 @@ public final class Uapki implements AutoCloseable {
                               String signAlgo) { }
     //  ptr/size - data in the memory of this process: the address (hex, big-endian) and the size
     private record DataTbs(String id, byte[] bytes, String file, Boolean isDigest, String ptr, Long size) { }
-    private record SignOptions(boolean ignoreCertStatus) { }
+    //  checkTrustedRoot: null (not sent) or true
+    private record SignOptions(boolean ignoreCertStatus, Boolean checkTrustedRoot) { }
     private record SignParameters(SignFormat signParams, List<DataTbs> dataTbs, SignOptions options) { }
     private record SignedData(byte[] bytes, byte[] content, String file, String ptr, Long size) { }
     private record VerifyParams(SignedData signature, ValidationOptions options, Boolean returnContent) { }
@@ -1014,7 +1016,22 @@ public final class Uapki implements AutoCloseable {
      * @param validateTime час перевірки (перевірка за СВС) або null
      */
     public CertValidation verifyCert(byte[] cert, boolean useOcsp, boolean useCrl, Instant validateTime) {
-        CertVerifyParams parameters = new CertVerifyParams(cert, null, validationType(useOcsp, useCrl, validateTime), formatUtcTime(validateTime));
+        return verifyCert(cert, useOcsp, useCrl, validateTime, false);
+    }
+
+    /**
+     * Перевіряє сертифікат (метод VERIFY_CERT)
+     *
+     * @param cert             сертифікат
+     * @param useOcsp          перевірити статус за OCSP
+     * @param useCrl           перевірити статус за СВС
+     * @param validateTime     час перевірки (перевірка за СВС) або null
+     * @param checkTrustedRoot ланцюжок сертифіката має закінчуватися довіреним кореневим сертифікатом
+     *                         (інакше помилка CERT_NOT_TRUSTED)
+     */
+    public CertValidation verifyCert(byte[] cert, boolean useOcsp, boolean useCrl, Instant validateTime, boolean checkTrustedRoot) {
+        CertVerifyParams parameters = new CertVerifyParams(cert, null, validationType(useOcsp, useCrl, validateTime), formatUtcTime(validateTime),
+                checkTrustedRoot ? Boolean.TRUE : null);
         return callResult(requestObject("VERIFY_CERT", parameters), CertValidation.class);
     }
 
@@ -1034,7 +1051,22 @@ public final class Uapki implements AutoCloseable {
      * @param validateTime час перевірки (перевірка за СВС) або null
      */
     public CertValidation verifyCert(String certId, boolean useOcsp, boolean useCrl, Instant validateTime) {
-        CertVerifyParams parameters = new CertVerifyParams(null, certId, validationType(useOcsp, useCrl, validateTime), formatUtcTime(validateTime));
+        return verifyCert(certId, useOcsp, useCrl, validateTime, false);
+    }
+
+    /**
+     * Перевіряє сертифікат з кешу (метод VERIFY_CERT)
+     *
+     * @param certId           ідентифікатор сертифіката
+     * @param useOcsp          перевірити статус за OCSP
+     * @param useCrl           перевірити статус за СВС
+     * @param validateTime     час перевірки (перевірка за СВС) або null
+     * @param checkTrustedRoot ланцюжок сертифіката має закінчуватися довіреним кореневим сертифікатом
+     *                         (інакше помилка CERT_NOT_TRUSTED)
+     */
+    public CertValidation verifyCert(String certId, boolean useOcsp, boolean useCrl, Instant validateTime, boolean checkTrustedRoot) {
+        CertVerifyParams parameters = new CertVerifyParams(null, certId, validationType(useOcsp, useCrl, validateTime), formatUtcTime(validateTime),
+                checkTrustedRoot ? Boolean.TRUE : null);
         return callResult(requestObject("VERIFY_CERT", parameters), CertValidation.class);
     }
 
@@ -1397,11 +1429,30 @@ public final class Uapki implements AutoCloseable {
      */
     public List<byte[]> sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, boolean detachedData,
                              boolean includeCert, boolean ignoreCertStatus, boolean isDigest) {
+        return sign(datas, algo, signFormat, detachedData, includeCert, ignoreCertStatus, isDigest, false);
+    }
+
+    /**
+     * Підписує дані або геші вибраним ключем (метод SIGN)
+     *
+     * @param datas            дані (або геші, якщо isDigest)
+     * @param algo             алгоритм підпису
+     * @param signFormat       формат підпису
+     * @param detachedData     підпис без інкапсуляції даних
+     * @param includeCert      включити сертифікат підписувача
+     * @param ignoreCertStatus не перевіряти статус сертифіката підписувача
+     * @param isDigest         у datas знаходяться геші
+     * @param checkTrustedRoot під час перевірки статусу ланцюжок сертифіката підписувача має закінчуватися
+     *                         довіреним кореневим сертифікатом (інакше помилка CERT_NOT_TRUSTED)
+     * @return підписи
+     */
+    public List<byte[]> sign(List<byte[]> datas, SignAlgo algo, SignatureFormat signFormat, boolean detachedData,
+                             boolean includeCert, boolean ignoreCertStatus, boolean isDigest, boolean checkTrustedRoot) {
         List<DataTbs> dataTbs = new ArrayList<>();
         for (int i = 0; i < datas.size(); i++)
             dataTbs.add(new DataTbs(Integer.toString(i), datas.get(i), null, isDigest, null, null));
 
-        SignaturesList ret = callSign(dataTbs, algo, signFormat, detachedData, includeCert, ignoreCertStatus);
+        SignaturesList ret = callSign(dataTbs, algo, signFormat, detachedData, includeCert, ignoreCertStatus, checkTrustedRoot);
 
         List<byte[]> signatures = new ArrayList<>();
         for (Signature signature : ret.signatures())
@@ -1410,11 +1461,11 @@ public final class Uapki implements AutoCloseable {
     }
 
     private SignaturesList callSign(List<DataTbs> dataTbs, SignAlgo algo, SignatureFormat signFormat, boolean detachedData,
-                                    boolean includeCert, boolean ignoreCertStatus) {
+                                    boolean includeCert, boolean ignoreCertStatus, boolean checkTrustedRoot) {
         SignParameters parameters = new SignParameters(
                 new SignFormat(signFormat.value(), detachedData, includeCert, true, algo.oid()),
                 dataTbs,
-                new SignOptions(ignoreCertStatus));
+                new SignOptions(ignoreCertStatus, checkTrustedRoot ? Boolean.TRUE : null));
 
         SignaturesList ret = call(requestObject("SIGN", parameters), SignaturesList.class);
         if (ret == null || ret.signatures() == null)
@@ -1438,10 +1489,20 @@ public final class Uapki implements AutoCloseable {
      */
     public List<byte[]> signFilesDetached(String[] files, SignAlgo algo, SignatureFormat signFormat,
                                           boolean includeCert, boolean ignoreCertStatus) {
+        return signFilesDetached(files, algo, signFormat, includeCert, ignoreCertStatus, false);
+    }
+
+    /**
+     * Підписує файли вибраним ключем без інкапсуляції даних (метод SIGN)
+     *
+     * @see #signDetached(List, SignAlgo, SignatureFormat, boolean, boolean, boolean)
+     */
+    public List<byte[]> signFilesDetached(String[] files, SignAlgo algo, SignatureFormat signFormat,
+                                          boolean includeCert, boolean ignoreCertStatus, boolean checkTrustedRoot) {
         List<SignSource> sources = new ArrayList<>();
         for (String file : files)
             sources.add(SignSource.ofFile(file));
-        return signDetached(sources, algo, signFormat, includeCert, ignoreCertStatus);
+        return signDetached(sources, algo, signFormat, includeCert, ignoreCertStatus, checkTrustedRoot);
     }
 
     /**
@@ -1459,6 +1520,24 @@ public final class Uapki implements AutoCloseable {
      */
     public List<byte[]> signDetached(List<SignSource> sources, SignAlgo algo, SignatureFormat signFormat,
                                      boolean includeCert, boolean ignoreCertStatus) {
+        return signDetached(sources, algo, signFormat, includeCert, ignoreCertStatus, false);
+    }
+
+    /**
+     * Підписує файли або дані в пам'яті вибраним ключем без інкапсуляції даних, одним викликом SIGN
+     *
+     * @param sources          файли або дані в пам'яті ({@link SignSource})
+     * @param algo             алгоритм підпису
+     * @param signFormat       формат підпису
+     * @param includeCert      включити сертифікат підписувача
+     * @param ignoreCertStatus не перевіряти статус сертифіката підписувача
+     * @param checkTrustedRoot під час перевірки статусу ланцюжок сертифіката підписувача має закінчуватися
+     *                         довіреним кореневим сертифікатом (інакше помилка CERT_NOT_TRUSTED)
+     * @return підписи в порядку sources
+     * @see #signDetached(List, SignAlgo, SignatureFormat, boolean, boolean)
+     */
+    public List<byte[]> signDetached(List<SignSource> sources, SignAlgo algo, SignatureFormat signFormat,
+                                     boolean includeCert, boolean ignoreCertStatus, boolean checkTrustedRoot) {
         List<DataTbs> dataTbs = new ArrayList<>();
         for (int i = 0; i < sources.size(); i++) {
             SignSource source = sources.get(i);
@@ -1468,7 +1547,7 @@ public final class Uapki implements AutoCloseable {
                 dataTbs.add(new DataTbs(Integer.toString(i), null, null, null, SignSource.hexAddress(source.ptr()), source.size()));
         }
 
-        SignaturesList ret = callSign(dataTbs, algo, signFormat, true, includeCert, ignoreCertStatus);
+        SignaturesList ret = callSign(dataTbs, algo, signFormat, true, includeCert, ignoreCertStatus, checkTrustedRoot);
 
         byte[][] signatures = new byte[sources.size()][];
         for (Signature signature : ret.signatures())

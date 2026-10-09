@@ -67,10 +67,13 @@ public:
     int getCount (
         size_t& count
     );
+    //  The newest CRL of the issuer (authority key id) for the certificate cerSubject: of its
+    //  segment if the CRLs are segmented (see CrlItem::coversCert)
     CrlItem* getCrl (
         const ByteArray* baAuthorityKeyId,
         const Type crlType,
-        const std::vector<std::string>& urisDelta
+        const std::vector<std::string>& urisDelta,
+        const Cert::CerItem* cerSubject = nullptr
     );
     int getCrlByCrlId (
         const ByteArray* baCrlId,

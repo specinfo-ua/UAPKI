@@ -253,6 +253,7 @@ CertValidator::CertValidator (void)
     , m_CerStore(nullptr)
     , m_CrlStore(nullptr)
     , m_ValidationType(Cert::ValidationType::UNDEFINED)
+    , m_CheckTrustedRoot(false)
 {
 }
 
@@ -281,6 +282,7 @@ bool CertValidator::init (
     m_CerStore = iCertValidator.getCerStore();
     m_CrlStore = iCertValidator.getCrlStore();
     m_ValidationType = iCertValidator.getValidationType();
+    m_CheckTrustedRoot = iCertValidator.getCheckTrustedRoot();
 
     return (m_LibConfig && m_CerStore && m_CrlStore);
 }
@@ -294,6 +296,7 @@ bool CertValidator::init (
         m_CerStore = iCertValidator->getCerStore();
         m_CrlStore = iCertValidator->getCrlStore();
         m_ValidationType = iCertValidator->getValidationType();
+        m_CheckTrustedRoot = iCertValidator->getCheckTrustedRoot();
     }
 
     return (m_LibConfig && m_CerStore && m_CrlStore);
@@ -319,6 +322,82 @@ void CertValidator::setValidationType (
     m_ValidationType = validationType;
 }
 
+void CertValidator::setCheckTrustedRoot (
+        const bool checkTrustedRoot
+)
+{
+    m_CheckTrustedRoot = checkTrustedRoot;
+}
+
+int CertValidator::addChainItem (
+        vector<CertChainItem*>& chainItems,
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem,
+        CertChainItem** chainItem,
+        bool& isNewItem
+)
+{
+    for (const auto& it : chainItems) {
+        if (cerItem->equalCertId(it->getSubjectCertId())) {
+            *chainItem = it;
+            isNewItem = false;
+            return RET_OK;
+        }
+    }
+
+    CertChainItem* new_item = new CertChainItem(certEntity, cerItem);
+    *chainItem = new_item;
+    if (!new_item) return RET_UAPKI_GENERAL_ERROR;
+
+    isNewItem = true;
+    chainItems.push_back(new_item);
+    return new_item->decodeName();
+}
+
+int CertValidator::buildCertChain (
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem,
+        vector<CertChainItem*>& chainItems,
+        CertChainItem** subjectItem
+)
+{
+    if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    const ByteArray* ba_authkeyid_notfound = nullptr;
+    vector<Cert::CerItem*> chain_certs;
+    CertChainItem* added_cci = nullptr;
+    bool is_newitem = false;
+
+    ret = addChainItem(chainItems, certEntity, cerItem, &added_cci, is_newitem);
+    if (ret != RET_OK) return ret;
+    if (subjectItem) {
+        *subjectItem = added_cci;
+    }
+
+    //  Issuers by the authority key id, up to a self-signed certificate. Each link verifies the signature
+    //  of its issuer; whether the root is trusted is decided by the caller (checkTrustedRoot, VERIFY)
+    const int ret_chain = m_CerStore->getChainCerts(cerItem, chain_certs, &ba_authkeyid_notfound);
+    if ((ret_chain != RET_OK) && (ret_chain != RET_UAPKI_CERT_ISSUER_NOT_FOUND)) return ret_chain;
+
+    for (const auto& it : chain_certs) {
+        added_cci->setIssuer(it);
+        ret = addChainItem(chainItems, CertEntity::INTERMEDIATE, it, &added_cci, is_newitem);
+        if (ret != RET_OK) return ret;
+    }
+
+    if (ret_chain == RET_OK) {
+        if (added_cci->isSelfSigned()) {
+            added_cci->setRoot();
+        }
+        return RET_OK;
+    }
+
+    //  The issuer of the last certificate is missing: it stays unverified, the issuer is expected
+    ret = addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound);
+    return (ret == RET_OK) ? RET_UAPKI_CERT_ISSUER_NOT_FOUND : ret;
+}
+
 int CertValidator::getStatus (
         Cert::CerItem* cerItem,
         const CertEntity certEntity,
@@ -327,72 +406,65 @@ int CertValidator::getStatus (
 {
     if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
 
-    CertChainItem* entity = new CertChainItem(certEntity, cerItem);
-    if (!entity) return RET_UAPKI_GENERAL_ERROR;
-
-    m_CertChain.push_back(entity);
-    if (m_ValidationType <= Cert::ValidationType::NONE) return RET_OK;
-
-    int ret = RET_OK;
-    vector<Cert::CerItem*> chain_certs, obtained_certs;
-    size_t idx_root;
-    CertEntity expected_certentity = CertEntity::UNDEFINED;
-
-    //  build a chain of certs
-    ret = m_CerStore->getChainCerts(cerItem, chain_certs);
-    if (ret != RET_OK) {
-        if (((ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) || (ret == RET_UAPKI_CERT_NOT_FOUND)) && !chain_certs.empty()) {
-            (void)addExpectedCertByKeyId(CertEntity::INTERMEDIATE, chain_certs[chain_certs.size() - 1]->getAuthorityKeyId());
-        }
-        SET_ERROR(ret);
-    }
-    for (auto it : chain_certs) {
-        entity = new CertChainItem(CertEntity::INTERMEDIATE, it);
+    if (m_ValidationType <= Cert::ValidationType::NONE) {
+        CertChainItem* entity = new CertChainItem(certEntity, cerItem);
         if (!entity) return RET_UAPKI_GENERAL_ERROR;
         m_CertChain.push_back(entity);
+        return RET_OK;
     }
-    chain_certs.clear();
 
-    //  check signature in chain-certs
-    idx_root = m_CertChain.size() - 1;
-    entity = m_CertChain[idx_root];
-    DO(entity->getSubject()->verify(entity->getSubject()));
-    entity->setRoot();
-    for (size_t i = 0; i < idx_root; i++) {
-        entity = m_CertChain[i];
-        DO(entity->getSubject()->verify(m_CertChain[i + 1]->getSubject()));
-        entity->setIssuer(m_CertChain[i + 1]->getSubject());
+    int ret = RET_OK;
+    vector<CertChainItem*> chain;
+    vector<Cert::CerItem*> obtained_certs;
+    CertChainItem* root = nullptr;
+
+    //  Build a chain of certs: [cerItem, its issuer, ..., root]
+    ret = buildCertChain(certEntity, cerItem, chain);
+    for (const auto it : chain) {
+        //  The items are owned by m_CertChain
+        m_CertChain.push_back(it);
+    }
+    DO(ret);
+    root = chain.back();
+    if (root->getCertEntity() != CertEntity::ROOT) {
+        SET_ERROR(RET_UAPKI_CERT_ISSUER_NOT_FOUND);
+    }
+
+    //  Check signature in chain-certs (the verdicts are cached, see setIssuer() and setRoot())
+    for (const auto it : chain) {
+        DO(it->getSubject()->verify(it->getIssuer()));
+    }
+
+    //  The root must be trusted only if asked: who to trust is decided by the one who verifies a signature
+    if (m_CheckTrustedRoot && !root->isTrusted()) {
+        SET_ERROR(RET_UAPKI_CERT_NOT_TRUSTED);
     }
 
     //  check validity in chain-certs
-    for (auto it : m_CertChain) {
+    for (const auto it : chain) {
         DO(it->getSubject()->checkValidity(validateTime));
     }
 
-    //  check status in chain-certs
-    if (m_ValidationType == Cert::ValidationType::OCSP) {
-        expected_certentity = CertEntity::OCSP;
-        for (size_t i = 0; i < idx_root; i++) {
-            entity = m_CertChain[i];
+    //  check status in chain-certs (the root has no status)
+    for (const auto it : chain) {
+        if (it == root) continue;
+        if (m_ValidationType == Cert::ValidationType::OCSP) {
+            //  The responder is checked in validateByOcsp(): authorized for the issuer (RFC 6960)
             DO(validateByOcsp(
-                entity->getSubject(),
-                entity->getIssuer(),
-                entity->getResultValidationByOcsp()
+                it->getSubject(),
+                it->getIssuer(),
+                it->getResultValidationByOcsp()
             ));
-            DO(addUniqueItem(obtained_certs, entity->getResultValidationByOcsp().cerResponder));
+            DO(addUniqueItem(obtained_certs, it->getResultValidationByOcsp().cerResponder));
         }
-    }
-    else if (m_ValidationType == Cert::ValidationType::CRL) {
-        expected_certentity = CertEntity::CRL;
-        for (size_t i = 0; i < idx_root; i++) {
-            entity = m_CertChain[i];
+        else if (m_ValidationType == Cert::ValidationType::CRL) {
             DO(validateByCrl(
-                entity->getSubject(),
+                it->getSubject(),
                 validateTime,
                 true,
-                entity->getResultValidationByCrl()
+                it->getResultValidationByCrl()
             ));
-            DO(addUniqueItem(obtained_certs, entity->getResultValidationByCrl().cerIssuer));
+            DO(addUniqueItem(obtained_certs, it->getResultValidationByCrl().cerIssuer));
         }
     }
 
@@ -400,48 +472,29 @@ int CertValidator::getStatus (
     if (!checkCertUsage(certEntity, cerItem)) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
-    entity = m_CertChain[idx_root];
-    if (!entity->getSubject()->getCertExtKeyUsage().isCa()) {
+    if (!root->getSubject()->getCertExtKeyUsage().isCa()) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
-    for (const auto it : obtained_certs) {
-        if (!checkCertUsage(expected_certentity, it)) {
-            SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
-        }
-    }
 
-    //  check obtained certs
-    if (m_ValidationType == Cert::ValidationType::OCSP) {
-        for (auto it_obtcert : obtained_certs) {
-            if (
-                !findItemByKeyId(m_CertChain, it_obtcert->getAuthorityKeyId()) &&
-                !findItemByKeyId(m_CertChain, it_obtcert->getKeyId())
-            ) {
-                (void)addExpectedCert(CertEntity::OCSP, it_obtcert);
-                SET_ERROR(RET_UAPKI_CERT_CHAIN_NOT_FOUND);
-            }
-
-            if (!it_obtcert->getUris().ocsp.empty()) {
-                Cert::CerItem* cer_issuer = nullptr;
-                bool is_selfsigned;
-                ResultValidationByOcsp result_validation;
-                DO(m_CerStore->getIssuerCert(it_obtcert, &cer_issuer, is_selfsigned));
-                DO(validateByOcsp(it_obtcert, cer_issuer, result_validation));
-            }
-
-            DO(addUniqueItem(m_ObtainedCerts, CertEntity::OCSP, it_obtcert));
+    //  check obtained certs: the status of a delegated OCSP responder (unless id-pkix-ocsp-nocheck)
+    for (auto it_obtcert : obtained_certs) {
+        if (findItemByCertId(chain, it_obtcert)) continue;
+        if (
+            (m_ValidationType == Cert::ValidationType::OCSP) &&
+            !it_obtcert->getCertExtKeyUsage().isOcspNoCheck() &&
+            !it_obtcert->getUris().ocsp.empty()
+        ) {
+            Cert::CerItem* cer_issuer = nullptr;
+            bool is_selfsigned;
+            ResultValidationByOcsp result_validation;
+            DO(m_CerStore->getIssuerCert(it_obtcert, &cer_issuer, is_selfsigned));
+            DO(validateByOcsp(it_obtcert, cer_issuer, result_validation));
         }
-    }
-    else if (m_ValidationType == Cert::ValidationType::CRL) {
-        for (const auto it_obtcert : obtained_certs) {
-            if (
-                !findItemByKeyId(m_CertChain, it_obtcert->getKeyId()) &&
-                !findItemByKeyId(m_CertChain, it_obtcert->getAuthorityKeyId())
-            ) {
-                (void)addExpectedCert(CertEntity::CRL, it_obtcert);
-                SET_ERROR(RET_UAPKI_CERT_CHAIN_NOT_FOUND);
-            }
-        }
+        DO(addUniqueItem(
+            m_ObtainedCerts,
+            (m_ValidationType == Cert::ValidationType::OCSP) ? CertEntity::OCSP : CertEntity::CRL,
+            it_obtcert
+        ));
     }
 
 cleanup:
@@ -518,7 +571,6 @@ int CertValidator::validateByCrl (
     JSON_Object* joDelta = nullptr;
     JSON_Object* joFull = nullptr;
     const ByteArray* ba_crlnumber = nullptr;
-    bool is_found;
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
@@ -565,16 +617,12 @@ int CertValidator::validateByCrl (
     DEBUG_OUTCON(for (auto& it : revoked_items) {
         printf("revocationDate: %lld  crlReason: %i  invalidityDate: %lld\n", it->revocationDate, it->crlReason, it->invalidityDate);
     });
-    is_found = Crl::findRevokedCert(
+    (void)Crl::findRevokedCert(
         revoked_items,
         validateTime,
         resultValidation.certStatus,
         resultValidation.revokedCertItem
     );
-    if (is_found && (resultValidation.crlItem->getVersion() == 1)) {
-        resultValidation.certStatus = CertStatus::REVOKED;
-        resultValidation.revokedCertItem.crlReason = UapkiNS::CrlReason::UNSPECIFIED;
-    }
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
@@ -694,7 +742,10 @@ int CertValidator::validateByOcsp (
         if (ocsp_helper.getResponseStatus() == Ocsp::ResponseStatus::SUCCESSFUL) {
             DO(processResponseData(
                 ocsp_helper,
+                cerSubject->getSerialNumber(),
+                cerIssuer,
                 resultValidation,
+                nullptr,
                 joResult
             ));
 
@@ -941,7 +992,8 @@ int CertValidator::getCrl (
     crl_item = crlStore.getCrl(
         cerSubject->getAuthorityKeyId(),
         is_full ? Crl::Type::FULL : Crl::Type::DELTA,
-        uris.deltaCrl
+        uris.deltaCrl,
+        cerSubject
     );
 
     {   // Download coordination is separate from the item and store locks.
@@ -949,7 +1001,7 @@ int CertValidator::getCrl (
         const auto download_gate = crlStore.getDownloadMutex(cerSubject->getAuthorityKeyId());
         lock_guard<mutex> lock(*download_gate);
         crl_item = crlStore.getCrl(cerSubject->getAuthorityKeyId(),
-            is_full ? Crl::Type::FULL : Crl::Type::DELTA, uris.deltaCrl);
+            is_full ? Crl::Type::FULL : Crl::Type::DELTA, uris.deltaCrl, cerSubject);
 
         if (crl_item) {
             if (crl_item->getNextUpdate() < validateTime) {
@@ -988,10 +1040,14 @@ int CertValidator::getCrl (
                 SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
             }
 
+            //  The same way into the cache as ADD_CRL, plus: signed by the issuer of this certificate
             bool is_unique;
-            DO(crlStore.addCrl(
+            DO(addCrlToStore(
+                crlStore,
+                cerStore,
                 sba_crl.get(),
                 true,
+                cerSubject,
                 is_unique,
                 &crl_item
             ));
@@ -1022,11 +1078,8 @@ int CertValidator::getCrl (
         }
     }
 
-    //  Find certificate
-    DO(cerStore.getCertByKeyId(crl_item->getAuthorityKeyId(), cerCrlSigner));
-
-    //  Verify signature
-    ret = crl_item->verify(*cerCrlSigner);
+    //  The signer and the signature (also of a cached CRL: it may come from ADD_CRL)
+    ret = verifyCrlSigner(*crl_item, cerSubject, cerStore, cerCrlSigner);
     if (joResult) {
         (void)json_object_set_base64(joResult, "crlId", crl_item->getCrlId());
         (void)json_object_set_string(joResult, "statusSignature", Cert::verifyStatusToStr(crl_item->getStatusSign()));
@@ -1044,27 +1097,151 @@ cleanup:
     return ret;
 }
 
+int CertValidator::publicKeyFromSpki (
+        const ByteArray* baSpki,
+        ByteArray** baPublicKey
+)
+{
+    const uint8_t* buf = ba_get_buf_const(baSpki);
+    size_t len = ba_get_len(baSpki);
+    uint32_t tag = 0;
+    size_t hlen = 0, vlen = 0;
+
+    if (!buf || !Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > len)) return RET_UAPKI_INVALID_STRUCT;
+    buf += hlen;
+    len = vlen;
+    //  algorithm
+    if (!Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > len)) return RET_UAPKI_INVALID_STRUCT;
+    buf += hlen + vlen;
+    len -= hlen + vlen;
+    //  subjectPublicKey
+    if (!Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x03) || (vlen < 1) || (hlen + vlen > len)) return RET_UAPKI_INVALID_STRUCT;
+
+    *baPublicKey = ba_alloc_from_uint8(buf + hlen + 1, vlen - 1);
+    return (*baPublicKey) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int CertValidator::verifyCrlIssuer (
+        Crl::CrlItem& crlItem,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+)
+{
+    //  Signed by its issuer: the certificate with the key id and the name of the CRL issuer, having cRLSign
+    const int ret = cerStore.getCertByKeyId(crlItem.getAuthorityKeyId(), cerCrlSigner);
+    if (ret != RET_OK) return ret;
+
+    if (ba_cmp(crlItem.getIssuer(), (*cerCrlSigner)->getSubject()) != 0) return RET_UAPKI_CRL_NOT_FOUND;
+    if (!checkCertUsage(CertEntity::CRL, *cerCrlSigner)) return RET_UAPKI_INVALID_KEY_USAGE;
+
+    return crlItem.verify(*cerCrlSigner);
+}
+
+//  The root a certificate chains to in the store, every link verified; nullptr if there is no such path
+static const Cert::CerItem* path_root (
+        Cert::CerStore& cerStore,
+        const Cert::CerItem* cerItem
+)
+{
+    vector<Cert::CerItem*> chain;
+    if (cerStore.getChainCerts(cerItem, chain) != RET_OK) return nullptr;
+
+    const Cert::CerItem* cer_subject = cerItem;
+    for (const auto it : chain) {
+        if (cer_subject->verifySignatureBy(it->getSpki()) != RET_OK) return nullptr;
+        cer_subject = it;
+    }
+    if (!cer_subject->isSelfSigned() || (cer_subject->verifySignatureBy(cer_subject->getSpki()) != RET_OK)) return nullptr;
+    return cer_subject;
+}
+
+int CertValidator::verifyCrlSigner (
+        Crl::CrlItem& crlItem,
+        const Cert::CerItem* cerSubject,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+)
+{
+    //  RFC 5280 without indirect CRLs: the CRL issuer is the issuer of the certificate (its name)
+    if (ba_cmp(crlItem.getIssuer(), cerSubject->getIssuer()) != 0) return RET_UAPKI_CRL_NOT_FOUND;
+
+    //  The signer: the certificate with the key id and the name of the CRL issuer, cRLSign, the signature
+    const int ret = verifyCrlIssuer(crlItem, cerStore, cerCrlSigner);
+    if (ret != RET_OK) return ret;
+
+    //  The very key that signed the certificate - not just a certificate with the same key id
+    if (cerSubject->verifySignatureBy((*cerCrlSigner)->getSpki()) == RET_OK) return RET_OK;
+
+    //  A delegated CRL signer (RFC 5280, 6.3.3 f): another key of the same issuer - the same name and
+    //  cRLSign (checked above), valid when the CRL was issued, its path leading to the same root
+    const Cert::CerItem* cer_signer = *cerCrlSigner;
+    if (cer_signer->checkValidity(crlItem.getThisUpdate()) != RET_OK) return RET_UAPKI_CRL_NOT_FOUND;
+    const Cert::CerItem* root_subject = path_root(cerStore, cerSubject);
+    const Cert::CerItem* root_signer = path_root(cerStore, cer_signer);
+    if (!root_subject || (root_subject != root_signer)) return RET_UAPKI_CRL_NOT_FOUND;
+    return RET_OK;
+}
+
+int CertValidator::addCrlToStore (
+        Crl::CrlStore& crlStore,
+        Cert::CerStore& cerStore,
+        const ByteArray* baEncoded,
+        const bool permanent,
+        const Cert::CerItem* cerSubject,
+        bool& isUnique,
+        Crl::CrlItem** crlItem
+)
+{
+    int ret = RET_OK;
+    Crl::CrlItem* parsed_crl = nullptr;
+    Cert::CerItem* cer_signer = nullptr;
+    SmartBA sba_parsed;
+
+    //  Checked before it is stored: a stored CRL with a greater number makes the older ones obsolete
+    if (!sba_parsed.set(ba_copy_with_alloc(baEncoded, 0, 0))) return RET_UAPKI_GENERAL_ERROR;
+    ret = Crl::parseCrl(sba_parsed.get(), &parsed_crl);
+    if (ret != RET_OK) return ret;
+    (void)sba_parsed.pop();     //  owned by parsed_crl
+
+    if (cerSubject) {
+        //  Downloaded for this certificate: of its segment and signed for its issuer
+        ret = parsed_crl->coversCert(cerSubject)
+            ? verifyCrlSigner(*parsed_crl, cerSubject, cerStore, &cer_signer)
+            : RET_UAPKI_CRL_NOT_FOUND;
+    }
+    else {
+        ret = verifyCrlIssuer(*parsed_crl, cerStore, &cer_signer);
+    }
+    delete parsed_crl;
+    if (ret != RET_OK) return ret;
+
+    return crlStore.addCrl(baEncoded, permanent, isUnique, crlItem);
+}
+
 int CertValidator::processResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        const ByteArray* baSerialNumber,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
+        std::vector<Cert::CerItem*>* addedCerts,
         JSON_Object* joResult
 )
 {
     int ret = RET_OK;
-    const size_t idx_certid = 0;    //  Work with one OCSP request that has one certificate
+    size_t idx_certid = 0;
     const ByteArray* ba_certid = nullptr;
-    SmartBA sba_serialnumber;
     VectorBA vba_encodedcerts;
     vector<Cert::CerStore::AddedCerItem> added_ceritems;
+    SmartBA sba_publickey;
     string s_time;
+
+    if (!baSerialNumber) return RET_UAPKI_INVALID_PARAMETER;
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(CertStatus::UNDEFINED)));
     }
 
-    DO(ocspHelper.getSerialNumberFromCertId(idx_certid, &sba_serialnumber));
     DO(ocspHelper.getCerts(vba_encodedcerts));
-
     if (!vba_encodedcerts.empty()) {
         DO(m_CerStore->addCerts(
             Cert::NOT_TRUSTED,
@@ -1073,8 +1250,13 @@ int CertValidator::processResponseData (
             added_ceritems
         ));
         for (auto& it : added_ceritems) {
-            if (it.cerItem && (ba_cmp(it.cerItem->getSerialNumber(), sba_serialnumber.get()) == 0)) {
-                ba_certid = it.cerItem->getCertId();
+            if (it.cerItem) {
+                if (addedCerts) {
+                    addedCerts->push_back(it.cerItem);
+                }
+                if (it.cerItem->equalSerialNumber(baSerialNumber)) {
+                    ba_certid = it.cerItem->getCertId();
+                }
             }
         }
     }
@@ -1094,8 +1276,28 @@ int CertValidator::processResponseData (
         DO_JSON(json_object_set_string(joResult, "producedAt", s_time.c_str()));
     }
 
+    //  The response may hold several certificates: only the one about this certificate of this issuer
+    //  counts. Without the issuer certificate (CERT_STATUS_BY_OCSP by hashes) - by the serial number
+    if (cerIssuer) {
+        (void)publicKeyFromSpki(cerIssuer->getSpki(), &sba_publickey);
+        DO(ocspHelper.findSingleResponse(
+            cerIssuer->getSubject(),
+            cerIssuer->getKeyId(),
+            sba_publickey.get(),
+            baSerialNumber,
+            idx_certid
+        ));
+    }
+    else {
+        SmartBA sba_serialnumber;
+        DO(ocspHelper.getSerialNumberFromCertId(idx_certid, &sba_serialnumber));
+        if (ba_cmp(sba_serialnumber.get(), baSerialNumber) != 0) {
+            SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+        }
+    }
     DO(ocspHelper.scanSingleResponses());
     resultValidation.singleResponseInfo = ocspHelper.getSingleResponseInfo(idx_certid);
+    resultValidation.msProducedAt = ocspHelper.getProducedAt();
 
     if (joResult) {
         auto& res_singlerespinfo = resultValidation.singleResponseInfo;
@@ -1117,7 +1319,7 @@ int CertValidator::processResponseData (
     }
 
     DO(ocspHelper.checkNonce());
-    DO(verifyResponseData(ocspHelper, resultValidation, joResult));
+    DO(verifyResponseData(ocspHelper, cerIssuer, resultValidation, joResult));
 
 cleanup:
     return ret;
@@ -1125,48 +1327,91 @@ cleanup:
 
 int CertValidator::verifyResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult
 )
 {
     int ret = RET_OK;
-    SmartBA sba_responderid;
-    Ocsp::ResponderIdType responder_idtype = Ocsp::ResponderIdType::UNDEFINED;
     SignatureVerifyStatus status_sign = SignatureVerifyStatus::UNDEFINED;
 
-    DO(ocspHelper.getResponderId(responder_idtype, &sba_responderid));
+    resultValidation.statusSignature = SignatureVerifyStatus::UNDEFINED;
+    resultValidation.cerResponder = nullptr;
+    DO(ocspHelper.getResponderId(resultValidation.responderIdType, &resultValidation.baResponderId));
     if (joResult) {
-        DO(responderIdToJson(joResult, responder_idtype, sba_responderid.get()));
+        DO(responderIdToJson(joResult, resultValidation.responderIdType, resultValidation.baResponderId.get()));
     }
-    if (responder_idtype == Ocsp::ResponderIdType::BY_NAME) {
-        ret = m_CerStore->getCertBySubject(sba_responderid.get(), &resultValidation.cerResponder);
-        if (ret == RET_UAPKI_CERT_NOT_FOUND) {
-            const int ret2 = addExpectedOcspCert(false, sba_responderid.get());
-            SET_ERROR((ret2 == RET_OK) ? ret : ret2);
-        }
+    if (resultValidation.responderIdType == Ocsp::ResponderIdType::BY_NAME) {
+        ret = m_CerStore->getCertBySubject(resultValidation.baResponderId.get(), &resultValidation.cerResponder);
     }
     else {
         //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY
-        ret = m_CerStore->getCertByKeyId(sba_responderid.get(), &resultValidation.cerResponder);
-        if (ret == RET_UAPKI_CERT_NOT_FOUND) {
-            const int ret2 = addExpectedOcspCert(true, sba_responderid.get());
-            SET_ERROR((ret2 == RET_OK) ? ret : ret2);
-        }
+        ret = m_CerStore->getCertByKeyId(resultValidation.baResponderId.get(), &resultValidation.cerResponder);
     }
+    if (ret == RET_UAPKI_CERT_NOT_FOUND) {
+        resultValidation.statusSignature = SignatureVerifyStatus::INDETERMINATE;
+        const int ret2 = addExpectedOcspCert(
+            (resultValidation.responderIdType != Ocsp::ResponderIdType::BY_NAME),
+            resultValidation.baResponderId.get()
+        );
+        SET_ERROR((ret2 == RET_OK) ? ret : ret2);
+    }
+    DO(ret);
 
     ret = ocspHelper.verifyTbsResponseData(resultValidation.cerResponder->getSpki(), status_sign);
+    if ((ret == RET_OK) && cerIssuer) {
+        //  A valid signature counts only from a responder authorized for certificates of this issuer
+        ret = authorizeOcspResponder(resultValidation.cerResponder, cerIssuer, resultValidation.msProducedAt);
+        if (ret != RET_OK) {
+            status_sign = SignatureVerifyStatus::INVALID;
+        }
+    }
+    else if (ret == RET_VERIFY_FAILED) {
+        ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED;
+    }
+    else {
+        ret = RET_UAPKI_OCSP_RESPONSE_VERIFY_ERROR;
+    }
+    resultValidation.statusSignature = status_sign;
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "statusSignature", verifyStatusToStr(status_sign)));
-    }
-    if (ret == RET_VERIFY_FAILED) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_FAILED);
-    }
-    else if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_OCSP_RESPONSE_VERIFY_ERROR);
     }
 
 cleanup:
     return ret;
+}
+
+int CertValidator::authorizeOcspResponder (
+        Cert::CerItem* cerResponder,
+        Cert::CerItem* cerIssuer,
+        const uint64_t producedAt
+)
+{
+    if (!cerResponder || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
+
+    //  RFC 6960, 4.2.2.2: the issuer of the certificate itself, or its delegate with the extended key
+    //  usage id-kp-OCSPSigning, recognized "only if the delegation certificate and the certificate being
+    //  checked for revocation were signed by the same key" - not by another key of the same CA
+    if (
+        cerResponder->equalCertId(cerIssuer->getCertId()) ||
+        (ba_cmp(cerResponder->getSpki(), cerIssuer->getSpki()) == 0)
+    ) {
+        return RET_OK;
+    }
+
+    if (!checkCertUsage(CertEntity::OCSP, cerResponder)) return RET_UAPKI_INVALID_KEY_USAGE;
+    if (
+        !cerIssuer->equalKeyId(cerResponder->getAuthorityKeyId()) ||
+        (cerResponder->verifySignatureBy(cerIssuer->getSpki()) != RET_OK)
+    ) {
+        return RET_UAPKI_CERT_CHAIN_NOT_FOUND;
+    }
+    if (producedAt > 0) {
+        const int ret = cerResponder->checkValidity(producedAt);
+        if (ret != RET_OK) return ret;
+    }
+
+    return RET_OK;
 }
 
 int CertValidator::verifySignatureSignerInfo (
@@ -1178,10 +1423,8 @@ int CertValidator::verifySignatureSignerInfo (
     int ret = RET_OK;
     switch (signerInfo.getSidType()) {
     case Pkcs7::SignerIdentifierType::ISSUER_AND_SN:
-        ret = getCertByIssuerAndSN(certEntity, signerInfo.getSidEncoded(), cerSigner);
-        break;
     case Pkcs7::SignerIdentifierType::SUBJECT_KEYID:
-        ret = getCertByKeyId(certEntity, signerInfo.getSidEncoded(), cerSigner);
+        ret = getCertBySID(certEntity, signerInfo.getSidEncoded(), cerSigner);
         break;
     default:
         ret = RET_UAPKI_INVALID_STRUCT;

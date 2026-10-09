@@ -28,6 +28,7 @@
 #define FILE_MARKER "uapki/api/add-crl.cpp"
 
 #include "api-json-internal.h"
+#include "cert-validator.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
 #include "uapki-ns.h"
@@ -38,6 +39,9 @@ using namespace UapkiNS;
 
 int uapki_add_crl (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
+    CertValidator::CertValidator cert_validator;
+    if (!cert_validator.init(context.config(), context.cerStore(), context.crlStore())) return RET_UAPKI_GENERAL_ERROR;
+
     int ret = RET_OK;
     LibraryConfig* lib_config = context.config();
     Crl::CrlStore* crl_store = context.crlStore();
@@ -53,7 +57,16 @@ int uapki_add_crl (Context& context, JSON_Object* joParams, JSON_Object* joResul
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
 
-    DO(crl_store->addCrl(sba_encoded.get(), permanent, is_unique, &crl_item));
+    //  The same check as for a downloaded CRL: signed by its issuer
+    DO(cert_validator.addCrlToStore(
+        *crl_store,
+        *cert_validator.getCerStore(),
+        sba_encoded.get(),
+        permanent,
+        nullptr,
+        is_unique,
+        &crl_item
+    ));
 
     DO(json_object_set_base64(joResult, "crlId", crl_item->getCrlId()));
     DO(ParsonHelper::jsonObjectSetBoolean(joResult, "isUnique", is_unique));

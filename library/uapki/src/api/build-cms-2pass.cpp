@@ -216,6 +216,7 @@ static int step2_encodesd (
     shared_data.aidDigest.baParameters = json_object_get_base64(joStep2Params, "digestAlgoParams");
     shared_data.includeCert = ParsonHelper::jsonObjectGetBoolean(joStep2Params, "includeCert", false);
     shared_data.options.ignoreCertStatus = ParsonHelper::jsonObjectGetBoolean(json_object_get_object(joStep2Params, "options"), "ignoreCertStatus", false);
+    shared_data.options.checkTrustedRoot = ParsonHelper::jsonObjectGetBoolean(json_object_get_object(joStep2Params, "options"), "checkTrustedRoot", false);
     if (sba_encodedsa.empty() || !shared_data.aidSignature.isPresent() || sba_signvalue.empty() || !shared_data.aidDigest.isPresent()) return RET_UAPKI_INVALID_PARAMETER;
 
     shared_data.hashSignature = hash_from_oid(shared_data.aidSignature.algorithm.c_str());
@@ -258,6 +259,7 @@ static int step2_encodesd (
                 ((shared_data.signatureFormat == SignatureFormat::CADES_BES) && config.getOffline())
                 ) ? Cert::ValidationType::CRL : Cert::ValidationType::OCSP;
             cert_validator.setValidationType(validation_type);
+            cert_validator.setCheckTrustedRoot(shared_data.options.checkTrustedRoot);
         }
         DO(cert_validator.getStatus(
             shared_data.cerSigner,

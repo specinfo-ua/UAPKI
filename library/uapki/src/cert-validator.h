@@ -328,6 +328,7 @@ class CertValidator {
                 m_CrlStore;
     Cert::ValidationType
                 m_ValidationType;
+    bool        m_CheckTrustedRoot;
 
     std::vector<CertChainItem*>
                 m_CertChain;
@@ -357,7 +358,14 @@ public:
     void setValidationType (
         const Cert::ValidationType validationType
     );
+    //  getStatus(): the root of the chain must be trusted (signing: options.checkTrustedRoot)
+    void setCheckTrustedRoot (
+        const bool checkTrustedRoot
+    );
 
+    bool getCheckTrustedRoot (void) const {
+        return m_CheckTrustedRoot;
+    }
     LibraryConfig* getLibConfig (void) const {
         return m_LibConfig;
     }
@@ -388,10 +396,28 @@ public:
     }
 
 public:
+    //  Before signing: the chain of cerItem, its validity, status (OCSP or CRL) and usage
     int getStatus (
         Cert::CerItem* cerItem,
         const CertEntity certEntity,
         const uint64_t validateTime
+    );
+
+    //  The one chain builder for signing and verifying: the item of cerItem and its issuers up to
+    //  a self-signed root are added to chainItems (an item already there is reused), each link is
+    //  verified, the root is marked. A missing issuer is expected: RET_UAPKI_CERT_ISSUER_NOT_FOUND
+    int buildCertChain (
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem,
+        std::vector<CertChainItem*>& chainItems,
+        CertChainItem** subjectItem = nullptr
+    );
+    int addChainItem (
+        std::vector<CertChainItem*>& chainItems,
+        const CertEntity certEntity,
+        Cert::CerItem* cerItem,
+        CertChainItem** chainItem,
+        bool& isNewItem
     );
 
 public:
@@ -481,15 +507,57 @@ public:
         Cert::CerItem** cerCrlSigner,
         JSON_Object* joResult = nullptr
     );
+    //  One check of an OCSP response for all callers (sign, VERIFY_CERT, VERIFY online and embedded):
+    //  the SingleResponse about baSerialNumber of cerIssuer, the responder signature and its authority.
+    //  The certificates of the response are added to the store (and to addedCerts)
+    //  The one way a CRL gets into the cache (ADD_CRL, a download): signed by its issuer
+    //  (verifyCrlIssuer), and if it is for cerSubject - by the key that signed cerSubject
+    int addCrlToStore (
+        Crl::CrlStore& crlStore,
+        Cert::CerStore& cerStore,
+        const ByteArray* baEncoded,
+        const bool permanent,
+        const Cert::CerItem* cerSubject,
+        bool& isUnique,
+        Crl::CrlItem** crlItem
+    );
+    //  The CRL is signed by the certificate of its issuer (name, key id) having cRLSign
+    int verifyCrlIssuer (
+        Crl::CrlItem& crlItem,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+    );
+    //  The CRL is signed by the issuer of cerSubject (same name and key) having cRLSign
+    int verifyCrlSigner (
+        Crl::CrlItem& crlItem,
+        const Cert::CerItem* cerSubject,
+        Cert::CerStore& cerStore,
+        Cert::CerItem** cerCrlSigner
+    );
     int processResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        const ByteArray* baSerialNumber,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
+        std::vector<Cert::CerItem*>* addedCerts = nullptr,
         JSON_Object* joResult = nullptr
     );
     int verifyResponseData (
         Ocsp::OcspHelper& ocspHelper,
+        Cert::CerItem* cerIssuer,
         ResultValidationByOcsp& resultValidation,
         JSON_Object* joResult = nullptr
+    );
+    //  Public key from SubjectPublicKeyInfo: the content of subjectPublicKey without the unused-bits octet
+    static int publicKeyFromSpki (
+        const ByteArray* baSpki,
+        ByteArray** baPublicKey
+    );
+    //  RFC 6960, 4.2.2.2: the issuer itself or a certificate issued by it with id-kp-OCSPSigning
+    int authorizeOcspResponder (
+        Cert::CerItem* cerResponder,
+        Cert::CerItem* cerIssuer,
+        const uint64_t producedAt
     );
     int verifySignatureSignerInfo (
         const CertEntity certEntity,

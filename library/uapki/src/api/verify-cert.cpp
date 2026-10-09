@@ -49,6 +49,32 @@ using namespace std;
 using namespace UapkiNS;
 
 
+//  The chain built as for signing and VERIFY ends in a trusted root, every link verified
+static int check_trusted_root (
+        CertValidator::CertValidator& certValidator,
+        Cert::CerItem* cerSubject
+)
+{
+    vector<CertValidator::CertChainItem*> chain;
+    int ret = certValidator.buildCertChain(CertValidator::CertEntity::UNDEFINED, cerSubject, chain);
+    if (ret == RET_OK) {
+        for (const auto it : chain) {
+            ret = it->getSubject()->verify(it->getIssuer());
+            if (ret != RET_OK) break;
+        }
+    }
+    if (ret == RET_OK) {
+        const CertValidator::CertChainItem* root = chain.back();
+        if ((root->getCertEntity() != CertValidator::CertEntity::ROOT) || !root->isTrusted()) {
+            ret = RET_UAPKI_CERT_NOT_TRUSTED;
+        }
+    }
+    for (auto it : chain) {
+        delete it;
+    }
+    return ret;
+}   //  check_trusted_root
+
 static bool check_validity_time (
         const Cert::CerItem* cerIssuer,
         const Cert::CerItem* cerSubject,
@@ -77,6 +103,8 @@ int uapki_verify_cert (Context& context, JSON_Object* joParams, JSON_Object* joR
         ParsonHelper::jsonObjectGetString(joParams, "validationType")
     );
     bool is_expired = false, is_selfsigned = false, need_updatecert = false;
+    //  Off by default: the result of VERIFY_CERT stays as before for the callers that do not ask
+    const bool check_trustedroot = ParsonHelper::jsonObjectGetBoolean(joParams, "checkTrustedRoot", false);
     uint64_t validate_time = 0;
 
     if (
@@ -127,6 +155,10 @@ int uapki_verify_cert (Context& context, JSON_Object* joParams, JSON_Object* joR
 
     if (!is_selfsigned) {
         DO(json_object_set_base64(joResult, "issuerCertId", cer_issuer->getCertId()));
+    }
+
+    if (check_trustedroot) {
+        DO(check_trusted_root(cert_validator, cer_subject));
     }
  
     if (validation_type == Cert::ValidationType::CRL) {
