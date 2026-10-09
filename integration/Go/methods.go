@@ -1,6 +1,11 @@
 package uapki
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"unsafe"
+)
 
 // VersionInfo is the result of the VERSION method.
 type VersionInfo struct {
@@ -220,6 +225,115 @@ func (l *Library) Verify(signature, content []byte) (VerifyResult, error) {
 		signatureParams["content"] = content
 	}
 	params := map[string]any{"signature": signatureParams}
+	var result json.RawMessage
+	if err := l.Call("VERIFY", params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// Source is the content of a document for SignDetached and VerifyDetached: a file,
+// read by the library in blocks, or data in memory, hashed by the library in
+// place. Neither goes through base64, so the size is not limited.
+type Source struct {
+	File string  // path of the file, or empty for data in memory
+	Ptr  uintptr // address of the data in memory
+	Size uint64  // size of the data in memory
+}
+
+// FileSource is the content of the file at path.
+func FileSource(path string) Source {
+	return Source{File: path}
+}
+
+// MemorySource is size bytes at ptr. The library reads the memory during the
+// call only, but the Go garbage collector must not move or free it meanwhile:
+// use memory outside the Go heap (a memory-mapped file, C memory) or pin the Go
+// memory with runtime.Pinner until the call returns. ptr must not be nil, even
+// for empty data.
+func MemorySource(ptr unsafe.Pointer, size uint64) Source {
+	return Source{Ptr: uintptr(ptr), Size: size}
+}
+
+// params returns the fields of the source in a dataTbs or signature object:
+// "file", or "ptr" (hex, big-endian, the width of a pointer) and "size".
+func (s Source) params() map[string]any {
+	if s.File != "" {
+		return map[string]any{"file": s.File}
+	}
+	return map[string]any{
+		"ptr":  fmt.Sprintf("%0*X", 2*unsafe.Sizeof(uintptr(0)), uint64(s.Ptr)),
+		"size": s.Size,
+	}
+}
+
+// SignOptions is the "options" object of the SIGN method.
+type SignOptions struct {
+	IgnoreCertStatus bool `json:"ignoreCertStatus,omitempty"` // do not check the status of the signer certificate
+}
+
+// SignDetached signs files or data in memory with the selected key in one call
+// of the SIGN method. The signatures are detached (signParams.DetachedData is
+// ignored) and are returned in the order of sources; nothing is written to disk.
+// options may be nil. A signature with encapsulated content can be assembled by
+// the caller: the content is not part of the signed attributes, so embedding it
+// does not change the signature value.
+func (l *Library) SignDetached(signParams SignParams, sources []Source, options *SignOptions) ([][]byte, error) {
+	detached := true
+	signParams.DetachedData = &detached
+
+	docs := make([]map[string]any, len(sources))
+	for i, source := range sources {
+		doc := source.params()
+		doc["id"] = strconv.Itoa(i)
+		docs[i] = doc
+	}
+	params := map[string]any{
+		"signParams": signParams,
+		"dataTbs":    docs,
+	}
+	if options != nil {
+		params["options"] = options
+	}
+	var result struct {
+		Signatures []SignedDoc `json:"signatures"`
+	}
+	if err := l.Call("SIGN", params, &result); err != nil {
+		return nil, err
+	}
+
+	signatures := make([][]byte, len(sources))
+	for _, signature := range result.Signatures {
+		i, err := strconv.Atoi(signature.ID)
+		if err != nil || i < 0 || i >= len(sources) {
+			return nil, fmt.Errorf("uapki: SIGN returned an unknown id %q", signature.ID)
+		}
+		signatures[i] = signature.Bytes
+	}
+	for i, signature := range signatures {
+		if signature == nil {
+			return nil, fmt.Errorf("uapki: SIGN returned no signature for source %d", i)
+		}
+	}
+	return signatures, nil
+}
+
+// VerifyDetached verifies a signature without encapsulated content against
+// content in a file or in memory, in one call of the VERIFY method; the content
+// is not returned. For a signature with encapsulated content the caller can
+// pass the signature without the content and point to the content inside the
+// memory-mapped signature file. validationType is "FULL", "CHAIN", "STRUCT" or
+// empty for the default of the library.
+func (l *Library) VerifyDetached(signature []byte, content Source, validationType string) (VerifyResult, error) {
+	signatureParams := content.params()
+	signatureParams["bytes"] = signature
+	params := map[string]any{
+		"signature":     signatureParams,
+		"returnContent": false,
+	}
+	if validationType != "" {
+		params["options"] = map[string]string{"validationType": validationType}
+	}
 	var result json.RawMessage
 	if err := l.Call("VERIFY", params, &result); err != nil {
 		return nil, err

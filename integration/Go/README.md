@@ -8,8 +8,8 @@ loads the shared library at runtime and provides:
 
 * `Library.Process` / `Library.Call` — generic access to every UAPKI method;
 * typed helpers for the most common methods: `Version`, `Init`, `Deinit`,
-  `Providers`, `Open`, `CloseStorage`, `Keys`, `SelectKey`, `Sign`, `Verify`,
-  `Digest`, `RandomBytes`.
+  `Providers`, `Open`, `CloseStorage`, `Keys`, `SelectKey`, `Sign`,
+  `SignDetached`, `Verify`, `VerifyDetached`, `Digest`, `RandomBytes`.
 
 Binary fields (`bytes`, certificates, …) are declared as `[]byte` in Go and
 are marshalled to/from base64 automatically, matching the UAPKI JSON API.
@@ -109,6 +109,26 @@ go run ./example -lib /path/to/uapki.dll -providers /path/to/providers-dir \
     -p12 key.p12 -password secret -in document.pdf
 ```
 
+## Files and large data
+
+`SignDetached` signs many files or buffers in one call and `VerifyDetached`
+verifies a signature without the content against a file or memory, without
+returning the content. The library reads files in blocks and hashes memory in
+place, so nothing goes through base64 and the size is not limited; nothing is
+written to disk.
+
+```go
+signatures, err := lib.SignDetached(uapki.SignParams{SignatureFormat: "CAdES-BES"},
+    []uapki.Source{uapki.FileSource("contract.pdf")}, nil)
+
+result, err := lib.VerifyDetached(signatures[0], uapki.FileSource("contract.pdf"), "FULL")
+```
+
+`uapki.MemorySource(ptr, size)` points to data in memory, for example the
+content inside a memory-mapped signature file. The Go garbage collector must not
+move that memory during the call: use memory outside the Go heap (a mapped file,
+C memory) or pin it with `runtime.Pinner`.
+
 ## Running the tests
 
 The tests need the built native libraries:
@@ -116,11 +136,13 @@ The tests need the built native libraries:
 ```sh
 # Windows (PowerShell)
 $env:UAPKI_LIBRARY = "C:\path\to\uapki.dll"
-$env:UAPKI_CM_PROVIDERS = "C:\path\to\dir-with-cm-pkcs12"   # optional, enables the signing test
+$env:UAPKI_CM_PROVIDERS = "C:\path\to\dir-with-cm-pkcs12"   # optional, enables the signing tests
+$env:UAPKI_TEST_DATA = "C:\path\to\library\test\data"       # optional, enables the SignDetached/VerifyDetached test
 go test ./...
 
 # Linux/macOS
-UAPKI_LIBRARY=/path/to/libuapki.so UAPKI_CM_PROVIDERS=/path/to/providers go test ./...
+UAPKI_LIBRARY=/path/to/libuapki.so UAPKI_CM_PROVIDERS=/path/to/providers \
+    UAPKI_TEST_DATA=/path/to/library/test/data go test ./...
 ```
 
 Tests are skipped when `UAPKI_LIBRARY` is not set and the library is not found
