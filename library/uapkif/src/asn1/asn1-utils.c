@@ -66,15 +66,15 @@ cleanup:
 }
 
 /**
- * Возвращает байтовое представление объекта в DER-кодировании.
- * Выделяемая память требует освобождения.
+ * Повертає байтове подання об'єкта в DER-кодуванні.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param desc       дескриптор объекта
- * @param object     указатель на объект
- * @param encode     указатель на выделяемую память, содержащую DER-представление.
- * @param encode_len актуальный размер данных
+ * @param desc       дескриптор об'єкта
+ * @param object     вказівник на об'єкт
+ * @param encode     вказівник на виділену пам'ять, що містить DER-подання.
+ * @param encode_len фактичний розмір даних
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_encode(asn_TYPE_descriptor_t *desc, const void *object,
         uint8_t **encode, size_t *encode_len)
@@ -123,15 +123,15 @@ cleanup:
     return ret;
 }
 /**
- * Инициализирует asn1 структуру объекта из байтового представления.
- * Выделяемая память требует освобождения.
+ * Ініціалізує asn1-структуру об'єкта з байтового подання.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param desc        дескриптор объекта
- * @param object      указатель на объект
- * @param encode      указатель буфер содержащий BER-представление структуры.
- * @param encode_len  размер буфер
+ * @param desc        дескриптор об'єкта
+ * @param object      вказівник на об'єкт
+ * @param encode      вказівник на буфер, що містить BER-подання структури.
+ * @param encode_len  розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_decode(asn_TYPE_descriptor_t *desc, void *object,
         const void *encode, size_t encode_len)
@@ -199,15 +199,15 @@ cleanup:
 }
 
 /**
- * Создает копию ASN.1 объекта заданного типа.
- * Если (*dst == NULL) выделяется память.
- * Выделяемая память требует освобождения.
+ * Створює копію ASN.1-об'єкта заданого типу.
+ * Якщо (*dst == NULL), пам'ять виділяється.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param type тип объекта
- * @param src  источник
- * @param dst  приемник
+ * @param type тип об'єкта
+ * @param src  джерело
+ * @param dst  приймач
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_copy(asn_TYPE_descriptor_t *type, const void *src, void *dst)
 {
@@ -231,15 +231,15 @@ cleanup:
 }
 
 /**
-* Создает копию ASN.1 объекта заданного типа.
-* Если (*dst == NULL) выделяется память.
-* Выделяемая память требует освобождения.
+* Створює копію ASN.1-об'єкта заданого типу.
+* Якщо (*dst == NULL), пам'ять виділяється.
+* Виділена пам'ять потребує вивільнення.
 *
-* @param type тип объекта
-* @param src  источник
-* @param dst  приемник
+* @param type тип об'єкта
+* @param src  джерело
+* @param dst  приймач
 *
-* @return код ошибки
+* @return код помилки
 */
 void *asn_copy_with_alloc(asn_TYPE_descriptor_t *type, const void *src)
 {
@@ -263,13 +263,13 @@ cleanup:
 }
 
 /**
- * Сравнивает две ASN.1 структуры.
+ * Порівнює дві ASN.1-структури.
  *
- * @param type тип объекта
- * @param a    сравниваемая структура
- * @param b    сравниваемая структура
+ * @param type тип об'єкта
+ * @param a    структура для порівняння
+ * @param b    структура для порівняння
  *
- * @return равны ли a и b
+ * @return чи рівні a і b
  */
 bool asn_equals(asn_TYPE_descriptor_t *type, const void *a, const void *b)
 {
@@ -388,12 +388,18 @@ int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
     *text = NULL;
 
     count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
+    //  An error or no arcs: *text would be an empty buffer without the terminator
+    if ((count == (unsigned int)-1) || (count == 0)) {
+        SET_ERROR(RET_INVALID_OID);
+    }
     // If necessary, reallocate arcs array and try again.
     if (count > arc_slots) {
         arc_slots = count;
         MALLOC_CHECKED(arcs, (size_t)arc_type_size * arc_slots);
         count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
-        ASSERT(count == arc_slots);
+        if (count != arc_slots) {
+            SET_ERROR(RET_INVALID_OID);
+        }
     }
 
     CALLOC_CHECKED(*text, (size_t)count * 11); /*10 digits + 1 point or zero teminator*/
@@ -749,14 +755,14 @@ cleanup:
 }
 
 /**
- * Проверяет вхождение заданного OID`а в другой (родительский) OID.
+ * Перевіряє входження заданого OID в інший (батьківський) OID.
  *
- * @param oid         проверяемый OID
- * @param parent_arcs int-представление родительского OID`а
- * @param parent_size размер родительского OID`а
+ * @param oid         OID, що перевіряється
+ * @param parent_arcs int-подання батьківського OID
+ * @param parent_size розмір батьківського OID
  *
- * @return true  - OID входит в родительский
- *         false - OID не входит в родительский
+ * @return true  - OID входить до батьківського
+ *         false - OID не входить до батьківського
  */
 bool asn_check_oid_parent(const OBJECT_IDENTIFIER_t *oid, const long *parent_arcs, size_t parent_size)
 {
@@ -784,13 +790,13 @@ cleanup:
 }
 
 /**
- * Сравнивает два OID.
+ * Порівнює два OID.
  *
  * @param oid         OID
- * @param parent_arcs указатель на буфер для int`ов
- * @param parent_size указатель на размер буфера для int`ов
+ * @param parent_arcs вказівник на буфер для int-ів
+ * @param parent_size вказівник на розмір буфера для int-ів
  *
- * @return равны ли oid и parent_arcs
+ * @return чи рівні oid і parent_arcs
  */
 bool asn_check_oid_equal(const OBJECT_IDENTIFIER_t *oid, const long *parent_arcs, size_t parent_size)
 {
@@ -818,14 +824,14 @@ cleanup:
 }
 
 /**
- * Возврощает содержимое структуры OCTET STRING.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури OCTET STRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet     указатель на объект
- * @param bytes     указатель буфер содержащий содержимое структуры.
- * @param bytes_len размер буфера
+ * @param octet     вказівник на об'єкт
+ * @param bytes     вказівник на буфер, що містить вміст структури.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_OCTSTRING2bytes(const OCTET_STRING_t *octet, unsigned char **bytes, size_t *bytes_len)
 {
@@ -845,14 +851,14 @@ cleanup:
 }
 
 /**
- * Устанвливает содержимое структуры OCTET STRING.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури OCTET STRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param octet     указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param octet     вказівник на об'єкт
+ * @param bytes     вказівник на буфер з даними.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_bytes2OCTSTRING(OCTET_STRING_t *octet, const unsigned char *bytes, size_t bytes_len)
 {
@@ -871,14 +877,14 @@ cleanup:
 }
 
 /**
- * Возврощает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param integer   указатель на объект
- * @param bytes     указатель буфер содержащий содержимое структуры.
- * @param bytes_len размер буфера
+ * @param integer   вказівник на об'єкт
+ * @param bytes     вказівник на буфер, що містить вміст структури.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_INTEGER2bytes(const INTEGER_t *integer, unsigned char **bytes, size_t *bytes_len)
 {
@@ -898,14 +904,14 @@ cleanup:
 }
 
 /**
- * Устанвливает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param integer   указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param integer   вказівник на об'єкт
+ * @param bytes     вказівник на буфер з даними.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_bytes2INTEGER(INTEGER_t *integer, const unsigned char *value, size_t len)
 {
@@ -967,13 +973,13 @@ cleanup:
 }
 
 /**
- * Устанвливает содержимое структуры INTEGER.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури INTEGER.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param integer   указатель на объект
- * @param bytes     указатель буфер с данными.
+ * @param integer   вказівник на об'єкт
+ * @param bytes     вказівник на буфер з даними.
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_ba2INTEGER(const ByteArray *value, INTEGER_t *integer)
 {
@@ -1014,14 +1020,14 @@ cleanup:
 }
 
 /**
- * Возврощает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Повертає вміст структури BITSTRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param string    указатель на объект
- * @param bytes     указатель буфер содержащий содержимое структуры.
- * @param bytes_len размер буфера
+ * @param string    вказівник на об'єкт
+ * @param bytes     вказівник на буфер, що містить вміст структури.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_BITSTRING2bytes(const BIT_STRING_t *string, unsigned char **bytes, size_t *bytes_len)
 {
@@ -1054,14 +1060,14 @@ cleanup:
 }
 
 /**
- * Устанвливает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури BITSTRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param string    указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param string    вказівник на об'єкт
+ * @param bytes     вказівник на буфер з даними.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_bytes2BITSTRING(const unsigned char *bytes, BIT_STRING_t *string, size_t bytes_len)
 {
@@ -1080,14 +1086,14 @@ cleanup:
 }
 
 /**
- * Устанвливает содержимое структуры BITSTRING.
- * Выделяемая память требует освобождения.
+ * Встановлює вміст структури BITSTRING.
+ * Виділена пам'ять потребує вивільнення.
  *
- * @param string    указатель на объект
- * @param bytes     указатель буфер с данными.
- * @param bytes_len размер буфера
+ * @param string    вказівник на об'єкт
+ * @param bytes     вказівник на буфер з даними.
+ * @param bytes_len розмір буфера
  *
- * @return код ошибки
+ * @return код помилки
  */
 int asn_BITSTRING_get_bit(const BIT_STRING_t *string, int bit_num, int *bit_value)
 {
@@ -1171,7 +1177,7 @@ cleanup:
     return ret;
 }
 
-/** Преобразует OCTERT_STRING в объект указанного типа. */
+/** Перетворює OCTET_STRING на об'єкт зазначеного типу. */
 int asn_OCTSTRING_to_type(const OCTET_STRING_t *src, asn_TYPE_descriptor_t *type, void **dst)
 {
     uint8_t *buffer = NULL;

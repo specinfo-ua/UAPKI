@@ -445,6 +445,11 @@ OBJECT_IDENTIFIER_get_arcs(const OBJECT_IDENTIFIER_t *oid, void *arcs,
         errno = EINVAL;
         return -1;
     }
+    /* X.690 8.19.2: at least one subidentifier, the last octet of each has bit 8 = 0 */
+    if ((oid->size <= 0) || (oid->buf[oid->size - 1] & 0x80)) {
+        errno = EINVAL;
+        return -1;
+    }
 
     for (i = 0; i < oid->size; i++) {
         uint8_t b = oid->buf[i];
