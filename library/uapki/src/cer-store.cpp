@@ -31,6 +31,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 #include <string.h>
+#include <algorithm>
 #include "cer-store.h"
 #include "ba-utils.h"
 #include "crl-item.h"
@@ -373,6 +374,11 @@ int CerStore::getChainCerts (
     while (true) {
         DO(getIssuerCert(cer_subject, &cer_issuer, is_selfsigned));
         if (is_selfsigned) break;
+        //  A certificate that is its own issuer by the key identifier (e.g. without authorityKeyIdentifier)
+        //  or a cycle of certificates: not a chain
+        if ((cer_issuer == cerSubject) || (std::find(chainCerts.begin(), chainCerts.end(), cer_issuer) != chainCerts.end())) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
         chainCerts.push_back(cer_issuer);
         cer_subject = cer_issuer;
     }
@@ -397,6 +403,12 @@ int CerStore::getChainCerts (
         ret = getIssuerCert(cer_subject, &cer_issuer, is_selfsigned);
         if (ret == RET_OK) {
             if (is_selfsigned) break;
+            //  A certificate that is its own issuer by the key identifier (e.g. without authorityKeyIdentifier)
+            //  or a cycle of certificates: not a chain
+            if ((cer_issuer == cerSubject) || (std::find(chainCerts.begin(), chainCerts.end(), cer_issuer) != chainCerts.end())) {
+                ret = RET_UAPKI_INVALID_STRUCT;
+                break;
+            }
             chainCerts.push_back(cer_issuer);
             cer_subject = cer_issuer;
         }
