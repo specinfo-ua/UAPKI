@@ -1407,7 +1407,8 @@ int CertValidator::verifySignatureSignerInfo (
             signerInfo.getSignedAttrsEncoded(),
             false,
             (*cerSigner)->getSpki(),
-            signerInfo.getSignature()
+            signerInfo.getSignature(),
+            signerInfo.getDigestAlgorithm().algorithm.c_str()
         );
     }
 

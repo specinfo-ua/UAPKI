@@ -309,7 +309,8 @@ int Verify::verifySignature (
         const ByteArray* baData,
         const bool isHash,
         const ByteArray* baSignerSPKI,
-        const ByteArray* baSignValue
+        const ByteArray* baSignValue,
+        const char* digestAlgo
 )
 {
     int ret = RET_OK;
@@ -327,6 +328,12 @@ int Verify::verifySignature (
 
     hash_algo = hash_from_oid(signAlgo);
     sign_algo = signature_from_oid(signAlgo);
+    //  rsaEncryption in SignerInfo.signatureAlgorithm: RSASSA-PKCS1-v1_5 with the digest algorithm of the SignerInfo
+    //  (RFC 3370, 3.2)
+    if ((hash_algo == HASH_ALG_UNDEFINED) && digestAlgo && oid_is_equal(OID_RSA, signAlgo)) {
+        hash_algo = hash_from_oid(digestAlgo);
+        sign_algo = SIGN_RSA_PKCS_1_5;
+    }
     if ((hash_algo == HASH_ALG_UNDEFINED) || (sign_algo == SIGN_UNDEFINED)) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }

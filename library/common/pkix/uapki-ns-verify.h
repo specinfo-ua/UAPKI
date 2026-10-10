@@ -59,12 +59,15 @@ int verifyRsaV15Sign (
     const ByteArray* baHash,
     const ByteArray* baSignValue
 );
+//  digestAlgo - the digest algorithm of a CMS SignerInfo: used when signAlgo is rsaEncryption, which does not
+//  name the hash (RFC 3370, 3.2); nullptr - signAlgo has to name the hash itself
 int verifySignature (
     const char* signAlgo,
     const ByteArray* baData,
     const bool isHash,
     const ByteArray* baSignerSPKI,
-    const ByteArray* baSignValue
+    const ByteArray* baSignValue,
+    const char* digestAlgo = nullptr
 );
 
 

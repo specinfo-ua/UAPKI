@@ -1141,7 +1141,8 @@ int VerifiedSignerInfo::verifySignedAttribute (
             m_SignerInfo.getSignedAttrsEncoded(),
             false,
             m_CerSigner->getSpki(),
-            m_SignerInfo.getSignature()
+            m_SignerInfo.getSignature(),
+            m_SignerInfo.getDigestAlgorithm().algorithm.c_str()
         );
     }
     switch (ret) {
@@ -1338,7 +1339,8 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
             signer_info.getSignedAttrsEncoded(),
             false,
             attrTS.cerSigner->getSpki(),
-            signer_info.getSignature()
+            signer_info.getSignature(),
+            signer_info.getDigestAlgorithm().algorithm.c_str()
         );
     }
     switch (ret) {
