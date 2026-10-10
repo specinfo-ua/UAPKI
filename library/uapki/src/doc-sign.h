@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -111,6 +111,9 @@ struct SharedData : Params {
                 ocsp;
     LibraryConfig::TspParams
                 tsp;
+    //  tsp.uris - the TSAs of the signing certificate; the TSAs of INIT, tried after them (from the first)
+    std::vector<std::string>
+                tspFallbackUris;
     SmartBA     encodedSigningCert;
     SmartBA     encodedSignPolicy;
 
@@ -231,6 +234,24 @@ private:
     );
 
 };  //  end class SigningDoc
+
+//  The TSA: INIT tsp.url if "forced"; else all the TSAs of the signing certificate (subjectInfoAccess
+//  id-ad-timeStamping), then, if they are absent, do not respond or refuse, all the TSAs of INIT tsp.url.
+//  certUris - the TSAs of the certificate, configUris - of INIT (without those of the certificate)
+void tspUris (
+        const LibraryConfig::TspParams& tspParams,
+        const Cert::CerItem* cerSigner,
+        std::vector<std::string>& certUris,
+        std::vector<std::string>& configUris
+);
+//  A granted TSP response: tspUri (the TSA that granted before) if not empty, then certUris in random order,
+//  then configUris in their order (from the first); tspUri - the TSA that granted
+int requestTimestamp (
+        const std::vector<std::string>& certUris,
+        const std::vector<std::string>& configUris,
+        Tsp::TspHelper& tspHelper,
+        std::string& tspUri
+);
 
 int verifySignedData (
         CertValidator::CertValidator& certValidator,

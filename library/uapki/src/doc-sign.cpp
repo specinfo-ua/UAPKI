@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,6 +33,7 @@
 #include "oid-utils.h"
 #include "time-util.h"
 #include "uapki-ns-util.h"
+#include <algorithm>
 
 
 #define DEBUG_OUTCON(expression)
@@ -149,22 +150,9 @@ int SharedData::setupTsp (
     tsp.certReq = tspParams.certReq;
     tsp.nonceLen = tspParams.nonceLen;
     tsp.policyId = tspParams.policyId;
-    if (cerSigner) {
-        if (tspParams.forced && !tspParams.uris.empty()) {
-            tsp.uris = tspParams.uris;
-        }
-        else {
-            tsp.uris = cerSigner->getUris().tsp;
-            if (tsp.uris.empty()) {
-                tsp.uris = tspParams.uris;
-            }
-        }
-    }
-    else {
-        tsp.uris = tspParams.uris;
-    }
+    tspUris(tspParams, cerSigner, tsp.uris, tspFallbackUris);
 
-    if (tsp.uris.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
+    if (tsp.uris.empty() && tspFallbackUris.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
 
     return RET_OK;
 }
@@ -489,44 +477,12 @@ int SigningDoc::getTimestamp (
 
     DO(tspHelper.encodeRequest());
 
-    if (tspUri.empty()) {
-        const vector<string> shuffled_uris = HttpHelper::randomURIs(tsp_params.uris);
-        for (auto& it : shuffled_uris) {
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
-            ret = HttpHelper::post(
-                it,
-                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-                tspHelper.getRequestEncoded(),
-                &sba_resp
-            );
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
-            if (ret == RET_OK) {
-                tspUri = it;
-                break;
-            }
-        }
-    }
-    else {
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
-        ret = HttpHelper::post(
-            tspUri,
-            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-            tspHelper.getRequestEncoded(),
-            &sba_resp
-        );
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
-    }
-    if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
-    }
-
-    DO(tspHelper.parseResponse(sba_resp.get()));
-    if (
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED) &&
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED_WITHMODS)
-        ) {
-        SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
-    }
+    DO(requestTimestamp(
+        tsp_params.uris,
+        sharedData->tspFallbackUris,
+        tspHelper,
+        tspUri
+    ));
 
     DO(verifySignedData(
         certValidator,
@@ -632,8 +588,12 @@ int SigningDoc::setupSignerIdentifier (void)
         version = 1;
     }
     else {
-        DEBUG_OUTCON(printf("sharedData->keyId, hex:"); ba_print(stdout, sharedData->keyId.get()));
-        DO(signerInfo->setSid(Pkcs7::SignerIdentifierType::SUBJECT_KEYID, sharedData->keyId.get()));
+        //  subjectKeyIdentifier of the signing certificate (RFC 5652, 5.3): for DSTU 4145 it may be the hash
+        //  DSTU 7564 of the key while the key id of the storage is the hash GOST 34.311; the key id without
+        //  a certificate
+        const ByteArray* ba_keyid = (sharedData->cerSigner) ? sharedData->cerSigner->getKeyId() : sharedData->keyId.get();
+        DEBUG_OUTCON(printf("sid keyId, hex:"); ba_print(stdout, ba_keyid));
+        DO(signerInfo->setSid(Pkcs7::SignerIdentifierType::SUBJECT_KEYID, ba_keyid));
         version = 3;
     }
     DEBUG_OUTCON(printf("SigningDoc::setupSignerIdentifier(), sba_sid, hex:"); ba_print(stdout, sba_sid.get()));
@@ -830,6 +790,79 @@ int SigningDoc::encodeRevocationValues (
 
 cleanup:
     return ret;
+}
+
+void tspUris (
+        const LibraryConfig::TspParams& tspParams,
+        const Cert::CerItem* cerSigner,
+        vector<string>& certUris,
+        vector<string>& configUris
+)
+{
+    certUris.clear();
+    configUris.clear();
+    if (cerSigner && !(tspParams.forced && !tspParams.uris.empty())) {
+        certUris = cerSigner->getUris().tsp;
+    }
+    for (const auto& it : tspParams.uris) {
+        if (std::find(certUris.begin(), certUris.end(), it) == certUris.end()) {
+            configUris.push_back(it);
+        }
+    }
+}
+
+int requestTimestamp (
+        const vector<string>& certUris,
+        const vector<string>& configUris,
+        Tsp::TspHelper& tspHelper,
+        string& tspUri
+)
+{
+    vector<string> candidates;
+    auto add = [&candidates](const string& uri) {
+        if (std::find(candidates.begin(), candidates.end(), uri) == candidates.end()) {
+            candidates.push_back(uri);
+        }
+    };
+    if (!tspUri.empty()) {
+        add(tspUri);
+    }
+    for (const auto& it : HttpHelper::randomURIs(certUris)) {
+        add(it);
+    }
+    for (const auto& it : configUris) {
+        add(it);
+    }
+    if (candidates.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
+
+    int rv = RET_UAPKI_TSP_NOT_RESPONDING;
+    for (const auto& it : candidates) {
+        SmartBA sba_resp;
+        int ret = HttpHelper::post(
+            it,
+            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+            tspHelper.getRequestEncoded(),
+            &sba_resp
+        );
+        if (ret != RET_OK) continue;
+
+        //  A TSA that refuses (e.g. an unsupported hash algorithm) or answers wrongly: the next one
+        ret = tspHelper.parseResponse(sba_resp.get());
+        if (ret != RET_OK) {
+            rv = ret;
+            continue;
+        }
+        if (
+            (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED) &&
+            (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED_WITHMODS)
+        ) {
+            rv = RET_UAPKI_TSP_RESPONSE_NOT_GRANTED;
+            continue;
+        }
+        tspUri = it;
+        return RET_OK;
+    }
+    return rv;
 }
 
 int verifySignedData (

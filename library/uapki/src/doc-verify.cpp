@@ -201,6 +201,23 @@ bool AttrTimeStamp::isPresent (void) const
     );
 }
 
+const ByteArray* AttrTimeStamp::getAtsHashIndex (
+        Pkcs7::AtsV3::IndexType& indexType
+) const
+{
+    for (const auto& it : signerInfo.getUnsignedAttrs()) {
+        if (it.type == string(OID_ETSI_ATS_HASH_INDEX_V3)) {
+            indexType = Pkcs7::AtsV3::IndexType::EN_319_122;
+            return it.baValues;
+        }
+        if (it.type == string(OID_ETSI_ATS_HASH_INDEX)) {
+            indexType = Pkcs7::AtsV3::IndexType::TS_101_733;
+            return it.baValues;
+        }
+    }
+    return nullptr;
+}
+
 int AttrTimeStamp::parse (
         const ByteArray* baEncoded
 )
@@ -897,6 +914,7 @@ void VerifiedSignerInfo::validateValidityTimeCerts (
 
 int VerifiedSignerInfo::verifyArchiveTimeStamp (
         const vector<Cert::CerItem*>& certs,
+        const VectorBA& certsEncoded,
         const VectorBA& crls
 )
 {
@@ -908,6 +926,47 @@ int VerifiedSignerInfo::verifyArchiveTimeStamp (
             m_LastError = RET_UAPKI_INVALID_DIGEST;
             (void)verifyAttrTimestamp(m_ArchiveTS);
             return RET_OK;
+        }
+
+        //  archive-time-stamp-v3 with its hash index in the token (UAPKI 3.x, other libraries): first the index -
+        //  every hash it has refers to a value of the signature, then the message imprint by this index
+        //  (TS 101 733 6.4.2, 6.4.3; EN 319 122-1 5.5.2, 5.5.3). Of several archive time-stamps the last one,
+        //  its index covers the earlier ones
+        Pkcs7::AtsV3::IndexType index_type = Pkcs7::AtsV3::IndexType::EN_319_122;
+        const ByteArray* ba_hashindex = m_ArchiveTS.getAtsHashIndex(index_type);
+        if (ba_hashindex) {
+            bool is_validindex = false;
+            SmartBA sba_hash;
+            const HashAlg hash_alg = hash_from_oid(m_ArchiveTS.hashAlgo.c_str());
+            m_ArchiveTS.statusDigest = SignatureVerifyStatus::INVALID;
+            //  The hash of the signed data by the hash algorithm of the time-stamp: the message-digest attribute
+            //  if it is the digest algorithm of the signature
+            if (
+                (hash_alg != HASH_ALG_UNDEFINED) &&
+                (m_ArchiveTS.hashAlgo == m_SignerInfo.getDigestAlgorithm().algorithm) &&
+                (Pkcs7::AtsV3::checkHashIndex(index_type, ba_hashindex, certsEncoded, crls, m_SignerInfo.getAsn1Data(), is_validindex) == RET_OK) &&
+                is_validindex &&
+                (Pkcs7::AtsV3::calcMessageImprint(
+                    hash_alg,
+                    m_SignerInfo.getContentType(),
+                    m_SignerInfo.getMessageDigest(),
+                    m_SignerInfo.getAsn1Data(),
+                    ba_hashindex,
+                    &sba_hash
+                ) == RET_OK) &&
+                (ba_cmp(m_ArchiveTS.hashedMessage.get(), sba_hash.get()) == 0)
+            ) {
+                m_ArchiveTS.statusDigest = SignatureVerifyStatus::VALID;
+            }
+            if (m_ArchiveTS.statusDigest == SignatureVerifyStatus::INVALID) {
+                m_LastError = RET_UAPKI_INVALID_DIGEST;
+            }
+            ret = verifyAttrTimestamp(m_ArchiveTS);
+            if (ret != RET_OK) {
+                m_LastError = ret;
+                ret = (ret == RET_UAPKI_CERT_NOT_FOUND) ? RET_OK : ret;
+            }
+            return ret;
         }
 
         DO(m_ArchiveTsHelper.init((const AlgorithmIdentifier*)&m_SignerInfo.getDigestAlgorithm()));

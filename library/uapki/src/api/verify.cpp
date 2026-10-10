@@ -738,7 +738,7 @@ static int verify_p7s (
             DO(verified_sinfo.verifyContentTimeStamp(*verify_sdoc.refContentHasher));
             DO(verified_sinfo.verifySignatureTimeStamp());
             DO(verified_sinfo.verifyCertificateRefs());
-            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.sdataParser.getCrls()));
+            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.sdataParser.getCerts(), verify_sdoc.sdataParser.getCrls()));
 
             verified_sinfo.validateSignFormat(verify_sdoc.validateTime, verify_sdoc.refContentHasher->isPresent());
             if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {

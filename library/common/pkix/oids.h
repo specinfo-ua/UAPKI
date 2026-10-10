@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -489,6 +489,8 @@ DEFINE_OID(OID_PDS_UKRAINE_EDDR,            "1.2.804.2.1.1.1.11.1.4.11.1");
 //-----------------------------------------------------------------------------------------
 //ETSI
 DEFINE_OID(OID_ETSI_ARCHIVE_TIMESTAMP_V3,   "0.4.0.1733.2.4");
+DEFINE_OID(OID_ETSI_ATS_HASH_INDEX,         "0.4.0.1733.2.5");      //  ETSI TS 101 733, 6.4.2
+DEFINE_OID(OID_ETSI_ATS_HASH_INDEX_V3,      "0.4.0.19122.1.5");     //  ETSI EN 319 122-1, 5.5.2
 //-----------------------------------------------------------------------------------------
 
 

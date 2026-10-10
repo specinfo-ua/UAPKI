@@ -30,6 +30,7 @@
 
 #include "uapki-ns.h"
 #include "archive-timestamp-helper.h"
+#include "archive-timestamp-v3.h"
 #include "cer-store.h"
 #include "cert-validator.h"
 #include "content-hasher.h"
@@ -83,6 +84,11 @@ struct AttrTimeStamp {
     ~AttrTimeStamp (void);
 
     bool isPresent (void) const;
+    //  The hash index of an archive-time-stamp-v3 in its token: ats-hash-index-v3 (EN 319 122-1) or
+    //  ats-hash-index (TS 101 733), nullptr if absent (CAdES-A of UAPKI 2.x)
+    const ByteArray* getAtsHashIndex (
+        Pkcs7::AtsV3::IndexType& indexType
+    ) const;
     int parse (
         const ByteArray* baEncoded
     );
@@ -254,8 +260,10 @@ public:
     void validateValidityTimeCerts (
         const uint64_t validateTime
     );
+    //  certs - the certificates of the store added from the signature, certsEncoded - SignedData.certificates
     int verifyArchiveTimeStamp (
         const std::vector<Cert::CerItem*>& certs,
+        const VectorBA& certsEncoded,
         const VectorBA& crls
     );
     int verifyCertificateRefs (void);

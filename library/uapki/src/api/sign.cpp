@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -306,7 +306,12 @@ int uapki_sign (
             DO(cer_store.getCertByCertId(storage->getPairedCertId(), &shared_data.cerSigner));
         }
         else {
-            DO(cer_store.getCertByKeyId(storage->getSelectedKeyId(), &shared_data.cerSigner));
+            //  DSTU 4145: the certificate by keyId (GOST 34.311) or keyId2 (DSTU 7564-256), see SELECT_KEY
+            ret = cer_store.getCertByKeyId(storage->getSelectedKeyId(), &shared_data.cerSigner);
+            if ((ret == RET_UAPKI_CERT_NOT_FOUND) && storage->getSelectedKeyId2()) {
+                ret = cer_store.getCertByKeyId(storage->getSelectedKeyId2(), &shared_data.cerSigner);
+            }
+            DO(ret);
         }
         DO(json_object_set_base64(joResult, "signerCertId", shared_data.cerSigner->getCertId()));
         if (!shared_data.cerSigner->keyUsageByBit(KeyUsage_digitalSignature)) {

@@ -16,7 +16,7 @@ The version number in the document title corresponds to the version of the uapki
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
-| 3       | 2026-10-10 | Library version 2.0.18: the ADD_CRL method adds a CRL only with the certificate of its issuer in the cache and a valid signature; "options.onlyCrl" of the VERIFY method defaults to "validationByCrl" |
+| 3       | 2026-10-10 | Library version 2.0.18: the ADD_CRL method adds a CRL only with the certificate of its issuer in the cache and a valid signature; "options.onlyCrl" of the VERIFY method defaults to "validationByCrl"; the certificate of a DSTU 4145 key by the key identifier of GOST 34.311 or DSTU 7564; the choice of the TSP service and all the access points of OCSP and CRL; archive time-stamps of the library 3.x verified by the index in the token |
 
 # General information
 
@@ -251,7 +251,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | **Field name** | **Type** | **Description**                                                                                                                                                                                                                                            |
 | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | certReq        | Boolean | Requirement to return the service certificate in the TSP response.<br>Optional, default is false                                                                                                                                                 |
-| forced         | Boolean | Requirement to use the TSP service URLs<br>specified in the "url" field, ignoring the addresses specified in the<br>signer's certificate. Optional,<br>default is false                                                               |
+| forced         | Boolean | Requirement to use the TSP service URLs<br>specified in the "url" field, ignoring the addresses specified in the<br>signer's certificate. Without it all the TSP services of the signer's<br>certificate are tried first (in random order), then, if they are absent,<br>do not respond or refuse, all the addresses of "url" in their order.<br>Optional, default is false                                                               |
 | nonceLen       | Integer | Length of the one-time random number in the TSP<br>request. Value range: 0, 4..32. If the value<br>equals 0 or is out of range, the<br>random number in the TSP request is not used.<br>Optional, default is 8 |
 | policyId       | OID     | Identifier of the TSP service policy. If the field<br>is absent or its value is an empty string, the TSP service<br>policy parameter in the request is not used.<br>Optional                                                                            |
 
@@ -1365,6 +1365,8 @@ Additional signature parameters can be specified in the options (the "options" f
 
 When the "ignoreCertStatus" parameter is set to true, the status of the key owner's certificate will not be checked during signing. This option is available only for the CAdES-BES and CAdES-T signature formats; for other signature formats it will be ignored.
 
+The certificate of a DSTU 4145 key is looked up by the key identifier calculated by GOST 34.311 or DSTU 7564-256 - as the CA set the subjectKeyIdentifier of the certificate. In the "CMS" format the signer is identified by the subjectKeyIdentifier of the certificate if the certificate is added to the signature ("includeCert"), else by the key identifier.
+
 Signature formats are described in Appendix B. The signature format names "CAdES-LT" and "CAdES-LTA" are synonyms for "CAdES-XL" and "CAdES-A" respectively.
 
 ### Structure of the parameters field in the request
@@ -1838,6 +1840,10 @@ The method supports three types of validation of a CMS/CAdES-format signature (t
 To simplify the analysis of the signature validation results, the result fields "validSignatures", "validDigests" and "bestSignatureTime" can be used. The "bestSignatureTime" field contains the best trusted signature time: the time of the signature time-stamp ("signatureTS.genTime"), without it the time of the content time-stamp ("contentTS.genTime"), without them the validation time. The "signingTime" attribute is claimed by the signer, so it is only reported and not used as the signature time. A revocation of a certificate after this time does not invalidate the signature (the same for OCSP and CRL).
 
 The signature format is determined by the attributes present: CAdES is a signature with the signingCertificateV2 attribute, whatever the type of the signer identifier (issuerAndSerialNumber or subjectKeyIdentifier), otherwise CMS. Then: "CAdES-T" - a signature time-stamp is present (the content time-stamp is optional); "CAdES-C" - certificateRefs and revocationRefs are present; "CAdES-XL" ("CAdES-LT") - certValues and revocationValues are present (with or without the references); "CAdES-A" ("CAdES-LTA") - an archive time-stamp is present. The signer certificate in the signingCertificateV2 attribute is identified by the first entry: its hash, and issuerSerial (if present), must match the signer certificate. If the signer is identified by subjectKeyIdentifier and the cache holds several certificates of this key (for example, re-issued by another CA on the same key), the certificate the signingCertificateV2 attribute points to is used, without it the certificate included in the signature.
+
+An archive time-stamp with an index in its token (signatures of the library 3.x and of other libraries) is verified by it: ats-hash-index - by ETSI TS 101 733, 6.4.2 and 6.4.3; ats-hash-index-v3 - by ETSI EN 319 122-1, 5.5.2 and 5.5.3. Every hash of the index must match a certificate, a CRL or an OCSP response of SignedData or an unsigned attribute, and the message imprint is calculated by this index; of several archive time-stamps the last one is verified - its index covers the earlier ones. An archive time-stamp without an index (CAdES-A of the library 2.x) is verified as before. This version does not use the revocation data of SignedData.crls (the B-LT and B-LTA levels of ETSI EN 319 122-1): offline such signatures give INDETERMINATE.
+
+When the status is checked, all the access points of a certificate are tried: if an OCSP responder does not respond, refuses (responseStatus not successful) or returns not an OCSP response, the next one is tried; if a CRL distribution point does not respond or gives not a CRL of the issuer of the certificate or an expired CRL - the next one.
 
 When the "CHAIN" or "FULL" validation type is used, the "certificateChain" field stores information about the certificate chain (an array of CERT_CHAIN_INFO records).
 

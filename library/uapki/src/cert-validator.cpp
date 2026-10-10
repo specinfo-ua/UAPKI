@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -649,18 +649,38 @@ int CertValidator::validateByOcsp (
         DO(ocsp_helper.encodeRequest());
         (void)sba_ocsprequest.set(ocsp_helper.getRequestEncoded(true));
 
+        //  All the OCSP responders of the certificate: the next one if a responder does not respond, refuses
+        //  (responseStatus not successful) or answers not an OCSP response
         shuffled_uris = HttpHelper::randomURIs(cerSubject->getUris().ocsp);
+        int err_last = RET_UAPKI_OCSP_NOT_RESPONDING;
         for (auto& it : shuffled_uris) {
+            sba_ocspresponse.clear();
             ret = HttpHelper::post(
                 it,
                 HttpHelper::CONTENT_TYPE_OCSP_REQUEST,
                 sba_ocsprequest.get(),
                 &sba_ocspresponse
             );
-            if (ret == RET_OK) {
-                DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), sba_ocspresponse.size()));
+            if (ret != RET_OK) {
+                err_last = ret;
+                continue;
+            }
+            DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), sba_ocspresponse.size()));
+            Ocsp::OcspHelper ocsp_probe;
+            if (ocsp_probe.parseResponse(sba_ocspresponse.get()) != RET_OK) {
+                err_last = RET_UAPKI_OCSP_RESPONSE_INVALID;
+            }
+            else if (ocsp_probe.getResponseStatus() != Ocsp::ResponseStatus::SUCCESSFUL) {
+                err_last = RET_UAPKI_OCSP_RESPONSE_NOT_SUCCESSFUL;
+            }
+            else {
+                ret = RET_OK;
                 break;
             }
+            ret = err_last;
+        }
+        if (ret != RET_OK) {
+            ret = err_last;
         }
         if (ret != RET_OK) {
             SET_ERROR(ret);
@@ -959,38 +979,52 @@ int CertValidator::getCrl (
                 SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
             }
 
+            //  All the distribution points of the certificate: the next one if a point does not respond, gives
+            //  not a CRL of the issuer of this certificate or an expired one
             const vector<string> shuffled_uris = HttpHelper::randomURIs(uris_crl);
+            int err_last = RET_UAPKI_CRL_NOT_DOWNLOADED;
             DEBUG_OUTCON(printf("CertValidator::getCrl(is full=%d), download CRL", is_full));
             for (auto& it : shuffled_uris) {
+                sba_crl.clear();
+                crl_item = nullptr;
                 DEBUG_OUTCON(printf("CertValidator::getCrl(), HttpHelper::get('%s')\n", it.c_str()));
                 ret = HttpHelper::get(it, &sba_crl);
-                if (ret == RET_OK) {
-                    DEBUG_OUTCON(printf("CertValidator::getCrl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+                if (ret != RET_OK) {
+                    err_last = RET_UAPKI_CRL_NOT_DOWNLOADED;
+                    continue;
+                }
+                DEBUG_OUTCON(printf("CertValidator::getCrl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+
+                //  The same way into the cache as ADD_CRL, plus: signed by the issuer of this certificate
+                bool is_unique;
+                ret = addCrlToStore(
+                    crlStore,
+                    cerStore,
+                    sba_crl.get(),
+                    true,
+                    cerSubject,
+                    is_unique,
+                    &crl_item
+                );
+                if (ret != RET_OK) {
+                    err_last = ret;
+                }
+                else if (!crl_item) {
+                    err_last = RET_UAPKI_CRL_NOT_FOUND;
+                }
+                else if (crl_item->getNextUpdate() < validateTime) {
+                    DEBUG_OUTCON(puts("CertValidator::getCrl(), the CRL is expired: the next distribution point"));
+                    err_last = RET_UAPKI_CRL_EXPIRED;
+                }
+                else {
+                    ret = RET_OK;
                     break;
                 }
+                crl_item = nullptr;
+                ret = err_last;
             }
             if (ret != RET_OK) {
-                SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
-            }
-
-            //  The same way into the cache as ADD_CRL, plus: signed by the issuer of this certificate
-            bool is_unique;
-            DO(addCrlToStore(
-                crlStore,
-                cerStore,
-                sba_crl.get(),
-                true,
-                cerSubject,
-                is_unique,
-                &crl_item
-            ));
-            if (!crl_item) {
-                SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
-            }
-
-            if (crl_item->getNextUpdate() < validateTime) {
-                DEBUG_OUTCON(puts("CertValidator::getCrl(), need get newest CRL. Again... stop it!"));
-                SET_ERROR(RET_UAPKI_CRL_EXPIRED);
+                SET_ERROR(err_last);
             }
         }
     }   //  end lock_guard
