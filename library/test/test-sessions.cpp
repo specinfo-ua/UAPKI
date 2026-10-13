@@ -125,6 +125,7 @@ struct Options {
     string      signerCertB64;
     string      providerDir;
     string      workDir;
+    string      certDir;        //  the directory of the certificate of --cert, with the trailing separator
     unsigned    countSessions;
     unsigned    countSigns;
     unsigned    rsaBits;
@@ -2253,8 +2254,8 @@ static bool test_trust_list (
     const string list = read_file_base64(DIR_LISTS + "trust-list.xml");
     const string list_old = read_file_base64(DIR_LISTS + "trust-list-old.xml");
     const string list_withdrawn = read_file_base64(DIR_LISTS + "trust-list-withdrawn.xml");
-    const string ca_cert = read_file_base64("certs/diia-CA-05E19E2CD92EA2990100000001000000E1000000.cer");
-    const string tsa_cert = read_file_base64("certs/diia-2023-tsp-05E19E2CD92EA29902000000010000004A010000.cer");
+    const string ca_cert = read_file_base64(options.certDir + "diia-CA-05E19E2CD92EA2990100000001000000E1000000.cer");
+    const string tsa_cert = read_file_base64(options.certDir + "diia-2023-tsp-05E19E2CD92EA29902000000010000004A010000.cer");
     const string lists_dir = options.workDir + "/trust-lists/";
     string list_text;
     {
@@ -2268,7 +2269,7 @@ static bool test_trust_list (
     }
 
     const bool has_data = !signer_cert.empty() && !list.empty() && !list_old.empty() && !list_withdrawn.empty() && !ca_cert.empty() && !tsa_cert.empty() && !list_text.empty();
-    if (!checker.check(has_data, "the test trusted lists (trust-list) or the certificates (certs) are not found in the current directory")) {
+    if (!checker.check(has_data, "the test trusted lists (trust-list, in the current directory) or the certificates (in the directory of --cert) are not found")) {
         checker.report("ADD_TRUST_LIST: trusted lists");
         return checker.passed();
     }
@@ -2631,6 +2632,7 @@ int main (int argc, char* argv[])
     }
 
     options.signerCertB64 = read_file_base64(cert_file);
+    options.certDir = cert_file.substr(0, cert_file.find_last_of("/\\") + 1);
     if (options.signerCertB64.empty()) {
         return show_usage(("Can't read certificate '" + cert_file + "'").c_str());
     }
@@ -2655,8 +2657,7 @@ int main (int argc, char* argv[])
     }
 
     SharedMemorySetup shared_setup;
-    const string cert_source_dir = cert_file.substr(0, cert_file.find_last_of("/\\") + 1);
-    if (!prepare_shared_memory_data(loader, options, cert_source_dir, shared_setup)) {
+    if (!prepare_shared_memory_data(loader, options, options.certDir, shared_setup)) {
         return show_usage("Can't prepare the shared memory test data");
     }
 
