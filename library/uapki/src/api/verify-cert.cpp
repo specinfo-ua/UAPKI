@@ -90,6 +90,12 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
         DO(Cert::parseCert(sba_encoded.get(), &cer_parsed));
         cer_subject = cer_parsed;
+        {   //  The certificate of the cache, if it is there: it has what the library knows about its trust
+            Cert::CerItem* cer_cached = nullptr;
+            if (cert_validator.getCerStore()->getCertByEncoded(sba_encoded.get(), &cer_cached) == RET_OK) {
+                cer_subject = cer_cached;
+            }
+        }
     }
     else {
         SmartBA sba_certid;
@@ -120,7 +126,8 @@ int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult)
     is_expired = check_validity_time(cer_issuer, cer_subject, validate_time);
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "expired", is_expired));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", is_selfsigned));
-    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cer_subject->isTrusted()));
+    //  Trusted at the validation time (a certificate of a trusted list is trusted in a period)
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cer_subject->isTrustedAt(validate_time)));
     if (cer_subject->getVerifyStatus() == Cert::VerifyStatus::UNDEFINED) {
         DO(cer_subject->verify(cer_issuer));
     }

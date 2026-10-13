@@ -195,6 +195,56 @@ int rdnameFromName (
 
 namespace Cert {
 
+//  "trusted" and, for a certificate of a service of a trusted list, "trustServices"
+int trustToJson (
+        JSON_Object* joResult,
+        const CerItem* cerItem
+)
+{
+    int ret = RET_OK;
+    const std::shared_ptr<const TrustServices> services = cerItem->getTrustServices();
+
+    DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trusted", cerItem->isTrusted()));
+    if (cerItem->isTrustListSigner()) {
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "trustListSigner", true));
+    }
+    if (!services || services->empty()) return RET_OK;
+
+    DO_JSON(json_object_set_value(joResult, "trustServices", json_value_init_array()));
+    {
+        JSON_Array* ja_services = json_object_get_array(joResult, "trustServices");
+        for (const auto& it : *services) {
+            DO_JSON(json_array_append_value(ja_services, json_value_init_object()));
+            JSON_Object* jo_service = json_array_get_object(ja_services, json_array_get_count(ja_services) - 1);
+            DO_JSON(json_object_set_string(jo_service, "listId", it.listId.c_str()));
+            DO_JSON(json_object_set_string(jo_service, "type", it.type.c_str()));
+            DO_JSON(json_object_set_string(jo_service, "tspName", it.tspName.c_str()));
+            DO_JSON(json_object_set_string(jo_service, "serviceName", it.serviceName.c_str()));
+            if (it.forESignatures) {
+                DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_service, "forESignatures", true));
+            }
+            if (it.forESeals) {
+                DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_service, "forESeals", true));
+            }
+            //  The status of the service in time, the current one first
+            DO_JSON(json_object_set_value(jo_service, "statuses", json_value_init_array()));
+            JSON_Array* ja_statuses = json_object_get_array(jo_service, "statuses");
+            for (const auto& it_period : it.periods) {
+                DO_JSON(json_array_append_value(ja_statuses, json_value_init_object()));
+                JSON_Object* jo_status = json_array_get_object(ja_statuses, json_array_get_count(ja_statuses) - 1);
+                DO_JSON(json_object_set_string(jo_status, "status", it_period.status.c_str()));
+                DO_JSON(json_object_set_string(jo_status, "from", TimeUtil::mtimeToFtime(it_period.msFrom).c_str()));
+                if (it_period.msTo > 0) {
+                    DO_JSON(json_object_set_string(jo_status, "to", TimeUtil::mtimeToFtime(it_period.msTo).c_str()));
+                }
+            }
+        }
+    }
+
+cleanup:
+    return ret;
+}
+
 int detailInfoToJson (
         JSON_Object* joResult,
         const CerItem* cerItem
@@ -224,6 +274,7 @@ int detailInfoToJson (
     DO(extensionsToJson(json_object_get_array(joResult, "extensions"), cerItem));
     DO(signatureInfoToJson(json_object_get_object(joResult, "signatureInfo"), cerItem));
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "selfSigned", cerItem->isSelfSigned()));
+    DO(trustToJson(joResult, cerItem));
 
 cleanup:
     return ret;

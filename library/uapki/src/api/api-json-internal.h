@@ -82,6 +82,10 @@ int uapki_remove_cert (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_verify_cert (JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_add_crl (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_add_trust_list (JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_trust_lists (JSON_Object* joParams, JSON_Object* joResult);
+namespace UapkiNS { namespace Cert { class CerStore; } }
+int uapki_load_trust_lists (UapkiNS::Cert::CerStore* cerStore, size_t& countLoaded, size_t& countRefused);
 int uapki_crl_info (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_list_crls (JSON_Object* joParams, JSON_Object* joResult);
 int uapki_remove_crl (JSON_Object* joParams, JSON_Object* joResult);

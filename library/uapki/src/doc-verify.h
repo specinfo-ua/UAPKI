@@ -196,6 +196,8 @@ class VerifiedSignerInfo : public CertValidator::CertValidator {
     DataVerifyStatus
                 m_StatusEssCert;
     std::string m_SigPolicyId;
+    VectorBA    m_TsCrls;               //  CRLs of the validation data of the TSUs (in their time-stamp tokens)
+    VectorBA    m_TsOcspVals;           //  BasicOCSPResponse of the validation data of the TSUs
     AttrTimeStamp
                 m_ContentTS;
     AttrTimeStamp
@@ -210,6 +212,12 @@ class VerifiedSignerInfo : public CertValidator::CertValidator {
     bool        m_IsValidSignatures;
     bool        m_IsValidDigests;
     uint64_t    m_BestSignatureTime;
+    bool        m_RevocationNotFresh;   //  An embedded OCSP response not fresh for the best signature time
+    bool        m_ExpiredSignerCert;    //  The certificate of the signer is expired, the signing before it is not proven
+    bool        m_ExpiredChainCert;     //  Another certificate of the chain is expired
+    bool        m_StatusSignerUnknown;  //  The status of an OCSP responder (a CRL signer) is not determined
+    bool        m_TsaKeyCompromised;    //  See CertValidator::tsaKeyTrust()
+    bool        m_TsaRevokedNoReason;
     std::vector<CertChainItem*>
                 m_CertChainItems;
     ListAddedCerts
@@ -236,6 +244,13 @@ public:
         CertChainItem** certChainItem,
         bool& isNewItem
     );
+    //  The issuance time of the revocation data the certificate signed: producedAt of an OCSP response
+    //  (certEntity OCSP), thisUpdate of a CRL (certEntity CRL); 0 - not known. The validity period of such
+    //  a certificate is checked for this time, not for the validation time (ETSI EN 319 102-1, 5.2.6.4)
+    uint64_t getTimeOfStatusData (
+        const CertEntity certEntity,
+        const Cert::CerItem* cerItem
+    ) const;
     int addCrlCertsToChain (
         const uint64_t validateTime
     );
@@ -252,6 +267,9 @@ public:
         const uint64_t validateTime
     );
     int tspCertToStore ();
+    int tspValidationData (
+        AttrTimeStamp& attrTS
+    );
     void validateSignFormat (
         const uint64_t validateTime,
         const bool contentIsPresent

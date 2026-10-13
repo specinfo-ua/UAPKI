@@ -277,11 +277,11 @@ static const char* STR_UAPKI_ERRORS[COUNT_UAPKI_ERRORS] = {
     "",
     "",
     "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    "TRUST_LIST_INVALID",               //  (UAPKI_ERROR_NAME_CODE | 0x00000078)
+    "TRUST_LIST_VERIFY_FAILED",         //  (UAPKI_ERROR_NAME_CODE | 0x00000079)
+    "TRUST_LIST_SIGNER_NOT_TRUSTED",    //  (UAPKI_ERROR_NAME_CODE | 0x0000007A)
+    "TRUST_LIST_OBSOLETE",              //  (UAPKI_ERROR_NAME_CODE | 0x0000007B)
+    "CERT_TRUSTED_NOT_REMOVABLE",       //  (UAPKI_ERROR_NAME_CODE | 0x0000007C)
     "",
     "",
     ""

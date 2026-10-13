@@ -194,6 +194,16 @@ static const UapkiMethod uapki_methods[] = {
         call_thread_method
     },
     {
+        "ADD_TRUST_LIST",
+        uapki_add_trust_list,
+        call_thread_method
+    },
+    {
+        "LIST_TRUST_LISTS",
+        uapki_list_trust_lists,
+        call_thread_method
+    },
+    {
         "CRL_INFO",
         uapki_crl_info,
         call_thread_method

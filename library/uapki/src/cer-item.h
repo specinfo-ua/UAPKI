@@ -29,6 +29,7 @@
 #define UAPKI_CER_ITEM_H
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include "uapkic.h"
 #include "uapkif.h"
@@ -107,6 +108,38 @@ struct CertStatusInfo {
     );
 
 };  //  end struct CertStatusInfo
+
+
+//  What a trusted list says about a certificate (a service digital identity of ETSI TS 119 612): the type of
+//  the service and the periods of its status, the current one first
+struct TrustService {
+    struct Period {
+        std::string status;         //  the last segment of the status URI: "granted", "withdrawn"...
+        uint64_t    msFrom;         //  the starting time of the status
+        uint64_t    msTo;           //  the time the next status started; 0 - the current status
+        Period (void) : msFrom(0), msTo(0) {}
+    };
+
+    std::string listId;             //  the trusted list the service comes from
+    std::string type;               //  the service type after ".../Svctype/": "CA/QC", "TSA/QTST", "Certstatus/OCSP"...
+    std::string tspName;
+    std::string serviceName;
+    bool        forESignatures;     //  additional service information of a CA/QC service
+    bool        forESeals;
+    std::vector<Period>
+                periods;
+
+    TrustService (void) : forESignatures(false), forESeals(false) {}
+
+    //  The status at the time; nullptr if the service did not exist then
+    const Period* periodAt (const uint64_t msTime) const;
+    //  The status of a service that is provided ("granted", "recognisedatnationallevel"...), not ended
+    static bool isActiveStatus (const std::string& status);
+    //  A service that issues certificates: its certificate is a trust anchor
+    bool isCa (void) const;
+};
+
+typedef std::vector<TrustService> TrustServices;
 
 
 struct CertExtKeyUsage {
@@ -204,8 +237,13 @@ private:
     size_t      m_PublicKeySize;
     std::atomic_bool
                 m_SelfSigned;
+    //  Trusted by the configuration of the library (INIT); the trust by a trusted list is in m_TrustServices
     std::atomic_bool
-                m_Trusted;
+                m_TrustedInit;
+    std::atomic_bool
+                m_TrustListSigner;
+    std::shared_ptr<const TrustServices>
+                m_TrustServices;
     Uris        m_Uris;
     VerifyStatus
                 m_VerifyStatus;
@@ -305,9 +343,54 @@ public:
     bool isSelfSigned (void) const {
         return m_SelfSigned;
     }
-    bool isTrusted (void) const {
-        return m_Trusted;
+    //  Trust. A certificate given to INIT as trusted is trusted always. A certificate of a trusted list is
+    //  trusted conditionally: at a time from the first provision of a service of the certificate to its sunset
+    //  date - the end of the last period a service was provided in (ETSI EN 319 102-1: the trust anchor sunset
+    //  date); what the list says is kept whatever the status is now, so a signature made in that period is
+    //  validated with it.
+    //  isTrusted() - trusted now
+    bool isTrusted (void) const;
+    //  Trusted at the time (milliseconds; 0 - now)
+    bool isTrustedAt (
+        const uint64_t msTime
+    ) const;
+    //  May be a trust anchor at some time: trusted by INIT or a certificate of a service of a trusted list
+    bool isTrustAnchorCandidate (void) const;
+    //  Was a trust anchor at some time: trusted by INIT or a certificate of a service that was provided
+    bool wasTrusted (void) const;
+    //  The period a certificate of a trusted list is a trust anchor in: from the first time a service of it was
+    //  provided to the sunset date (0 - none, a service is provided now); false - no service was ever provided
+    bool trustPeriod (
+        uint64_t& msStart,
+        uint64_t& msSunset
+    ) const;
+    //  Trusted by the configuration of the library (the trusted certificates of INIT), not by a trusted list
+    bool isTrustedInit (void) const {
+        return m_TrustedInit;
     }
+    //  The services of trusted lists the certificate is the identity of; nullptr if none
+    std::shared_ptr<const TrustServices> getTrustServices (void) const {
+        return std::atomic_load(&m_TrustServices);
+    }
+    //  The certificate verifies the signature of trusted lists (INIT, trustListCache.trustListSignerCerts): a status
+    //  of its own, it does not make the certificate trusted in a certification path
+    bool isTrustListSigner (void) const {
+        return m_TrustListSigner;
+    }
+    void setTrustListSigner (void) {
+        m_TrustListSigner = true;
+        m_MarkedToRemove = false;
+    }
+    //  The certificate is a service of a trusted list provided at the time; typeMark - a part of the type of the
+    //  service ("OCSP", "CRL", "TSA/", "CA/")
+    bool hasActiveTrustService (
+        const char* typeMark,
+        const uint64_t msTime
+    ) const;
+    //  The services of the trusted lists replace the ones the certificate had (nullptr - none)
+    void setTrustServices (
+        const std::shared_ptr<const TrustServices>& trustServices
+    );
     bool isUniqueKeyId (void) const {
         return m_UniqueKeyId;
     }

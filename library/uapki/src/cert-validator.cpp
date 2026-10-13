@@ -64,6 +64,7 @@ CertChainItem::CertChainItem (
     , m_CerIssuer(nullptr)
     , m_Expired(true)
     , m_ValidationType(Cert::ValidationType::UNDEFINED)
+    , m_TrustTime(0)
 {
 }
 
@@ -116,6 +117,61 @@ void CertChainItem::setIssuer (
 void CertChainItem::setRoot (void)
 {
     m_CertEntity = CertEntity::ROOT;
+    m_CerIssuer = m_CerSubject;
+    m_ValidationType = Cert::ValidationType::NONE;
+    (void)m_CerSubject->verify(m_CerIssuer);
+}
+
+TsaKeyTrust tsaKeyTrust (
+        const CertChainItem& tsaItem
+)
+{
+    bool is_revoked = false;
+    CrlReason reason = CrlReason::UNDEFINED;
+    switch (tsaItem.getValidationType()) {
+    case Cert::ValidationType::CRL: {
+        const ResultValidationByCrl& by_crl = tsaItem.getResultValidationByCrl();
+        if (by_crl.certStatus == CertStatus::REVOKED) {
+            is_revoked = true;
+            reason = by_crl.revokedCertItem.crlReason;
+        }
+        else if (by_crl.hasRevokedLater) {
+            is_revoked = true;
+            reason = by_crl.revokedLater.crlReason;
+        }
+        break;
+    }
+    case Cert::ValidationType::OCSP: {
+        const ResultValidationByOcsp& by_ocsp = tsaItem.getResultValidationByOcsp();
+        if (
+            (by_ocsp.statusSignature == SignatureVerifyStatus::VALID) &&
+            (by_ocsp.singleResponseInfo.certStatus == CertStatus::REVOKED)
+        ) {
+            is_revoked = true;
+            reason = by_ocsp.singleResponseInfo.revocationReason;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    if (!is_revoked) return TsaKeyTrust::OK;
+
+    switch (reason) {
+    case CrlReason::KEY_COMPROMISE:
+    case CrlReason::CA_COMPROMISE:
+    case CrlReason::AA_COMPROMISE:
+        return TsaKeyTrust::COMPROMISED;
+    case CrlReason::UNDEFINED:
+    case CrlReason::UNSPECIFIED:
+        return TsaKeyTrust::REASON_NOT_GIVEN;
+    default:
+        return TsaKeyTrust::OK;
+    }
+}
+
+void CertChainItem::setTrustAnchor (void)
+{
     m_CerIssuer = m_CerSubject;
     m_ValidationType = Cert::ValidationType::NONE;
     (void)m_CerSubject->verify(m_CerIssuer);
@@ -330,6 +386,7 @@ int CertValidator::getStatus (
     CertChainItem* entity = new CertChainItem(certEntity, cerItem);
     if (!entity) return RET_UAPKI_GENERAL_ERROR;
 
+    entity->setTrustTime(validateTime);
     m_CertChain.push_back(entity);
     if (m_ValidationType <= Cert::ValidationType::NONE) return RET_OK;
 
@@ -340,6 +397,10 @@ int CertValidator::getStatus (
 
     //  build a chain of certs
     ret = m_CerStore->getChainCerts(cerItem, chain_certs);
+    //  The chain ends at the first certificate trusted at the validation time; the issuers above it are not needed
+    if (Cert::cutChainAtTrusted(chain_certs, validateTime)) {
+        ret = RET_OK;
+    }
     if (ret != RET_OK) {
         if (((ret == RET_UAPKI_CERT_ISSUER_NOT_FOUND) || (ret == RET_UAPKI_CERT_NOT_FOUND)) && !chain_certs.empty()) {
             (void)addExpectedCertByKeyId(CertEntity::INTERMEDIATE, chain_certs[chain_certs.size() - 1]->getAuthorityKeyId());
@@ -349,6 +410,7 @@ int CertValidator::getStatus (
     for (auto it : chain_certs) {
         entity = new CertChainItem(CertEntity::INTERMEDIATE, it);
         if (!entity) return RET_UAPKI_GENERAL_ERROR;
+        entity->setTrustTime(validateTime);
         m_CertChain.push_back(entity);
     }
     chain_certs.clear();
@@ -571,6 +633,22 @@ int CertValidator::validateByCrl (
         resultValidation.certStatus,
         resultValidation.revokedCertItem
     );
+    //  Good at the time, revoked later: the entry is kept (the time-stamps of a TSA, see tsaKeyTrust())
+    resultValidation.hasRevokedLater = false;
+    if (resultValidation.certStatus == CertStatus::GOOD) {
+        for (const auto& it : revoked_items) {
+            if ((it->crlReason == CrlReason::REMOVE_FROM_CRL) || (it->revocationDate <= validateTime)) continue;
+            //  the entry of a compromise, or without a reason, is the one that matters
+            const bool is_bad = (it->crlReason == CrlReason::UNDEFINED) || (it->crlReason == CrlReason::UNSPECIFIED) ||
+                (it->crlReason == CrlReason::KEY_COMPROMISE) || (it->crlReason == CrlReason::CA_COMPROMISE) ||
+                (it->crlReason == CrlReason::AA_COMPROMISE);
+            if (!resultValidation.hasRevokedLater || is_bad) {
+                resultValidation.revokedLater = *it;
+                resultValidation.hasRevokedLater = true;
+            }
+            if (is_bad) break;
+        }
+    }
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
@@ -1111,13 +1189,19 @@ static const Cert::CerItem* path_root (
 )
 {
     vector<Cert::CerItem*> chain;
-    if (cerStore.getChainCerts(cerItem, chain) != RET_OK) return nullptr;
+    const int ret_chain = cerStore.getChainCerts(cerItem, chain);
+    if ((ret_chain != RET_OK) && (ret_chain != RET_UAPKI_CERT_ISSUER_NOT_FOUND)) return nullptr;
 
+    //  The path ends at the first certificate that may be a trust anchor (of INIT or of a trusted list, whatever
+    //  its service is now): whether a CRL signer has the path of the certificate does not depend on the time
+    if (cerItem->isTrustAnchorCandidate() && cerItem->getCertExtKeyUsage().isCa()) return cerItem;
     const Cert::CerItem* cer_subject = cerItem;
     for (const auto it : chain) {
         if (cer_subject->verifySignatureBy(it->getSpki()) != RET_OK) return nullptr;
         cer_subject = it;
+        if (cer_subject->isTrustAnchorCandidate()) return cer_subject;
     }
+    if (ret_chain != RET_OK) return nullptr;
     if (!cer_subject->isSelfSigned() || (cer_subject->verifySignatureBy(cer_subject->getSpki()) != RET_OK)) return nullptr;
     return cer_subject;
 }
@@ -1308,6 +1392,8 @@ int CertValidator::verifyResponseData (
 
     resultValidation.statusSignature = SignatureVerifyStatus::UNDEFINED;
     resultValidation.cerResponder = nullptr;
+    //  The result may be filled again (the status is looked for once more)
+    resultValidation.baResponderId.clear();
     DO(ocspHelper.getResponderId(resultValidation.responderIdType, &resultValidation.baResponderId));
     if (joResult) {
         DO(responderIdToJson(joResult, resultValidation.responderIdType, resultValidation.baResponderId.get()));

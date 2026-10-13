@@ -282,8 +282,8 @@ int pkcs12_add_p7data_single_safecontent (AuthenticatedSafe_t * authentSafe, con
     DO(asn_encode_ba(get_SafeContents_desc(), safe_contents, &ba_data));
 
     ASN_ALLOC(cinfo);
+    //  The data is copied: ba_data is freed at cleanup
     DO(cinfo_init_by_data(cinfo, ba_data));
-    ba_data = NULL;
 
     ASN_SEQUENCE_ADD(&authentSafe->list, cinfo);
     cinfo = NULL;

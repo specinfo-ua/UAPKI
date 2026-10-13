@@ -384,6 +384,7 @@ DEFINE_OID(OID_PKIX_KpTspSigning,               "1.3.6.1.5.5.7.3.8");
 DEFINE_OID(OID_PKIX_KpOcspSigning,              "1.3.6.1.5.5.7.3.9");
 DEFINE_OID(OID_PKIX_OCSP,                       "1.3.6.1.5.5.7.48.1");
 DEFINE_OID(OID_PKIX_OcspBasic,                  "1.3.6.1.5.5.7.48.1.1");
+DEFINE_OID(OID_PKIX_RiOcspResponse,             "1.3.6.1.5.5.7.16.2");     //  RFC 5940: OCSP response in RevocationInfoChoices
 DEFINE_OID(OID_PKIX_OcspNonce,                  "1.3.6.1.5.5.7.48.1.2");
 DEFINE_OID(OID_PKIX_OcspCrl,                    "1.3.6.1.5.5.7.48.1.3");
 DEFINE_OID(OID_PKIX_OcspResponse,               "1.3.6.1.5.5.7.48.1.4");

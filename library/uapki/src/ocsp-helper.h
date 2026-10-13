@@ -61,6 +61,22 @@ namespace Ocsp {
     static const size_t NONCE_MAXLEN    = 64;
     static const size_t NONCE_MINLEN    = 8;
     static const uint64_t OFFSET_EXPIRE_DEFAULT = 30 * 60000;
+    //  A response without nextUpdate is fresh for the validation time if issued not earlier than 120 minutes
+    //  before it (EN 319 102-1, 5.2.5.4): the time to publish a change of the status. OFFSET_EXPIRE_DEFAULT
+    //  (the cache) is less: the responses embedded by signing pass VERIFY
+    static const uint64_t MAX_FRESHNESS_DEFAULT = 120 * 60000;
+
+    //  The response is fresh for the validation time: nextUpdate later than it, without nextUpdate
+    //  thisUpdate later than validateTime - MAX_FRESHNESS_DEFAULT
+    inline bool isFresh (
+            const uint64_t msThisUpdate,
+            const uint64_t msNextUpdate,
+            const uint64_t validateTime
+    )
+    {
+        if (msNextUpdate > 0) return (msNextUpdate > validateTime);
+        return (msThisUpdate + MAX_FRESHNESS_DEFAULT > validateTime);
+    }
 
     class OcspHelper
     {

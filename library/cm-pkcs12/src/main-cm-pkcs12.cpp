@@ -42,7 +42,7 @@
 #include "rc-version.h"
 #else
 //  See cm-pkcs12\CMakeLists.txt
-#define STR_FILEVERSION "1.0.24"
+#define STR_FILEVERSION "1.0.25"
 #endif
 
 

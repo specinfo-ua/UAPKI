@@ -89,13 +89,14 @@ void CmStorageProxy::arrayCmbaFree (
         CM_BYTEARRAY** arrayBa
 )
 {
-    if ((count > 0) && arrayBa) {
-        for (uint32_t i = 0; i < count; i++) {
-            cmbaFree(arrayBa[i]);
-            arrayBa[i] = nullptr;
-        }
-        cmFree(arrayBa);
+    if (!arrayBa) return;
+
+    for (uint32_t i = 0; i < count; i++) {
+        cmbaFree(arrayBa[i]);
+        arrayBa[i] = nullptr;
     }
+    //  a provider may hand out a non-null (calloc(0)) array for an empty list
+    cmFree(arrayBa);
 }
 
 int CmStorageProxy::providerInfo (

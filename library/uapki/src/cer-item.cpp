@@ -267,7 +267,8 @@ CerItem::CerItem (void)
     , m_KeyUsage(0)
     , m_PublicKeySize(0)
     , m_SelfSigned(false)
-    , m_Trusted(false)
+    , m_TrustedInit(false)
+    , m_TrustListSigner(false)
     , m_VerifyStatus(VerifyStatus::UNDEFINED)
     , m_CertStatusByCrl(ValidationType::CRL)
     , m_CertStatusByOcsp(ValidationType::OCSP)
@@ -367,10 +368,125 @@ void CerItem::setTrusted (
         const bool trusted
 )
 {
-    lock_guard<mutex> lock(m_Mutex);
-
-    m_Trusted = trusted;
+    m_TrustedInit = trusted;
 }
+
+bool CerItem::isTrusted (void) const
+{
+    return isTrustedAt(0);
+}
+
+bool CerItem::trustPeriod (
+        uint64_t& msStart,
+        uint64_t& msSunset
+) const
+{
+    //  A certificate of a trusted list is a trust anchor from the time a service of the certificate was first
+    //  provided until its sunset date (ETSI EN 319 102-1, 3.1 and 5.2.6.4: the time until when the trust anchor
+    //  is considered reliable): the end of the last period a service was provided in; msSunset is 0 while a
+    //  service is provided. The breaks between the periods are not told apart here - they tell the quality of
+    //  a signature, not the trust in the path
+    msStart = msSunset = 0;
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    if (!services) return false;
+
+    const uint64_t now = TimeUtil::mtimeNow();
+    bool was_provided = false, is_provided = false;
+    for (const auto& it : *services) {
+        for (const auto& it_period : it.periods) {
+            //  A status that starts later than now is not in effect yet
+            if (!TrustService::isActiveStatus(it_period.status) || (it_period.msFrom > now)) continue;
+            if (!was_provided || (it_period.msFrom < msStart)) {
+                msStart = it_period.msFrom;
+            }
+            was_provided = true;
+            if (it_period.msTo == 0) {
+                is_provided = true;
+            }
+            else if (it_period.msTo > msSunset) {
+                msSunset = it_period.msTo;
+            }
+        }
+    }
+    if (is_provided) {
+        msSunset = 0;
+    }
+    return was_provided;
+}
+
+bool CerItem::isTrustedAt (
+        const uint64_t msTime
+) const
+{
+    if (m_TrustedInit) return true;
+
+    uint64_t start = 0, sunset = 0;
+    if (!trustPeriod(start, sunset)) return false;
+    const uint64_t time = (msTime > 0) ? msTime : TimeUtil::mtimeNow();
+    return (time >= start) && ((sunset == 0) || (time < sunset));
+}
+
+bool CerItem::wasTrusted (void) const
+{
+    uint64_t start = 0, sunset = 0;
+    return m_TrustedInit || trustPeriod(start, sunset);
+}
+
+bool CerItem::isTrustAnchorCandidate (void) const
+{
+    if (m_TrustedInit) return true;
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    return services && !services->empty();
+}
+
+bool CerItem::hasActiveTrustService (
+        const char* typeMark,
+        const uint64_t msTime
+) const
+{
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    if (!services) return false;
+    for (const auto& it : *services) {
+        if (it.type.find(typeMark) == std::string::npos) continue;
+        const TrustService::Period* period = it.periodAt(msTime);
+        if (period && TrustService::isActiveStatus(period->status)) return true;
+    }
+    return false;
+}
+
+void CerItem::setTrustServices (
+        const std::shared_ptr<const TrustServices>& trustServices
+)
+{
+    //  The trust by a list is decided at a time (isTrustedAt): by the status of the services then
+    std::atomic_store(&m_TrustServices, trustServices);
+    //  A certificate of a trusted list is not a temporary one (see CerStore::removeMarkedCerts)
+    if (trustServices) {
+        m_MarkedToRemove = false;
+    }
+}
+
+const TrustService::Period* TrustService::periodAt (const uint64_t msTime) const
+{
+    for (const auto& it : periods) {
+        if ((msTime >= it.msFrom) && ((it.msTo == 0) || (msTime < it.msTo))) return &it;
+    }
+    return nullptr;
+}
+
+bool TrustService::isActiveStatus (const std::string& status)
+{
+    //  ETSI TS 119 612, 5.5.4 (granted, recognisedatnationallevel) and the statuses used before eIDAS
+    return (status == "granted") || (status == "recognisedatnationallevel") || (status == "undersupervision") ||
+        (status == "supervisionincessation") || (status == "accredited") || (status == "setbynationallaw");
+}
+
+bool TrustService::isCa (void) const
+{
+    //  "CA/QC", "CA/PKC", "National-CA/QC", "MR-CA/QC", "NationalRootCA-QC"
+    return (type.find("CA/") != std::string::npos) || (type.find("RootCA") != std::string::npos);
+}
+
 
 void CerItem::setUniqueKeyId (
     const bool uniqueKeyId
@@ -387,6 +503,12 @@ int CerItem::verify (
 )
 {
     lock_guard<mutex> lock(m_Mutex);
+
+    //  A trust anchor is not verified by a signature (RFC 5280, 6.1): the certificate is trusted itself
+    if ((cerIssuer == this) && !m_SelfSigned && isTrustAnchorCandidate()) {
+        m_VerifyStatus = VerifyStatus::VALID;
+        return RET_OK;
+    }
 
     if (!force) {
         if (m_VerifyStatus > VerifyStatus::INDETERMINATE) return RET_OK;

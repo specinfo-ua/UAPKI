@@ -78,6 +78,8 @@ private:
     TspParams
             m_TspParams;
     bool    m_ValidationByCrl;
+    std::string
+            m_InitParams;
 
 public:
     LibraryConfig (void)
@@ -103,6 +105,13 @@ public:
     }
     bool isInitialized (void) const {
         return m_IsInitialized;
+    }
+    //  The parameters the library was initialized with, as JSON; without the proxy credentials
+    const std::string& getInitParams (void) const {
+        return m_InitParams;
+    }
+    void setInitParams (const std::string& initParams) {
+        m_InitParams = initParams;
     }
 
     void setInitialized (bool initialized) {

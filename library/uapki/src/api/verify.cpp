@@ -590,6 +590,45 @@ cleanup:
     return ret;
 }   //  validate_by_ocsp
 
+//  The status of the signers of the OCSP responses and CRLs without id-pkix-ocsp-nocheck, after the status of the
+//  other certificates (RFC 6960, 4.2.2.2.1): by OCSP if the certificate has its OCSP responder and the response is
+//  not signed by the certificate itself (it proves nothing about itself), else by CRL. A responder (a CRL signer)
+//  that is a service of a trusted list provided at the time needs no status of its own, as with
+//  id-pkix-ocsp-nocheck: nothing is requested for it. Not determined - the result is INDETERMINATE
+//  (validateStatusCerts()), the CRL that would determine it is among the expected ones
+static void validate_status_signers (
+        Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
+        const bool onlyCrl
+)
+{
+    const uint64_t status_time = (verifiedSignerInfo.getBestSignatureTime() > 0)
+        ? verifiedSignerInfo.getBestSignatureTime() : TimeUtil::mtimeNow();
+    for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+        const bool is_ocsp = (it->getCertEntity() == CertValidator::CertEntity::OCSP);
+        if (
+            (!is_ocsp && (it->getCertEntity() != CertValidator::CertEntity::CRL)) ||
+            it->isExpired() ||
+            (it->getValidationType() != Cert::ValidationType::UNDEFINED)
+        ) continue;
+
+        if (it->getSubject()->hasActiveTrustService(is_ocsp ? "OCSP" : "CRL", status_time)) {
+            it->setValidationType(Cert::ValidationType::NONE);
+            continue;
+        }
+
+        if (!onlyCrl && !it->getSubject()->getUris().ocsp.empty() && it->getIssuer()) {
+            if (
+                (validate_by_ocsp(verifiedSignerInfo, *it) == RET_OK) &&
+                (it->getResultValidationByOcsp().cerResponder != it->getSubject())
+            ) continue;
+            it->setValidationType(Cert::ValidationType::UNDEFINED);
+        }
+        if (validate_by_crl(verifiedSignerInfo, *it) != RET_OK) {
+            it->setValidationType(Cert::ValidationType::UNDEFINED);
+        }
+    }
+}
+
 static int validate_certs (
         Doc::Verify::VerifySignedDoc& verifySignedDoc,
         Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo
@@ -640,6 +679,7 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         case SignatureFormat::CADES_C:
             verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
@@ -656,6 +696,7 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         case SignatureFormat::CADES_XL:
         case SignatureFormat::CADES_A:
@@ -673,6 +714,8 @@ static int validate_certs (
                 }
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
+            DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         default:
             break;

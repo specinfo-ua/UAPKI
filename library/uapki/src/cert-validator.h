@@ -71,11 +71,16 @@ struct ResultValidationByCrl {
                 cerIssuer;
     Crl::RevokedCertItem
                 revokedCertItem;
+    //  Not revoked at the time of the validation, revoked later (the CRL is newer): the entry, see tsaKeyTrust()
+    bool        hasRevokedLater;
+    Crl::RevokedCertItem
+                revokedLater;
 
     ResultValidationByCrl (void)
         : certStatus(CertStatus::UNDEFINED)
         , crlItem(nullptr)
         , cerIssuer(nullptr)
+        , hasRevokedLater(false)
     {}
 
 };  //  end struct ResultValidationByCrl
@@ -96,6 +101,23 @@ struct ResultValidationByOcsp : public Ocsp::ResponseInfo {
 
 };  //  end struct ResultValidationByOcsp
 
+class CertChainItem;
+
+//  The time-stamps of a TSA whose certificate is revoked (RFC 3161, 4): revoked for a reason that is not a compromise
+//  (affiliationChanged, superseded, cessationOfOperation...) - the ones made before the revocation stay valid, that
+//  is told by the status at their time; revoked for the compromise of a key, or with no reason given - none of
+//  them can be trusted, whenever the certificate was revoked
+enum class TsaKeyTrust {
+    OK,
+    COMPROMISED,
+    REASON_NOT_GIVEN
+};
+
+TsaKeyTrust tsaKeyTrust (
+    const CertChainItem& tsaItem
+);
+
+
 class CertChainItem {
     CertEntity  m_CertEntity;
     Cert::CerItem*
@@ -107,6 +129,7 @@ class CertChainItem {
     bool        m_Expired;
     Cert::ValidationType
                 m_ValidationType;
+    uint64_t    m_TrustTime;        //  0 - now
     ResultValidationByCrl
                 m_ResultValidationByCrl;
     ResultValidationByOcsp
@@ -135,6 +158,10 @@ public:
         Cert::CerItem* cerIssuer
     );
     void setRoot (void);
+    //  The certificate is a trust anchor itself though it is not a CA at the top of a path (a TSA or an OCSP
+    //  responder of a trusted list, a certificate given to INIT as trusted): no issuer and no revocation status are
+    //  looked for (RFC 5280, 6.1); the entity stays what it is
+    void setTrustAnchor (void);
     void setValidationType (
         const Cert::ValidationType validationType
     );
@@ -188,8 +215,12 @@ public:
     bool isSelfSigned (void) const {
         return (m_CerSubject) ? m_CerSubject->isSelfSigned() : false;
     }
+    //  Trusted at the time the chain is built for (a certificate of a trusted list is trusted in a period)
     bool isTrusted (void) const {
-        return (m_CerSubject) ? m_CerSubject->isTrusted() : false;
+        return (m_CerSubject) ? m_CerSubject->isTrustedAt(m_TrustTime) : false;
+    }
+    void setTrustTime (const uint64_t msTrustTime) {
+        m_TrustTime = msTrustTime;
     }
 
 };  //  end class CertChainItem

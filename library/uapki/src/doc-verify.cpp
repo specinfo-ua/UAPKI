@@ -60,6 +60,12 @@ namespace Doc {
 
 namespace Verify {
 
+static void revocation_info_choices (
+    const VectorBA& revocationInfoChoices,
+    VectorBA& crls,
+    VectorBA& ocspVals
+);
+
 
 struct CollectVerifyStatus {
     bool    values[6];
@@ -358,12 +364,9 @@ int CadesXlInfo::verifyCertRefs (
 {
     if (!isPresentCertRefs) return RET_OK;
 
-    if (isPresentCertVals) {
-        if (certValues.size() != certRefs.size()) {
-            statusCertRefs = DigestVerifyStatus::INVALID;
-            return RET_UAPKI_INVALID_COUNT_ITEMS;
-        }
-    }
+    //  The references are matched by IssuerSerial (or the hash), not by index: certificate-values holds
+    //  the certificates of the references and the signing certificate if not in SignedData.certificates
+    //  (EN 319 122-1, A.1.1.2), signatures of earlier versions also reference the signing certificate
 
     statusesCertRefs.resize(certRefs.size());
     for (auto& it : statusesCertRefs) {
@@ -383,8 +386,20 @@ int CadesXlInfo::verifyCertRefs (
         int ret = RET_OK;
         const ByteArray* refba_cert = nullptr;
         Cert::CerItem* cer_item = nullptr;
-        if (isPresentCertVals) {
-            refba_cert = certValues[idx];
+        if (!it.issuerSerial.baIssuer || !it.issuerSerial.baSerialNumber) {
+            //  Without IssuerSerial: one of the certificate values with the hash
+            for (const auto& it_val : certValues) {
+                SmartBA sba_valhash;
+                if ((::hash(hash_alg, it_val, &sba_valhash) == RET_OK) && (ba_cmp(it.baHashValue, sba_valhash.get()) == 0)) {
+                    refba_cert = it_val;
+                    break;
+                }
+            }
+            if (!refba_cert) {
+                status = DigestVerifyStatus::INDETERMINATE;
+                idx++;
+                continue;
+            }
         }
         else {
             SmartBA sba_issuer;
@@ -455,6 +470,12 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
     , m_IsValidSignatures(false)
     , m_IsValidDigests(false)
     , m_BestSignatureTime(0)
+    , m_RevocationNotFresh(false)
+    , m_ExpiredSignerCert(false)
+    , m_ExpiredChainCert(false)
+    , m_StatusSignerUnknown(false)
+    , m_TsaKeyCompromised(false)
+    , m_TsaRevokedNoReason(false)
 {}
 
 VerifiedSignerInfo::~VerifiedSignerInfo (void)
@@ -510,6 +531,24 @@ int VerifiedSignerInfo::addCertChainItem (
     return certchain_item->decodeName();
 }
 
+uint64_t VerifiedSignerInfo::getTimeOfStatusData (
+        const CertEntity certEntity,
+        const Cert::CerItem* cerItem
+) const
+{
+    for (const auto& it : m_CertChainItems) {
+        if (certEntity == CertEntity::OCSP) {
+            const ResultValidationByOcsp& result = it->getResultValidationByOcsp();
+            if ((result.cerResponder == cerItem) && (result.msProducedAt > 0)) return result.msProducedAt;
+        }
+        else if (certEntity == CertEntity::CRL) {
+            const ResultValidationByCrl& result = it->getResultValidationByCrl();
+            if ((result.cerIssuer == cerItem) && result.crlItem) return result.crlItem->getThisUpdate();
+        }
+    }
+    return 0;
+}
+
 int VerifiedSignerInfo::addCrlCertsToChain (
         const uint64_t validateTime
 )
@@ -527,13 +566,28 @@ int VerifiedSignerInfo::addCrlCertsToChain (
 
         if (is_newitem) {
             vector<Cert::CerItem*> chain_certs;
-            added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(Cert::ValidationType::NONE);
+            //  The signer of revocation data: valid when the data was issued (it may be issued later than the signature)
+            const uint64_t status_time = getTimeOfStatusData(added_cci->getCertEntity(), it_cer);
+            added_cci->checkValidityTime((status_time > 0) ? status_time : validateTime);
             ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
-            if ((ret == RET_OK) && !chain_certs.empty()) {
+            //  A chain that ends at a certificate trusted at the time the signature is validated for (the best
+            //  signature time) needs no issuers above it
+            const uint64_t trust_time = validateTime;
+            added_cci->setTrustTime(trust_time);
+            if (!it_cer->isSelfSigned() && it_cer->isTrustedAt(trust_time)) {
+                //  The signer of the revocation data is trusted itself (a service of a trusted list)
+                added_cci->setTrustAnchor();
+            }
+            else if (((ret == RET_OK) || Cert::cutChainAtTrusted(chain_certs, trust_time)) && !chain_certs.empty()) {
                 //  Add one cert - issuer
                 added_cci->setIssuer(chain_certs[0]);
             }
+            //  The status of the signer of revocation data is required (RFC 6960, 4.2.2.2.1), unless it is
+            //  self-signed or has id-pkix-ocsp-nocheck; it is determined by validate_certs of VERIFY
+            added_cci->setValidationType(
+                (it_cer->isSelfSigned() || it_cer->getCertExtKeyUsage().isOcspNoCheck())
+                ? Cert::ValidationType::NONE : Cert::ValidationType::UNDEFINED
+            );
         }
     }
     return RET_OK;
@@ -556,13 +610,28 @@ int VerifiedSignerInfo::addOcspCertsToChain (
 
         if (is_newitem) {
             vector<Cert::CerItem*> chain_certs;
-            added_cci->checkValidityTime(validateTime);
-            added_cci->setValidationType(Cert::ValidationType::NONE);
+            //  The signer of revocation data: valid when the data was issued (it may be issued later than the signature)
+            const uint64_t status_time = getTimeOfStatusData(added_cci->getCertEntity(), it_cer);
+            added_cci->checkValidityTime((status_time > 0) ? status_time : validateTime);
             ret = getCerStore()->getChainCerts(added_cci->getSubject(), chain_certs);
-            if ((ret == RET_OK) && !chain_certs.empty()) {
+            //  A chain that ends at a certificate trusted at the time the signature is validated for (the best
+            //  signature time) needs no issuers above it
+            const uint64_t trust_time = validateTime;
+            added_cci->setTrustTime(trust_time);
+            if (!it_cer->isSelfSigned() && it_cer->isTrustedAt(trust_time)) {
+                //  The signer of the revocation data is trusted itself (a service of a trusted list)
+                added_cci->setTrustAnchor();
+            }
+            else if (((ret == RET_OK) || Cert::cutChainAtTrusted(chain_certs, trust_time)) && !chain_certs.empty()) {
                 //  Add one cert - issuer
                 added_cci->setIssuer(chain_certs[0]);
             }
+            //  The status of the signer of revocation data is required (RFC 6960, 4.2.2.2.1), unless it is
+            //  self-signed or has id-pkix-ocsp-nocheck; it is determined by validate_certs of VERIFY
+            added_cci->setValidationType(
+                (it_cer->isSelfSigned() || it_cer->getCertExtKeyUsage().isOcspNoCheck())
+                ? Cert::ValidationType::NONE : Cert::ValidationType::UNDEFINED
+            );
         }
     }
     return RET_OK;
@@ -581,13 +650,21 @@ int VerifiedSignerInfo::buildCertChain (void)
 
         (void)m_CerSigner->verify(nullptr);
         DO(addCertChainItem(CertEntity::SIGNER, m_CerSigner, &added_cci));
+        added_cci->setTrustTime(m_BestSignatureTime);
         ret = getCerStore()->getChainCerts(m_CerSigner, chain_certs, &ba_authkeyid_notfound);
+        //  The chain ends at the first certificate trusted at the best signature time (it is set by
+        //  validateSignFormat() from the time-stamps already verified; without one it is the validation time)
+        const bool has_anchor = Cert::cutChainAtTrusted(chain_certs, m_BestSignatureTime);
+        if (has_anchor) {
+            ret = RET_OK;
+        }
         if (ret == RET_OK) {
             for (const auto& it : chain_certs) {
                 added_cci->setIssuer(it);
                 DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
+                added_cci->setTrustTime(m_BestSignatureTime);
             }
-            added_cci->isSelfSigned() ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
+            (added_cci->isSelfSigned() || (has_anchor && !chain_certs.empty())) ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
         }
         else {
             m_LastError = ret;
@@ -610,14 +687,32 @@ int VerifiedSignerInfo::buildCertChain (void)
         vector<Cert::CerItem*> chain_certs;
         CertChainItem* added_cci = nullptr;
 
+        //  The TSA must be trusted at the time of its time-stamp (the last one of this TSA): that its key was not
+        //  compromised is told by the revocation status of its certificate (RFC 3161, 4; tsaKeyTrust())
+        uint64_t trust_time = m_BestSignatureTime;
+        for (const AttrTimeStamp* it : { &m_ContentTS, &m_SignatureTS, &m_ArchiveTS }) {
+            if (it->isPresent() && (it->cerSigner == it_tsp) && (it->msGenTime > 0)) {
+                trust_time = it->msGenTime;
+            }
+        }
         DO(addCertChainItem(CertEntity::TSP, it_tsp, &added_cci));
+        added_cci->setTrustTime(trust_time);
+        //  The TSA is trusted itself (a service of a trusted list): the anchor of its path, no issuers needed
+        if (!it_tsp->isSelfSigned() && it_tsp->isTrustedAt(trust_time)) {
+            added_cci->setTrustAnchor();
+            continue;
+        }
         ret = getCerStore()->getChainCerts(it_tsp, chain_certs, &ba_authkeyid_notfound);
+        const bool has_anchor = Cert::cutChainAtTrusted(chain_certs, trust_time);
+        if (has_anchor) {
+            ret = RET_OK;
+        }
         if (ret == RET_OK) {
             for (const auto& it : chain_certs) {
                 added_cci->setIssuer(it);
                 DO(addCertChainItem(CertEntity::INTERMEDIATE, it, &added_cci));
             }
-            added_cci->isSelfSigned() ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
+            (added_cci->isSelfSigned() || (has_anchor && !chain_certs.empty())) ? added_cci->setRoot() : added_cci->setIssuer(nullptr);
         }
         else {
             m_LastError = ret;
@@ -651,6 +746,13 @@ int VerifiedSignerInfo::certValuesToStore (void)
             m_ListAddedCerts.certValues.push_back(it.cerItem);
             m_ListAddedCerts.fromSignature.push_back(it.cerItem);
         }
+    }
+
+    //  The CRLs of the validation data of the TSUs: the same way as ADD_CRL, not to the disk
+    for (const auto& it : m_TsCrls) {
+        bool is_unique = false;
+        Crl::CrlItem* crl_item = nullptr;
+        (void)addCrlToStore(*getCrlStore(), *getCerStore(), it, false, nullptr, is_unique, &crl_item);
     }
     return RET_OK;
 }
@@ -690,6 +792,25 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
         }
     }
 
+    if (m_RevocationNotFresh) {
+        rv_warns.push_back("THE REVOCATION DATA OF THE SIGNATURE IS NOT FRESH");
+    }
+    if (m_ExpiredSignerCert) {
+        rv_warns.push_back("THE CERTIFICATE OF THE SIGNER IS EXPIRED, THE SIGNING BEFORE ITS EXPIRATION IS NOT PROVEN");
+    }
+    if (m_ExpiredChainCert) {
+        rv_warns.push_back("A CERTIFICATE OF THE CHAIN IS EXPIRED");
+    }
+    if (m_StatusSignerUnknown) {
+        rv_warns.push_back("THE STATUS OF THE OCSP RESPONDER IS NOT DETERMINED");
+    }
+    if (m_TsaKeyCompromised) {
+        rv_warns.push_back("THE KEY OF THE TSA IS COMPROMISED");
+    }
+    if (m_TsaRevokedNoReason) {
+        rv_warns.push_back("THE TSA CERTIFICATE IS REVOKED WITH NO REASON GIVEN");
+    }
+
     if (m_SignatureFormat >= SignatureFormat::CADES_C) {
         for (const auto& it : m_CertChainItems) {
             if (
@@ -719,8 +840,15 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
 )
 {
     int ret = RET_OK;
+    vector<const ByteArray*> ocsp_vals;
+    for (const auto& it : m_CadesXlInfo.revocationValuesParser.getOcspVals()) {
+        ocsp_vals.push_back(it);
+    }
+    for (const auto& it : m_TsOcspVals) {
+        ocsp_vals.push_back(it);
+    }
 
-    for (const auto& it_ocspval : m_CadesXlInfo.revocationValuesParser.getOcspVals()) {
+    for (const auto& it_ocspval : ocsp_vals) {
         Ocsp::OcspHelper ocsp_helper;
         if (ocsp_helper.parseBasicOcspResponse(it_ocspval) != RET_OK) continue;
 
@@ -761,6 +889,15 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
             if (result_valbyocsp.cerResponder) {
                 m_ListAddedCerts.ocsp.push_back(result_valbyocsp.cerResponder);
             }
+            //  Not fresh for the validation time: not used, the status from a CRL or online
+            if (!Ocsp::isFresh(
+                result_valbyocsp.singleResponseInfo.msThisUpdate,
+                result_valbyocsp.singleResponseInfo.msNextUpdate,
+                validateTime
+            )) {
+                m_RevocationNotFresh = true;
+                continue;
+            }
             it_cci->setValidationType(Cert::ValidationType::OCSP);
             break;
         }
@@ -770,11 +907,101 @@ int VerifiedSignerInfo::setRevocationValuesForChain (
     return RET_OK;
 }
 
+//  RevocationInfoChoices: CRLs and OCSP responses (RFC 5940: OCSPResponse; EN 319 122-1 4.8.2 also BasicOCSPResponse)
+static void revocation_info_choices (
+        const VectorBA& revocationInfoChoices,
+        VectorBA& crls,
+        VectorBA& ocspVals
+)
+{
+    for (const auto& it : revocationInfoChoices) {
+        RevocationInfoChoice_t* revinfo_choice = (RevocationInfoChoice_t*)asn_decode_ba_with_alloc(
+            get_RevocationInfoChoice_desc(), it);
+        if (!revinfo_choice) continue;
+
+        if (revinfo_choice->present == RevocationInfoChoice_PR_crl) {
+            //  CertificateList is not tagged in RevocationInfoChoice
+            ByteArray* ba_crl = ba_copy_with_alloc(it, 0, 0);
+            if (ba_crl) {
+                crls.push_back(ba_crl);
+            }
+        }
+        else if (
+            (revinfo_choice->present == RevocationInfoChoice_PR_other) &&
+            OID_is_equal_oid(&revinfo_choice->choice.other.otherRevInfoFormat, OID_PKIX_RiOcspResponse)
+        ) {
+            const ANY_t& other_revinfo = revinfo_choice->choice.other.otherRevInfo;
+            SmartBA sba_value;
+            if (sba_value.set(ba_alloc_from_uint8(other_revinfo.buf, (size_t)other_revinfo.size))) {
+                Ocsp::OcspHelper ocsp_helper;
+                if (
+                    (ocsp_helper.parseResponse(sba_value.get()) == RET_OK) &&
+                    (ocsp_helper.getResponseStatus() == Ocsp::ResponseStatus::SUCCESSFUL)
+                ) {
+                    ByteArray* ba_basic = ocsp_helper.getBasicOcspResponseEncoded(true);
+                    if (ba_basic) {
+                        ocspVals.push_back(ba_basic);
+                    }
+                }
+                else {
+                    Ocsp::OcspHelper ocsp_basic;
+                    if (ocsp_basic.parseBasicOcspResponse(sba_value.get()) == RET_OK) {
+                        ocspVals.push_back(sba_value.pop());
+                    }
+                }
+            }
+        }
+        asn_free(get_RevocationInfoChoice_desc(), revinfo_choice);
+    }
+}   //  revocation_info_choices
+
+int VerifiedSignerInfo::tspValidationData (
+        AttrTimeStamp& attrTS
+)
+{
+    //  The validation data of a TSU in its time-stamp token (TS 101 733 6.3.3, 6.3.4): certificate-values and
+    //  revocation-values of the unsigned attributes of the token and its SignedData.crls
+    Pkcs7::SignedDataParser& sdata_parser = attrTS.tsTokenParser.getSignedDataParser();
+    revocation_info_choices(sdata_parser.getCrls(), m_TsCrls, m_TsOcspVals);
+    if (sdata_parser.getCountSignerInfos() == 0) return RET_OK;
+
+    Pkcs7::SignedDataParser::SignerInfo signer_info;
+    if (sdata_parser.parseSignerInfo(0, signer_info) != RET_OK) return RET_OK;
+    for (const auto& it : signer_info.getUnsignedAttrs()) {
+        if (it.type == string(OID_PKCS9_CERT_VALUES)) {
+            VectorBA vba_certs;
+            if (AttributeHelper::decodeCertValues(it.baValues, vba_certs) == RET_OK) {
+                vector<Cert::CerStore::AddedCerItem> added_ceritems;
+                (void)getCerStore()->addCerts(Cert::NOT_TRUSTED, Cert::NOT_PERMANENT, vba_certs, added_ceritems);
+                for (const auto& it_added : added_ceritems) {
+                    if (it_added.cerItem) {
+                        m_ListAddedCerts.fromSignature.push_back(it_added.cerItem);
+                    }
+                }
+            }
+        }
+        else if (it.type == string(OID_PKCS9_REVOCATION_VALUES)) {
+            AttributeHelper::RevocationValuesParser revvals_parser;
+            if (revvals_parser.parse(it.baValues) == RET_OK) {
+                for (const auto& it_crl : revvals_parser.getCrlVals()) {
+                    m_TsCrls.push_back(ba_copy_with_alloc(it_crl, 0, 0));
+                }
+                for (const auto& it_ocsp : revvals_parser.getOcspVals()) {
+                    m_TsOcspVals.push_back(ba_copy_with_alloc(it_ocsp, 0, 0));
+                }
+            }
+        }
+    }
+    return RET_OK;
+}
+
 int VerifiedSignerInfo::tspCertToStore() {
     int ret = RET_OK;
 
-    if (m_ContentTS.isPresent()) {
-        Pkcs7::SignedDataParser& sdata_parser = m_ContentTS.tsTokenParser.getSignedDataParser();
+    //  The certificates of the time-stamp tokens are of the signature
+    for (AttrTimeStamp* attr_ts : { &m_ContentTS, &m_SignatureTS }) {
+        if (!attr_ts->isPresent()) continue;
+        Pkcs7::SignedDataParser& sdata_parser = attr_ts->tsTokenParser.getSignedDataParser();
         vector<Cert::CerStore::AddedCerItem> added_ceritems;
         DO(getCerStore()->addCerts(
             Cert::NOT_TRUSTED,
@@ -782,16 +1009,17 @@ int VerifiedSignerInfo::tspCertToStore() {
             sdata_parser.getCerts(),
             added_ceritems
         ));
+        for (const auto& it : added_ceritems) {
+            if (it.cerItem) {
+                m_ListAddedCerts.fromSignature.push_back(it.cerItem);
+            }
+        }
+    }
+    if (m_ContentTS.isPresent()) {
+        DO(tspValidationData(m_ContentTS));
     }
     if (m_SignatureTS.isPresent()) {
-        Pkcs7::SignedDataParser& sdata_parser = m_SignatureTS.tsTokenParser.getSignedDataParser();
-        vector<Cert::CerStore::AddedCerItem> added_ceritems;
-        DO(getCerStore()->addCerts(
-            Cert::NOT_TRUSTED,
-            Cert::NOT_PERMANENT,
-            sdata_parser.getCerts(),
-            added_ceritems
-        ));
+        DO(tspValidationData(m_SignatureTS));
     }
 
 cleanup:
@@ -875,6 +1103,22 @@ void VerifiedSignerInfo::validateStatusCerts (void)
         switch (it->getVerifyStatus()) {
         case Cert::VerifyStatus::VALID:
             validation_status.setByCertChainItem(*it, m_BestSignatureTime);
+            //  The status of an OCSP responder (a CRL signer) is required (RFC 6960, 4.2.2.2.1): the certificate
+            //  is a service of a trusted list or has id-pkix-ocsp-nocheck (no status is looked for), else its
+            //  revocation data is in the signature, in the cache or online. Not determined - INDETERMINATE
+            if (
+                ((it->getCertEntity() == CertEntity::OCSP) || (it->getCertEntity() == CertEntity::CRL)) &&
+                (it->getValidationType() == Cert::ValidationType::UNDEFINED)
+            ) {
+                m_StatusSignerUnknown = true;
+            }
+            //  RFC 3161, 4: the time-stamps of a TSA whose key is compromised, or whose certificate is revoked with
+            //  no reason given, are not trusted whenever they were made
+            if ((it->getCertEntity() == CertEntity::TSP) && (UapkiNS::CertValidator::tsaKeyTrust(*it) != UapkiNS::CertValidator::TsaKeyTrust::OK)) {
+                validation_status.setIndeterminate();
+                if (UapkiNS::CertValidator::tsaKeyTrust(*it) == UapkiNS::CertValidator::TsaKeyTrust::COMPROMISED) m_TsaKeyCompromised = true;
+                else m_TsaRevokedNoReason = true;
+            }
             break;
         case Cert::VerifyStatus::INDETERMINATE:
         case Cert::VerifyStatus::VALID_WITHOUT_KEYUSAGE:
@@ -888,7 +1132,30 @@ void VerifiedSignerInfo::validateStatusCerts (void)
         }
 
         if (it->isExpired()) {
-            validation_status.setTotalFailed();
+            //  Outside the validity period at the best signature time (ETSI EN 319 102-1, 5.3.4, 5.5.4). The signing
+            //  certificate before notBefore - FAILED (NOT_YET_VALID). After notAfter the signature may have been made in time: that it
+            //  was not is proven only by a valid content time-stamp later than notAfter of the signing certificate
+            //  (FAILED, EXPIRED); otherwise INDETERMINATE (OUT_OF_BOUNDS_NO_POE), as EU DSS
+            const Cert::CerItem* cer_subject = it->getSubject();
+            const bool is_notyetvalid = (it->getCertEntity() == CertEntity::SIGNER) &&
+                (m_BestSignatureTime > 0) && (cer_subject->getNotBefore() > m_BestSignatureTime);
+            const bool is_signedafter = (it->getCertEntity() == CertEntity::SIGNER) &&
+                m_ContentTS.isPresent() &&
+                (m_ContentTS.statusDigest == DigestVerifyStatus::VALID) &&
+                (m_ContentTS.statusSignature == SignatureVerifyStatus::VALID) &&
+                (m_ContentTS.msGenTime > cer_subject->getNotAfter());
+            if (is_notyetvalid || is_signedafter) {
+                validation_status.setTotalFailed();
+            }
+            else {
+                validation_status.setIndeterminate();
+                if (it->getCertEntity() == CertEntity::SIGNER) {
+                    m_ExpiredSignerCert = true;
+                }
+                else {
+                    m_ExpiredChainCert = true;
+                }
+            }
         }
 
         if (validation_status.isTotalFailed()) {
@@ -908,7 +1175,11 @@ void VerifiedSignerInfo::validateValidityTimeCerts (
 )
 {
     for (auto& it : m_CertChainItems) {
-        (void)it->checkValidityTime(validateTime);
+        uint64_t status_time = 0;
+        if ((it->getCertEntity() == CertEntity::OCSP) || (it->getCertEntity() == CertEntity::CRL)) {
+            status_time = getTimeOfStatusData(it->getCertEntity(), it->getSubject());
+        }
+        (void)it->checkValidityTime((status_time > 0) ? status_time : validateTime);
     }
 }
 

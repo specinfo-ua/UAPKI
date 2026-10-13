@@ -216,6 +216,15 @@ public:
 
 private:
     std::vector<CertValidator::CertChainItem*> collectCerts (void) const;
+    //  The CA certificates of the signer path and the certificates of its status data, without the signing
+    //  certificate (complete-certificate-references, TS 101 733 6.2.1); signerItem - the signing certificate
+    std::vector<CertValidator::CertChainItem*> collectSignerCerts (
+        CertValidator::CertChainItem** signerItem
+    ) const;
+    //  The certificates of the TSUs of the content and signature time-stamps and of their status data
+    std::vector<CertValidator::CertChainItem*> collectTspCerts (void) const;
+    //  The validation data of the TSUs go to the signature time-stamp token (TS 101 733 6.3.3, 6.3.4)
+    int addTspValidationData (void);
     int encodeCertValues (
         const std::vector<CertValidator::CertChainItem*>& certs,
         ByteArray** baEncoded
@@ -251,6 +260,14 @@ int requestTimestamp (
         const std::vector<std::string>& configUris,
         Tsp::TspHelper& tspHelper,
         std::string& tspUri
+);
+
+//  Unsigned attributes added to the (first) SignerInfo of a CMS ContentInfo (a time-stamp token), the other
+//  bytes kept as they are
+int addUnsignedAttrsToToken (
+        const ByteArray* baToken,
+        const std::vector<std::vector<uint8_t>>& encodedAttrs,
+        ByteArray** baResult
 );
 
 int verifySignedData (

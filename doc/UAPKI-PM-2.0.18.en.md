@@ -16,7 +16,8 @@ The version number in the document title corresponds to the version of the uapki
 | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
-| 3       | 2026-10-10 | Library version 2.0.18: the ADD_CRL method adds a CRL only with the certificate of its issuer in the cache and a valid signature; "options.onlyCrl" of the VERIFY method defaults to "validationByCrl"; the certificate of a DSTU 4145 key by the key identifier of GOST 34.311 or DSTU 7564; the choice of the TSP service and all the access points of OCSP and CRL; archive time-stamps of the library 3.x verified by the index in the token |
+| 3       | 2026-10-10 | Library version 2.0.18: the ADD_CRL method adds a CRL only with the certificate of its issuer in the cache and a valid signature; "options.onlyCrl" of the VERIFY method defaults to "validationByCrl"; freshness of the OCSP responses of the signature when CAdES-XL/A is verified; the certificate of a DSTU 4145 key by the key identifier of GOST 34.311 or DSTU 7564; the choice of the TSP service and all the access points of OCSP and CRL; archive time-stamps of the library 3.x verified by the index in the token; an expired certificate without a proof of the signing time gives INDETERMINATE, not TOTAL-FAILED |
+| 4       | 2026-10-12 | Trusted lists (ETSI TS 119 612): the ADD_TRUST_LIST method, the trustListCache parameter of the INIT method, the fields trusted, trustListSigner, trustServices of the CERT_INFO method. A certificate chain ends at the first certificate trusted at the validation time: a trusted certificate of INIT or a certificate of a service of a trusted list. The status of the certificate of an OCSP responder and of a CRL signer is required when a signature is validated, except for the services of a trusted list and the certificates with id-pkix-ocsp-nocheck. The time-stamps of a service whose certificate is revoked for a key compromise or with no reason given are not accepted (RFC 3161, section 4) |
 
 # General information
 
@@ -88,6 +89,8 @@ Table 2. List of library methods
 | 37    | DIGEST              | Data hashing                                    | IND      |
 | 38    | ASN1_DECODE         | Decode DER-encoded ASN.1 data              | IND      |
 | 39    | ASN1_ENCODE         | Encode data according to ASN.1 DER encoding         | IND      |
+| 40    | ADD_TRUST_LIST      | Add a trusted list | MT      |
+| 41    | LIST_TRUST_LISTS    | The list of the accepted trusted lists | MT      |
 
 Table 3. List of exported library functions
 
@@ -180,6 +183,8 @@ The method is intended for determining the library version. Input parameters: no
 
 The method is intended for initializing the library. Input parameters are optional. The output parameters return the current status/parameter values of the library subsystems. If the library has been initialized, the DEINIT method must be executed before finishing work with it.
 
+A repeated call of the method for a library that is already initialized changes nothing and returns the error ALREADY_INITIALIZED; the result field of the response then has the field "parameters" (Object) — the parameters the library was initialized with: in the structure of the parameters field of the request, for a configuration file — its content with the "configFile" field, without the "proxy.credentials" field.
+
 If methods that change the internal state of the library (i.e. of type ST and MT) are used, library initialization is mandatory. Methods that do not change the internal state of the library are of type IND, for example: VERSION and DIGEST.
 
 Library parameters can be set in two ways: via parameters or via a configuration file. The parameters and the configuration file have the same structure. If a configuration file is used, its path must be specified in the "configFile" field (recommended name "uapki-config.json").
@@ -212,6 +217,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | cmProviders     | Object<br>CMPROVIDERS_PARAMS | Storage provider parameters. Optional                 |
 | certCache       | Object<br>CERT_CACHE_PARAMS  | Certificate cache parameters. Optional.              |
 | crlCache        | Object<br>CRL_CACHE_PARAMS   | CRL cache parameters. Optional                        |
+| trustListCache  | Object<br>TRUST_LIST_CACHE_PARAMS | Trusted lists parameters. Optional |
 | offline         | Boolean                      | "Offline" operation mode. Optional                     |
 | ocsp            | Object<br>OCSP_PARAMS        | OCSP service parameters. Optional                    |
 | proxy           | Object<br>PROXY_PARAMS       | PROXY service parameters. Optional                   |
@@ -224,7 +230,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | **Field name** | **Type**  | **Description**                                                                                                                                    |
 | -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | path           | String   | Full path to the directory. Optional. If the path<br>to the directory is not set, only the<br>temporary in-memory certificate cache is used |
-| trustedCerts   | Base64[] | Array of trusted certificates. Optional                                                                                                  |
+| trustedCerts   | Base64[] | Array of trusted certificates. Optional. A certificate chain is built up to the first trusted certificate |
 
 ### Structure CRL_CACHE_PARAMS
 
@@ -232,6 +238,13 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | path           | String  | Full path to the directory. Optional. If the path<br>to the directory is not set, only the<br>temporary in-memory CRL cache is used |
 | useDeltaCrl    | Boolean | Use delta CRL. Optional,<br>default true                                                                |
+
+### Structure TRUST_LIST_CACHE_PARAMS
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| path           | String   | Full path to the directory of trusted lists. Optional. The directory<br>keeps the last accepted version of every trusted list (the<br>ADD_TRUST_LIST method); at initialization the kept lists are<br>verified and applied again. If the path is not set, trusted lists<br>are in effect until the library is deinitialized |
+| trustListSignerCerts | Base64[] | The certificates that sign trusted lists. Optional. A trusted list<br>is accepted only if it is signed by one of these certificates. Such<br>a certificate is not a trusted certificate of a certificate chain;<br>a certificate of certCache.trustedCerts is not a certificate for<br>signing trusted lists |
 
 ### Structure OCSP_PARAMS
 
@@ -319,6 +332,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | ---------------- | ------------------------- | -------------------------------------- |
 | certCache        | Object<br>CERT_CACHE_INFO | Information about the certificate cache state  |
 | crlCache         | Object<br>CRL_CACHE_INFO  | Information about the CRL cache state           |
+| trustListCache   | Object<br>TRUST_LIST_CACHE_INFO | Information about trusted lists. Optional — present if<br>trustListCache.path is set |
 | countCmProviders | Integer                   | Number of loaded storage providers |
 | offline          | Boolean                   | "Offline" operation mode                  |
 | ocsp             | Object<br>OCSP_INFO       | Information about the OCSP service parameters  |
@@ -332,6 +346,14 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | ----------------- | ------- | --------------------------------------------------- |
 | countTrustedCerts | Integer | Number of trusted certificates in the certificate cache |
 | countCerts        | Integer | Total number of certificates in the certificate cache |
+
+### Structure TRUST_LIST_CACHE_INFO
+
+| **Field name**    | **Type** | **Description** |
+| ----------------- | -------- | --------------- |
+| countLists        | Integer  | Number of trusted lists applied from the directory |
+| countRefusedLists | Integer  | Number of trusted lists of the directory that are not accepted |
+| countListsNextUpdatePassed | Integer | Number of the accepted trusted lists whose next update time<br>is passed (the list is to be obtained again) |
 
 ### Structure CRL_CACHE_INFO
 
@@ -1851,6 +1873,10 @@ If a certificate is missing for validation, the information for finding it is st
 
 If a CRL is missing to determine the certificate status, the information for finding it is stored in the "expectedCrls" field (an array of EXPECTED_CRL_INFO records).
 
+The status of the certificate of an OCSP responder and of a CRL signer is required (RFC 6960, 4.2.2.2.1). It is not determined if the certificate is self-signed, has the id-pkix-ocsp-nocheck extension or is a service of a trusted list (OCSP or CRL) provided at the validation time; otherwise it is determined by OCSP or CRL — from the signature, the cache or the network. If the status is not determined, the validation result is INDETERMINATE with the warning "THE STATUS OF THE OCSP RESPONDER IS NOT DETERMINED", and the CRL needed is given in the "expectedCrls" field (it can be added with the ADD_CRL method).
+
+If the certificate of a time-stamping service is revoked for a key compromise or with no reason given, the validation result is INDETERMINATE with the warning "THE KEY OF THE TSA IS COMPROMISED" or "THE TSA CERTIFICATE IS REVOKED WITH NO REASON GIVEN" (RFC 3161, section 4).
+
 The "warnings" field contains warnings about the signature validation result (an array of text strings).
 
 During full signature validation, the following logic is used to determine the certificate status:
@@ -2501,6 +2527,29 @@ The method returns an array of certificate extensions in the order in which they
 | extensions           | Object[],<br>EXTENSION_INFO[]    | Array of extensions the certificate has |
 | signatureInfo        | Object<br>SIGNATURE_INFO         | Electronic signature of the certificate |
 | selfSigned           | Boolean                          | Flag indicating the certificate is self-signed |
+| trusted              | Boolean                          | Flag indicating the certificate is trusted at this time: given at<br>initialization or a certificate of a service of a trusted list within<br>its period of trust (see the ADD_TRUST_LIST method). For<br>a certificate given by the bytes field that is not in the certificate<br>cache — false |
+| trustListSigner      | Boolean                          | Flag indicating the certificate is for verifying the signature of<br>trusted lists (trustListCache.trustListSignerCerts of the INIT method). Optional |
+| trustServices        | Object[]<br>TRUST_SERVICE[]      | The services of trusted lists this certificate is the certificate of.<br>Optional |
+
+### Structure TRUST_SERVICE
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| listId         | String   | Identifier of the trusted list |
+| type           | String   | Service type: the part of the type identifier after "/Svctype/",<br>for example "CA/QC", "TSA/QTST", "Certstatus/OCSP/QC",<br>"NationalRootCA-QC" |
+| tspName        | String   | Name of the trust service provider |
+| serviceName    | String   | Name of the service |
+| forESignatures | Boolean  | The service is for electronic signatures. Optional |
+| forESeals      | Boolean  | The service is for electronic seals. Optional |
+| statuses       | Object[]<br>TRUST_SERVICE_STATUS[] | Statuses of the service: the first is the current one, then the<br>previous ones |
+
+### Structure TRUST_SERVICE_STATUS
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| status         | String   | Service status: the last part of the status identifier, for example<br>"granted", "withdrawn", "recognisedatnationallevel" |
+| from           | String   | Time the status started (UTC) |
+| to             | String   | Time the status ended (UTC). Optional — absent for the current<br>status |
 
 ### Structure SUBJECT_PUBLICKEY_INFO
 
@@ -2769,6 +2818,8 @@ The method removes a certificate from the certificate cache or from the opened s
 
 If the certificate to be removed is not specified (bytes and certId are absent), all temporary certificates are removed from the cache (those that were added by the ADD*CERT method without the \_permanent = true* flag or added indirectly in other methods).
 
+A certificate trusted at the initialization (the "certCache.trustedCerts" parameter of the INIT method) is not removed: the method returns the error CERT_TRUSTED_NOT_REMOVABLE.
+
 Output parameters: none.
 
 ### Structure of the parameters field in the request
@@ -3033,6 +3084,164 @@ The method is intended for forming an OCSP request and obtaining an OCSP respons
     "thisUpdate": "2023-08-01 12:34:56",
     "responderId": { "O": "Test CA", "CN": "OCSP-service", "C": "UA", "L": "Київ" },
     "statusSignature": "VALID"
+  }
+}
+```
+
+## ADD_TRUST_LIST method
+
+The method is intended for adding a trusted list (ETSI TS 119 612, an XML document with a XAdES signature). The method does not download a trusted list.
+
+A trusted list is accepted if:
+
+- it is signed by one of the certificates given in the trustListCache.trustListSignerCerts field of the INIT method;
+- its sequence number is not less than the number of the trusted list with the same identifier accepted before.
+
+The certificates of the services of the trusted list are added to the certificate cache (without saving to disk) with the information about the services; a certificate of a service becomes trusted for the period from the first time the service was provided to the end of the last period it was provided in (without a limit while the service is provided). The trust is decided at a time: for the certificate of the signer when a signature is verified — at the best signature time, for the certificate of a time-stamping service — at the time of its time-stamp, when a certificate is checked before signing — at the time of signing. A certificate chain ends at the first certificate trusted at that time; the certificates of the issuers above it are not needed. A certificate that is trusted itself at that time (a certificate of a service of a trusted list — a time-stamping service, an OCSP responder) ends its own chain: the certificates of its issuers and its status are not needed. The time-stamps of a service whose certificate is revoked for a key compromise or with no reason given are not accepted whenever they were made; of one revoked for another reason — are accepted if made before the revocation (RFC 3161, section 4). Adding a trusted list again replaces the information received from its previous version. The information about the services is returned by the CERT_INFO method.
+
+The signature of a trusted list is verified with the algorithms DSTU 4145, RSA (PKCS #1 v1.5) and ECDSA; for another algorithm the method returns the error UNSUPPORTED_ALG.
+
+### Structure of the parameters field in the request
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| bytes          | Base64   | Trusted list (XML document). Mutually exclusive with the text field |
+| text           | String   | Trusted list as the text of the XML document (UTF-8). Mutually<br>exclusive with the bytes field |
+
+### Structure of the result field in the response
+
+| **Field name**    | **Type** | **Description** |
+| ----------------- | -------- | --------------- |
+| listId            | String   | Identifier of the trusted list: its first distribution point<br>(DistributionPoints), or the territory and the type of the list if<br>there is none |
+| type              | String   | Type of the trusted list: the last part of the TSLType identifier |
+| territory         | String   | Scheme territory (SchemeTerritory) |
+| schemeName        | String  | Name of the scheme: in English if the list has it, else the first one. May be empty |
+| schemeOperatorName | String | Name of the scheme operator: the same. May be empty |
+| sequenceNumber    | Integer  | Sequence number of the trusted list (TSLSequenceNumber) |
+| listIssueDateTime | String   | Issue time of the trusted list (UTC). Optional |
+| nextUpdate        | String   | Time of the next update (UTC). Optional |
+| signerCertId      | Base64   | Identifier of the certificate the trusted list is signed with |
+| countProviders    | Integer  | Number of trust service providers |
+| countServices     | Integer  | Number of services |
+| countCerts        | Integer  | Number of certificates of the services |
+| countAddedCerts   | Integer  | Number of certificates that were not in the certificate cache |
+| countTrustedCerts | Integer  | Number of certificates of the trusted list that are trusted at this time |
+| countSkippedCerts | Integer  | Number of certificates the library did not parse (for example,<br>x.509 version 1); their services are not taken into account |
+| stored            | Boolean  | Flag indicating the trusted list is saved in the directory<br>trustListCache.path |
+| warnings          | String[] | Remarks on the certificate that signs the trusted list<br>(ETSI TS 119 612, clause 5.7.1). Optional |
+
+In case of an error the result field may contain: "detail" (String) — the reason of the refusal; "xmlError" (String) and "xmlErrorOffset" (Integer) — the error of parsing the XML document and its offset.
+
+| **Value of warnings** | **Description** |
+| --- | --- |
+| "SIGNER_WITHOUT_TSL_SIGNING_KEY_PURPOSE" | The certificate has no extended key usage<br>id-tsl-kp-tslSigning (0.4.0.2231.3.0) |
+| "SIGNER_WITH_OTHER_KEY_USAGE" | The key usage of the certificate has values other than<br>digitalSignature and nonRepudiation |
+| "SIGNER_COUNTRY_IS_NOT_SCHEME_TERRITORY" | The country in the name of the certificate is not the scheme territory |
+| "SIGNER_ORGANIZATION_IS_NOT_SCHEME_OPERATOR_NAME" | The organization in the name of the certificate is none of the<br>scheme operator names |
+| "SIGNER_ISSUER_IS_NOT_A_SERVICE_OF_THE_LIST" | The certificate is not self-signed and its issuer is not a service<br>of this trusted list |
+| "LIST_NEXT_UPDATE_PASSED" | The next update time of the list (NextUpdate) is passed: the list<br>is accepted, it is to be obtained again (ETSI TS 119 612, 5.3.15) |
+
+Errors of the method: TRUST_LIST_INVALID, TRUST_LIST_VERIFY_FAILED, TRUST_LIST_SIGNER_NOT_TRUSTED, TRUST_LIST_OBSOLETE (Appendix A).
+
+### Request example
+
+```
+{
+  "method": "ADD_TRUST_LIST",
+  "parameters": {
+    "bytes": "PD94bWwgdmVy...dExpc3Q+"
+  }
+}
+```
+
+### Response example
+
+```
+{
+  "errorCode": 0,
+  "method": "ADD_TRUST_LIST",
+  "result": {
+    "listId": "https://czo.gov.ua/download/tl/TL-UA-DSTU.xml",
+    "type": "CClist",
+    "territory": "UA",
+    "sequenceNumber": 196,
+    "listIssueDateTime": "2026-09-17 13:33:00",
+    "nextUpdate": "2027-03-17 13:33:00",
+    "signerCertId": "MIIBJzCB1TCB...AgEBAgEH",
+    "countProviders": 34,
+    "countServices": 416,
+    "countCerts": 416,
+    "countAddedCerts": 416,
+    "countTrustedCerts": 255,
+    "countSkippedCerts": 0,
+    "stored": true,
+    "warnings": [
+      "SIGNER_ORGANIZATION_IS_NOT_SCHEME_OPERATOR_NAME"
+    ]
+  }
+}
+```
+
+## LIST_TRUST_LISTS method
+
+The method returns the list of the accepted trusted lists: the last accepted version of every list (the ADD_TRUST_LIST method and the lists of the directory of trusted lists read at the initialization).
+
+Input parameters: none.
+
+### Structure of the result field in the response
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| trustLists     | Object[]<br>TRUST_LIST_INFO[] | The accepted trusted lists |
+
+### Structure of the TRUST_LIST_INFO record
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| listId            | String  | Identifier of the list |
+| type              | String  | Type of the list |
+| territory         | String  | Scheme territory |
+| schemeName        | String  | Name of the scheme: in English if the list has it, else the first one. May be empty |
+| schemeOperatorName | String | Name of the scheme operator: the same. May be empty |
+| sequenceNumber    | Integer | Sequence number of the list |
+| listIssueDateTime | String  | Issue time of the list. Optional |
+| nextUpdate        | String  | Next update time. Optional |
+| nextUpdatePassed  | Boolean | Flag: the next update time is passed |
+| signerCertId      | Base64  | Identifier of the certificate that signs the list |
+| countCerts        | Integer | Number of the certificates of the services of the list |
+| countTrustedCerts | Integer | Number of the certificates trusted by the list when it was accepted |
+| stored            | Boolean | Flag: the list is kept in the directory of trusted lists |
+
+### Request example
+
+```
+{
+  "method": "LIST_TRUST_LISTS"
+}
+```
+
+### Response example
+
+```
+{
+  "errorCode": 0,
+  "method": "LIST_TRUST_LISTS",
+  "result": {
+    "trustLists": [
+      {
+        "listId": "https://czo.gov.ua/download/tl/TL-UA-DSTU.xml",
+        "type": "CClist",
+        "territory": "UA",
+        "sequenceNumber": 196,
+        "listIssueDateTime": "2026-09-17 13:33:00",
+        "nextUpdate": "2026-12-17 13:33:00",
+        "nextUpdatePassed": false,
+        "signerCertId": "MIIBJzCB1TCB...AgEBAgEH",
+        "countCerts": 416,
+        "countTrustedCerts": 255,
+        "stored": true
+      }
+    ]
   }
 }
 ```
@@ -3708,6 +3917,11 @@ Table A.1. Error codes
 | `RET_UAPKI_TSP_RESPONSE_NOT_GRANTED`       | 0x1072 | Timestamp not granted                              |
 | `RET_UAPKI_TSP_RESPONSE_NOT_EQUAL_REQUEST` | 0x1073 | TSP response does not match the request            |
 | `RET_UAPKI_TSP_RESPONSE_INVALID`                 | 0x1074 | TSP response structure is invalid                  |
+| `RET_UAPKI_TRUST_LIST_INVALID`                   | 0x1078 | The trusted list does not conform to the format    |
+| `RET_UAPKI_TRUST_LIST_VERIFY_FAILED`             | 0x1079 | Invalid signature of the trusted list              |
+| `RET_UAPKI_TRUST_LIST_SIGNER_NOT_TRUSTED`        | 0x107A | The certificate that signs the trusted list is not trusted for that |
+| `RET_UAPKI_TRUST_LIST_OBSOLETE`                  | 0x107B | A trusted list with a greater sequence number is accepted |
+| `RET_UAPKI_CERT_TRUSTED_NOT_REMOVABLE`          | 0x107C | A certificate trusted at the initialization is not removed |
 
 Table A.2. Storage error codes
 
