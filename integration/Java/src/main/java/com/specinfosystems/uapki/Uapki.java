@@ -383,6 +383,12 @@ public final class Uapki implements AutoCloseable {
     private record SignParameters(SignFormat signParams, List<DataTbs> dataTbs, SignOptions options) { }
     private record SignedData(byte[] bytes, byte[] content, String file, String ptr, Long size) { }
     private record VerifyParams(SignedData signature, ValidationOptions options, Boolean returnContent) { }
+    //  validationPolicy: the name of a policy (String), its values (ValidationPolicy) or null (the default policy)
+    private record EtsiOptions(String validationType, Integer verifySignerInfoIndex, Object validationPolicy, String proofOfExistenceTime) { }
+    private record EtsiVerifyParams(SignedData signature, EtsiOptions options, Boolean returnContent) { }
+    //  isDigest: null (not sent) or true - content is the hash of the data
+    private record AugmentData(byte[] bytes, byte[] content, String file, String ptr, Long size, Boolean isDigest) { }
+    private record AugmentParams(AugmentData signature, String signatureFormat, Integer signerInfoIndex, AugmentOptions options) { }
 
     // ---------------------------------------------------------------------------------------------------------------
     //  INIT, DEINIT, VERSION, PROVIDERS
@@ -412,6 +418,8 @@ public final class Uapki implements AutoCloseable {
                 Files.createDirectories(Path.of(parameters.getCertCache().getPath()));
             if (parameters.getCrlCache() != null && parameters.getCrlCache().getPath() != null)
                 Files.createDirectories(Path.of(parameters.getCrlCache().getPath()));
+            if (parameters.getTrustListCache() != null && parameters.getTrustListCache().getPath() != null)
+                Files.createDirectories(Path.of(parameters.getTrustListCache().getPath()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -460,7 +468,9 @@ public final class Uapki implements AutoCloseable {
         //  The shared memory does not load providers (PROVIDERS is not allowed there)
         List<CmProvider> providers = isSharedMemory() ? new ArrayList<>() : getProviders();
         return new UapkiLibraryInfo(version, ret.result.certCache().countCerts(), ret.result.certCache().countTrustedCerts(),
-                ret.result.crlCache().countCrls(), providers);
+                ret.result.crlCache().countCrls(),
+                ret.result.trustListCache() == null ? 0 : ret.result.trustListCache().countLists(),
+                ret.result.trustListCache() == null ? 0 : ret.result.trustListCache().countRefusedLists(), providers);
     }
 
     /**
@@ -789,6 +799,54 @@ public final class Uapki implements AutoCloseable {
     // ---------------------------------------------------------------------------------------------------------------
     //  Certificates
     // ---------------------------------------------------------------------------------------------------------------
+
+    /**
+     * @param cert сертифікат
+     * @return відомості про сертифікат (метод CERT_INFO); якщо сертифікат є в кеші - з тим, що бібліотека знає про
+     *         довіру до нього (trusted, trustListSigner, trustServices)
+     */
+    public Certificate getCertInfo(byte[] cert) {
+        checkInit();
+
+        Json.Response<Certificate> ret = response(request("CERT_INFO", p -> writeBase64(p, "bytes", cert)), Certificate.class);
+        if (ret.errorCode != 0)
+            throw new UapkiException(ret.errorCode);
+        if (ret.result == null)
+            throw new UapkiException(0x1005);
+        return ret.result;
+    }
+
+    /**
+     * Додає довірчий список (ETSI TS 119 612, XML) (метод ADD_TRUST_LIST). Список приймається, якщо підписаний одним
+     * із сертифікатів trustListCache.trustListSignerCerts методу INIT і його порядковий номер не менший за вже прийнятий
+     *
+     * @param trustList XML-документ довірчого списку
+     * @return відомості про прийнятий список
+     */
+    public TrustListInfo addTrustList(byte[] trustList) {
+        checkInit();
+
+        return callResult(request("ADD_TRUST_LIST", p -> writeBase64(p, "bytes", trustList)), TrustListInfo.class);
+    }
+
+    /**
+     * Прийняті довірчі списки: остання прийнята версія кожного списку (метод LIST_TRUST_LISTS)
+     */
+    public List<AcceptedTrustList> listTrustLists() {
+        checkInit();
+
+        AcceptedTrustLists ret = callResult(request("LIST_TRUST_LISTS"), AcceptedTrustLists.class);
+        return ret.trustLists();
+    }
+
+    /**
+     * Додає довірчий список, заданий текстом XML-документа (метод ADD_TRUST_LIST)
+     */
+    public TrustListInfo addTrustListText(String trustList) {
+        checkInit();
+
+        return callResult(request("ADD_TRUST_LIST", p -> p.name("text").value(trustList)), TrustListInfo.class);
+    }
 
     /**
      * @param certId ідентифікатор сертифіката
@@ -1383,6 +1441,73 @@ public final class Uapki implements AutoCloseable {
     }
 
     // ---------------------------------------------------------------------------------------------------------------
+    //  AUGMENT_CMS
+    // ---------------------------------------------------------------------------------------------------------------
+
+    private static String augmentFormat(SignatureFormat format) {
+        if (format != SignatureFormat.CADES_T && format != SignatureFormat.CADES_B_LT && format != SignatureFormat.CADES_B_LTA)
+            throw new IllegalArgumentException("AUGMENT_CMS: CAdES-T, CAdES-B-LT або CAdES-B-LTA");
+        return format.value();
+    }
+
+    /**
+     * Розширює CAdES-підпис до CAdES-T, CAdES-B-LT або CAdES-B-LTA (метод AUGMENT_CMS). Якщо перевірка не дала
+     * TOTAL-VALID, результат не має bytes, errorCode - NOT_ALLOWED, а signatureInfos пояснюють чому
+     *
+     * @param signature       PKCS#7-підпис
+     * @param content         дані зовнішнього підпису (або їх геш з isDigest), null для підпису з даними
+     * @param format          CADES_T, CADES_B_LT або CADES_B_LTA
+     * @param options         параметри або null
+     * @param signerInfoIndex індекс підпису або null (усі підписи)
+     * @param isDigest        content містить геш даних
+     */
+    public AugmentResult augmentCms(byte[] signature, byte[] content, SignatureFormat format, AugmentOptions options,
+                                    Integer signerInfoIndex, boolean isDigest) {
+        AugmentData data = new AugmentData(signature, content, null, null, null, isDigest ? Boolean.TRUE : null);
+        return augmentRequest(new AugmentParams(data, augmentFormat(format), signerInfoIndex, options));
+    }
+
+    /**
+     * Розширює CAdES-підпис (метод AUGMENT_CMS)
+     *
+     * @see #augmentCms(byte[], byte[], SignatureFormat, AugmentOptions, Integer, boolean)
+     */
+    public AugmentResult augmentCms(byte[] signature, byte[] content, SignatureFormat format) {
+        return augmentCms(signature, content, format, null, null, false);
+    }
+
+    /**
+     * Розширює зовнішній підпис за файлом даних (бібліотека читає файл блоками; метод AUGMENT_CMS)
+     *
+     * @see #augmentCms(byte[], byte[], SignatureFormat, AugmentOptions, Integer, boolean)
+     */
+    public AugmentResult augmentCmsDetached(byte[] signature, String contentFile, SignatureFormat format,
+                                            AugmentOptions options, Integer signerInfoIndex) {
+        AugmentData data = new AugmentData(signature, null, contentFile, null, null, null);
+        return augmentRequest(new AugmentParams(data, augmentFormat(format), signerInfoIndex, options));
+    }
+
+    /**
+     * Розширює зовнішній підпис за даними в пам'яті процесу (без копій і base64; метод AUGMENT_CMS)
+     *
+     * @see #augmentCms(byte[], byte[], SignatureFormat, AugmentOptions, Integer, boolean)
+     */
+    public AugmentResult augmentCmsDetached(byte[] signature, Pointer content, long size, SignatureFormat format,
+                                            AugmentOptions options, Integer signerInfoIndex) {
+        AugmentData data = new AugmentData(signature, null, null, SignSource.hexAddress(content), size, null);
+        return augmentRequest(new AugmentParams(data, augmentFormat(format), signerInfoIndex, options));
+    }
+
+    private AugmentResult augmentRequest(AugmentParams parameters) {
+        Json.Response<AugmentResult> ret = response(requestObject("AUGMENT_CMS", parameters), AugmentResult.class);
+        if (ret.errorCode != 0 && (ret.result == null || ret.result.signatureInfos() == null))
+            throw new UapkiException(ret.errorCode);
+        if (ret.result == null)
+            throw new UapkiException(0x2001);
+        return ret.result.withErrorCode(ret.errorCode);
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
     //  Sign
     // ---------------------------------------------------------------------------------------------------------------
 
@@ -1582,7 +1707,18 @@ public final class Uapki implements AutoCloseable {
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
     public ValidationResult verify(byte[] signature, byte[] content, String validationType) {
-        VerifyParams parameters = new VerifyParams(new SignedData(signature, content, null, null, null), new ValidationOptions(validationType), null);
+        return verify(signature, content, new ValidationOptions(validationType));
+    }
+
+    /**
+     * Перевіряє підпис (метод VERIFY) з усіма параметрами options
+     *
+     * @param signature PKCS#7-підпис
+     * @param content   дані (для підпису без інкапсуляції даних) або null
+     * @param options   параметри перевірки
+     */
+    public ValidationResult verify(byte[] signature, byte[] content, ValidationOptions options) {
+        VerifyParams parameters = new VerifyParams(new SignedData(signature, content, null, null, null), options, null);
         return verifyResult(response(requestObject("VERIFY", parameters), ValidationResult.class));
     }
 
@@ -1608,8 +1744,17 @@ public final class Uapki implements AutoCloseable {
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
     public ValidationResult verifyDetached(byte[] signature, Pointer content, long size, String validationType) {
+        return verifyDetached(signature, content, size, new ValidationOptions(validationType));
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за даними в пам'яті процесу (метод VERIFY) з усіма параметрами options
+     *
+     * @see #verifyDetached(byte[], Pointer, long, String)
+     */
+    public ValidationResult verifyDetached(byte[] signature, Pointer content, long size, ValidationOptions options) {
         SignedData signed = new SignedData(signature, null, null, SignSource.hexAddress(content), size);
-        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, new ValidationOptions(validationType), false)),
+        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, options, false)),
                 ValidationResult.class));
     }
 
@@ -1632,8 +1777,17 @@ public final class Uapki implements AutoCloseable {
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
     public ValidationResult verifyDetached(byte[] signature, ByteBuffer content, String validationType) {
+        return verifyDetached(signature, content, new ValidationOptions(validationType));
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за даними прямого буфера (метод VERIFY) з усіма параметрами options
+     *
+     * @see #verifyDetached(byte[], ByteBuffer, String)
+     */
+    public ValidationResult verifyDetached(byte[] signature, ByteBuffer content, ValidationOptions options) {
         try {
-            return verifyDetached(signature, SignSource.address(content), content.remaining(), validationType);
+            return verifyDetached(signature, SignSource.address(content), content.remaining(), options);
         } finally {
             Reference.reachabilityFence(content);
         }
@@ -1657,9 +1811,89 @@ public final class Uapki implements AutoCloseable {
      * @param validationType тип перевірки ("FULL", "CHAIN", "STRUCT")
      */
     public ValidationResult verifyDetached(byte[] signature, String contentFile, String validationType) {
+        return verifyDetached(signature, contentFile, new ValidationOptions(validationType));
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за файлом даних (метод VERIFY) з усіма параметрами options
+     *
+     * @see #verifyDetached(byte[], String, String)
+     */
+    public ValidationResult verifyDetached(byte[] signature, String contentFile, ValidationOptions options) {
         SignedData signed = new SignedData(signature, null, contentFile, null, null);
-        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, new ValidationOptions(validationType), false)),
+        return verifyResult(response(requestObject("VERIFY", new VerifyParams(signed, options, false)),
                 ValidationResult.class));
+    }
+
+    /**
+     * Перевіряє підпис з типом валідації "FULL-ETSI" і політикою за замовчуванням ("UkraineDefault"): звіт зі
+     * статусами ETSI EN 319 102-1 у структурі ETSI TS 119 102-2
+     *
+     * @param signature PKCS#7-підпис
+     * @param content   дані для підпису без інкапсуляції даних, інакше null
+     */
+    public EtsiValidationResult verifyEtsi(byte[] signature, byte[] content) {
+        return verifyEtsi(new SignedData(signature, content, null, null, null), null);
+    }
+
+    /**
+     * Перевіряє підпис з типом валідації "FULL-ETSI" і передвстановленою політикою
+     *
+     * @param signature  PKCS#7-підпис
+     * @param content    дані для підпису без інкапсуляції даних, інакше null
+     * @param policyName назва політики: "UkraineDefault", "EtsiStrict"
+     */
+    public EtsiValidationResult verifyEtsi(byte[] signature, byte[] content, String policyName) {
+        return verifyEtsi(new SignedData(signature, content, null, null, null), policyName);
+    }
+
+    /**
+     * Перевіряє підпис з типом валідації "FULL-ETSI" і політикою, заданою значеннями (у звіті - "custom")
+     *
+     * @param signature PKCS#7-підпис
+     * @param content   дані для підпису без інкапсуляції даних, інакше null
+     * @param policy    значення політики
+     */
+    public EtsiValidationResult verifyEtsi(byte[] signature, byte[] content, ValidationPolicy policy) {
+        return verifyEtsi(new SignedData(signature, content, null, null, null), policy);
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за файлом даних з типом валідації "FULL-ETSI" і передвстановленою
+     * політикою (null - за замовчуванням). Бібліотека читає файл блоками
+     */
+    public EtsiValidationResult verifyEtsiDetached(byte[] signature, String contentFile, String policyName) {
+        return verifyEtsi(new SignedData(signature, null, contentFile, null, null), policyName);
+    }
+
+    /**
+     * Перевіряє підпис без інкапсуляції даних за файлом даних з типом валідації "FULL-ETSI" і політикою,
+     * заданою значеннями
+     */
+    public EtsiValidationResult verifyEtsiDetached(byte[] signature, String contentFile, ValidationPolicy policy) {
+        return verifyEtsi(new SignedData(signature, null, contentFile, null, null), policy);
+    }
+
+    private volatile String etsiProofOfExistenceTime;
+
+    /**
+     * Час ("РРРР-ММ-ДД гг:хх:сс", UTC), на який застосунок засвідчує існування підписів, що перевіряються далі
+     * методами verifyEtsi..., з усіма їхніми об'єктами: доказ існування, наданий як вхідні дані
+     * (ETSI EN 319 102-1, 5.6.3); null - немає
+     */
+    public void setEtsiProofOfExistenceTime(String proofOfExistenceTime) {
+        this.etsiProofOfExistenceTime = proofOfExistenceTime;
+    }
+
+    //  The error of the method is what stops the whole validation; what is found for a signature is in its report
+    private EtsiValidationResult verifyEtsi(SignedData signed, Object policy) {
+        EtsiVerifyParams parameters = new EtsiVerifyParams(signed, new EtsiOptions("FULL-ETSI", null, policy, etsiProofOfExistenceTime), false);
+        Json.Response<EtsiValidationResult> ret = response(requestObject("VERIFY", parameters), EtsiValidationResult.class);
+        if (ret.errorCode != 0)
+            throw new UapkiException(ret.errorCode);
+        if (ret.result == null)
+            throw new UapkiException(0x2001);
+        return ret.result;
     }
 
     private static ValidationResult verifyResult(Json.Response<ValidationResult> ret) {

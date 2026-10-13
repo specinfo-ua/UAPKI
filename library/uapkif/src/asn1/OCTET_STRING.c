@@ -212,6 +212,7 @@ OCTET_STRING_decode_ber(asn_codec_ctx_t *opt_codec_ctx,
     struct _stack *stck;        /* Expectations stack structure */
     struct _stack_el *sel = 0;    /* Stack element */
     int tlv_constr;
+    int explicit_eoc = 0;        /* The end-of-contents octets of an indefinite-length EXPLICIT tag */
     enum asn_OS_Subvariant type_variant = specs->subvariant;
 
     ASN_DEBUG("Decoding %s as %s (frame %ld)",
@@ -235,6 +236,38 @@ OCTET_STRING_decode_ber(asn_codec_ctx_t *opt_codec_ctx,
 
     switch (ctx->phase) {
     case 0:
+        /*
+         * An EXPLICIT tag of the indefinite length around a primitive OCTET STRING of
+         * a definite length (X.690, 8.14.2 and 8.1.3.6): A0 80  04 L ...  00 00.
+         * ber_check_tags() does not allow such a mix of lengths in a chain of tags, so
+         * the outer tag is passed here and its end-of-contents octets - after the string.
+         * Only when all the octets are in the buffer: the decoding is not suspended then.
+         */
+        if ((tag_mode == 1) && (ctx->step == 0) && (type_variant == ASN_OSUBV_STR) && (size >= 6)) {
+            const uint8_t *p = (const uint8_t *)buf_ptr;
+            if ((p[0] & 0x20) && ((p[0] & 0x1F) != 0x1F) && (p[1] == 0x80) && (p[2] == 0x04)) {
+                size_t len_inner = p[3], len_hdr = 4, len_of_len;
+                int is_whole = 1;
+                if (len_inner & 0x80) {
+                    len_of_len = len_inner & 0x7F;
+                    len_inner = 0;
+                    if ((len_of_len == 0) || (len_of_len > sizeof(len_inner)) || (size < len_hdr + len_of_len)) {
+                        is_whole = 0;
+                    } else {
+                        while (len_of_len--) {
+                            len_inner = (len_inner << 8) | p[len_hdr++];
+                        }
+                    }
+                }
+                if (is_whole && (len_inner <= size) && (len_hdr + 2 <= size - len_inner)
+                        && (p[len_hdr + len_inner] == 0x00) && (p[len_hdr + len_inner + 1] == 0x00)) {
+                    explicit_eoc = 1;
+                    ADVANCE(2);
+                    tag_mode = 0;
+                }
+            }
+        }
+
         /*
          * Check tags.
          */
@@ -528,6 +561,11 @@ phase3:
             APPEND(buf_ptr, ctx->left);
             ADVANCE(ctx->left);
             ctx->left = 0;
+
+            if (explicit_eoc) {
+                /* Checked in the phase 0: the two octets are here */
+                ADVANCE(2);
+            }
 
             NEXT_PHASE(ctx);
         }

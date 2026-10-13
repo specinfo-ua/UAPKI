@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -52,15 +52,27 @@ using namespace UapkiNS;
 //  The chain built as for signing and VERIFY ends in a trusted root, every link verified
 static int check_trusted_root (
         CertValidator::CertValidator& certValidator,
-        Cert::CerItem* cerSubject
+        Cert::CerItem* cerSubject,
+        const uint64_t validateTime
 )
 {
+    //  The trust is decided at the validation time (a certificate of a trusted list is trusted while its service
+    //  is provided)
     vector<CertValidator::CertChainItem*> chain;
-    int ret = certValidator.buildCertChain(CertValidator::CertEntity::UNDEFINED, cerSubject, chain);
+    int ret = certValidator.buildCertChain(CertValidator::CertEntity::UNDEFINED, cerSubject, chain, nullptr, validateTime);
     if (ret == RET_OK) {
         for (const auto it : chain) {
             ret = it->getSubject()->verify(it->getIssuer());
             if (ret != RET_OK) break;
+        }
+    }
+    if (ret == RET_OK) {
+        //  The same constraints of the chain as for signing and VERIFY
+        for (const auto it : chain) {
+            if (CertValidator::checkChainConstraints(*it, chain, false) != CertValidator::ChainConstraint::NONE) {
+                ret = RET_UAPKI_INVALID_KEY_USAGE;
+                break;
+            }
         }
     }
     if (ret == RET_OK) {
@@ -158,7 +170,7 @@ int uapki_verify_cert (Context& context, JSON_Object* joParams, JSON_Object* joR
     }
 
     if (check_trustedroot) {
-        DO(check_trusted_root(cert_validator, cer_subject));
+        DO(check_trusted_root(cert_validator, cer_subject, validate_time));
     }
  
     if (validation_type == Cert::ValidationType::CRL) {
@@ -176,7 +188,7 @@ int uapki_verify_cert (Context& context, JSON_Object* joParams, JSON_Object* joR
         JSON_Object* jo_resvalbyocsp = nullptr;
         DO_JSON(json_object_set_value(joResult, "validateByOCSP", json_value_init_object()));
         jo_resvalbyocsp = json_object_get_object(joResult, "validateByOCSP");
-        if (!cer_subject->getCertExtKeyUsage().isOcspNoCheck()) {
+        if (!cer_subject->isNoRevocationCheck()) {
             CertValidator::ResultValidationByOcsp result_valbyocsp;
             DO(cert_validator.validateByOcsp(
                 cer_subject,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -139,8 +139,10 @@ private:
                 m_CrlId;
     const ByteArray*
                 m_Issuer;
+    std::string m_SignAlgo;
     uint64_t    m_ThisUpdate;
     uint64_t    m_NextUpdate;
+    uint64_t    m_ExpiredCertsOnCrl;    //  expiredCertsOnCRL (ITU-T X.509), 0 if absent
     std::vector<RevokedCertOffset>
                 m_RevokedCertOffsets;
     const ByteArray*
@@ -161,6 +163,8 @@ private:
     const ByteArray*
                 m_CrlIdentifier;
     std::atomic<Actuality> m_Actuality;
+    std::atomic_bool
+                m_MarkedToRemove;   //  a temporary CRL (not permanent): removed by REMOVE_CRL without crlId
 
 public:
     CrlItem (
@@ -171,6 +175,14 @@ public:
 public:
     Actuality getActuality (void) const {
         return m_Actuality;
+    }
+    bool isMarkedToRemove (void) const {
+        return m_MarkedToRemove;
+    }
+    void markToRemove (
+        const bool marked
+    ) {
+        m_MarkedToRemove = marked;
     }
     const ByteArray* getAuthorityKeyId (void) const {
         return m_AuthorityKeyId;
@@ -205,11 +217,19 @@ public:
     uint64_t getNextUpdate (void) const {
         return m_NextUpdate;
     }
+    //  The CRL keeps the expired certificates revoked since this time (expiredCertsOnCRL), 0 if absent
+    uint64_t getExpiredCertsOnCrl (void) const {
+        return m_ExpiredCertsOnCrl;
+    }
     Cert::VerifyStatus getStatusSign (void) const {
         return m_StatusSign;
     }
     const TBSCertListAlt_t* getTbsCrl (void) const {
         return m_TbsCrl;
+    }
+    //  The signature algorithm of the CRL (OID)
+    const std::string& getSignAlgo (void) const {
+        return m_SignAlgo;
     }
     uint64_t getThisUpdate (void) const {
         return m_ThisUpdate;

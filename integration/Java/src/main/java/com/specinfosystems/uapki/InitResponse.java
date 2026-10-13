@@ -34,6 +34,7 @@ public record InitResponse(
         int countCmProviders,
         CertCacheInfo certCache,
         CrlCacheInfo crlCache,
+        TrustListCacheInfo trustListCache,
         OcspParams ocsp,
         TspParams tsp,
         ProxyParams proxy,

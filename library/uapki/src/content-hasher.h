@@ -32,6 +32,7 @@
 #include "uapki-ns.h"
 #include "hash.h"
 #include <string>
+#include <vector>
 
 
 namespace UapkiNS {
@@ -64,6 +65,13 @@ public:
     int digest (
         const HashAlg hashAlgo
     );
+    //  The hash of prefix || content || suffix; the hash value kept by digest() is not changed
+    int digestWithAffixes (
+        const HashAlg hashAlgo,
+        const std::vector<uint8_t>& prefix,
+        const std::vector<uint8_t>& suffix,
+        ByteArray** baHash
+    ) const;
     void reset (void);
     int setContent (
         const ByteArray* baBytes,

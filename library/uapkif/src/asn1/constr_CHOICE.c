@@ -389,6 +389,10 @@ CHOICE_decode_ber(asn_codec_ctx_t *opt_codec_ctx, asn_TYPE_descriptor_t *td,
                     ctx->left++;
                     continue;
                 }
+                /* <0><non-0>: not an end-of-contents, the loop would not advance */
+                ASN_DEBUG("Bad end-of-contents in %s", td->name);
+                ERROR_CREATE(RET_ASN1_ERROR);
+                RETURN(RC_FAIL);
             } else {
                 ASN_DEBUG("Unexpected continuation in %s",
                         td->name);

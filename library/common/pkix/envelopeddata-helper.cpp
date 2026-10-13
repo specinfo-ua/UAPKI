@@ -65,6 +65,9 @@ EnvelopedDataBuilder::~EnvelopedDataBuilder (void)
         case RecipientInfo_PR_kari:
             delete (KeyAgreeRecipientInfo*)recip_info;
             break;
+        case RecipientInfo_PR_ktri:
+            delete recip_info;
+            break;
         default:
             break;
         }
@@ -83,6 +86,54 @@ int EnvelopedDataBuilder::init (
     if (!m_EnvData) return RET_UAPKI_GENERAL_ERROR;
 
     const int ret = asn_ulong2INTEGER(&m_EnvData->version, (unsigned long)version);
+    return ret;
+}
+
+int EnvelopedDataBuilder::setVersion (
+        const uint32_t version
+)
+{
+    if (!m_EnvData || (version > 5)) return RET_UAPKI_INVALID_PARAMETER;
+
+    return asn_ulong2INTEGER(&m_EnvData->version, (unsigned long)version);
+}
+
+int EnvelopedDataBuilder::addKeyTransRecipientInfo (
+        const ByteArray* baIssuerAndSN,
+        const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgoId,
+        const ByteArray* baEncryptedKey
+)
+{
+    int ret = RET_OK;
+    RecipientInfo_t* recip_info = nullptr;
+    RecipientInfoBase* recipinfo_item = nullptr;
+
+    if (!m_EnvData || !baIssuerAndSN || !aidKeyEncryptionAlgoId.isPresent() || !baEncryptedKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    ASN_ALLOC_TYPE(recip_info, RecipientInfo_t);
+    recip_info->present = RecipientInfo_PR_ktri;
+
+    //  =version=, =rid=
+    DO(asn_ulong2INTEGER(&recip_info->choice.ktri.version, 0));
+    recip_info->choice.ktri.rid.present = RecipientIdentifier_PR_issuerAndSerialNumber;
+    DO(asn_decode_ba(get_IssuerAndSerialNumber_desc(), &recip_info->choice.ktri.rid.choice.issuerAndSerialNumber, baIssuerAndSN));
+
+    //  =keyEncryptionAlgorithm=
+    DO(Util::algorithmIdentifierToAsn1(recip_info->choice.ktri.keyEncryptionAlgorithm, aidKeyEncryptionAlgoId));
+
+    //  =encryptedKey=
+    DO(asn_ba2OCTSTRING(baEncryptedKey, &recip_info->choice.ktri.encryptedKey));
+
+    recipinfo_item = new RecipientInfoBase(RecipientInfo_PR_ktri);
+    ASN_SET_ADD(&m_EnvData->recipientInfos, recip_info);
+    recip_info = nullptr;
+
+    m_RecipientInfos.push_back(recipinfo_item);
+    recipinfo_item = nullptr;
+
+cleanup:
+    asn_free(get_RecipientInfo_desc(), recip_info);
+    delete recipinfo_item;
     return ret;
 }
 
@@ -610,6 +661,52 @@ int EnvelopedDataParser::parseKeyAgreeRecipientInfo (
     if (recip_info->present != RecipientInfo_PR_kari) return RET_UAPKI_INVALID_STRUCT;
 
     return kari.parse(recip_info->choice.kari);
+}
+
+int EnvelopedDataParser::parseKeyTransRecipientInfo (
+        const size_t index,
+        KeyTransRecipientInfo& ktri
+)
+{
+    if (index >= (size_t)m_EnvData->recipientInfos.list.count) return RET_INDEX_OUT_OF_RANGE;
+
+    const RecipientInfo_t* recip_info = m_EnvData->recipientInfos.list.array[index];
+    if (recip_info->present != RecipientInfo_PR_ktri) return RET_UAPKI_INVALID_STRUCT;
+
+    int ret = RET_OK;
+    const KeyTransRecipientInfo_t& src = recip_info->choice.ktri;
+    long version = 0;
+
+    //  =version=
+    DO(asn_INTEGER2long(&src.version, &version));
+    ktri.version = (uint32_t)version;
+
+    //  =rid=
+    ktri.ridType = src.rid.present;
+    switch (src.rid.present) {
+    case RecipientIdentifier_PR_issuerAndSerialNumber:
+        DO(asn_encode_ba(get_Name_desc(), &src.rid.choice.issuerAndSerialNumber.issuer, &ktri.baIssuer));
+        DO(asn_INTEGER2ba(&src.rid.choice.issuerAndSerialNumber.serialNumber, &ktri.baSerialNumber));
+        break;
+    case RecipientIdentifier_PR_subjectKeyIdentifier:
+        DO(asn_OCTSTRING2ba(&src.rid.choice.subjectKeyIdentifier, &ktri.baSubjectKeyId));
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+    }
+
+    //  =keyEncryptionAlgorithm=
+    DO(Util::oidFromAsn1(&src.keyEncryptionAlgorithm.algorithm, ktri.keyEncryptionAlgorithm.algorithm));
+    if (src.keyEncryptionAlgorithm.parameters) {
+        const ANY_t* any_param = src.keyEncryptionAlgorithm.parameters;
+        CHECK_NOT_NULL(ktri.keyEncryptionAlgorithm.baParameters = ba_alloc_from_uint8(any_param->buf, any_param->size));
+    }
+
+    //  =encryptedKey=
+    DO(asn_OCTSTRING2ba(&src.encryptedKey, &ktri.baEncryptedKey));
+
+cleanup:
+    return ret;
 }
 
 int EnvelopedDataParser::parseEncryptedContentInfo (

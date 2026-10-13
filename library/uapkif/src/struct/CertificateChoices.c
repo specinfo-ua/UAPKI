@@ -54,10 +54,15 @@ static asn_TYPE_member_t asn_MBR_CertificateChoices_1[] = {
         "extendedCertificate"
     },
     {
+        /*
+         * [1]: v1AttrCert of RFC 3852/5652 (obsolete) or attrCert of RFC 2630/3369 - an attribute
+         * certificate of the version 2 (X.509:2000). It is not used: the element is kept as it is
+         * encoded, with its tag.
+         */
         ATF_NOFLAGS, 0, offsetof(struct CertificateChoices, choice.v1AttrCert),
         (ASN_TAG_CLASS_CONTEXT | (1 << 2)),
-        -1,    /* IMPLICIT tag at current level */
-        &AttributeCertificateV1_desc,
+        0,
+        &ANY_desc,
         0,    /* Defer constraints checking to the member type */
         0,    /* PER is not compiled, use -gen-PER */
         0,

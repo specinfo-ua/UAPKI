@@ -37,6 +37,7 @@
 
 #include <string.h>
 #include "private-key.h"
+#include "key-trans.h"
 #include "aid.h"
 #include "cm-errors.h"
 #include "dstu4145-params.h"
@@ -640,6 +641,10 @@ int spki_get_algo_param(const ByteArray* baSpki, char** algo, char** algoParam)
         oid_is_parent(OID_DSTU4145_WITH_DSTU7564, s_algo)) {
         DO(private_key_get_param_dstu(spki->algorithm.parameters, &s_param));
     }
+    else if (oid_is_equal(OID_EC_KEY, s_algo) &&
+        (!spki->algorithm.parameters || ((spki->algorithm.parameters->size == 2) && (spki->algorithm.parameters->buf[0] == 0x05)))) {
+        //  The parameters of an originator key may be absent or NULL (RFC 5753, 3.1.1): no curve is named
+    }
     else if (oid_is_equal(OID_EC_KEY, s_algo) ||
         oid_is_equal(OID_ECKCDSA, s_algo) ||
         oid_is_parent(OID_ECGDSA_STD, s_algo) ||
@@ -886,6 +891,17 @@ static int private_key_sign_rsa(const PrivateKeyInfo_t* rsaprivkey, SignAlg sign
     CHECK_NOT_NULL(rsa_ctx = rsa_alloc());
     
     if (SIGN_RSA_PSS == sign_alg) {
+        //  The salt has the length of the hash (as in RSASSA-PSS-params of the signature): the modulus
+        //  is not less than 2 * hash length + 2 bytes (RFC 8017, 9.1.1)
+        //  The modulus is odd: a zero byte is only the leading one, whatever the byte order
+        size_t modulus_len = ba_get_len(ba_n);
+        const uint8_t* modulus_buf = ba_get_buf_const(ba_n);
+        if ((modulus_len > 0) && ((modulus_buf[0] == 0) || (modulus_buf[modulus_len - 1] == 0))) {
+            modulus_len--;
+        }
+        if (modulus_len < 2 * hash_get_size(hash_alg) + 2) {
+            SET_ERROR(RET_CM_UNSUPPORTED_ALG);
+        }
         DO(rsa_init_sign_pss(rsa_ctx, hash_alg, ba_n, ba_d));
     } 
     else {
@@ -944,7 +960,31 @@ static int hash_from_rsa_pss (const ByteArray* encodedHash, HashAlg* hashAlgo)
     char* s_oid = NULL;
 
     if (encodedHash) {
-        CHECK_NOT_NULL(oid = asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), encodedHash));
+        //  RSASSA-PSS-params (RFC 4055, 3.1): SEQUENCE { [0] { SEQUENCE { OID hash, ... } } DEFAULT sha1, ... },
+        //  or the OID of the hash alone
+        const uint8_t* buf = ba_get_buf_const(encodedHash);
+        const size_t len = ba_get_len(encodedHash);
+        ByteArray* ba_oid = NULL;
+        if ((len >= 2) && (buf[0] == 0x30)) {
+            size_t pos = 1;
+            pos += (buf[pos] & 0x80) ? (size_t)(buf[pos] & 0x7F) + 1 : 1;
+            if ((pos >= len) || (buf[pos] != 0xA0)) {
+                *hashAlgo = HASH_ALG_SHA1;
+                return RET_OK;
+            }
+            //  [0], then SEQUENCE of AlgorithmIdentifier: the lengths are short (an OID and NULL)
+            if ((pos + 6 > len) || (buf[pos + 1] & 0x80) || (buf[pos + 2] != 0x30) || (buf[pos + 3] & 0x80)
+                || (buf[pos + 4] != 0x06) || (pos + 6 + buf[pos + 5] > len)) {
+                SET_ERROR(RET_CM_UNSUPPORTED_ALG);
+            }
+            CHECK_NOT_NULL(ba_oid = ba_alloc_from_uint8(buf + pos + 4, (size_t)buf[pos + 5] + 2));
+            oid = asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), ba_oid);
+            ba_free(ba_oid);
+            CHECK_NOT_NULL(oid);
+        }
+        else {
+            CHECK_NOT_NULL(oid = asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), encodedHash));
+        }
         DO(asn_oid_to_text(oid, &s_oid));
         *hashAlgo = hash_from_oid(s_oid);
     }
@@ -1094,6 +1134,51 @@ cleanup:
     return ret;
 }
 
+int private_key_decrypt(const ByteArray* key, const ByteArray* baAlgorithmIdentifier,
+        const ByteArray* baEncryptedKey, ByteArray** baDecryptedKey)
+{
+    int ret = RET_OK;
+    PrivateKeyInfo_t* privkey = NULL;
+    RSAPrivateKey_t* rsa_privkey = NULL;
+    ByteArray* ba_encoded = NULL;
+    ByteArray* ba_d = NULL;
+    ByteArray* ba_n = NULL;
+    ByteArray* ba_params = NULL;
+    char* key_algo = NULL;
+    char* s_oid = NULL;
+
+    CHECK_PARAM(key != NULL);
+    CHECK_PARAM(baAlgorithmIdentifier != NULL);
+    CHECK_PARAM(baEncryptedKey != NULL);
+    CHECK_PARAM(baDecryptedKey != NULL);
+
+    DO(key_trans_decode_algid(baAlgorithmIdentifier, &s_oid, &ba_params));
+
+    CHECK_NOT_NULL(privkey = asn_decode_ba_with_alloc(get_PrivateKeyInfo_desc(), key));
+    DO(asn_oid_to_text(&privkey->privateKeyAlgorithm.algorithm, &key_algo));
+    if (!oid_is_equal(OID_RSA, key_algo)) {
+        SET_ERROR(RET_CM_UNSUPPORTED_ALG);
+    }
+
+    DO(asn_OCTSTRING2ba(&privkey->privateKey, &ba_encoded));
+    CHECK_NOT_NULL(rsa_privkey = asn_decode_ba_with_alloc(get_RSAPrivateKey_desc(), ba_encoded));
+    DO(asn_INTEGER2ba(&rsa_privkey->privateExponent, &ba_d));
+    DO(asn_INTEGER2ba(&rsa_privkey->modulus, &ba_n));
+
+    DO(key_trans_decrypt(ba_n, ba_d, s_oid, ba_params, baEncryptedKey, baDecryptedKey));
+
+cleanup:
+    asn_free(get_PrivateKeyInfo_desc(), privkey);
+    asn_free(get_RSAPrivateKey_desc(), rsa_privkey);
+    ba_free_private(ba_encoded);
+    ba_free_private(ba_d);
+    ba_free(ba_n);
+    ba_free(ba_params);
+    free(key_algo);
+    free(s_oid);
+    return ret;
+}
+
 int private_key_ecdh(const bool withCofactor, const ByteArray* baSenderKey,
         const ByteArray* baRecipientSpki, ByteArray** baCommonSecret)
 {
@@ -1126,6 +1211,10 @@ int private_key_ecdh(const bool withCofactor, const ByteArray* baSenderKey,
     DO(spki_get_algo_param(baRecipientSpki, &s_algo2, &s_param2));
     DEBUG_OUTCON( printf("\t algo2: '%s',  param2: '%s'\n", s_algo2, s_param2); );
 
+    if (s_algo1 && s_algo2 && s_param1 && !s_param2 && oid_is_equal(OID_EC_KEY, s_algo1) && oid_is_equal(OID_EC_KEY, s_algo2)) {
+        //  The public key without parameters is on the curve of the private key
+        CHECK_NOT_NULL(s_param2 = strdup(s_param1));
+    }
     if (!s_algo1 || !s_algo2 || !s_param1 || !s_param2) {
         SET_ERROR(RET_CM_INVALID_PARAM_DH);
     }

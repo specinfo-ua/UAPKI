@@ -98,16 +98,23 @@ static const uint8_t CRL_ISSUER_KEY_ID[20] = {
     0x8D, 0x90, 0xAF, 0x09, 0x19, 0x31, 0x7A, 0xDE, 0xFD, 0x1C, 0x17, 0x5B, 0x94, 0xAD, 0xFB, 0x3C, 0x07, 0xBC, 0xCD, 0x34
 };
 static const int ERR_CONNECTION_ERROR = 0x1002;
+static const int ERR_INVALID_PARAMETER = 0x1005;
 static const int ERR_NOT_INITIALIZED = 0x1009;
+static const int ERR_ALREADY_INITIALIZED = 0x100A;
 static const int ERR_KEY_NOT_SELECTED = 0x100C;
 static const int ERR_NOT_ALLOWED = 0x1017;
 static const int ERR_OFFLINE_MODE = 0x1018;
 static const int ERR_STORAGE_NOT_OPEN = 0x1019;
 static const int ERR_INVALID_SESSION = 0x101D;
 static const int ERR_INVALID_SHARED_MEMORY = 0x101E;
+static const int ERR_ATTRIBUTE_NOT_PRESENT = 0x1035;
 static const int ERR_CERT_NOT_FOUND = 0x1041;
 static const int ERR_CRL_NOT_FOUND = 0x1053;
 static const int ERR_TSP_NOT_RESPONDING = 0x1071;
+static const int ERR_TRUST_LIST_INVALID = 0x1078;
+static const int ERR_TRUST_LIST_VERIFY_FAILED = 0x1079;
+static const int ERR_TRUST_LIST_SIGNER_NOT_TRUSTED = 0x107A;
+static const int ERR_TRUST_LIST_OBSOLETE = 0x107B;
 static const char* TSP_URL_UNREACHABLE = "http://127.0.0.1:1/";
 
 
@@ -2022,6 +2029,554 @@ static unsigned parse_number (const char* text, const unsigned minValue, const u
     return (unsigned)value;
 }
 
+//  VERIFY of signatures with an archive-time-stamp of ETSI TS 101 733, 6.4.1 (id-aa-ets-archiveTimestampV2):
+//  data/atsv2-attached.p7s and data/atsv2-detached.p7s (the content is data/test-fox.txt) are test signatures
+//  made with OpenSSL by an own test CA, signer and TSA
+static string request_verify (
+        const string& signatureB64,
+        const char* contentKey = nullptr,
+        const string& contentValue = string()
+)
+{
+    ParsonHelper json;
+    json.create();
+    json.setString("method", "VERIFY");
+    JSON_Object* jo_params = json.setObject("parameters");
+    json_object_dotset_string(jo_params, "signature.bytes", signatureB64.c_str());
+    if (contentKey) {
+        json_object_dotset_string(jo_params, (string("signature.") + contentKey).c_str(), contentValue.c_str());
+    }
+    string rv;
+    json.serialize(rv);
+    return rv;
+}
+
+static bool test_verify_archive_timestamp_v2 (
+        UapkiSessionLoader& loader,
+        const Options& options
+)
+{
+    Checker checker;
+    Response resp;
+    const string sig_attached = read_file_base64("atsv2-attached.p7s");
+    const string sig_detached = read_file_base64("atsv2-detached.p7s");
+    const string content = read_file_base64("test-fox.txt");
+    const string cache_dir = options.workDir + "/atsv2/";
+
+    if (checker.check(!sig_attached.empty() && !sig_detached.empty() && !content.empty(), "the test signatures or test-fox.txt are not found in the current directory")) {
+        (void)MAKE_DIR(cache_dir.c_str());
+        UAPKI_SESSION* session = loader.sessionCreate();
+        if (checker.check(session != nullptr, "uapki_session_create")) {
+            Api api(loader, session);
+            (void)call_ok(api, request_init_caches(cache_dir, cache_dir), resp, checker, "INIT");
+
+            //  The expected state of the archive time-stamp of the first signature
+            //  (the method returns the error met for the signature together with its report)
+            const auto expect = [&](const string& request, const char* statusDigest, const char* status, const string& what) {
+                if (!checker.check(api.call(request, resp) && (resp.result != nullptr), "VERIFY, " + what + ": no report, " + resp.error)) return;
+                JSON_Object* jo_signinfo = json_array_get_object(json_object_get_array(resp.result, "signatureInfos"), 0);
+                JSON_Object* jo_archivets = json_object_get_object(jo_signinfo, "archiveTS");
+                checker.check(ParsonHelper::jsonObjectGetString(jo_archivets, "statusDigest") == string(statusDigest),
+                    what + ": the message imprint of the archive time-stamp is " + ParsonHelper::jsonObjectGetString(jo_archivets, "statusDigest"));
+                checker.check(ParsonHelper::jsonObjectGetString(jo_archivets, "statusSignature") == string("VALID"),
+                    what + ": the signature of the archive time-stamp token is " + ParsonHelper::jsonObjectGetString(jo_archivets, "statusSignature"));
+                checker.check(ParsonHelper::jsonObjectGetString(jo_signinfo, "status") == string(status),
+                    what + ": the status is " + ParsonHelper::jsonObjectGetString(jo_signinfo, "status"));
+            };
+            expect(request_verify(sig_attached), "VALID", "TOTAL-VALID", "attached");
+            expect(request_verify(sig_detached, "content", content), "VALID", "TOTAL-VALID", "detached, the content as bytes");
+            expect(request_verify(sig_detached, "file", "test-fox.txt"), "VALID", "TOTAL-VALID", "detached, the content as a file");
+            //  Without the content the message imprint is not computed; another content - it does not match
+            expect(request_verify(sig_detached), "FAILED", "INDETERMINATE", "detached, without the content");
+            expect(request_verify(sig_detached, "content", sig_detached), "INVALID", "TOTAL-FAILED", "detached, another content");
+
+            (void)api.call(request_method("DEINIT"));
+            loader.sessionFree(session);
+        }
+        (void)REMOVE_DIR(cache_dir.c_str());
+    }
+
+    checker.report("VERIFY: archive-time-stamp of TS 101 733 (id-aa-ets-archiveTimestampV2), attached and detached");
+    return checker.passed();
+}
+
+//  VERIFY with the validation type FULL-ETSI: the report of ETSI TS 119 102-2 with the status indications of
+//  ETSI EN 319 102-1 and the validation policy. Offline, with the test signatures of data/ (their root is not
+//  trusted and the status of their certificates is not available: the signature is INDETERMINATE)
+static bool test_verify_full_etsi (
+        UapkiSessionLoader& loader,
+        const Options& options
+)
+{
+    Checker checker;
+    Response resp;
+    const string sig_attached = read_file_base64("atsv2-attached.p7s");
+    const string sig_detached = read_file_base64("atsv2-detached.p7s");
+    const string content = read_file_base64("test-fox.txt");
+    const string cache_dir = options.workDir + "/full-etsi/";
+
+    if (checker.check(!sig_attached.empty() && !sig_detached.empty() && !content.empty(), "the test signatures or test-fox.txt are not found in the current directory")) {
+        (void)MAKE_DIR(cache_dir.c_str());
+        UAPKI_SESSION* session = loader.sessionCreate();
+        if (checker.check(session != nullptr, "uapki_session_create")) {
+            Api api(loader, session);
+            (void)call_ok(api, request_init_caches(cache_dir, cache_dir), resp, checker, "INIT");
+
+            //  policy: nullptr - not given; a name; or a JSON object
+            const auto request = [&](const string& signature, const string& contentB64, const char* policy, const bool policyIsObject) -> string {
+                ParsonHelper json;
+                json.create();
+                json.setString("method", "VERIFY");
+                JSON_Object* jo_params = json.setObject("parameters");
+                json_object_dotset_string(jo_params, "signature.bytes", signature.c_str());
+                if (!contentB64.empty()) {
+                    json_object_dotset_string(jo_params, "signature.content", contentB64.c_str());
+                }
+                json_object_dotset_string(jo_params, "options.validationType", "FULL-ETSI");
+                if (policy && policyIsObject) {
+                    json_object_dotset_value(jo_params, "options.validationPolicy", json_parse_string(policy));
+                }
+                else if (policy) {
+                    json_object_dotset_string(jo_params, "options.validationPolicy", policy);
+                }
+                string rv;
+                json.serialize(rv);
+                return rv;
+            };
+            const auto has_string = [](JSON_Array* ja, const char* value) -> bool {
+                for (size_t i = 0; i < json_array_get_count(ja); i++) {
+                    const char* s_item = json_array_get_string(ja, i);
+                    if (s_item && (string(s_item) == value)) return true;
+                }
+                return false;
+            };
+            //  The report of the first signature: the indication, a sub-indication it must have (nullptr - none),
+            //  the name of the policy; returns the report (nullptr if absent)
+            const auto expect = [&](const string& req, const char* indication, const char* subIndication, const char* policyName, const string& what) -> JSON_Object* {
+                if (!checker.check(api.call(req, resp), what + ": no response")) return nullptr;
+                if (!checker.check(resp.ok(), what + ": the method returned " + resp.error)) return nullptr;
+                JSON_Object* jo_report = json_array_get_object(json_object_get_array(resp.result, "signatureValidationReports"), 0);
+                if (!checker.check(jo_report != nullptr, what + ": no report of the signature")) return nullptr;
+                JSON_Object* jo_status = json_object_get_object(jo_report, "signatureValidationStatus");
+                checker.check(ParsonHelper::jsonObjectGetString(jo_status, "mainIndication") == string(indication),
+                    what + ": the indication is " + ParsonHelper::jsonObjectGetString(jo_status, "mainIndication"));
+                if (subIndication) {
+                    checker.check(has_string(json_object_get_array(jo_status, "subIndications"), subIndication),
+                        what + ": no sub-indication " + subIndication);
+                }
+                const string s_policy = ParsonHelper::jsonObjectGetString(
+                    json_object_dotget_object(jo_report, "validationConstraintsEvaluationReport.signatureValidationPolicy"), "policyName");
+                checker.check(s_policy == string(policyName), what + ": the policy is " + s_policy);
+                return jo_report;
+            };
+            //  The status of a constraint of the report ("" if the constraint is absent or not applied)
+            const auto constraint_status = [](JSON_Object* joReport, const char* id) -> string {
+                JSON_Array* ja_constraints = json_object_dotget_array(joReport, "validationConstraintsEvaluationReport.validationConstraints");
+                for (size_t i = 0; i < json_array_get_count(ja_constraints); i++) {
+                    JSON_Object* jo_constraint = json_array_get_object(ja_constraints, i);
+                    if (ParsonHelper::jsonObjectGetString(jo_constraint, "validationConstraintIdentifier") == string(id)) {
+                        return ParsonHelper::jsonObjectGetString(json_object_get_object(jo_constraint, "validationStatus"), "mainIndication");
+                    }
+                }
+                return string();
+            };
+
+            //  The signature and its content are intact; the chain does not end in a trusted root
+            JSON_Object* jo_report = expect(request(sig_attached, string(), nullptr, false),
+                "INDETERMINATE", "NO_CERTIFICATE_CHAIN_FOUND", "UkraineDefault", "attached");
+            if (jo_report) {
+                checker.check(constraint_status(jo_report, "cryptographicVerification") == "PASSED",
+                    "attached: cryptographicVerification is " + constraint_status(jo_report, "cryptographicVerification"));
+                checker.check(constraint_status(jo_report, "x509CertificateValidation") == "INDETERMINATE",
+                    "attached: x509CertificateValidation is " + constraint_status(jo_report, "x509CertificateValidation"));
+                checker.check(ParsonHelper::jsonObjectGetString(json_object_get_object(jo_report, "signatureValidationProcess"), "signatureValidationProcessId") == string("LTA"),
+                    "attached: the validation process is not LTA");
+                checker.check(json_object_dotget_string(jo_report, "signatureIdentifier.digestAlgAndValue.digestValue") != nullptr,
+                    "attached: no hash in signatureIdentifier");
+                checker.check(json_object_dotget_string(jo_report, "validationTimeInfo.bestSignatureTime.poeObject") != nullptr,
+                    "attached: the best signature time is not proven by a time-stamp");
+                checker.check(!ParsonHelper::jsonObjectHasValue(jo_report, "signatureQuality"), "attached: the quality of a signature that did not pass");
+                checker.check(json_array_get_count(json_object_get_array(jo_report, "timeStamps")) > 0, "attached: no time-stamps in the report");
+                checker.check(json_array_get_count(json_object_get_array(resp.result, "signatureValidationObjects")) > 0, "attached: no validation objects");
+                checker.check(!ParsonHelper::jsonObjectHasValue(resp.result, "signatureInfos"), "attached: the result of the other validation types is present");
+            }
+
+            //  The content: another one - the hash does not match; none - there is nothing to compare with
+            (void)expect(request(sig_detached, content, nullptr, false), "INDETERMINATE", "NO_CERTIFICATE_CHAIN_FOUND", "UkraineDefault", "detached");
+            jo_report = expect(request(sig_detached, sig_detached, nullptr, false), "TOTAL-FAILED", "HASH_FAILURE", "UkraineDefault", "detached, another content");
+            if (jo_report) {
+                checker.check(constraint_status(jo_report, "cryptographicVerification") == "FAILED",
+                    "detached, another content: cryptographicVerification is " + constraint_status(jo_report, "cryptographicVerification"));
+            }
+            (void)expect(request(sig_detached, string(), nullptr, false), "INDETERMINATE", "SIGNED_DATA_NOT_FOUND", "UkraineDefault", "detached, without the content");
+
+            //  The validation policy: by name, by values; what the library does not know is refused
+            (void)expect(request(sig_attached, string(), "UkraineDefault", false), "INDETERMINATE", nullptr, "UkraineDefault", "the policy UkraineDefault");
+            (void)expect(request(sig_attached, string(), "EtsiStrict", false), "INDETERMINATE", nullptr, "EtsiStrict", "the policy EtsiStrict");
+            jo_report = expect(request(sig_attached, string(), "{\"basedOn\":\"EtsiStrict\",\"revocationFreshness\":60}", true),
+                "INDETERMINATE", nullptr, "custom", "a custom policy");
+            if (jo_report) {
+                checker.check(string(json_object_dotget_string(jo_report, "validationConstraintsEvaluationReport.signatureValidationPolicy.basedOn")
+                    ? json_object_dotget_string(jo_report, "validationConstraintsEvaluationReport.signatureValidationPolicy.basedOn") : "") == "EtsiStrict",
+                    "a custom policy: basedOn is not EtsiStrict");
+            }
+            for (const auto& it : vector<pair<const char*, bool>>{
+                { "Unknown", false }, { "{\"unknownField\":true}", true }, { "{\"basedOn\":\"Unknown\"}", true },
+                { "{\"revocationFreshness\":-1}", true }, { "{\"tsaExtendedKeyUsage\":\"other\"}", true }
+            }) {
+                checker.check(api.call(request(sig_attached, string(), it.first, it.second), resp) && (resp.errorCode == ERR_INVALID_PARAMETER),
+                    string("the policy ") + it.first + ": expected INVALID_PARAMETER, got " + resp.error);
+            }
+
+            (void)api.call(request_method("DEINIT"));
+            loader.sessionFree(session);
+        }
+        (void)REMOVE_DIR(cache_dir.c_str());
+    }
+
+    checker.report("VERIFY: the validation type FULL-ETSI, the report and the validation policy");
+    return checker.passed();
+}
+
+//  ADD_TRUST_LIST: the test trusted lists of data/trust-list (signed by the certificate trust-list-signer.cer, whose
+//  key is not kept) name the certificates of data/certs as trust services. trust-list.xml - sequence number 2;
+//  trust-list-old.xml - 1; trust-list-withdrawn.xml - 3, the service of the CA is withdrawn
+static bool test_trust_list (
+        UapkiSessionLoader& loader,
+        const Options& options
+)
+{
+    Checker checker;
+    Response resp;
+    const string DIR_LISTS = "trust-list/";
+    const string signer_cert = read_file_base64(DIR_LISTS + "trust-list-signer.cer");
+    const string list = read_file_base64(DIR_LISTS + "trust-list.xml");
+    const string list_old = read_file_base64(DIR_LISTS + "trust-list-old.xml");
+    const string list_withdrawn = read_file_base64(DIR_LISTS + "trust-list-withdrawn.xml");
+    const string ca_cert = read_file_base64("certs/diia-CA-05E19E2CD92EA2990100000001000000E1000000.cer");
+    const string tsa_cert = read_file_base64("certs/diia-2023-tsp-05E19E2CD92EA29902000000010000004A010000.cer");
+    const string lists_dir = options.workDir + "/trust-lists/";
+    string list_text;
+    {
+        FILE* f = fopen((DIR_LISTS + "trust-list.xml").c_str(), "rb");
+        if (f) {
+            char buf[4096];
+            size_t len;
+            while ((len = fread(buf, 1, sizeof(buf), f)) > 0) list_text.append(buf, len);
+            fclose(f);
+        }
+    }
+
+    const bool has_data = !signer_cert.empty() && !list.empty() && !list_old.empty() && !list_withdrawn.empty() && !ca_cert.empty() && !tsa_cert.empty() && !list_text.empty();
+    if (!checker.check(has_data, "the test trusted lists (trust-list) or the certificates (certs) are not found in the current directory")) {
+        checker.report("ADD_TRUST_LIST: trusted lists");
+        return checker.passed();
+    }
+
+    //  INIT: the signers of trusted lists and the directory of the lists (none if empty)
+    const auto request_init_lists = [&](const bool withSigner, const string& dir) -> string {
+        ParsonHelper json;
+        json.create();
+        json.setString("method", "INIT");
+        JSON_Object* jo_params = json.setObject("parameters");
+        json_object_set_boolean(jo_params, "offline", true);
+        if (!dir.empty()) {
+            json_object_dotset_string(jo_params, "trustListCache.path", dir.c_str());
+        }
+        json_object_dotset_value(jo_params, "trustListCache.trustListSignerCerts", json_value_init_array());
+        if (withSigner) {
+            json_array_append_string(json_object_dotget_array(jo_params, "trustListCache.trustListSignerCerts"), signer_cert.c_str());
+        }
+        set_skip_self_test(jo_params);
+        string rv;
+        json.serialize(rv);
+        return rv;
+    };
+    const auto request_one = [](const char* method, const char* key, const string& value) -> string {
+        ParsonHelper json;
+        json.create();
+        json.setString("method", method);
+        json_object_set_string(json.setObject("parameters"), key, value.c_str());
+        string rv;
+        json.serialize(rv);
+        return rv;
+    };
+    const auto expect_error = [&](Api& api, const string& req, const int errorCode, const string& what) {
+        const bool called = api.call(req, resp);
+        checker.check(called && (resp.errorCode == errorCode), what + ": " + to_string(resp.errorCode) + " " + resp.error);
+    };
+    //  CERT_INFO of a certificate: trusted, the type of its first trust service ("" - none)
+    const auto expect_cert = [&](Api& api, const string& cert, const bool trusted, const char* serviceType, const string& what) {
+        if (!call_ok(api, request_one("CERT_INFO", "bytes", cert), resp, checker, what + ": CERT_INFO")) return;
+        checker.check(ParsonHelper::jsonObjectGetBoolean(resp.result, "trusted", !trusted) == trusted, what + ": trusted is not " + (trusted ? "true" : "false"));
+        JSON_Object* jo_service = json_array_get_object(json_object_get_array(resp.result, "trustServices"), 0);
+        checker.check(ParsonHelper::jsonObjectGetString(jo_service, "type") == string(serviceType),
+            what + ": the service type is '" + ParsonHelper::jsonObjectGetString(jo_service, "type") + "'");
+    };
+
+    //  The directory of the lists is cleared by listing: a kept list is named by its identifier
+    const auto clear_lists_dir = [&](void) {
+        for (const string& name : list_dir(lists_dir)) {
+            remove((lists_dir + name).c_str());
+        }
+        (void)REMOVE_DIR(lists_dir.c_str());
+    };
+    clear_lists_dir();
+    (void)MAKE_DIR(lists_dir.c_str());
+
+    {   //  A session of its own
+        UapkiSession session(loader), session_next(loader), session_nosigner(loader);
+        Api api(loader, session.getHandle()), api_next(loader, session_next.getHandle()), api_nosigner(loader, session_nosigner.getHandle());
+        checker.check(session.isCreated() && session_next.isCreated() && session_nosigner.isCreated(), "sessions not created");
+
+        if (call_ok(api, request_init_lists(true, lists_dir), resp, checker, "INIT with the signer and the directory")) {
+            checker.check(json_object_dotget_number(resp.result, "trustListCache.countLists") == 0, "the directory of the lists is not empty");
+        }
+        //  A repeated INIT changes nothing and tells the parameters of the INIT that was done
+        {
+            const bool called = api.call(request_init_lists(false, string()), resp);
+            checker.check(called && (resp.errorCode == ERR_ALREADY_INITIALIZED), "a repeated INIT: " + to_string(resp.errorCode));
+            const char* s_path = json_object_dotget_string(resp.result, "parameters.trustListCache.path");
+            checker.check(s_path && (lists_dir == s_path),
+                "a repeated INIT does not tell the directory of the lists it was initialized with");
+            checker.check(json_array_get_count(json_object_dotget_array(resp.result, "parameters.trustListCache.trustListSignerCerts")) == 1,
+                "a repeated INIT does not tell the signers of lists it was initialized with");
+            checker.check(json_object_dotget_boolean(resp.result, "parameters.offline") == 1, "a repeated INIT does not tell the offline mode");
+        }
+        expect_cert(api, signer_cert, false, "", "the signer of lists");
+        checker.check(ParsonHelper::jsonObjectGetBoolean(resp.result, "trustListSigner", false), "the signer of lists has no trustListSigner");
+        expect_cert(api, ca_cert, false, "", "the CA before the list");
+
+        if (call_ok(api, request_one("ADD_TRUST_LIST", "bytes", list), resp, checker, "ADD_TRUST_LIST")) {
+            checker.check(json_object_get_number(resp.result, "sequenceNumber") == 2, "the sequence number is not 2");
+            checker.check(json_object_get_number(resp.result, "countServices") == 4, "the number of services is not 4");
+            checker.check(json_object_get_number(resp.result, "countTrustedCerts") == 4, "the number of trusted certificates is not 4");
+            checker.check(ParsonHelper::jsonObjectGetString(resp.result, "territory") == string("UA"), "the territory is not UA");
+            checker.check(ParsonHelper::jsonObjectGetBoolean(resp.result, "stored", false), "the list is not stored");
+            checker.check(json_array_get_count(json_object_get_array(resp.result, "warnings")) == 0, "warnings about the signer certificate");
+        }
+        expect_cert(api, ca_cert, true, "National-CA/QC", "the CA of the list");
+        expect_cert(api, tsa_cert, true, "National-TSA/QTST", "the TSA of the list");
+        (void)call_ok(api, request_one("ADD_TRUST_LIST", "text", list_text), resp, checker, "ADD_TRUST_LIST as text");
+
+        //  Refused: an older list, a changed list, not a list
+        expect_error(api, request_one("ADD_TRUST_LIST", "bytes", list_old), ERR_TRUST_LIST_OBSOLETE, "a list with a smaller sequence number");
+        {
+            string changed = list_text;
+            const size_t pos = changed.find("/Svcstatus/granted");
+            if (checker.check(pos != string::npos, "no granted service in the test list")) {
+                changed.replace(pos, 18, "/Svcstatus/grantee");
+                expect_error(api, request_one("ADD_TRUST_LIST", "text", changed), ERR_TRUST_LIST_VERIFY_FAILED, "a changed list");
+            }
+        }
+        expect_error(api, request_one("ADD_TRUST_LIST", "text", "not a list"), ERR_TRUST_LIST_INVALID, "not an XML document");
+        expect_error(api, request_method("ADD_TRUST_LIST"), ERR_INVALID_PARAMETER, "no list");
+        expect_cert(api, ca_cert, true, "National-CA/QC", "the CA after the refused lists");
+
+        //  The next INIT reads the kept list
+        if (call_ok(api_next, request_init_lists(true, lists_dir), resp, checker, "INIT of the next session")) {
+            checker.check(json_object_dotget_number(resp.result, "trustListCache.countLists") == 1, "the kept list is not applied");
+            checker.check(json_object_dotget_number(resp.result, "trustListCache.countRefusedLists") == 0, "the kept list is refused");
+        }
+        expect_cert(api_next, ca_cert, true, "National-CA/QC", "the CA in the next session");
+
+        //  A newer list withdraws the service of the CA: its history stays, the trust does not
+        if (call_ok(api, request_one("ADD_TRUST_LIST", "bytes", list_withdrawn), resp, checker, "ADD_TRUST_LIST of a newer list")) {
+            checker.check(json_object_get_number(resp.result, "countTrustedCerts") == 3, "the number of trusted certificates is not 3");
+        }
+        expect_cert(api, ca_cert, false, "National-CA/QC", "the CA of a withdrawn service");
+        checker.check(json_array_get_count(json_object_dotget_array(resp.result, "trustServices")) == 1, "the services of the previous version of the list stay");
+        expect_cert(api, tsa_cert, true, "National-TSA/QTST", "the TSA after the newer list");
+
+        //  Without the signer: the list is not accepted, the kept one is refused
+        if (call_ok(api_nosigner, request_init_lists(false, lists_dir), resp, checker, "INIT without the signer")) {
+            checker.check(json_object_dotget_number(resp.result, "trustListCache.countRefusedLists") == 1, "the kept list is not refused without the signer");
+        }
+        expect_error(api_nosigner, request_one("ADD_TRUST_LIST", "bytes", list_withdrawn), ERR_TRUST_LIST_SIGNER_NOT_TRUSTED, "a list of a signer that is not given");
+        expect_cert(api_nosigner, ca_cert, false, "", "the CA without the list");
+    }
+
+    {   //  With a shared memory the list a session adds is for every session
+        UapkiSharedMemory memory(loader);
+        UapkiSession session_a(loader), session_b(loader);
+        Api memory_api(loader, memory.getHandle());
+        Api api_a(loader, session_a.getHandle(), memory.getHandle()), api_b(loader, session_b.getHandle(), memory.getHandle());
+        checker.check(memory.isCreated() && session_a.isCreated() && session_b.isCreated(), "shared memory objects not created");
+        (void)call_ok(memory_api, request_init_lists(true, string()), resp, checker, "INIT of the shared memory");
+        (void)call_ok(api_a, request_init_lists(false, string()), resp, checker, "INIT A");
+        (void)call_ok(api_b, request_init_lists(false, string()), resp, checker, "INIT B");
+        if (call_ok(api_a, request_one("ADD_TRUST_LIST", "bytes", list), resp, checker, "ADD_TRUST_LIST in A")) {
+            checker.check(!ParsonHelper::jsonObjectGetBoolean(resp.result, "stored", true), "the list is stored without a directory");
+        }
+        expect_cert(api_b, ca_cert, true, "National-CA/QC", "the CA in B");
+        expect_cert(memory_api, ca_cert, true, "National-CA/QC", "the CA in the shared memory");
+    }
+
+    clear_lists_dir();
+    checker.report("ADD_TRUST_LIST: trusted lists, their signers, the directory of the lists, sessions with a shared memory");
+    return checker.passed();
+}
+
+//  BUILD_CMS_2PASS: the signed attributes of the first pass are signed apart from the method (here by SIGN with
+//  the format RAW), the second pass builds the signature. Offline, with the storage and the certificate of the
+//  options. The content time-stamp is not required by any format: it is asked by includeContentTS of the first pass
+static bool test_build_cms_2pass (
+        UapkiSessionLoader& loader,
+        const Options& options
+)
+{
+    Checker checker;
+    Response resp;
+    UAPKI_SESSION* session = loader.sessionCreate();
+
+    if (checker.check(session != nullptr, "uapki_session_create")) {
+        Api api(loader, session);
+        string cert_id, key_id, sign_algo, digest_algo, message_digest;
+
+        bool ok = call_ok(api, request_init(true), resp, checker, "INIT");
+        if (ok && (ok = call_ok(api, request_add_cert(options.signerCertB64), resp, checker, "ADD_CERT"))) {
+            cert_id = ParsonHelper::jsonObjectGetString(json_array_get_object(json_object_get_array(resp.result, "added"), 0), "certId");
+        }
+        ok = ok && call_ok(api, request_open(options.storage, options.password, "RO"), resp, checker, "OPEN");
+        if (ok && (ok = call_ok(api, request_method("KEYS"), resp, checker, "KEYS"))) {
+            JSON_Object* jo_key = json_array_get_object(json_object_get_array(resp.result, "keys"), 0);
+            key_id = ParsonHelper::jsonObjectGetString(jo_key, "id");
+            sign_algo = ParsonHelper::jsonArrayGetString(json_object_get_array(jo_key, "signAlgo"), 0);
+        }
+        ok = ok && call_ok(api, request_select_key(key_id), resp, checker, "SELECT_KEY");
+        //  The hash of the content by the hash algorithm of the signature algorithm
+        if (ok && (ok = call_ok(api,
+            string("{\"method\":\"DIGEST\",\"parameters\":{\"signAlgo\":\"") + sign_algo + "\",\"bytes\":\"" + DATA_TBS_B64 + "\"}}",
+            resp, checker, "DIGEST"
+        ))) {
+            digest_algo = resp.resultString("hashAlgo");
+            message_digest = resp.resultString("bytes");
+        }
+        ok = ok && checker.check(!cert_id.empty() && !sign_algo.empty() && !digest_algo.empty() && !message_digest.empty(),
+            "the certificate id, the algorithms or the hash of the content are not obtained");
+
+        //  The first pass; an empty string - the method failed (resp has the error)
+        const auto step1 = [&](const bool cades, const bool signingCert, const bool contentTs) -> string {
+            ParsonHelper json;
+            json.create();
+            json.setString("method", "BUILD_CMS_2PASS");
+            JSON_Object* jo_step1 = json_object_dotget_object(json.rootObject(), "parameters.step1");
+            if (!jo_step1) {
+                json_object_dotset_value(json.rootObject(), "parameters.step1", json_value_init_object());
+                jo_step1 = json_object_dotget_object(json.rootObject(), "parameters.step1");
+            }
+            json_object_set_string(jo_step1, "digestAlgo", digest_algo.c_str());
+            json_object_set_string(jo_step1, "messageDigest", message_digest.c_str());
+            json_object_set_boolean(jo_step1, "includeTime", 1);
+            if (cades) {
+                json_object_set_string(jo_step1, "certId", cert_id.c_str());
+                json_object_set_boolean(jo_step1, "includeSigningCert", signingCert ? 1 : 0);
+            }
+            if (contentTs) {
+                json_object_set_boolean(jo_step1, "includeContentTS", 1);
+            }
+            string request;
+            json.serialize(request);
+            if (!api.call(request, resp) || !resp.ok()) return string();
+            return ParsonHelper::jsonObjectGetString(json_object_get_object(resp.result, "step1"), "bytes");
+        };
+        //  The signature of the signed attributes by the key of the storage
+        const auto sign_raw = [&](const string& attrs) -> string {
+            const string request = string("{\"method\":\"SIGN\",\"parameters\":{\"signParams\":{\"signatureFormat\":\"RAW\",\"signAlgo\":\"")
+                + sign_algo + "\"},\"dataTbs\":[{\"id\":\"attrs\",\"bytes\":\"" + attrs + "\"}]}}";
+            if (!call_ok(api, request, resp, checker, "SIGN of the signed attributes (RAW)")) return string();
+            return resp.signatureBytes();
+        };
+        //  The second pass; returns the error code, the signature is in signature
+        const auto step2 = [&](const string& attrs, const string& signValue, const char* format, const bool cades, string& signature) -> int {
+            ParsonHelper json;
+            json.create();
+            json.setString("method", "BUILD_CMS_2PASS");
+            json_object_dotset_value(json.rootObject(), "parameters.step2", json_value_init_object());
+            JSON_Object* jo_step2 = json_object_dotget_object(json.rootObject(), "parameters.step2");
+            json_object_set_string(jo_step2, "bytes", attrs.c_str());
+            json_object_set_string(jo_step2, "signatureFormat", format);
+            json_object_set_string(jo_step2, "signAlgo", sign_algo.c_str());
+            json_object_set_string(jo_step2, "signBytes", signValue.c_str());
+            json_object_set_string(jo_step2, "digestAlgo", digest_algo.c_str());
+            json_object_set_string(jo_step2, "contentBytes", DATA_TBS_B64);
+            if (cades) {
+                json_object_set_string(jo_step2, "certId", cert_id.c_str());
+                json_object_set_boolean(jo_step2, "includeCert", 1);
+                //  The certificate of the test storage may be expired: its status is not the subject of this test
+                json_object_dotset_boolean(jo_step2, "options.ignoreCertStatus", 1);
+            }
+            else {
+                json_object_set_string(jo_step2, "keyId", key_id.c_str());
+            }
+            string request;
+            json.serialize(request);
+            signature.clear();
+            if (!api.call(request, resp)) return -1;
+            if (resp.ok()) {
+                signature = ParsonHelper::jsonObjectGetString(json_object_get_object(resp.result, "step2"), "bytes");
+            }
+            return resp.errorCode;
+        };
+        //  The signature built is a valid one of the format, without a content time-stamp
+        const auto expect_signature = [&](const string& signature, const char* format, const string& what) {
+            if (!checker.check(api.call(request_verify(signature), resp) && (resp.result != nullptr), what + ": VERIFY, " + resp.error)) return;
+            JSON_Object* jo_signinfo = json_array_get_object(json_object_get_array(resp.result, "signatureInfos"), 0);
+            checker.check(ParsonHelper::jsonObjectGetString(jo_signinfo, "signatureFormat") == string(format),
+                what + ": the format is " + ParsonHelper::jsonObjectGetString(jo_signinfo, "signatureFormat"));
+            checker.check(ParsonHelper::jsonObjectGetString(jo_signinfo, "statusSignature") == string("VALID"),
+                what + ": the signature is " + ParsonHelper::jsonObjectGetString(jo_signinfo, "statusSignature"));
+            checker.check(ParsonHelper::jsonObjectGetString(jo_signinfo, "statusMessageDigest") == string("VALID"),
+                what + ": the message digest is " + ParsonHelper::jsonObjectGetString(jo_signinfo, "statusMessageDigest"));
+            checker.check(!ParsonHelper::jsonObjectHasValue(jo_signinfo, "contentTS"), what + ": a content time-stamp is present");
+        };
+
+        if (ok) {
+            string attrs, sign_value, signature;
+
+            //  CAdES-BES
+            attrs = step1(true, true, false);
+            if (checker.check(!attrs.empty(), "step1 for CAdES-BES: " + resp.error)) {
+                sign_value = sign_raw(attrs);
+                if (!sign_value.empty() && checker.check(step2(attrs, sign_value, "CAdES-BES", true, signature) == 0, "step2 for CAdES-BES: " + resp.error)) {
+                    expect_signature(signature, "CAdES-BES", "CAdES-BES");
+                }
+                //  The same signed attributes without a content time-stamp are accepted for a format with
+                //  time-stamps: offline the method stops at the signature time-stamp, not at the attributes
+                if (!sign_value.empty()) {
+                    checker.check(step2(attrs, sign_value, "CAdES-T", true, signature) == ERR_OFFLINE_MODE,
+                        "step2 for CAdES-T offline: expected OFFLINE_MODE, got " + resp.error);
+                }
+            }
+
+            //  CMS: the signer by the key identifier, no certificate
+            attrs = step1(false, false, false);
+            if (checker.check(!attrs.empty(), "step1 for CMS: " + resp.error)) {
+                sign_value = sign_raw(attrs);
+                if (!sign_value.empty() && checker.check(step2(attrs, sign_value, "CMS", false, signature) == 0, "step2 for CMS: " + resp.error)) {
+                    expect_signature(signature, "CMS", "CMS");
+                }
+                //  CAdES needs the signing-certificate attribute
+                if (!sign_value.empty()) {
+                    checker.check(step2(attrs, sign_value, "CAdES-BES", true, signature) == ERR_ATTRIBUTE_NOT_PRESENT,
+                        "step2 for CAdES-BES without signing-certificate: expected ATTRIBUTE_NOT_PRESENT, got " + resp.error);
+                }
+            }
+
+            //  A content time-stamp is asked by the first pass: it needs the TSP service
+            checker.check(step1(true, true, true).empty() && (resp.errorCode == ERR_OFFLINE_MODE),
+                "step1 with includeContentTS offline: expected OFFLINE_MODE, got " + resp.error);
+        }
+
+        (void)api.call(request_method("CLOSE"));
+        (void)api.call(request_method("DEINIT"));
+        loader.sessionFree(session);
+    }
+
+    checker.report("BUILD_CMS_2PASS: CAdES-BES and CMS built in two passes, a content time-stamp only by includeContentTS");
+    return checker.passed();
+}
+
 static int show_usage (const char* msg)
 {
     if (msg) puts(msg);
@@ -2133,6 +2688,10 @@ int main (int argc, char* argv[])
                 [&] { return test_shared_memory_whitelist(loader, shared_setup); },
                 [&] { return test_shared_memory_concurrent_writers(loader, options, shared_setup); },
                 [&] { return test_shared_memory_lifecycle(loader, options, shared_setup); },
+                [&] { return test_verify_archive_timestamp_v2(loader, options); },
+                [&] { return test_build_cms_2pass(loader, options); },
+                [&] { return test_verify_full_etsi(loader, options); },
+                [&] { return test_trust_list(loader, options); },
             };
             for (const auto& it : tests) {
                 ok = it() && ok;

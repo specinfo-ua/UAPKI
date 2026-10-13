@@ -33,6 +33,8 @@
 #include <string.h>
 #include "cer-store.h"
 #include <algorithm>
+#include <fstream>
+#include <set>
 #include "ba-utils.h"
 #include "crl-item.h"
 #include "dirent-internal.h"
@@ -596,7 +598,25 @@ int CerStore::getIssuerCert (
 
     int ret = RET_OK;
     isSelfSigned = cerSubject->isSelfSigned();
-    if (!isSelfSigned) {
+    if (!isSelfSigned && !cerSubject->hasAuthorityKeyIdExtension()) {
+        //  No authorityKeyIdentifier (RFC 5280, 4.2.1.1: it only helps to choose the key of the issuer): the issuer
+        //  is the newest certificate with the issuer name whose key signed the certificate (RFC 5280, 6.1.3 (a))
+        vector<CerItem*> cer_candidates;
+        CerItem* cer_signer = nullptr;
+        getCertsBySubject(cerSubject->getIssuer(), cer_candidates);
+        for (const auto& it : cer_candidates) {
+            if (
+                (it != cerSubject) &&
+                (!cer_signer || (it->getNotBefore() > cer_signer->getNotBefore())) &&
+                (cerSubject->verifySignatureBy(it->getSpki()) == RET_OK)
+            ) {
+                cer_signer = it;
+            }
+        }
+        *cerIssuer = cer_signer;
+        ret = cer_signer ? RET_OK : RET_UAPKI_CERT_ISSUER_NOT_FOUND;
+    }
+    else if (!isSelfSigned) {
         ret = getCertByKeyId(cerSubject->getAuthorityKeyId(), cerIssuer);
         if (ret == RET_UAPKI_CERT_NOT_FOUND) {
             ret = RET_UAPKI_CERT_ISSUER_NOT_FOUND;
@@ -643,6 +663,189 @@ int CerStore::load (void)
     return ret;
 }
 
+//  One line per trusted list: "<sequence number> <identifier of the list>"
+static const char* TRUST_LIST_SEQUENCES_FILE = "trust-lists.seq";
+static const char* TRUST_LIST_EXT = ".xml";
+
+void CerStore::setTrustListPath (
+        const string& path
+)
+{
+    if (m_Base) return m_Base->setTrustListPath(path);
+
+    lock_guard<mutex> lock(m_Mutex);
+    m_TrustListPath = path;
+}
+
+void CerStore::setTrustListSigners (
+        const vector<vector<uint8_t>>& encodedCerts
+)
+{
+    if (m_Base) return m_Base->setTrustListSigners(encodedCerts);
+
+    lock_guard<mutex> lock(m_Mutex);
+    m_TrustListSigners = encodedCerts;
+}
+
+bool CerStore::isTrustListSigner (
+        const ByteArray* baEncodedCert
+)
+{
+    if (m_Base) return m_Base->isTrustListSigner(baEncodedCert);
+
+    const uint8_t* buf = ba_get_buf_const(baEncodedCert);
+    const size_t len = ba_get_len(baEncodedCert);
+    lock_guard<mutex> lock(m_Mutex);
+    for (const auto& it : m_TrustListSigners) {
+        if (buf && (it.size() == len) && (memcmp(it.data(), buf, len) == 0)) return true;
+    }
+    return false;
+}
+
+string CerStore::getTrustListPath (void)
+{
+    if (m_Base) return m_Base->getTrustListPath();
+
+    lock_guard<mutex> lock(m_Mutex);
+    return m_TrustListPath;
+}
+
+void CerStore::setAcceptedTrustList (
+        const AcceptedTrustList& trustList
+)
+{
+    if (m_Base) { m_Base->setAcceptedTrustList(trustList); return; }
+    lock_guard<mutex> lock(m_Mutex);
+    m_AcceptedTrustLists[trustList.listId] = trustList;
+}
+
+vector<AcceptedTrustList> CerStore::getAcceptedTrustLists (void)
+{
+    if (m_Base) return m_Base->getAcceptedTrustLists();
+    lock_guard<mutex> lock(m_Mutex);
+    vector<AcceptedTrustList> rv;
+    for (const auto& it : m_AcceptedTrustLists) {
+        rv.push_back(it.second);
+    }
+    return rv;
+}
+
+int CerStore::getStoredTrustLists (
+        vector<string>& fileNames
+)
+{
+    const string path = getTrustListPath();
+    if (path.empty()) return RET_OK;
+
+    DIR* dir = opendir(path.c_str());
+    if (!dir) return RET_UAPKI_FILE_OPEN_ERROR;
+
+    struct dirent* in_file;
+    while ((in_file = readdir(dir))) {
+        const string s_name = string(in_file->d_name);
+        const size_t len_ext = strlen(TRUST_LIST_EXT);
+        if ((s_name.length() <= len_ext) || (s_name.compare(s_name.length() - len_ext, len_ext, TRUST_LIST_EXT) != 0)) continue;
+        const string s_fullpath = path + s_name;
+        if (!is_dir(s_fullpath.c_str())) {
+            fileNames.push_back(s_fullpath);
+        }
+    }
+    closedir(dir);
+    std::sort(fileNames.begin(), fileNames.end());
+    return RET_OK;
+}
+
+int CerStore::applyTrustList (
+        const string& listId,
+        const uint64_t sequenceNumber,
+        const vector<pair<CerItem*, TrustService>>& services,
+        size_t& countTrusted,
+        const ByteArray* baList,
+        const string& storeName,
+        bool* stored
+)
+{
+    if (m_Base) return m_Base->applyTrustList(listId, sequenceNumber, services, countTrusted, baList, storeName, stored);
+
+    const string list_path = getTrustListPath();
+    const string& seq_path = list_path.empty() ? m_Path : list_path;
+    lock_guard<mutex> lock_path(lockPath(seq_path));
+    lock_guard<mutex> lock(m_Mutex);
+
+    //  The numbers accepted before, also by another instance of the library with the same directory
+    const string file_name = seq_path.empty() ? string() : (seq_path + TRUST_LIST_SEQUENCES_FILE);
+    if (!file_name.empty()) {
+        ifstream file(file_name);
+        string line;
+        while (getline(file, line)) {
+            const size_t pos = line.find(' ');
+            if ((pos == string::npos) || (pos == 0)) continue;
+            const string id = line.substr(pos + 1);
+            const uint64_t number = strtoull(line.substr(0, pos).c_str(), nullptr, 10);
+            const auto it = m_TrustListSequences.find(id);
+            if ((it == m_TrustListSequences.end()) || (it->second < number)) {
+                m_TrustListSequences[id] = number;
+            }
+        }
+    }
+    {
+        const auto it = m_TrustListSequences.find(listId);
+        if ((it != m_TrustListSequences.end()) && (sequenceNumber < it->second)) return RET_UAPKI_TRUST_LIST_OBSOLETE;
+    }
+    m_TrustListSequences[listId] = sequenceNumber;
+    if (!file_name.empty()) {
+        ofstream file(file_name, ios::trunc);
+        for (const auto& it : m_TrustListSequences) {
+            file << it.second << ' ' << it.first << '\n';
+        }
+        if (!file.good()) return RET_UAPKI_FILE_WRITE_ERROR;
+    }
+    //  The accepted list replaces its previous version in the directory of the lists
+    if (stored) *stored = false;
+    if (baList && !storeName.empty() && !list_path.empty()) {
+        const string s_file = list_path + storeName + TRUST_LIST_EXT;
+        const string s_temp = s_file + ".tmp";
+        {
+            ofstream file(s_temp, ios::trunc | ios::binary);
+            file.write((const char*)ba_get_buf_const(baList), (std::streamsize)ba_get_len(baList));
+            file.flush();
+            if (!file.good()) return RET_UAPKI_FILE_WRITE_ERROR;
+        }
+        (void)std::remove(s_file.c_str());
+        if (std::rename(s_temp.c_str(), s_file.c_str()) != 0) return RET_UAPKI_FILE_WRITE_ERROR;
+        if (stored) *stored = true;
+    }
+
+    //  The services of this list replace the ones it gave before; the services of the other lists stay
+    set<CerItem*> cer_items(m_Items.begin(), m_Items.end());
+    for (const auto& it : services) {
+        cer_items.insert(it.first);
+    }
+    countTrusted = 0;
+    for (const auto& it_cer : cer_items) {
+        const shared_ptr<const TrustServices> current = it_cer->getTrustServices();
+        shared_ptr<TrustServices> updated = make_shared<TrustServices>();
+        bool changed = false;
+        if (current) {
+            for (const auto& it : *current) {
+                if (it.listId == listId) changed = true;
+                else updated->push_back(it);
+            }
+        }
+        bool in_list = false;
+        for (const auto& it : services) {
+            if (it.first != it_cer) continue;
+            updated->push_back(it.second);
+            changed = in_list = true;
+        }
+        if (changed) {
+            it_cer->setTrustServices(updated->empty() ? shared_ptr<const TrustServices>() : shared_ptr<const TrustServices>(updated));
+        }
+        if (in_list && it_cer->isTrusted()) countTrusted++;
+    }
+    return RET_OK;
+}
+
 int CerStore::removeCert (
         CerItem* cerSubject,
         const bool permanent
@@ -660,6 +863,9 @@ int CerStore::removeCert (
     int ret = RET_UAPKI_CERT_NOT_FOUND;
     for (auto it = m_Items.begin(); it != m_Items.end(); it++) {
         if (*it == cerSubject) {
+            //  A certificate trusted by INIT (certCache.trustedCerts) is not removed: the trust is set for the
+            //  whole work of the library
+            if (cerSubject->isTrustedInit()) return RET_UAPKI_CERT_TRUSTED_NOT_REMOVABLE;
             m_Items.erase(it);
             ret = RET_OK;
             break;
@@ -730,6 +936,26 @@ CerItem* CerStore::addItem (
     m_Items.push_back(item);
     DEBUG_OUTCON(printf("CerStore::addItem(), cert is unique - add it. keyId: "); ba_print(stdout, item->getKeyId()));
     return item;
+}
+
+void CerStore::getCertsBySubject (
+        const ByteArray* baSubject,
+        vector<CerItem*>& cerItems
+)
+{
+    if (m_Overlay) {
+        m_Overlay->getCertsBySubject(baSubject, cerItems);
+        m_Base->getCertsBySubject(baSubject, cerItems);
+        return;
+    }
+
+    lock_guard<mutex> lock(m_Mutex);
+
+    for (const auto& it : m_Items) {
+        if (ba_cmp(baSubject, it->getSubject()) == 0) {
+            cerItems.push_back(it);
+        }
+    }
 }
 
 void CerStore::getCertsByKeyId (

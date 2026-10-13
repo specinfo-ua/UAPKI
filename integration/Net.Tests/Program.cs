@@ -128,6 +128,107 @@ try
             Check(e.Message.Contains("Спільну пам'ять звільнено"), "a session rejects calls after its shared memory is released");
         }
     }
+    // VERIFY with the validation type FULL-ETSI: the report and the validation policy (offline: the root of the
+    // test signatures is not trusted and the status of their certificates is not available)
+    using (var etsi = new Uapki())
+    {
+        etsi.Init(Config(CertDir("etsi"), false));
+        byte[] attached = File.ReadAllBytes(Path.Combine(testData, "atsv2-attached.p7s"));
+        byte[] detached = File.ReadAllBytes(Path.Combine(testData, "atsv2-detached.p7s"));
+        string contentFile = Path.Combine(testData, "test-fox.txt");
+
+        var result = etsi.VerifyEtsi(attached);
+        var report = result.SignatureValidationReports.FirstOrDefault();
+        Check(result.SignatureValidationReports.Count == 1 && report is not null && !report.IsTotalPassed
+            && report.SignatureValidationStatus.MainIndication == "INDETERMINATE"
+            && report.SignatureValidationStatus.SubIndications?.Contains("NO_CERTIFICATE_CHAIN_FOUND") == true,
+            "FULL-ETSI: an intact signature with an untrusted root is INDETERMINATE / NO_CERTIFICATE_CHAIN_FOUND");
+        Check(report?.ValidationConstraintsEvaluationReport?.SignatureValidationPolicy?.PolicyName == Uapki.ValidationPolicyName.UkraineDefault
+            && report.SignatureValidationProcess?.SignatureValidationProcessId == "LTA"
+            && report.SignatureIdentifier?.DigestAlgAndValue?.DigestValue?.Length > 0
+            && report.SignatureQuality is null,
+            "FULL-ETSI: the default policy, the validation process, the identifier of the signature");
+        var crypto = report?.ValidationConstraintsEvaluationReport?.ValidationConstraints?.Find(c => c.ValidationConstraintIdentifier == "cryptographicVerification");
+        Check(crypto is not null && crypto.IsApplied && crypto.ValidationStatus?.MainIndication == "PASSED",
+            "FULL-ETSI: the constraint cryptographicVerification passed");
+        Check(report?.TimeStamps?.Count > 0 && result.FindObject(report.TimeStamps[0])?.ObjectType == "timestamp"
+            && report.SignerInformation is not null && result.FindObject(report.SignerInformation.SignerCertificate)?.ObjectType == "certificate"
+            && report.SignatureValidationStatus.CertificateChain?.SigningCertificate == report.SignerInformation.SignerCertificate,
+            "FULL-ETSI: the time-stamps and the certificates are validation objects referenced from the report");
+        Check(report?.SignatureValidationStatus.AssociatedValidationReportData?.Any(d => d.SubIndication == "NO_CERTIFICATE_CHAIN_FOUND" && d.MainIndication == "INDETERMINATE") == true,
+            "FULL-ETSI: the data of a reason names its sub-indication");
+
+        var changed = etsi.VerifyEtsi(detached, detached).SignatureValidationReports[0];
+        Check(changed.SignatureValidationStatus.MainIndication == "TOTAL-FAILED" && changed.SignatureValidationStatus.SubIndications?[0] == "HASH_FAILURE",
+            "FULL-ETSI: another content is TOTAL-FAILED / HASH_FAILURE");
+        Check(etsi.VerifyEtsiDetached(detached, contentFile).SignatureValidationReports[0].SignatureValidationStatus.SubIndications?.Contains("HASH_FAILURE") == false,
+            "FULL-ETSI: a detached signature against its content file");
+        Check(etsi.VerifyEtsi(detached).SignatureValidationReports[0].SignatureValidationStatus.SubIndications?.Contains("SIGNED_DATA_NOT_FOUND") == true,
+            "FULL-ETSI: without the content it is SIGNED_DATA_NOT_FOUND");
+
+        Check(etsi.VerifyEtsi(attached, null, Uapki.ValidationPolicyName.EtsiStrict).SignatureValidationReports[0]
+            .ValidationConstraintsEvaluationReport?.SignatureValidationPolicy?.PolicyName == Uapki.ValidationPolicyName.EtsiStrict,
+            "FULL-ETSI: the policy EtsiStrict by name");
+        var custom = etsi.VerifyEtsi(attached, null, new Uapki.ValidationPolicy() { BasedOn = Uapki.ValidationPolicyName.EtsiStrict, RevocationFreshness = 60 })
+            .SignatureValidationReports[0].ValidationConstraintsEvaluationReport;
+        Check(custom?.SignatureValidationPolicy?.PolicyName == Uapki.ValidationPolicyName.Custom
+            && custom.SignatureValidationPolicy.BasedOn == Uapki.ValidationPolicyName.EtsiStrict
+            && custom.ValidationConstraints?.Find(c => c.ValidationConstraintIdentifier == "revocationFreshnessChecker")?.ValidationConstraintParameter?.Value == "60",
+            "FULL-ETSI: a policy given by values is custom, with its values in the report");
+        Expect<UapkiException>(() => etsi.VerifyEtsi(attached, null, "Unknown"), "FULL-ETSI: an unknown policy is refused by the library");
+        Expect<UapkiException>(() => etsi.VerifyEtsi(attached, null, new Uapki.ValidationPolicy() { TsaExtendedKeyUsage = "other" }),
+            "FULL-ETSI: an unknown value of a policy field is refused by the library");
+        Expect<ArgumentException>(() => etsi.VerifyEtsi(attached, null, "a\"b"), "FULL-ETSI: a policy name that is not a name is refused by the wrapper");
+    }
+
+    // Trusted lists: the test lists of data/trust-list name the certificates of data/certs as trust services
+    using (var lists = new Uapki())
+    {
+        string listDir = Path.Combine(testData, "trust-list");
+        byte[] signer = File.ReadAllBytes(Path.Combine(listDir, "trust-list-signer.cer"));
+        byte[] list = File.ReadAllBytes(Path.Combine(listDir, "trust-list.xml"));
+        byte[] ca = File.ReadAllBytes(Directory.GetFiles(Path.Combine(testData, "certs"), "diia-CA-*.cer")[0]);
+        string storeDir = Dir("trust-lists");
+        foreach (var file in Directory.GetFiles(storeDir)) File.Delete(file);
+        var config = new Uapki.Config()
+        {
+            Offline = true,
+            TrustListCache = new Uapki.TrustListCacheParams() { Path = storeDir, TrustListSignerCerts = new List<string>() { Convert.ToBase64String(signer) } }
+        };
+        lists.Init(config);
+        Check(lists.UapkiInfo is { TrustListsCount: 0, RefusedTrustListsCount: 0 }, "trusted lists: INIT with the directory of lists");
+
+        Check(!lists.GetCertInfo(ca).Trusted, "trusted lists: the CA is not trusted before the list");
+        var info = lists.AddTrustList(list);
+        Check(info.SequenceNumber == 2 && info.CountServices == 4 && info.CountTrustedCerts == 4 && info.Stored && info.Territory == "UA"
+            && info.Warnings is null, "trusted lists: the list is accepted and stored");
+        var caInfo = lists.GetCertInfo(ca);
+        Check(caInfo.Trusted && caInfo.TrustServices is { Count: 1 } && caInfo.TrustServices[0].Type == "National-CA/QC"
+            && caInfo.TrustServices[0].ForESignatures && caInfo.TrustServices[0].Statuses is { Count: 1 }
+            && caInfo.TrustServices[0].Statuses![0].Status == "granted", "trusted lists: the CA of the list is trusted, with its service");
+        var signerInfo = lists.GetCertInfo(signer);
+        Check(signerInfo.TrustListSigner && !signerInfo.Trusted, "trusted lists: the signer of lists has its own status");
+        Check(lists.AddTrustListText(System.Text.Encoding.UTF8.GetString(list)).SequenceNumber == 2, "trusted lists: the list as text");
+        var accepted = lists.ListTrustLists();
+        Check(accepted.Count == 1 && accepted[0].SequenceNumber == 2 && accepted[0].ListId == info.ListId && accepted[0].SignerCertId == info.SignerCertId,
+            "trusted lists: the list of the accepted lists");
+        ExpectCode(() => lists.AddTrustList(File.ReadAllBytes(Path.Combine(listDir, "trust-list-old.xml"))), 0x107B, "trusted lists: an older list is refused");
+        ExpectCode(() => lists.AddTrustListText(System.Text.Encoding.UTF8.GetString(list).Replace("/Svcstatus/granted", "/Svcstatus/grantee")), 0x1079,
+            "trusted lists: a changed list is refused");
+        Check(lists.AddTrustList(File.ReadAllBytes(Path.Combine(listDir, "trust-list-withdrawn.xml"))).CountTrustedCerts == 3
+            && !lists.GetCertInfo(ca).Trusted, "trusted lists: a withdrawn service is not trusted");
+        using (var next = new Uapki())
+        {
+            next.Init(config);
+            Check(next.UapkiInfo is { TrustListsCount: 1, RefusedTrustListsCount: 0 }, "trusted lists: the next INIT applies the stored list");
+        }
+        using (var noSigner = new Uapki())
+        {
+            noSigner.Init(new Uapki.Config() { Offline = true });
+            ExpectCode(() => noSigner.AddTrustList(list), 0x107A, "trusted lists: a list of a signer that is not given is refused");
+        }
+    }
+
     Uapki.Global.Dispose();
     Check(Uapki.Global.GetVersion().Length > 0, "Global: Dispose does nothing");
     Uapki.Global.Deinit();
@@ -162,6 +263,19 @@ void Expect<TException>(Action action, string what) where TException : Exception
     catch (TException e)
     {
         Check(true, what + " (" + e.GetType().Name + ")");
+    }
+}
+
+void ExpectCode(Action action, int errorCode, string what)
+{
+    try
+    {
+        action();
+        Check(false, what + " (no exception)");
+    }
+    catch (UapkiException e)
+    {
+        Check(e.ErrorCode == errorCode, what + " (0x" + e.ErrorCode.ToString("X4") + ")");
     }
 }
 

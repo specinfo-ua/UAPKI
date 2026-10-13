@@ -442,6 +442,10 @@ int asn_oid_to_text_buf(const OBJECT_IDENTIFIER_t* oid, char* buf, size_t size)
         v = 0;
         nbytes = 0;
     }
+    //  No subidentifier or the last one not finished (X.690 8.19.2): the general path rejects it
+    if (first || nbytes) {
+        return -1;
+    }
     *out = 0;
     return (int)(out - buf);
 }
@@ -470,7 +474,8 @@ int asn_oid_to_text(const OBJECT_IDENTIFIER_t* dst, char** text)
     }
 
     count = OBJECT_IDENTIFIER_get_arcs(dst, arcs, arc_type_size, arc_slots);
-    if (count == (unsigned int)-1) {
+    //  No arcs: *text would be an empty buffer without the terminator
+    if ((count == (unsigned int)-1) || (count == 0)) {
         SET_ERROR(RET_INVALID_OID);
     }
     // If necessary, reallocate arcs array and try again.

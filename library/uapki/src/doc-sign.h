@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -115,6 +115,9 @@ struct SharedData : Params {
                 ocsp;
     LibraryConfig::TspParams
                 tsp;
+    //  tsp.uris - the TSAs of the signing certificate; the TSAs of INIT, tried after them (from the first)
+    std::vector<std::string>
+                tspFallbackUris;
     SmartBA     encodedSigningCert;
     SmartBA     encodedSignPolicy;
 
@@ -150,6 +153,9 @@ public:
     uint64_t    signingTime;
     SmartBA     hashSignedAttrs;
     SmartBA     signature;
+    SmartBA     augmented;      //  CAdES-B-LT/B-LTA: the signature with the validation data
+    std::vector<std::string>
+                warnings;       //  CAdES-B-LT/B-LTA: e.g. a CRL of a responder not embedded
     std::string tspUri;
     uint64_t    contentTimeStamp;
     uint64_t    signatureTimeStamp;
@@ -217,6 +223,15 @@ public:
 
 private:
     std::vector<CertValidator::CertChainItem*> collectCerts (void) const;
+    //  The CA certificates of the signer path and the certificates of its status data, without the signing
+    //  certificate (complete-certificate-references, TS 101 733 6.2.1); signerItem - the signing certificate
+    std::vector<CertValidator::CertChainItem*> collectSignerCerts (
+        CertValidator::CertChainItem** signerItem
+    ) const;
+    //  The certificates of the TSUs of the content and signature time-stamps and of their status data
+    std::vector<CertValidator::CertChainItem*> collectTspCerts (void) const;
+    //  The validation data of the TSUs go to the signature time-stamp token (TS 101 733 6.3.3, 6.3.4)
+    int addTspValidationData (void);
     int encodeCertValues (
         const std::vector<CertValidator::CertChainItem*>& certs,
         ByteArray** baEncoded
@@ -235,6 +250,33 @@ private:
     );
 
 };  //  end class SigningDoc
+
+//  The TSA: INIT tsp.url if "forced"; else all the TSAs of the signing certificate (subjectInfoAccess
+//  id-ad-timeStamping), then, if they are absent, do not respond or refuse, all the TSAs of INIT tsp.url.
+//  certUris - the TSAs of the certificate, configUris - of INIT (without those of the certificate)
+void tspUris (
+        const LibraryConfig::TspParams& tspParams,
+        const Cert::CerItem* cerSigner,
+        std::vector<std::string>& certUris,
+        std::vector<std::string>& configUris
+);
+//  A granted TSP response: tspUri (the TSA that granted before) if not empty, then certUris in random order,
+//  then configUris in their order (from the first); tspUri - the TSA that granted
+int requestTimestamp (
+        const HttpHelper::Params& httpParams,
+        const std::vector<std::string>& certUris,
+        const std::vector<std::string>& configUris,
+        Tsp::TspHelper& tspHelper,
+        std::string& tspUri
+);
+
+//  Unsigned attributes added to the (first) SignerInfo of a CMS ContentInfo (a time-stamp token), the other
+//  bytes kept as they are
+int addUnsignedAttrsToToken (
+        const ByteArray* baToken,
+        const std::vector<std::vector<uint8_t>>& encodedAttrs,
+        ByteArray** baResult
+);
 
 int verifySignedData (
         CertValidator::CertValidator& certValidator,

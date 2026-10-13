@@ -31,11 +31,14 @@
 #include "cipher-helper.h"
 #include "dstu-ns.h"
 #include "envelopeddata-helper.h"
+#include "iso15946.h"
+#include "key-trans.h"
 #include "key-wrap.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "private-key.h"
 #include "uapki-ns.h"
+#include "uapki-ns-util.h"
 
 
 #define DEBUG_OUTCON(expression)
@@ -112,6 +115,23 @@ static int generate_ephemeral_privkey (
 
         DO(private_key_get_spki(*baPrivateKeyInfo, baSpki));
     }
+    else if (cerRecipient.getKeyAlgo() == string(OID_EC_KEY)) {
+        //  The ephemeral key on the curve of the recipient (RFC 5753, 3.1.1)
+        char* s_algo = nullptr;
+        char* s_curve = nullptr;
+        ret = spki_get_algo_param(cerRecipient.getSpki(), &s_algo, &s_curve);
+        if ((ret == RET_OK) && s_curve) {
+            ret = private_key_generate(OID_EC_KEY, s_curve, baPrivateKeyInfo);
+        }
+        else if (ret == RET_OK) {
+            ret = RET_UAPKI_UNSUPPORTED_ALG;
+        }
+        ::free(s_algo);
+        ::free(s_curve);
+        DO(ret);
+
+        DO(private_key_get_spki(*baPrivateKeyInfo, baSpki));
+    }
     else {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
@@ -169,6 +189,7 @@ cleanup:
 }   //  wrap_sessionkey
 
 static int parse_keyencryption_algo (
+        const Cert::CerItem& cerRecipient,
         JSON_Object* joRecipientInfo,
         UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgo,
         string& oidWrapAlgo
@@ -176,11 +197,27 @@ static int parse_keyencryption_algo (
 {
     int ret = RET_OK;
     string s_kdfalgo;
+    const bool is_ec = (cerRecipient.getKeyAlgo() == string(OID_EC_KEY));
 
-    s_kdfalgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "kdfAlgo", OID_KDF_ALGO_DEFAULT);
+    s_kdfalgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "kdfAlgo", is_ec ? OID_DHSINGLEPASS_STD_DH_SHA256_KDF : OID_KDF_ALGO_DEFAULT);
     oidWrapAlgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "keyWrapAlgo");
 
-    if ((s_kdfalgo == string(OID_COFACTOR_DH_DSTU7564_KDF)) || (s_kdfalgo == string(OID_STD_DH_DSTU7564_KDF))) {
+    if (is_ec) {
+        //  ECDH with the ANSI X9.63 KDF and AES Key Wrap (RFC 5753): the parameters of the scheme are
+        //  the key wrap algorithm, its own parameters are absent
+        const HashAlg hash_kdf = iso15946_hash_from_oid_dhkdf(s_kdfalgo.c_str(), nullptr);
+        if (oidWrapAlgo.empty()) {
+            oidWrapAlgo = string(OID_AES256_WRAP);
+        }
+        if (
+            (hash_kdf == HASH_ALG_UNDEFINED) || (hash_kdf == HASH_ALG_DSTU7564_256) || (hash_kdf == HASH_ALG_GOST34311) ||
+            ((oidWrapAlgo != string(OID_AES128_WRAP)) && (oidWrapAlgo != string(OID_AES192_WRAP)) && (oidWrapAlgo != string(OID_AES256_WRAP)))
+        ) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        DO(Util::encodeAlgorithmIdentifier(oidWrapAlgo, nullptr, &aidKeyEncryptionAlgo.baParameters));
+    }
+    else if ((s_kdfalgo == string(OID_COFACTOR_DH_DSTU7564_KDF)) || (s_kdfalgo == string(OID_STD_DH_DSTU7564_KDF))) {
         if (oidWrapAlgo.empty()) {
             oidWrapAlgo = string(OID_DSTU7624_WRAP);
         }
@@ -230,7 +267,7 @@ static int setup_kari (
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
 
-    DO(parse_keyencryption_algo(joRecipientInfo, aid_keyencryption, s_keywrapalgo));
+    DO(parse_keyencryption_algo(cerRecipient, joRecipientInfo, aid_keyencryption, s_keywrapalgo));
 
     DO(generate_ephemeral_privkey(cerRecipient, &sba_ephemkey, &sba_ephemspki));
     DO(wrap_sessionkey(sba_ephemkey.get(),
@@ -254,11 +291,59 @@ cleanup:
     return ret;
 }   //  setup_kari
 
+static int setup_ktri (
+        const Cert::CerItem& cerRecipient,
+        Pkcs7::EnvelopedDataBuilder& envDataBuilder,
+        EncryptContent& encryptContent,
+        JSON_Object* joRecipientInfo
+)
+{
+    int ret = RET_OK;
+    UapkiNS::AlgorithmIdentifier aid_keyencryption;
+    SmartBA sba_encryptedkey, sba_recipissasn;
+
+    if (!cerRecipient.keyUsageByBit(KeyUsage_keyEncipherment)) {
+        SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
+    }
+
+    //  RSAES-OAEP (RFC 3560) by default, or RSAES-PKCS1-v1_5 - rsaEncryption with the NULL parameters (RFC 3370, 4.2.1)
+    aid_keyencryption.algorithm = ParsonHelper::jsonObjectGetString(joRecipientInfo, "keyEncryptionAlgo", OID_RSAES_OAEP);
+    if (aid_keyencryption.algorithm == string(OID_RSAES_OAEP)) {
+        const string s_digestalgo = ParsonHelper::jsonObjectGetString(joRecipientInfo, "digestAlgo");
+        const HashAlg hash_algo = s_digestalgo.empty() ? HASH_ALG_SHA256 : hash_from_oid(s_digestalgo.c_str());
+        if (hash_algo == HASH_ALG_UNDEFINED) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        DO(key_trans_encode_oaep_params(hash_algo, &aid_keyencryption.baParameters));
+    }
+    else if (aid_keyencryption.algorithm == string(OID_RSA)) {
+        CHECK_NOT_NULL(aid_keyencryption.baParameters = ba_alloc_from_hex("0500"));
+    }
+    else {
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+    }
+
+    DO(key_trans_encrypt(
+        cerRecipient.getSpki(),
+        aid_keyencryption.algorithm.c_str(),
+        aid_keyencryption.baParameters,
+        encryptContent.secretKey.get(),
+        &sba_encryptedkey
+    ));
+
+    DO(cerRecipient.getIssuerAndSN(&sba_recipissasn));
+    DO(envDataBuilder.addKeyTransRecipientInfo(sba_recipissasn.get(), aid_keyencryption, sba_encryptedkey.get()));
+
+cleanup:
+    return ret;
+}   //  setup_ktri
+
 static int add_recipient_infos (
         Cert::CerStore& cerStore,
         Pkcs7::EnvelopedDataBuilder& envDataBuilder,
         EncryptContent& encryptContent,
-        JSON_Array* jaRecipientInfos
+        JSON_Array* jaRecipientInfos,
+        bool& allKeyTrans
 )
 {
     const size_t cnt_recips = json_array_get_count(jaRecipientInfos);
@@ -270,13 +355,20 @@ static int add_recipient_infos (
         Cert::CerItem* cer_recipient = nullptr;
         JSON_Object* jo_recipinfo = json_array_get_object(jaRecipientInfos, i);
 
-        //  Now supported only KeyAgree
-        DO(envDataBuilder.addRecipientInfo(RecipientInfo_PR_kari));
         if (!sba_certid.set(json_object_get_base64(jo_recipinfo, "certId"))) {
             SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
         }
         DO(cerStore.getCertByCertId(sba_certid.get(), &cer_recipient));
-        DO(setup_kari(*cer_recipient, envDataBuilder.getKeyAgreeRecipientInfo(i), encryptContent, jo_recipinfo));
+        if (cer_recipient->getKeyAlgo() == string(OID_RSA)) {
+            //  Key transport: the key is encrypted for the RSA key of the recipient
+            DO(setup_ktri(*cer_recipient, envDataBuilder, encryptContent, jo_recipinfo));
+        }
+        else {
+            //  Key agreement: an ephemeral key, a KDF and a key wrap
+            DO(envDataBuilder.addRecipientInfo(RecipientInfo_PR_kari));
+            DO(setup_kari(*cer_recipient, envDataBuilder.getKeyAgreeRecipientInfo(i), encryptContent, jo_recipinfo));
+            allKeyTrans = false;
+        }
     }
 
 cleanup:
@@ -331,6 +423,15 @@ static int encrypt_content (
                 &content.encrypted
             ));
         }
+        else if (Cipher::Aes::keySize(content.algoId.algorithm) > 0) {
+            DO(Cipher::Aes::cryptData(
+                content.algoId,
+                content.secretKey.get(),
+                Cipher::Direction::ENCRYPT,
+                content.data.get(),
+                &content.encrypted
+            ));
+        }
     }
 
 cleanup:
@@ -370,6 +471,22 @@ static int generate_secretkey (
             DO(Cipher::Gost28147::generateKey(&content.secretKey));
         }
     }
+    else if (Cipher::Aes::keySize(content.algoId.algorithm) > 0) {
+        if (!content.algoId.baParameters) {
+            DO(Cipher::Aes::generateIV(&sba_iv));
+            DO(Cipher::Aes::encodeParams(sba_iv.get(), &content.algoId.baParameters));
+        }
+        else {
+            // Check decoding AES-IV
+            DO(Cipher::Aes::decodeParams(content.algoId.baParameters, &sba_iv));
+        }
+        if (content.secretKey.empty()) {
+            DO(Cipher::Aes::generateKey(Cipher::Aes::keySize(content.algoId.algorithm), &content.secretKey));
+        }
+        else if (content.secretKey.size() != Cipher::Aes::keySize(content.algoId.algorithm)) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+    }
     else if (content.data.empty() && !content.algoId.algorithm.empty()  && !content.secretKey.empty()) {
         // No action: uses external encryption data
     }
@@ -396,7 +513,8 @@ static int parse_content (
         if (!content.secretKey.set(json_object_get_base64(joContent, "dataEncryptionKey"))) return RET_UAPKI_INVALID_PARAMETER;
     }
 
-    content.algoId.algorithm = ParsonHelper::jsonObjectGetString(joContent, "encryptionAlgo", string(OID_DSTU7624_256_CFB));
+    //  The default depends on the key of the first recipient, see default_encryption_algo()
+    content.algoId.algorithm = ParsonHelper::jsonObjectGetString(joContent, "encryptionAlgo");
     if (ParsonHelper::jsonObjectHasValue(joContent, "encryptionAlgoParams", JSONString)) {
         content.algoId.baParameters = json_object_get_base64(joContent, "encryptionAlgoParams");
         if (!content.algoId.baParameters) return RET_UAPKI_INVALID_PARAMETER;
@@ -410,6 +528,27 @@ static int parse_content (
 }   //  parse_content
 
 
+//  The content encryption algorithm by default: DSTU 7624 for a recipient with a DSTU 4145 key, AES-256-CBC for RSA and ECDSA
+static int default_encryption_algo (
+        Cert::CerStore& cerStore,
+        JSON_Array* jaRecipientInfos,
+        EncryptContent& content
+)
+{
+    if (!content.algoId.algorithm.empty()) return RET_OK;
+
+    SmartBA sba_certid;
+    Cert::CerItem* cer_recipient = nullptr;
+    if (!sba_certid.set(json_object_get_base64(json_array_get_object(jaRecipientInfos, 0), "certId"))) return RET_UAPKI_INVALID_PARAMETER;
+
+    const int ret = cerStore.getCertByCertId(sba_certid.get(), &cer_recipient);
+    if (ret != RET_OK) return ret;
+
+    content.algoId.algorithm = DstuNS::isDstu4145family(cer_recipient->getKeyAlgo()) ? string(OID_DSTU7624_256_CFB) : string(OID_AES256_CBC_PAD);
+    return RET_OK;
+}   //  default_encryption_algo
+
+
 int uapki_encrypt (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 {
     int ret = RET_OK;
@@ -418,6 +557,7 @@ int uapki_encrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
     EncryptContent econtent;
     vector<UapkiNS::Attribute> unpr_attrs;
     const uint32_t version = 2u;
+    bool all_keytrans = true;
 
     cer_store = context.cerStore();
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
@@ -425,14 +565,25 @@ int uapki_encrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
     DO(envdata_builder.init(version));
 
     DO(parse_content(json_object_get_object(joParams, "content"), econtent));
+    DO(default_encryption_algo(*cer_store, json_object_get_array(joParams, "recipientInfos"), econtent));
  
     DO(generate_secretkey(econtent));
 
     DO(add_originator_certs(*cer_store, envdata_builder, json_object_get_array(joParams, "originatorCertIds")));
 
-    DO(add_recipient_infos(*cer_store, envdata_builder, econtent, json_object_get_array(joParams, "recipientInfos")));
+    DO(add_recipient_infos(*cer_store, envdata_builder, econtent, json_object_get_array(joParams, "recipientInfos"), all_keytrans));
 
     DO(add_unprotected_attrs(envdata_builder, json_object_get_array(joParams, "unprotectedAttrs")));
+
+    //  The version is 0 if there is neither originatorInfo nor unprotectedAttrs and every RecipientInfo
+    //  has the version 0 (RFC 5652, 6.1)
+    if (
+        all_keytrans &&
+        (json_array_get_count(json_object_get_array(joParams, "originatorCertIds")) == 0) &&
+        (json_array_get_count(json_object_get_array(joParams, "unprotectedAttrs")) == 0)
+    ) {
+        DO(envdata_builder.setVersion(0));
+    }
 
     DO(encrypt_content(econtent));
     DO(envdata_builder.setEncryptedContentInfo(econtent.type, econtent.algoId, econtent.encrypted.get()));

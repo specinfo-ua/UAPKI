@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -43,12 +43,49 @@ class LibraryConfig {
 public:
     struct OcspParams {
         static const size_t NONCE_LEN_DEFAULT = 20;
+        //  Minutes. A cached response without nextUpdate is used up to thisUpdate + cacheTime; a response
+        //  without nextUpdate is fresh if issued after the validation time - maxFreshness (EN 319 102-1, 5.2.5.4):
+        //  by default the time to publish a change of the status. cacheTime < maxFreshness: the responses
+        //  embedded by signing pass VERIFY
+        static const uint32_t CACHE_TIME_DEFAULT = 30;
+        static const uint32_t MAX_FRESHNESS_DEFAULT = 120;
+        //  Bytes. The CRL of an OCSP responder without id-pkix-ocsp-nocheck is embedded into a CAdES-B-LT/B-LTA
+        //  signature only up to this size (the size of the signature: a CRL of a CA may be megabytes); a bigger one
+        //  is used for the validation but not embedded - the signature is then not a complete B-LT
+        //  (EN 319 122-1, table 1, o). By default only small CRLs (e.g. of the central certification authority)
+        static const uint32_t RESPONDER_CRL_EMBED_MAX_SIZE_DEFAULT = 10240;
 
         size_t  nonceLen;
+        uint32_t
+                cacheTime;
+        uint32_t
+                maxFreshness;
+        uint32_t
+                responderCrlEmbedMaxSize;
 
         OcspParams (void)
             : nonceLen (NONCE_LEN_DEFAULT)
+            , cacheTime (CACHE_TIME_DEFAULT)
+            , maxFreshness (MAX_FRESHNESS_DEFAULT)
+            , responderCrlEmbedMaxSize (RESPONDER_CRL_EMBED_MAX_SIZE_DEFAULT)
         {
+        }
+        //  The time a response may be used from the cache: up to nextUpdate, without it thisUpdate + cacheTime
+        uint64_t cacheValidTime (
+            const uint64_t msThisUpdate,
+            const uint64_t msNextUpdate
+        ) const {
+            return (msNextUpdate > 0) ? msNextUpdate : (msThisUpdate + (uint64_t)cacheTime * 60000);
+        }
+        //  The response is fresh for the validation time: nextUpdate later than it, without nextUpdate
+        //  thisUpdate later than validateTime - maxFreshness
+        bool isFresh (
+            const uint64_t msThisUpdate,
+            const uint64_t msNextUpdate,
+            const uint64_t validateTime
+        ) const {
+            if (msNextUpdate > 0) return (msNextUpdate > validateTime);
+            return (msThisUpdate + (uint64_t)maxFreshness * 60000 > validateTime);
         }
     };  //  end struct OcspParams
 
@@ -73,6 +110,8 @@ public:
 
 private:
     bool    m_IsInitialized;
+    std::string
+            m_InitParams;
     HttpHelper::Params
             m_HttpParams;
     OcspParams
@@ -113,8 +152,18 @@ public:
     void setInitialized (bool initialized) {
         m_IsInitialized = initialized;
     }
+    //  The parameters the library (the session) was initialized with, as JSON; without the proxy credentials
+    const std::string& getInitParams (void) const {
+        return m_InitParams;
+    }
+    void setInitParams (const std::string& initParams) {
+        m_InitParams = initParams;
+    }
     void setOcsp (const OcspParams& ocspParams) {
         m_OcspParams.nonceLen = ocspParams.nonceLen;
+        m_OcspParams.cacheTime = ocspParams.cacheTime;
+        m_OcspParams.maxFreshness = ocspParams.maxFreshness;
+        m_OcspParams.responderCrlEmbedMaxSize = ocspParams.responderCrlEmbedMaxSize;
     }
     void setOffline (bool offline) {
         m_HttpParams.offline = offline;

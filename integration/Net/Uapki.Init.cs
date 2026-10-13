@@ -48,11 +48,21 @@ public partial class Uapki
         public uint CountCrls { get; init; }
     }
 
+    public class TrustListCacheInfo
+    {
+        public uint CountLists { get; init; }
+        public uint CountRefusedLists { get; init; }
+        /// <summary>The accepted lists whose next update time is passed</summary>
+        public uint CountListsNextUpdatePassed { get; init; }
+    }
+
     public class InitResponse
     {
         public int CountCmProviders { get; init; }
         public CertCacheInfo CertCache { get; init; } = new CertCacheInfo();
         public CrlCacheInfo CrlCache { get; init; } = new CrlCacheInfo();
+        /// <summary>Present when the directory of trusted lists is set</summary>
+        public TrustListCacheInfo? TrustListCache { get; init; }
         public OcspParams? Ocsp { get; init; }
         public TspParams? Tsp { get; init; }
         public ProxyParams? Proxy { get; init; }
@@ -86,6 +96,9 @@ public partial class Uapki
 
         if (parameters.CrlCache?.Path is not null)
             Directory.CreateDirectory(parameters.CrlCache.Path!);
+
+        if (parameters.TrustListCache?.Path is not null)
+            Directory.CreateDirectory(parameters.TrustListCache.Path);
 
         string init_cmd = Request("INIT", parameters, jsonCtx.Config);
 

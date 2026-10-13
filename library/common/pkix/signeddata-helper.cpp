@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,6 +29,7 @@
 
 #include "signeddata-helper.h"
 #include "attribute-helper.h"
+#include "der-helper.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapki-errors.h"
@@ -158,9 +159,8 @@ int SignedDataBuilder::addCrl (
         ASN_ALLOC_TYPE(m_SignedData->crls, RevocationInfoChoices);
     }
 
-    ASN_ALLOC_TYPE(crl, RevocationInfoChoice_t);
-    crl->present = RevocationInfoChoice_PR_crl;
-    DO(asn_decode_ba(get_CertificateList_desc(), &crl->choice.crl, baCrlEncoded));
+    //  A RevocationInfoChoice: the crl (CertificateList, untagged) or other ([1], e.g. RFC 5940 OCSP response)
+    CHECK_NOT_NULL(crl = (RevocationInfoChoice_t*)asn_decode_ba_with_alloc(get_RevocationInfoChoice_desc(), baCrlEncoded));
 
     ASN_SET_ADD(m_SignedData->crls, crl);
     crl = nullptr;
@@ -620,6 +620,7 @@ int SignedDataParser::parse (
     }
 
     CHECK_NOT_NULL(m_SignedData = (SignedData_t*)asn_any2type(&cinfo->content, get_SignedData_desc()));
+    m_RawSignedData.assign(cinfo->content.buf, cinfo->content.buf + cinfo->content.size);
 
     //  =version=
     DO(asn_INTEGER2long(&m_SignedData->version, &version));
@@ -667,7 +668,43 @@ int SignedDataParser::parseSignerInfo (
 {
     if (index >= m_CountSignerInfos) return RET_INDEX_OUT_OF_RANGE;
 
-    return signerInfo.parse(m_SignedData->signerInfos.list.array[index]);
+    const int ret = signerInfo.parse(m_SignedData->signerInfos.list.array[index]);
+    if (ret != RET_OK) return ret;
+
+    //  The octets of eContentType and of the fields of the SignerInfo as they are in the input, for what is
+    //  computed over them "without any modification" (the message imprint of archive-time-stamp-v3)
+    vector<vector<uint8_t>> sdata, eci, sinfos, fields;
+    vector<uint8_t> raw_fields;
+    if (
+        Der::childrenBer(m_RawSignedData.data(), m_RawSignedData.size(), sdata) && (sdata.size() >= 4) &&
+        Der::childrenBer(sdata[2].data(), sdata[2].size(), eci) && !eci.empty() && (eci[0][0] == 0x06) &&
+        (sdata.back()[0] == 0x31) && Der::childrenBer(sdata.back().data(), sdata.back().size(), sinfos) &&
+        (sinfos.size() == m_CountSignerInfos) &&
+        Der::childrenBer(sinfos[index].data(), sinfos[index].size(), fields)
+    ) {
+        vector<uint8_t> raw_certscrls;
+        vector<vector<uint8_t>> raw_unsignedattrs;
+        bool ok = true;
+        for (const auto& it : fields) {
+            if (it[0] != 0xA1) {
+                raw_fields.insert(raw_fields.end(), it.begin(), it.end());
+            }
+            else {
+                ok = Der::childrenBer(it.data(), it.size(), raw_unsignedattrs);
+            }
+        }
+        //  certificates [0] and crls [1] are between encapContentInfo and signerInfos
+        for (size_t i = 3; i + 1 < sdata.size(); i++) {
+            if ((sdata[i][0] == 0xA0) || (sdata[i][0] == 0xA1)) {
+                raw_certscrls.insert(raw_certscrls.end(), sdata[i].begin(), sdata[i].end());
+            }
+        }
+        signerInfo.setRaw(eci[0], raw_fields);
+        if (ok) {
+            signerInfo.setRawSignedData(sdata[2], (eci.size() > 1), raw_certscrls, raw_unsignedattrs);
+        }
+    }
+    return RET_OK;
 }
 
 int SignedDataParser::encodeSignerInfo (
@@ -726,6 +763,7 @@ cleanup:
 
 SignedDataParser::SignerInfo::SignerInfo (void)
     : m_SignerInfo(nullptr)
+    , m_RawContentIsPresent(false)
     , m_Version(0)
     , m_SidType(SignerIdentifierType::UNDEFINED)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -43,7 +43,9 @@ enum class SignatureFormat : uint32_t {
     CADES_T         = 4,
     CADES_C         = 5,
     CADES_XL        = 6,
-    CADES_A         = 7
+    CADES_A         = 7,
+    CADES_B_LT      = 8,    //  ETSI EN 319 122-1: the validation data in SignedData.certificates and SignedData.crls
+    CADES_B_LTA     = 9     //  ETSI EN 319 122-1: B-LT with archive-time-stamp-v3 and ats-hash-index-v3
 };  //  end enum SignatureFormat
 
 SignatureFormat signatureFormatFromString (

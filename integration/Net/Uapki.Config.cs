@@ -77,9 +77,23 @@ public partial class Uapki
         public bool? UseDeltaCrl { get; set; }
     }
 
+    public class TrustListCacheParams
+    {
+        /// <summary>The directory that keeps the last accepted version of every trusted list</summary>
+        public string? Path { get; set; }
+        /// <summary>The certificates (Base64) that sign trusted lists; they are not trusted in a certificate chain</summary>
+        public List<string>? TrustListSignerCerts { get; set; }
+    }
+
     public class OcspParams
     {
         public int? NonceLen { get; set; }
+        /// <summary>Minutes a response without nextUpdate is taken from the cache (default 30)</summary>
+        public uint? CacheTime { get; set; }
+        /// <summary>Maximum freshness (minutes) of a response without nextUpdate for VERIFY (default 120)</summary>
+        public uint? MaxFreshness { get; set; }
+        /// <summary>The largest CRL (bytes) of an OCSP responder embedded into CAdES-B-LT/B-LTA (default 10240)</summary>
+        public uint? ResponderCrlEmbedMaxSize { get; set; }
     }
 
     public class TspParams
@@ -103,6 +117,7 @@ public partial class Uapki
         public CmProvidersParams? CmProviders { get; set; }
         public CertCacheParams? CertCache { get; set; }
         public CrlCacheParams? CrlCache { get; set; }
+        public TrustListCacheParams? TrustListCache { get; set; }
         public OcspParams? Ocsp { get; set; }
         public TspParams? Tsp { get; set; }
         public ProxyParams? Proxy { get; set; }

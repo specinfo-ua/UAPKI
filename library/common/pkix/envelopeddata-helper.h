@@ -155,8 +155,17 @@ namespace Pkcs7 {
         int addOriginatorCrl (
             const ByteArray* baCrlEncoded
         );
+        int setVersion (
+            const uint32_t version
+        );
         int addRecipientInfo (
             const RecipientInfo_PR recipInfoType
+        );
+        //  KeyTransRecipientInfo of the version 0: the recipient by issuerAndSerialNumber (RFC 5652, 6.2.1)
+        int addKeyTransRecipientInfo (
+            const ByteArray* baIssuerAndSN,
+            const UapkiNS::AlgorithmIdentifier& aidKeyEncryptionAlgoId,
+            const ByteArray* baEncryptedKey
         );
         KeyAgreeRecipientInfo* getKeyAgreeRecipientInfo (
             const size_t index = 0
@@ -278,6 +287,28 @@ namespace Pkcs7 {
 
         };  //  end class KeyAgreeRecipientInfo
 
+        struct KeyTransRecipientInfo {
+            uint32_t    version;
+            RecipientIdentifier_PR
+                        ridType;
+            ByteArray*  baIssuer;
+            ByteArray*  baSerialNumber;
+            ByteArray*  baSubjectKeyId;
+            AlgorithmIdentifier
+                        keyEncryptionAlgorithm;
+            ByteArray*  baEncryptedKey;
+
+            KeyTransRecipientInfo (void)
+                : version(0), ridType(RecipientIdentifier_PR_NOTHING), baIssuer(nullptr), baSerialNumber(nullptr)
+                , baSubjectKeyId(nullptr), baEncryptedKey(nullptr) {}
+            ~KeyTransRecipientInfo (void) {
+                ba_free(baIssuer);
+                ba_free(baSerialNumber);
+                ba_free(baSubjectKeyId);
+                ba_free(baEncryptedKey);
+            }
+        };  //  end struct KeyTransRecipientInfo
+
     public:
         EnvelopedDataParser (void);
         ~EnvelopedDataParser (void);
@@ -288,6 +319,10 @@ namespace Pkcs7 {
         int parseKeyAgreeRecipientInfo (
             const size_t index,
             KeyAgreeRecipientInfo& kari
+        );
+        int parseKeyTransRecipientInfo (
+            const size_t index,
+            KeyTransRecipientInfo& ktri
         );
 
         uint32_t getVersion (void) const {

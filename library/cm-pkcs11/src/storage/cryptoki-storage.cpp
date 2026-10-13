@@ -34,6 +34,7 @@
 #include "dstu4145-params.h"
 #include "ecdsa-params.h"
 #include "iso15946.h"
+#include "key-trans.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
 #include "uapki-ns-util.h"
@@ -887,7 +888,7 @@ CM_ERROR CryptokiStorage::signData (
         CM_BYTEARRAY** baSignature
 )
 {
-    const HashAlg hash_algo = hashAlgBySignAlgo(keyInfo, signAlgo);
+    const HashAlg hash_algo = hashAlgBySignAlgo(keyInfo, signAlgo, baSignAlgoParams);
     if (hash_algo == HASH_ALG_UNDEFINED) return RET_CM_UNSUPPORTED_ALG;
 
     SmartBA sba_hash;
@@ -912,7 +913,6 @@ CM_ERROR CryptokiStorage::signHash (
         CM_BYTEARRAY** baSignature
 )
 {
-    (void)baSignAlgoParams;
     //  Check support signAlgo
     bool is_found = false;
     for (const auto& it : keyInfo.signAlgo) {
@@ -921,8 +921,34 @@ CM_ERROR CryptokiStorage::signHash (
     }
     if (!is_found) return RET_CM_UNSUPPORTED_ALG;
 
-    const CK_MECHANISM mech_param = { keyInfo.mechType, NULL_PTR, 0 };
+    CK_MECHANISM mech_param = { keyInfo.mechType, NULL_PTR, 0 };
+    CK_RSA_PKCS_PSS_PARAMS pss_params = { 0, 0, 0 };
     Buffer buf_hashvalue, buf_signvalue;
+    const bool is_rsapss = (keyInfo.keyAlgo == KeyAlgo::RSA) && (signature_from_oid(signAlgo.c_str()) == SIGN_RSA_PSS);
+
+    if (is_rsapss) {
+        //  RSASSA-PSS (CKM_RSA_PKCS_PSS): the hash is signed as is, the parameters of the mechanism are
+        //  those of the signature algorithm - the hash, MGF1 with it, the salt of its length
+        const HashAlg hash_algo = hashAlgBySignAlgo(keyInfo, signAlgo, baSignAlgoParams);
+        switch (hash_algo) {
+        case HASH_ALG_SHA1:     pss_params.hashAlg = CKM_SHA_1;    pss_params.mgf = CKG_MGF1_SHA1;     break;
+        case HASH_ALG_SHA224:   pss_params.hashAlg = CKM_SHA224;   pss_params.mgf = CKG_MGF1_SHA224;   break;
+        case HASH_ALG_SHA256:   pss_params.hashAlg = CKM_SHA256;   pss_params.mgf = CKG_MGF1_SHA256;   break;
+        case HASH_ALG_SHA384:   pss_params.hashAlg = CKM_SHA384;   pss_params.mgf = CKG_MGF1_SHA384;   break;
+        case HASH_ALG_SHA512:   pss_params.hashAlg = CKM_SHA512;   pss_params.mgf = CKG_MGF1_SHA512;   break;
+        case HASH_ALG_SHA3_224: pss_params.hashAlg = CKM_SHA3_224; pss_params.mgf = CKG_MGF1_SHA3_224; break;
+        case HASH_ALG_SHA3_256: pss_params.hashAlg = CKM_SHA3_256; pss_params.mgf = CKG_MGF1_SHA3_256; break;
+        case HASH_ALG_SHA3_384: pss_params.hashAlg = CKM_SHA3_384; pss_params.mgf = CKG_MGF1_SHA3_384; break;
+        case HASH_ALG_SHA3_512: pss_params.hashAlg = CKM_SHA3_512; pss_params.mgf = CKG_MGF1_SHA3_512; break;
+        default:
+            return RET_CM_UNSUPPORTED_ALG;
+        }
+        pss_params.sLen = (CK_ULONG)hash_get_size(hash_algo);
+        if (ba_get_len((const ByteArray*)baHash) != hash_get_size(hash_algo)) return RET_CM_INVALID_HASH;
+        mech_param.mechanism = CKM_RSA_PKCS_PSS;
+        mech_param.pParameter = (CK_VOID_PTR)&pss_params;
+        mech_param.ulParameterLen = (CK_ULONG)sizeof(pss_params);
+    }
 
     switch (keyInfo.keyAlgo) {
     case KeyAlgo::DSTU:
@@ -930,7 +956,10 @@ CM_ERROR CryptokiStorage::signHash (
         if (!bufferFromBa((const ByteArray*)baHash, buf_hashvalue)) return RET_CM_GENERAL_ERROR;
         break;
     case KeyAlgo::RSA:
-        if (!encode_digestinfo(
+        if (is_rsapss) {
+            if (!bufferFromBa((const ByteArray*)baHash, buf_hashvalue)) return RET_CM_GENERAL_ERROR;
+        }
+        else if (!encode_digestinfo(
             hashAlgBySignAlgo(keyInfo, signAlgo),
             (const ByteArray*)baHash,
             buf_hashvalue)
@@ -1088,13 +1117,20 @@ CM_ERROR CryptokiStorage::dhUnwrapKey (
 {
     DeriveWrapKeyParams dwk_params = { 0, 0, 0, 0, 0 };
     bool with_cofactor;
-    const HashAlg hash_algo = hash_from_oid_dhkdf(oidDhKdf, with_cofactor);
-    if (hash_algo == HASH_ALG_UNDEFINED) {
+    const bool is_ecdh = (keyInfo.keyAlgo == KeyAlgo::ECDSA);
+    const HashAlg hash_algo = is_ecdh ? iso15946_hash_from_oid_dhkdf(oidDhKdf, &with_cofactor) : hash_from_oid_dhkdf(oidDhKdf, with_cofactor);
+    if ((hash_algo == HASH_ALG_UNDEFINED) || (is_ecdh && ((hash_algo == HASH_ALG_DSTU7564_256) || (hash_algo == HASH_ALG_GOST34311)))) {
         return RET_CM_UNSUPPORTED_KEY_DERIVATION_FUNC_ALG;
     }
     dwk_params.deriveMechType = with_cofactor ? CKM::UKR::DSTU4145_ECDH_COFACTOR_DERIVE : CKM::UKR::DSTU4145_ECDH_DERIVE;
 
-    if (oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)) {
+    if (is_ecdh) {
+        if (
+            !oid_is_equal(OID_AES128_WRAP, oidWrapAlgo) && !oid_is_equal(OID_AES192_WRAP, oidWrapAlgo) &&
+            !oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)
+        ) return RET_CM_UNSUPPORTED_CIPHER_ALG;
+    }
+    else if (oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)) {
         dwk_params.kdf = CKD::UKR::KUPYNA256_KDF;
         dwk_params.deriveKeyType = CKK::UKR::KALYNA256;
         dwk_params.wrapKeyType = CKK::UKR::KALYNA256;
@@ -1123,6 +1159,27 @@ CM_ERROR CryptokiStorage::dhUnwrapKey (
         DEBUG_OUTCON(printf("CryptokiStorage::dhUnwrapKey(), unwrap key [%zu]\n", i));
 
         Buffer buf_sessionkey;
+        if (is_ecdh) {
+            const CM_ERROR cm_err = unwrapKeyEcdh(
+                keyInfo,
+                with_cofactor,
+                hash_algo,
+                oidWrapAlgo,
+                abaSpkis[i],
+                (abaSalts) ? abaSalts[i] : nullptr,
+                abaWrappedKeys[i],
+                buf_sessionkey
+            );
+            if (cm_err != RET_OK) {
+                SET_ERROR(cm_err);
+            }
+            aba_sessionkeys[i] = bufferToBa(buf_sessionkey);
+            if (aba_sessionkeys[i] == nullptr) {
+                SET_ERROR(RET_CM_GENERAL_ERROR);
+            }
+            continue;
+        }
+
         CM_ERROR cm_err = unwrapKeyDstuRaw(
             keyInfo,
             dwk_params,
@@ -1442,7 +1499,7 @@ CM_ERROR CryptokiStorage::getSupportedMechanisms (
     //  Asym algos
     bool is_dstu4145 = false;
     bool is_ecdsa = false;
-    bool is_rsa = false;
+    bool is_rsa = false, is_rsapss = false;
     //  Sign algos
     bool dstu_signalgos[4]  = { false, false, false, false };
     bool ecdsa_signalgos[9] = { false, false, false, false, false, false, false, false, false };
@@ -1474,6 +1531,7 @@ CM_ERROR CryptokiStorage::getSupportedMechanisms (
 
         //  RSA
         if (it == CKM::RSA_PKCS) is_rsa = true;
+        if (it == CKM_RSA_PKCS_PSS) is_rsapss = true;
         if (it == CKM::RSA_WITH_SHA1)       rsa_signalgos[0] = true;
         if (it == CKM::RSA_WITH_SHA224)     rsa_signalgos[1] = true;
         if (it == CKM::RSA_WITH_SHA256)     rsa_signalgos[2] = true;
@@ -1575,6 +1633,14 @@ CM_ERROR CryptokiStorage::getSupportedMechanisms (
             if (rsa_signalgos[7]) signalgos_rsa.push_back(string(OID_RSA_WITH_SHA3_384));
             if (rsa_signalgos[8]) signalgos_rsa.push_back(string(OID_RSA_WITH_SHA3_512));
             if (rsa_signalgos[5]) signalgos_rsa.push_back(string(OID_RSA_WITH_SHA3_224));
+        }
+
+        //  RSASSA-PSS: by the mechanism that signs a hash
+        if (is_rsapss) {
+            ck_err = helper.getMechanismInfo(slotId, CKM_RSA_PKCS_PSS, mech_info);
+            if ((ck_err == CKR_OK) && (mech_info.flags & CKF_SIGN)) {
+                m_SupportedSignAlgos.rsa.push_back(string(OID_RSA_PSS));
+            }
         }
     }
 
@@ -1703,6 +1769,202 @@ CM_ERROR CryptokiStorage::unwrapKeyDstuRaw (
     if (ret != 0) return RET_CM_INVALID_WRAPPED_KEY;
 
     return bufferFromBa(sba_sessionkey.get(), bufSessionKey) ? 0 : RET_CM_GENERAL_ERROR;
+}
+
+CM_ERROR CryptokiStorage::decrypt (
+        const KeyInfo& keyInfo,
+        const CM_BYTEARRAY* baAlgorithmIdentifier,
+        const CM_BYTEARRAY* baSource,
+        CM_BYTEARRAY** baDest
+)
+{
+    if (keyInfo.keyAlgo != KeyAlgo::RSA) return RET_CM_UNSUPPORTED_ALG;
+
+    SmartBA sba_label, sba_params;
+    char* s_oid = nullptr;
+    HashAlg hash_algo = HASH_ALG_UNDEFINED;
+    bool is_oaep = false;
+    int ret = key_trans_decode_algid((const ByteArray*)baAlgorithmIdentifier, &s_oid, &sba_params);
+    if (ret == RET_OK) {
+        ret = key_trans_parse_algo(s_oid, sba_params.get(), &is_oaep, &hash_algo, &sba_label);
+    }
+    ::free(s_oid);
+    if (ret != RET_OK) return (ret == RET_CM_UNSUPPORTED_ALG) ? RET_CM_UNSUPPORTED_ALG : RET_CM_INVALID_PARAMETER;
+
+    CK_MECHANISM mech_param = { CKM_RSA_PKCS, NULL_PTR, 0 };
+    CK_RSA_PKCS_OAEP_PARAMS oaep_params = { 0, 0, CKZ_DATA_SPECIFIED, NULL_PTR, 0 };
+    if (is_oaep) {
+        switch (hash_algo) {
+        case HASH_ALG_SHA1:     oaep_params.hashAlg = CKM_SHA_1;    oaep_params.mgf = CKG_MGF1_SHA1;     break;
+        case HASH_ALG_SHA224:   oaep_params.hashAlg = CKM_SHA224;   oaep_params.mgf = CKG_MGF1_SHA224;   break;
+        case HASH_ALG_SHA256:   oaep_params.hashAlg = CKM_SHA256;   oaep_params.mgf = CKG_MGF1_SHA256;   break;
+        case HASH_ALG_SHA384:   oaep_params.hashAlg = CKM_SHA384;   oaep_params.mgf = CKG_MGF1_SHA384;   break;
+        case HASH_ALG_SHA512:   oaep_params.hashAlg = CKM_SHA512;   oaep_params.mgf = CKG_MGF1_SHA512;   break;
+        case HASH_ALG_SHA3_224: oaep_params.hashAlg = CKM_SHA3_224; oaep_params.mgf = CKG_MGF1_SHA3_224; break;
+        case HASH_ALG_SHA3_256: oaep_params.hashAlg = CKM_SHA3_256; oaep_params.mgf = CKG_MGF1_SHA3_256; break;
+        case HASH_ALG_SHA3_384: oaep_params.hashAlg = CKM_SHA3_384; oaep_params.mgf = CKG_MGF1_SHA3_384; break;
+        case HASH_ALG_SHA3_512: oaep_params.hashAlg = CKM_SHA3_512; oaep_params.mgf = CKG_MGF1_SHA3_512; break;
+        default:
+            return RET_CM_UNSUPPORTED_ALG;
+        }
+        if (!sba_label.empty()) {
+            oaep_params.pSourceData = (CK_VOID_PTR)sba_label.buf();
+            oaep_params.ulSourceDataLen = (CK_ULONG)sba_label.size();
+        }
+        mech_param.mechanism = CKM_RSA_PKCS_OAEP;
+        mech_param.pParameter = (CK_VOID_PTR)&oaep_params;
+        mech_param.ulParameterLen = (CK_ULONG)sizeof(oaep_params);
+    }
+
+    const Buffer buf_encrypted = bufferFromPtr(baSource->buf, baSource->len);
+    Buffer buf_decrypted;
+    if (buf_encrypted.empty()) return RET_CM_INVALID_PARAMETER;
+
+    const CK_RV ck_err = m_Session.decrypt(
+        keyInfo.hPrivateKey,
+        (CK_MECHANISM_PTR)&mech_param,
+        buf_encrypted,
+        buf_decrypted
+    );
+    switch (ck_err) {
+    case CKR_OK:
+        break;
+    case CKR_MECHANISM_INVALID:
+    case CKR_MECHANISM_PARAM_INVALID:
+    case CKR_KEY_FUNCTION_NOT_PERMITTED:
+    case CKR_KEY_TYPE_INCONSISTENT:
+        return toCmError(ck_err);
+    default:
+        //  Whatever is wrong with the encrypted key, the answer is the same
+        return RET_CM_INVALID_WRAPPED_KEY;
+    }
+
+    *baDest = (CM_BYTEARRAY*)bufferToBa(buf_decrypted);
+    return (*baDest) ? RET_OK : RET_CM_GENERAL_ERROR;
+}
+
+CM_ERROR CryptokiStorage::unwrapKeyEcdh (
+        const KeyInfo& keyInfo,
+        const bool withCofactor,
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const CM_BYTEARRAY* baSpki,
+        const CM_BYTEARRAY* baUkm,
+        const CM_BYTEARRAY* baWrappedKey,
+        Buffer& bufSessionKey
+)
+{
+    //  The public key of the originator: the EC point as it is in subjectPublicKey (04 || X || Y)
+    SmartBA sba_ecpoint;
+    {
+        SubjectPublicKeyInfo_t* spki = (SubjectPublicKeyInfo_t*)asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), (const ByteArray*)baSpki);
+        if (!spki) return RET_CM_DECODE_ASN1_ERROR;
+        const int ret = asn_BITSTRING2ba(&spki->subjectPublicKey, &sba_ecpoint);
+        asn_free(get_SubjectPublicKeyInfo_desc(), spki);
+        if (ret != RET_OK) return RET_CM_DECODE_ASN1_ERROR;
+    }
+    if ((sba_ecpoint.size() < 3) || (sba_ecpoint.buf()[0] != 0x04) || ((sba_ecpoint.size() % 2) != 1)) return RET_CM_INVALID_PARAM_DH;
+
+    const size_t kek_size = iso15946_kek_size(oidWrapAlgo);
+    if (kek_size == 0) return RET_CM_UNSUPPORTED_CIPHER_ALG;
+
+    const CK_MECHANISM_TYPE derive_mech = withCofactor ? CKM_ECDH1_COFACTOR_DERIVE : CKM_ECDH1_DERIVE;
+    const CK_OBJECT_CLASS obj_type = CKO::SECRET_KEY;
+
+    //  1) The shared secret from the token, the KDF and the key unwrap in the library
+    {
+        const CK_ULONG len_sharedsecret = (CK_ULONG)((sba_ecpoint.size() - 1) / 2);
+        CK_ECDH1_DERIVE_PARAMS derive_params = {
+            CKD_NULL, 0, NULL_PTR, (CK_ULONG)sba_ecpoint.size(), (CK_BYTE_PTR)sba_ecpoint.buf()
+        };
+        const CK_MECHANISM mech_param = { derive_mech, (CK_VOID_PTR)&derive_params, sizeof(derive_params) };
+        const CK_KEY_TYPE key_type = (CK_KEY_TYPE)CKK::GENERIC_SECRET;
+        const vector<CK_ATTRIBUTE> derivekey_attrs = {
+            { CKA::CLASS,       (CK_VOID_PTR)&obj_type,         sizeof(obj_type) },
+            { CKA::KEY_TYPE,    (CK_VOID_PTR)&key_type,         sizeof(key_type) },
+            { CKA::SENSITIVE,   (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) },
+            { CKA::EXTRACTABLE, (CK_VOID_PTR)&ATTRIBUTE_TRUE,   sizeof(ATTRIBUTE_TRUE) },
+            { CKA::VALUE_LEN,   (CK_VOID_PTR)&len_sharedsecret, sizeof(len_sharedsecret) },
+            { CKA::TOKEN,       (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) }
+        };
+
+        Buffer buf_sharedsecret;
+        CK_OBJECT_HANDLE h_secret = (CK_OBJECT_HANDLE)-1;
+        CK_RV ck_err = m_Session.deriveKey((CK_MECHANISM_PTR)&mech_param, keyInfo.hPrivateKey, derivekey_attrs, h_secret);
+        if (ck_err == CKR_OK) {
+            ck_err = m_Session.getAttributeBuffer(h_secret, CKA::VALUE, buf_sharedsecret);
+            (void)m_Session.destroyObject(h_secret);
+        }
+        if ((ck_err == CKR_OK) && !buf_sharedsecret.empty()) {
+            SmartBA sba_kek, sba_sharedsecret, sba_sessionkey;
+            if (!sba_sharedsecret.set(bufferToBa(buf_sharedsecret))) return RET_CM_GENERAL_ERROR;
+
+            int ret = iso15946_generate_secretc(hashAlgo, oidWrapAlgo, (const ByteArray*)baUkm, sba_sharedsecret.get(), &sba_kek);
+            if (ret != RET_OK) return RET_CM_GENERAL_ERROR;
+
+            AesCtx* aes = aes_alloc();
+            if (!aes) return RET_CM_GENERAL_ERROR;
+            ret = aes_init_wrap(aes, sba_kek.get(), nullptr);
+            if (ret == RET_OK) {
+                ret = aes_decrypt(aes, (const ByteArray*)baWrappedKey, &sba_sessionkey);
+            }
+            aes_free(aes);
+            if (ret != RET_OK) return RET_CM_INVALID_WRAPPED_KEY;
+
+            return bufferFromBa(sba_sessionkey.get(), bufSessionKey) ? RET_OK : RET_CM_GENERAL_ERROR;
+        }
+    }
+
+    //  2) The token does not give the shared secret out: the KDF and the key unwrap on the token
+    CK_EC_KDF_TYPE kdf = 0;
+    switch (hashAlgo) {
+    case HASH_ALG_SHA1:     kdf = CKD_SHA1_KDF;     break;
+    case HASH_ALG_SHA224:   kdf = CKD_SHA224_KDF;   break;
+    case HASH_ALG_SHA256:   kdf = CKD_SHA256_KDF;   break;
+    case HASH_ALG_SHA384:   kdf = CKD_SHA384_KDF;   break;
+    case HASH_ALG_SHA512:   kdf = CKD_SHA512_KDF;   break;
+    default:
+        return RET_CM_UNSUPPORTED_KEY_DERIVATION_FUNC_ALG;
+    }
+
+    SmartBA sba_sharedinfo;
+    if (iso15946_encode_sharedinfo(oidWrapAlgo, (const ByteArray*)baUkm, (int)(kek_size * 8), &sba_sharedinfo) != RET_OK) return RET_CM_GENERAL_ERROR;
+
+    CK_ECDH1_DERIVE_PARAMS derive_params = {
+        kdf, (CK_ULONG)sba_sharedinfo.size(), (CK_BYTE_PTR)sba_sharedinfo.buf(), (CK_ULONG)sba_ecpoint.size(), (CK_BYTE_PTR)sba_ecpoint.buf()
+    };
+    const CK_MECHANISM mech_derive = { derive_mech, (CK_VOID_PTR)&derive_params, sizeof(derive_params) };
+    const CK_KEY_TYPE key_type_aes = CKK_AES;
+    const CK_ULONG len_kek = (CK_ULONG)kek_size;
+    const vector<CK_ATTRIBUTE> kek_attrs = {
+        { CKA::CLASS,       (CK_VOID_PTR)&obj_type,         sizeof(obj_type) },
+        { CKA::KEY_TYPE,    (CK_VOID_PTR)&key_type_aes,     sizeof(key_type_aes) },
+        { CKA::VALUE_LEN,   (CK_VOID_PTR)&len_kek,          sizeof(len_kek) },
+        { CKA::UNWRAP,      (CK_VOID_PTR)&ATTRIBUTE_TRUE,   sizeof(ATTRIBUTE_TRUE) },
+        { CKA::TOKEN,       (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) }
+    };
+    CK_OBJECT_HANDLE h_kek = (CK_OBJECT_HANDLE)-1;
+    CK_RV ck_err = m_Session.deriveKey((CK_MECHANISM_PTR)&mech_derive, keyInfo.hPrivateKey, kek_attrs, h_kek);
+    if (ck_err != CKR_OK) return toCmError(ck_err);
+
+    const Buffer buf_wrappedkey = bufferFromPtr(baWrappedKey->buf, baWrappedKey->len);
+    const CK_KEY_TYPE key_type_secret = (CK_KEY_TYPE)CKK::GENERIC_SECRET;
+    const vector<CK_ATTRIBUTE> unwrappedkey_attrs = {
+        { CKA::CLASS,       (CK_VOID_PTR)&obj_type,         sizeof(obj_type) },
+        { CKA::KEY_TYPE,    (CK_VOID_PTR)&key_type_secret,  sizeof(key_type_secret) },
+        { CKA::SENSITIVE,   (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) },
+        { CKA::EXTRACTABLE, (CK_VOID_PTR)&ATTRIBUTE_TRUE,   sizeof(ATTRIBUTE_TRUE) },
+        { CKA::TOKEN,       (CK_VOID_PTR)&ATTRIBUTE_FALSE,  sizeof(ATTRIBUTE_FALSE) }
+    };
+    const CK_MECHANISM mech_unwrap = { CKM_AES_KEY_WRAP, NULL_PTR, 0 };
+    CK_OBJECT_HANDLE h_unwrappedkey = (CK_OBJECT_HANDLE)-1;
+    ck_err = m_Session.unwrapKey((CK_MECHANISM_PTR)&mech_unwrap, h_kek, buf_wrappedkey, unwrappedkey_attrs, h_unwrappedkey);
+    (void)m_Session.destroyObject(h_kek);
+    if (ck_err != CKR_OK) return RET_CM_INVALID_WRAPPED_KEY;
+
+    ck_err = m_Session.getAttributeBuffer(h_unwrappedkey, CKA::VALUE, bufSessionKey);
+    (void)m_Session.destroyObject(h_unwrappedkey);
+    return toCmError(ck_err);
 }
 
 CM_ERROR CryptokiStorage::unwrapKeyOnToken (
@@ -2025,7 +2287,8 @@ cleanup:
 
 HashAlg CryptokiStorage::hashAlgBySignAlgo (
         const KeyInfo& keyInfo,
-        const string& signAlgo
+        const string& signAlgo,
+        const CM_BYTEARRAY* baSignAlgoParams
 )
 {
     (void)keyInfo;
@@ -2037,7 +2300,27 @@ HashAlg CryptokiStorage::hashAlgBySignAlgo (
         rv_hashalg = hash_from_oid(signAlgo.c_str());
     }
     else {
-        DEBUG_OUTCON(puts("TODO: CryptokiStorage::hashAlgBySignAlgo(): hash_from_rsa_pss(signAlgoParams, &hash_alg)"));
+        //  RSASSA-PSS-params (RFC 4055, 3.1): SEQUENCE { [0] { SEQUENCE { OID hash, ... } } DEFAULT sha1, ... }
+        const uint8_t* buf = ba_get_buf_const((const ByteArray*)baSignAlgoParams);
+        const size_t len = ba_get_len((const ByteArray*)baSignAlgoParams);
+        if ((len < 2) || (buf[0] != 0x30)) return HASH_ALG_UNDEFINED;
+        size_t pos = 1;
+        pos += (buf[pos] & 0x80) ? (size_t)(buf[pos] & 0x7F) + 1 : 1;
+        if ((pos >= len) || (buf[pos] != 0xA0)) return HASH_ALG_SHA1;
+        //  [0], then SEQUENCE of AlgorithmIdentifier: the lengths are short (an OID and NULL)
+        if ((pos + 6 > len) || (buf[pos + 1] & 0x80) || (buf[pos + 2] != 0x30) || (buf[pos + 3] & 0x80)
+            || (buf[pos + 4] != 0x06) || (pos + 6 + buf[pos + 5] > len)) return HASH_ALG_UNDEFINED;
+        SmartBA sba_oid;
+        char* s_oid = nullptr;
+        OBJECT_IDENTIFIER_t* oid = nullptr;
+        if (sba_oid.set(ba_alloc_from_uint8(buf + pos + 4, (size_t)buf[pos + 5] + 2))) {
+            oid = (OBJECT_IDENTIFIER_t*)asn_decode_ba_with_alloc(get_OBJECT_IDENTIFIER_desc(), sba_oid.get());
+        }
+        if (oid && (asn_oid_to_text(oid, &s_oid) == RET_OK)) {
+            rv_hashalg = hash_from_oid(s_oid);
+        }
+        asn_free(get_OBJECT_IDENTIFIER_desc(), oid);
+        ::free(s_oid);
     }
     return rv_hashalg;
 }

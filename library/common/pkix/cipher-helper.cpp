@@ -28,7 +28,9 @@
 #define FILE_MARKER "common/pkix/cipher-helper.cpp"
 
 #include "cipher-helper.h"
+#include "aes.h"
 #include "dstu7624.h"
+#include "oids.h"
 #include "gost28147.h"
 #include "macros-internal.h"
 #include "uapki-errors.h"
@@ -40,6 +42,111 @@ using namespace UapkiNS;
 
 
 static const char* SHEX_GOST28147_SBOX_ID_1 = "A9D6EB45F13C708280C4967B231F5EADF658EBA4C037291D38D96BF025CA4E17F8E9720DC615B43A28975F0BC1DEA36438B564EA2C179FD0123E6DB8FAC57904";
+
+
+size_t Cipher::Aes::keySize (const string& algo)
+{
+    if (algo == string(OID_AES128_CBC_PAD)) return 16;
+    if (algo == string(OID_AES192_CBC_PAD)) return 24;
+    if (algo == string(OID_AES256_CBC_PAD)) return 32;
+    return 0;
+}
+
+int Cipher::Aes::cryptData (const AlgorithmIdentifier& algoId, const ByteArray* baKey,
+    const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut)
+{
+    int ret = RET_OK;
+    SmartBA sba_iv, sba_padded, sba_out;
+    AesCtx* ctx = nullptr;
+    const size_t key_size = keySize(algoId.algorithm);
+    const size_t len_in = ba_get_len(baDataIn);
+
+    if (key_size == 0) {
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+    }
+    if ((ba_get_len(baKey) != key_size) || !baDataOut) {
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
+
+    DO(decodeParams(algoId.baParameters, &sba_iv));
+    CHECK_NOT_NULL(ctx = aes_alloc());
+    DO(aes_init_cbc(ctx, baKey, sba_iv.get()));
+
+    if (direction == Direction::ENCRYPT) {
+        //  The padding: 1..16 bytes with the value of their number
+        const size_t len_pad = SIZE_IV - (len_in % SIZE_IV);
+        if (!sba_padded.set(ba_alloc_by_len(len_in + len_pad))) {
+            SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+        }
+        if (len_in > 0) {
+            memcpy(sba_padded.buf(), ba_get_buf_const(baDataIn), len_in);
+        }
+        memset(sba_padded.buf() + len_in, (int)len_pad, len_pad);
+        DO(aes_encrypt(ctx, sba_padded.get(), baDataOut));
+    }
+    else {
+        if ((len_in == 0) || (len_in % SIZE_IV != 0)) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+        DO(aes_decrypt(ctx, baDataIn, &sba_out));
+        const uint8_t* out = sba_out.buf();
+        const size_t len_pad = out[len_in - 1];
+        if ((sba_out.size() != len_in) || (len_pad == 0) || (len_pad > SIZE_IV)) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+        for (size_t i = len_in - len_pad; i < len_in; i++) {
+            if (out[i] != (uint8_t)len_pad) {
+                SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+            }
+        }
+        CHECK_NOT_NULL(*baDataOut = ba_alloc_from_uint8(out, len_in - len_pad));
+    }
+
+cleanup:
+    aes_free(ctx);
+    return ret;
+}
+
+int Cipher::Aes::decodeParams (const ByteArray* baEncoded, ByteArray** baIV)
+{
+    //  AES-IV ::= OCTET STRING (SIZE(16))
+    const uint8_t* buf = ba_get_buf_const(baEncoded);
+    if ((ba_get_len(baEncoded) != SIZE_IV + 2) || (buf[0] != 0x04) || (buf[1] != SIZE_IV)) return RET_UAPKI_INVALID_STRUCT;
+
+    *baIV = ba_alloc_from_uint8(buf + 2, SIZE_IV);
+    return (*baIV) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int Cipher::Aes::encodeParams (const ByteArray* baIV, ByteArray** baEncoded)
+{
+    if (ba_get_len(baIV) != SIZE_IV) return RET_UAPKI_INVALID_PARAMETER;
+
+    uint8_t buf[SIZE_IV + 2] = { 0x04, (uint8_t)SIZE_IV };
+    memcpy(buf + 2, ba_get_buf_const(baIV), SIZE_IV);
+    *baEncoded = ba_alloc_from_uint8(buf, sizeof(buf));
+    return (*baEncoded) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int Cipher::Aes::generateKey (const size_t keyLen, ByteArray** baKey)
+{
+    return aes_generate_key(keyLen, baKey);
+}
+
+int Cipher::Aes::generateIV (ByteArray** baIV)
+{
+    int ret = RET_OK;
+    ByteArray* ba_iv = nullptr;
+
+    CHECK_NOT_NULL(ba_iv = ba_alloc_by_len(SIZE_IV));
+    DO(drbg_random(ba_iv));
+
+    *baIV = ba_iv;
+    ba_iv = nullptr;
+
+cleanup:
+    ba_free(ba_iv);
+    return ret;
+}
 
 
 int Cipher::Dstu7624::cryptData (const AlgorithmIdentifier& algoId, const ByteArray* baKey,

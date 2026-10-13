@@ -1216,6 +1216,37 @@ CK_RV Session::setAttributeText (
     return setAttributeValue(hObject, (CK_ATTRIBUTE_PTR)&template_label);
 }
 
+CK_RV Session::decrypt (
+        const CK_OBJECT_HANDLE hObject,
+        const CK_MECHANISM_PTR pMechParam,
+        const Buffer& encryptedData,
+        Buffer& data
+)
+{
+    data.clear();
+
+    m_LastResult = getApi()->C_DecryptInit(m_Handle, pMechParam, hObject);
+    if (m_LastResult != CKR_OK) return m_LastResult;
+
+    //  The decrypted data is not longer than the encrypted one
+    CK_ULONG len_data = (CK_ULONG)encryptedData.size();
+    data.resize((size_t)len_data);
+    m_LastResult = getApi()->C_Decrypt(
+        m_Handle,
+        (CK_BYTE_PTR)encryptedData.data(),
+        (CK_ULONG)encryptedData.size(),
+        (CK_BYTE_PTR)data.data(),
+        &len_data
+    );
+    if (m_LastResult == CKR_OK) {
+        data.resize((size_t)len_data);
+    }
+    else {
+        data.clear();
+    }
+    return m_LastResult;
+}
+
 CK_RV Session::signHash (
         const CK_OBJECT_HANDLE hObject,
         const CK_MECHANISM_PTR pMechParam,

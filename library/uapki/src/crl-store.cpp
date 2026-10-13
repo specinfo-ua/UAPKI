@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -144,12 +144,22 @@ int CrlStore::addCrl (
     isUnique = (added_item == parsed_item);
     if (isUnique) {
         parsed_item = nullptr;
+        added_item->markToRemove(!permanent);
+        markObsolete(added_item);
+    }
+    else if (permanent) {
+        //  The CRL is already in the store: a permanent addition keeps a temporary one
+        added_item->markToRemove(false);
     }
     if (crlItem) {
         *crlItem = added_item;
     }
 
-    if (isUnique && permanent && !m_Path.empty()) {
+    //  A new CRL or one that was temporary; not an obsolete one (a newer CRL of its scope is in the store)
+    if (
+        permanent && !m_Path.empty() && added_item->getFileName().empty() &&
+        (added_item->getActuality() != CrlItem::Actuality::OBSOLETE)
+    ) {
         if (added_item->setFileName(added_item->generateFileName())) {
             ret = added_item->saveToFile(m_Path);
         }
@@ -323,7 +333,7 @@ int CrlStore::removeCrl (
     }
 
     for (auto& it : items) {
-        if (it->getActuality() == CrlItem::Actuality::OBSOLETE) {
+        if ((it->getActuality() == CrlItem::Actuality::OBSOLETE) || (!baCrlId && it->isMarkedToRemove())) {
             deleting_items.push_back(it);
         }
         else {
@@ -333,7 +343,7 @@ int CrlStore::removeCrl (
 
     m_Items = items2;
     for (auto& it : deleting_items) {
-        if (permanent) {
+        if (permanent && !it->getFileName().empty()) {
             const string s_fullpath = m_Path + it->getFileName();
             (void)delete_file(s_fullpath.c_str());
         }
@@ -433,25 +443,72 @@ int CrlStore::loadDir (void)
     return removeObsolete();
 }
 
+//  The CRLs of one scope supersede each other: the issuer key, the segment (issuingDistributionPoint),
+//  for a full CRL its freshest-CRL location, for a delta CRL its base CRL number
+static string crl_scope (
+        const CrlItem* crlItem
+)
+{
+    string s_id = Util::baToHex(crlItem->getAuthorityKeyId());
+    if (s_id.empty()) return s_id;
+    if (crlItem->getIdp().present) {
+        s_id += "-" + crlItem->getIdp().encoded;
+    }
+    if (crlItem->getType() == Type::FULL) {
+        s_id = "F-" + s_id;
+        if (!crlItem->getUris().deltaCrl.empty()) {
+            s_id += "-" + crlItem->getUris().deltaCrl[0];
+        }
+    }
+    else {
+        const string s_deltacrl = Util::baToHex(crlItem->getDeltaCrl());
+        if (s_deltacrl.empty()) return string();
+        s_id = "D-" + s_id + "-" + s_deltacrl;
+    }
+    return s_id;
+}   //  crl_scope
+
+void CrlStore::markObsolete (
+        CrlItem* crlItem
+)
+{
+    const string s_scope = crl_scope(crlItem);
+    if (s_scope.empty()) return;
+
+    for (auto& it : m_Items) {
+        if ((it == crlItem) || (it->getActuality() == CrlItem::Actuality::OBSOLETE)) continue;
+        if (crl_scope(it) != s_scope) continue;
+
+        CrlItem* obsolete_item = nullptr;
+        if (it->getThisUpdate() < crlItem->getThisUpdate()) {
+            obsolete_item = it;
+        }
+        else if (it->getThisUpdate() > crlItem->getThisUpdate()) {
+            obsolete_item = crlItem;
+        }
+        if (!obsolete_item) continue;
+
+        obsolete_item->setActuality(CrlItem::Actuality::OBSOLETE);
+        if (!m_Path.empty() && !obsolete_item->getFileName().empty()) {
+            const string s_fullpath = m_Path + obsolete_item->getFileName();
+            (void)delete_file(s_fullpath.c_str());
+            (void)obsolete_item->setFileName(string());
+        }
+        if (obsolete_item == crlItem) break;
+    }
+}
+
 int CrlStore::removeObsolete (void)
 {
     //  Build maps and list
     map<string, CrlItem*> map_fullcrls, map_deltacrls;
     vector<CrlItem*> deleting_items;
     for (const auto& it : m_Items) {
-        string s_id = Util::baToHex(it->getAuthorityKeyId());
-        if (s_id.empty()) continue;
         //  Each segment of a segmented CRL keeps its own freshest CRL
-        if (it->getIdp().present) {
-            s_id += "-" + it->getIdp().encoded;
-        }
+        const string s_id = crl_scope(it);
+        if (s_id.empty()) continue;
 
         if (it->getType() == Type::FULL) {
-            //  Check unique CRL-files
-            if (!it->getUris().deltaCrl.empty()) {
-                s_id += "-" + it->getUris().deltaCrl[0];
-            }
-
             auto it_value = map_fullcrls.find(s_id);
             if (it_value == map_fullcrls.end()) {
                 map_fullcrls.insert(pair<string, CrlItem*>(s_id, it));
@@ -465,11 +522,6 @@ int CrlStore::removeObsolete (void)
             }
         }
         else {
-            //  Check unique CRL-files
-            const string s_deltacrl = Util::baToHex(it->getDeltaCrl());
-            if (s_deltacrl.empty()) continue;
-
-            s_id += "-" + s_deltacrl;
             auto it_value = map_deltacrls.find(s_id);
             if (it_value == map_deltacrls.end()) {
                 map_deltacrls.insert(pair<string, CrlItem*>(s_id, it));

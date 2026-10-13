@@ -203,6 +203,8 @@ public partial class Uapki
         public TimeStampInfo? ContentTS { get; init; }
         public TimeStampInfo? SignatureTS { get; init; }
         public TimeStampInfo? ArchiveTS { get; init; }
+        /// <summary>All the archive time-stamps (re-archiving), if there is more than one; ArchiveTS is the first</summary>
+        public List<TimeStampInfo>? ArchiveTimeStamps { get; init; }
         public string? StatusCertificateRefs { get; init; }
         public List<CertRefInfo>? CertificateRefs { get; init; }
         public List<string>? CertValues { get; init; }
@@ -244,11 +246,26 @@ public partial class Uapki
         // Content in the memory of this process: address (hex, big-endian) and size
         public string? Ptr { get; init; }
         public ulong? Size { get; init; }
+        // Content is the hash of the data (AUGMENT_CMS, VERIFY)
+        public bool? IsDigest { get; init; }
     }
 
+    /// <summary>
+    /// The options of the VERIFY method; a property that is null is not sent (the default of the library)
+    /// </summary>
     public class ValidationOptions
     {
+        /// <summary>"FULL", "CHAIN", "STRUCT"</summary>
         public string? ValidationType { get; init; }
+        /// <summary>Use CRLs only (by default as "validationByCrl" of INIT)</summary>
+        public bool? OnlyCrl { get; init; }
+        /// <summary>Verify one signer (the first index is 0); null - all signers</summary>
+        public int? VerifySignerInfoIndex { get; init; }
+        /// <summary>A certificate with an unknown critical extension is unusable (RFC 5280, 4.2); default false</summary>
+        public bool? CheckCriticalExtensions { get; init; }
+        /// <summary>The CAs remove the expired certificates from the revocation data (RFC 5280, 3.3): data issued after
+        /// a certificate expired does not prove it is not revoked; default false</summary>
+        public bool? CaRemovesExpiredCerts { get; init; }
     }
 
     private class VerifyParams
@@ -260,6 +277,14 @@ public partial class Uapki
 
     public ValidationResult Verify(byte[] signature, byte[]? content, string validationType = "FULL")
     {
+        return Verify(signature, content, new ValidationOptions() { ValidationType = validationType });
+    }
+
+    /// <summary>
+    /// Verifies a signature with all the options of the VERIFY method
+    /// </summary>
+    public ValidationResult Verify(byte[] signature, byte[]? content, ValidationOptions options)
+    {
         var parameters = new VerifyParams()
         {
             Signature = new SignedData()
@@ -267,7 +292,7 @@ public partial class Uapki
                 Bytes = signature,
                 Content = content
             },
-            Options = new() { ValidationType = validationType }
+            Options = options
         };
 
         string verify_cmd = Request("VERIFY", parameters, jsonCtx.VerifyParams);
@@ -293,13 +318,22 @@ public partial class Uapki
     /// </summary>
     public ValidationResult Verify(byte[] signature, IntPtr content, ulong contentSize, string validationType = "FULL")
     {
+        return Verify(signature, content, contentSize, new ValidationOptions() { ValidationType = validationType });
+    }
+
+    /// <summary>
+    /// Verifies a signature without encapsulated content against content in the memory of this process,
+    /// with all the options of the VERIFY method
+    /// </summary>
+    public ValidationResult Verify(byte[] signature, IntPtr content, ulong contentSize, ValidationOptions options)
+    {
         var address = (ulong)content.ToInt64();
         var ptr = IntPtr.Size == 8 ? address.ToString("X16") : ((uint)address).ToString("X8");
 
         return VerifyRequest(new VerifyParams()
         {
             Signature = new SignedData() { Bytes = signature, Ptr = ptr, Size = contentSize },
-            Options = new() { ValidationType = validationType },
+            Options = options,
             ReturnContent = false
         });
     }
@@ -310,10 +344,18 @@ public partial class Uapki
     /// </summary>
     public ValidationResult VerifyDetached(byte[] signature, string contentFile, string validationType = "FULL")
     {
+        return VerifyDetached(signature, contentFile, new ValidationOptions() { ValidationType = validationType });
+    }
+
+    /// <summary>
+    /// Verifies a detached signature against a content file, with all the options of the VERIFY method
+    /// </summary>
+    public ValidationResult VerifyDetached(byte[] signature, string contentFile, ValidationOptions options)
+    {
         return VerifyRequest(new VerifyParams()
         {
             Signature = new SignedData() { Bytes = signature, File = contentFile },
-            Options = new() { ValidationType = validationType },
+            Options = options,
             ReturnContent = false
         });
     }

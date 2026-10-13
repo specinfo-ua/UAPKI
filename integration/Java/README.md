@@ -166,6 +166,23 @@ try (FileChannel channel = FileChannel.open(Path.of("contract.pdf"))) {
 }
 ```
 
+`verify` and `verifyDetached` also take a `ValidationOptions` with all the options of the VERIFY method
+(`validationType`, `onlyCrl`, `verifySignerInfoIndex`, `checkCriticalExtensions`, `caRemovesExpiredCerts`); a field left null is not sent.
+
+```java
+ValidationResult strict = uapki.verifyDetached(signatures.get(0), "contract.pdf",
+        new ValidationOptions("FULL").setCheckCriticalExtensions(true));
+```
+
+`augmentCms` and `augmentCmsDetached` augment a CAdES signature to `CADES_T`, `CADES_B_LT` or `CADES_B_LTA`
+(method AUGMENT_CMS). If the validation before the augmentation does not give TOTAL-VALID, the result has no
+`bytes`, `errorCode` is NOT_ALLOWED and `signatureInfos` explain why.
+
+```java
+AugmentResult lta = uapki.augmentCmsDetached(signature, "contract.pdf", SignatureFormat.CADES_B_LTA,
+        new AugmentOptions().setRevocationFreshness(0), null);
+```
+
 ## Migration from the old API (com.sit.uapki)
 
 The old integration (`com.sit.uapki`, Java 1.7, one class per method in `com.sit.uapki.method`) is replaced

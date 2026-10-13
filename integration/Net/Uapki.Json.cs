@@ -58,6 +58,8 @@ public partial class Uapki
     [JsonSerializable(typeof(SelectKeyResult))]
     [JsonSerializable(typeof(CertsListResult))]
     [JsonSerializable(typeof(CertInfoResult))]
+    [JsonSerializable(typeof(TrustListAddResult))]
+    [JsonSerializable(typeof(TrustListsResult))]
     [JsonSerializable(typeof(DigestParams))]
     [JsonSerializable(typeof(DigestResult))]
     [JsonSerializable(typeof(ListCertsParams))]
@@ -66,6 +68,9 @@ public partial class Uapki
     [JsonSerializable(typeof(SignResult))]
     [JsonSerializable(typeof(VerifyResult))]
     [JsonSerializable(typeof(VerifyParams))]
+    [JsonSerializable(typeof(EtsiVerifyResult))]
+    [JsonSerializable(typeof(EtsiVerifyParams))]
+    [JsonSerializable(typeof(ValidationPolicy))]
     [JsonSerializable(typeof(OpenKeyStorageLoginParams))]
     [JsonSerializable(typeof(BytesResult))]
     [JsonSerializable(typeof(CertsAddParams))]
@@ -80,6 +85,8 @@ public partial class Uapki
     [JsonSerializable(typeof(VerifyCsrResult))]
     [JsonSerializable(typeof(ModifyCmsParameters))]
     [JsonSerializable(typeof(ModifyCmsResponse))]
+    [JsonSerializable(typeof(AugmentParams))]
+    [JsonSerializable(typeof(AugmentResponse))]
 
     private partial class Json : JsonSerializerContext
     {

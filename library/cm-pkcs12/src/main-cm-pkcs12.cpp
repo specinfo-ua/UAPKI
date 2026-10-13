@@ -29,6 +29,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string>
 #include "cm-api.h"
@@ -43,7 +44,7 @@
 #include "rc-version.h"
 #else
 //  See cm-pkcs12\CMakeLists.txt
-#define STR_FILEVERSION "1.0.24"
+#define STR_FILEVERSION "1.1.0"
 #endif
 
 

@@ -31,6 +31,7 @@
 #include "cert-validator.h"
 #include "cipher-helper.h"
 #include "envelopeddata-helper.h"
+#include "iso15946.h"
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "store-json.h"
@@ -165,6 +166,18 @@ static int decrypt_content (
             eContentInfo.baEncryptedContent,
             baDecryptedContent
         ));
+    }
+    else if (Cipher::Aes::keySize(algo.algorithm) > 0) {
+        DO(Cipher::Aes::cryptData(
+            algo,
+            baSecretKey,
+            Cipher::Direction::DECRYPT,
+            eContentInfo.baEncryptedContent,
+            baDecryptedContent
+        ));
+    }
+    else {
+        SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
 
 cleanup:
@@ -307,6 +320,18 @@ static int parse_keyencryption_algo (
             SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
         }
     }
+    else if (iso15946_hash_from_oid_dhkdf(oidDhKdf.c_str(), nullptr) != HASH_ALG_UNDEFINED) {
+        //  dhSinglePass-(std|cofactor)DH-sha*kdf-scheme, its parameters are the key wrap algorithm (RFC 5753, 3.1.1)
+        if (!aidKeyEncryptionAlgo.baParameters) {
+            SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+        }
+
+        CHECK_NOT_NULL(aid = (AlgorithmIdentifier_t*)asn_decode_ba_with_alloc(get_AlgorithmIdentifier_desc(), aidKeyEncryptionAlgo.baParameters));
+        DO(Util::oidFromAsn1(&aid->algorithm, oidWrapAlgo));
+        if ((oidWrapAlgo != string(OID_AES128_WRAP)) && (oidWrapAlgo != string(OID_AES192_WRAP)) && (oidWrapAlgo != string(OID_AES256_WRAP))) {
+            SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
+        }
+    }
     else {
         SET_ERROR(RET_UAPKI_NOT_SUPPORTED);
     }
@@ -315,6 +340,72 @@ cleanup:
     asn_free(get_AlgorithmIdentifier_desc(), aid);
     return ret;
 }   //  parse_keyencryption_algo
+
+//  The recipient of a KeyTransRecipientInfo: its certificate and key identifier, the record in "recipientKeys"
+static int get_ktri_recipient (
+        Cert::CerStore& cerStore,
+        const Pkcs7::EnvelopedDataParser::KeyTransRecipientInfo& ktrInfo,
+        ExpectedCerts& expectedCerts,
+        JSON_Object* joRecipientKey,
+        ByteArray** baRecipKeyId
+)
+{
+    int ret = RET_OK;
+    Cert::CerItem* cer_recipient = nullptr;
+
+    if (ktrInfo.ridType == RecipientIdentifier_PR_issuerAndSerialNumber) {
+        DO_JSON(json_object_set_value(joRecipientKey, "issuer", json_value_init_object()));
+        DO(nameToJson(json_object_get_object(joRecipientKey, "issuer"), ktrInfo.baIssuer));
+        DO(json_object_set_hex(joRecipientKey, "serialNumber", ktrInfo.baSerialNumber));
+        DO(json_object_set_base64(joRecipientKey, "issuerBytes", ktrInfo.baIssuer));
+
+        ret = cerStore.getCertByIssuerAndSN(ktrInfo.baIssuer, ktrInfo.baSerialNumber, &cer_recipient);
+        if (ret == RET_OK) {
+            DO(json_object_set_base64(joRecipientKey, "certId", cer_recipient->getCertId()));
+            DO(json_object_set_hex(joRecipientKey, "keyId", cer_recipient->getKeyId()));
+            CHECK_NOT_NULL(*baRecipKeyId = ba_copy_with_alloc(cer_recipient->getKeyId(), 0, 0));
+        }
+        else if (ret == RET_UAPKI_CERT_NOT_FOUND) {
+            ret = expectedCerts.add(CertValidator::CertEntity::RECIPIENT, ktrInfo.baSerialNumber, ktrInfo.baIssuer);
+        }
+    }
+    else {
+        DO(json_object_set_hex(joRecipientKey, "keyId", ktrInfo.baSubjectKeyId));
+        CHECK_NOT_NULL(*baRecipKeyId = ba_copy_with_alloc(ktrInfo.baSubjectKeyId, 0, 0));
+    }
+
+cleanup:
+    return ret;
+}   //  get_ktri_recipient
+
+//  The content-encryption key is obtained: return it if it is asked, decrypt the content
+static int use_sessionkey (
+        const DecryptOptions& options,
+        const Pkcs7::EnvelopedDataParser& envDataParser,
+        const ByteArray* baSessionKey,
+        JSON_Object* joResult,
+        JSON_Object* joContent,
+        ByteArray** baDecrypted
+)
+{
+    int ret = RET_OK;
+
+    if (options.returnEncryptionKey) {
+        JSON_Object* jo_econtent = json_object_get_object(joResult, "encryptedContent");
+        if (!jo_econtent) {
+            DO_JSON(json_object_set_value(joResult, "encryptedContent", json_value_init_object()));
+            jo_econtent = json_object_get_object(joResult, "encryptedContent");
+        }
+        DO(json_object_set_base64(jo_econtent, "dataEncryptionKey", baSessionKey));
+    }
+    if (envDataParser.getEncryptedContentInfo().baEncryptedContent) {
+        DO(decrypt_content(envDataParser.getEncryptedContentInfo(), baSessionKey, baDecrypted));
+        DO(json_object_set_base64(joContent, "bytes", *baDecrypted));
+    }
+
+cleanup:
+    return ret;
+}   //  use_sessionkey
 
 static int result_recipientkey_to_json (
         JSON_Object* joResult,
@@ -386,6 +477,7 @@ int uapki_decrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
     JSON_Object* jo_content = nullptr;
     JSON_Object* jo_econtent = nullptr;
     size_t idx_recipkey = 0;
+    bool is_decrypted = false;
 
     if (!cer_store) return RET_UAPKI_GENERAL_ERROR;
 
@@ -501,7 +593,7 @@ int uapki_decrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
 
                 if (equal_recipekeyid(sba_recipekeyid.get(), rba_keyids[0], rba_keyids[1])) {
                     if (!options.noDecrypt) {
-                        if (sba_decrypted.empty() && rba_originatorspki) {
+                        if (!is_decrypted && rba_originatorspki) {
                             DO(storage->keyDhUnwrapKey(
                                 s_kdfalgo,
                                 s_keywrapalgo,
@@ -512,22 +604,44 @@ int uapki_decrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
                             ));
                             DEBUG_OUTCON(printf("storage->keyDhUnwrapKey(), vba_SessionKeys, hex: "); ba_print(stdout, sba_sessionkey.get()));
 
-                            if (options.returnEncryptionKey) {
-                                jo_econtent = json_object_get_object(joResult, "encryptedContent");
-                                if (!jo_econtent) {
-                                    DO_JSON(json_object_set_value(joResult, "encryptedContent", json_value_init_object()));
-                                    jo_econtent = json_object_get_object(joResult, "encryptedContent");
-                                }
-                                DO(json_object_set_base64(jo_econtent, "dataEncryptionKey", sba_sessionkey.get()));
-                            }
-                            if (envdata_parser.getEncryptedContentInfo().baEncryptedContent) {
-                                DO(decrypt_content(envdata_parser.getEncryptedContentInfo(), sba_sessionkey.get(), &sba_decrypted));
-                                DO(json_object_set_base64(jo_content, "bytes", sba_decrypted.get()));
-                            }
+                            DO(use_sessionkey(options, envdata_parser, sba_sessionkey.get(), joResult, jo_content, &sba_decrypted));
+                            is_decrypted = true;
                         }
                     }
                     DO(json_object_set_hex(joResult, "recipientKeyId", sba_recipekeyid.get()));
                 }
+            }
+        }
+        else if (envdata_parser.getRecipientInfoTypes()[idx_recip] == RecipientInfo_PR_ktri) {
+            Pkcs7::EnvelopedDataParser::KeyTransRecipientInfo ktr_info;
+            SmartBA sba_recipkeyid;
+
+            DO(envdata_parser.parseKeyTransRecipientInfo(idx_recip, ktr_info));
+
+            DO_JSON(json_array_append_value(ja_recipkeys, json_value_init_object()));
+            DO(get_ktri_recipient(
+                *cer_store,
+                ktr_info,
+                expected_certs,
+                json_array_get_object(ja_recipkeys, idx_recipkey++),
+                &sba_recipkeyid
+            ));
+
+            if (!sba_recipkeyid.empty() && equal_recipekeyid(sba_recipkeyid.get(), rba_keyids[0], rba_keyids[1])) {
+                if (!options.noDecrypt && !is_decrypted) {
+                    SmartBA sba_algid;
+                    DO(Util::encodeAlgorithmIdentifier(
+                        ktr_info.keyEncryptionAlgorithm.algorithm,
+                        ktr_info.keyEncryptionAlgorithm.baParameters,
+                        &sba_algid
+                    ));
+                    sba_sessionkey.clear();
+                    DO(storage->keyDecrypt(sba_algid.get(), ktr_info.baEncryptedKey, &sba_sessionkey));
+
+                    DO(use_sessionkey(options, envdata_parser, sba_sessionkey.get(), joResult, jo_content, &sba_decrypted));
+                    is_decrypted = true;
+                }
+                DO(json_object_set_hex(joResult, "recipientKeyId", sba_recipkeyid.get()));
             }
         }
     }
@@ -535,7 +649,7 @@ int uapki_decrypt (Context& context, JSON_Object* joParams, JSON_Object* joResul
     DO(expected_certs.toJson(joResult, "expectedCerts"));
 
     if (!options.noDecrypt) {
-        if (envdata_parser.getEncryptedContentInfo().baEncryptedContent && sba_decrypted.empty()) {
+        if (envdata_parser.getEncryptedContentInfo().baEncryptedContent && !is_decrypted) {
             ret = expected_certs.isPresent() ? RET_UAPKI_CERT_NOT_FOUND : RET_UAPKI_OTHER_RECIPIENT;
         }
     }

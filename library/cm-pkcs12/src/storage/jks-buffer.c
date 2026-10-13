@@ -158,8 +158,14 @@ int jks_buffer_read_data(JksBufferCtx *ctx, ByteArray **data)
     CHECK_PARAM(data != NULL);
 
     DO(jks_buffer_read_int(ctx, &len));
+    /* The length from the file: within the buffer; 0 is empty data (ba_copy_with_alloc would copy the rest) */
+    CHECK_PARAM(ba_get_len(ctx->buffer) - ctx->read_off >= len);
 
-    CHECK_NOT_NULL(*data = ba_copy_with_alloc(ctx->buffer, ctx->read_off, len));
+    if (len == 0) {
+        CHECK_NOT_NULL(*data = ba_alloc());
+    } else {
+        CHECK_NOT_NULL(*data = ba_copy_with_alloc(ctx->buffer, ctx->read_off, len));
+    }
 
     ctx->read_off += len;
 
@@ -178,6 +184,8 @@ int jks_buffer_read_string(JksBufferCtx *ctx, char **string)
     CHECK_PARAM(string != NULL);
 
     DO(jks_buffer_read_short(ctx, &string_len));
+    /* The length from the file: within the buffer */
+    CHECK_PARAM(ba_get_len(ctx->buffer) - ctx->read_off >= string_len);
 
     buffer = ba_get_buf(ctx->buffer);
 

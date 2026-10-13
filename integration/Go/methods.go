@@ -50,7 +50,10 @@ type CrlCacheConfig struct {
 
 // OcspConfig configures OCSP usage.
 type OcspConfig struct {
-	NonceLen int `json:"nonceLen,omitempty"`
+	NonceLen                 int     `json:"nonceLen,omitempty"`
+	CacheTime                *uint32 `json:"cacheTime,omitempty"`                // minutes a response without nextUpdate is cached; nil - 30
+	MaxFreshness             *uint32 `json:"maxFreshness,omitempty"`             // minutes, the freshness for VERIFY; nil - 120
+	ResponderCrlEmbedMaxSize *uint32 `json:"responderCrlEmbedMaxSize,omitempty"` // bytes, the largest CRL of a responder embedded into B-LT/B-LTA; nil - 10240
 }
 
 // TspConfig configures the time-stamp protocol client.
@@ -216,6 +219,118 @@ func (l *Library) Sign(signParams SignParams, docs []DataToSign) ([]SignedDoc, e
 
 // VerifyResult is the raw result of the VERIFY method.
 type VerifyResult = json.RawMessage
+
+// VerifyOptions are the options of the VERIFY method; a zero field is not sent
+// (the default of the library).
+type VerifyOptions struct {
+	ValidationType          string `json:"validationType,omitempty"`          // "FULL", "CHAIN", "STRUCT"
+	OnlyCrl                 *bool  `json:"onlyCrl,omitempty"`                 // CRLs only (default as validationByCrl of INIT)
+	VerifySignerInfoIndex   *int   `json:"verifySignerInfoIndex,omitempty"`   // one signer (the first index is 0); nil - all
+	CheckCriticalExtensions bool   `json:"checkCriticalExtensions,omitempty"` // an unknown critical extension makes a certificate unusable (RFC 5280, 4.2)
+	CaRemovesExpiredCerts   bool   `json:"caRemovesExpiredCerts,omitempty"`   // the CAs remove the expired certificates from the revocation data (RFC 5280, 3.3)
+}
+
+// VerifyWithOptions verifies a CAdES/CMS signature with all the options of the
+// VERIFY method. content may be nil for an attached (enveloped) signature.
+func (l *Library) VerifyWithOptions(signature, content []byte, options VerifyOptions) (VerifyResult, error) {
+	signatureParams := map[string]any{"bytes": signature}
+	if content != nil {
+		signatureParams["content"] = content
+	}
+	params := map[string]any{"signature": signatureParams, "options": options}
+	var result json.RawMessage
+	if err := l.Call("VERIFY", params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// VerifyDetachedWithOptions is VerifyDetached with all the options of the VERIFY method.
+func (l *Library) VerifyDetachedWithOptions(signature []byte, content Source, options VerifyOptions) (VerifyResult, error) {
+	signatureParams := content.params()
+	signatureParams["bytes"] = signature
+	params := map[string]any{
+		"signature":     signatureParams,
+		"returnContent": false,
+		"options":       options,
+	}
+	var result json.RawMessage
+	if err := l.Call("VERIFY", params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// AugmentOptions are the options of the AUGMENT_CMS method; a zero field is not
+// sent (the default of the library).
+type AugmentOptions struct {
+	RevocationFreshness     *uint32 `json:"revocationFreshness,omitempty"`     // minutes 0-120, 0 - always new data; nil - 120
+	OnlyCrl                 *bool   `json:"onlyCrl,omitempty"`                 // CRLs only (default as validationByCrl of INIT)
+	CheckCriticalExtensions bool    `json:"checkCriticalExtensions,omitempty"` // as in VERIFY
+	CaRemovesExpiredCerts   bool    `json:"caRemovesExpiredCerts,omitempty"`   // as in VERIFY
+}
+
+// AugmentResult is the result of AUGMENT_CMS: the augmented signature (nil if
+// not augmented) and the result of the validation of the augmented signers (for
+// CAdES-B-LT and CAdES-B-LTA, as signatureInfos of VERIFY).
+type AugmentResult struct {
+	Bytes          []byte          `json:"bytes,omitempty"`
+	SignatureInfos json.RawMessage `json:"signatureInfos,omitempty"`
+	Warnings       []string        `json:"warnings,omitempty"` // e.g. the CRL of an OCSP responder not embedded (size limit)
+}
+
+// AugmentCms augments a CAdES signature to "CAdES-T", "CAdES-B-LT" or
+// "CAdES-B-LTA" (method AUGMENT_CMS). content is the data of a detached
+// signature (its hash if isDigest), nil for an attached one; signerInfoIndex
+// nil - all signers. If the validation does not give TOTAL-VALID, the error
+// (NOT_ALLOWED) is returned together with the result that has SignatureInfos.
+func (l *Library) AugmentCms(signature, content []byte, format string, options AugmentOptions, signerInfoIndex *int, isDigest bool) (*AugmentResult, error) {
+	signatureParams := map[string]any{"bytes": signature}
+	if content != nil {
+		signatureParams["content"] = content
+	}
+	if isDigest {
+		signatureParams["isDigest"] = true
+	}
+	return l.augment(signatureParams, format, options, signerInfoIndex)
+}
+
+// AugmentCmsDetached is AugmentCms for a detached signature with the content in a
+// file or in memory (the library hashes it in place).
+func (l *Library) AugmentCmsDetached(signature []byte, content Source, format string, options AugmentOptions, signerInfoIndex *int) (*AugmentResult, error) {
+	signatureParams := content.params()
+	signatureParams["bytes"] = signature
+	return l.augment(signatureParams, format, options, signerInfoIndex)
+}
+
+func (l *Library) augment(signatureParams map[string]any, format string, options AugmentOptions, signerInfoIndex *int) (*AugmentResult, error) {
+	params := map[string]any{"signature": signatureParams, "signatureFormat": format, "options": options}
+	if signerInfoIndex != nil {
+		params["signerInfoIndex"] = *signerInfoIndex
+	}
+	request, err := json.Marshal(Request{Method: "AUGMENT_CMS", Parameters: params})
+	if err != nil {
+		return nil, fmt.Errorf("uapki: marshal request for %q: %w", "AUGMENT_CMS", err)
+	}
+	raw, err := l.Process(request)
+	if err != nil {
+		return nil, err
+	}
+	var response Response
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return nil, fmt.Errorf("uapki: unmarshal response of %q: %w", "AUGMENT_CMS", err)
+	}
+	var result AugmentResult
+	if len(response.Result) > 0 {
+		if err := json.Unmarshal(response.Result, &result); err != nil {
+			return nil, fmt.Errorf("uapki: unmarshal result of %q: %w", "AUGMENT_CMS", err)
+		}
+	}
+	if response.ErrorCode != 0 {
+		return &result, &Error{Code: response.ErrorCode, Message: response.ErrorText, Method: "AUGMENT_CMS"}
+	}
+	return &result, nil
+}
 
 // Verify verifies a CAdES/CMS signature. content may be nil for an
 // attached (enveloped) signature.

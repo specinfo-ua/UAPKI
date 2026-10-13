@@ -261,6 +261,9 @@ DEFINE_OID(OID_RSA_WITH_SHA3_256,   "2.16.840.1.101.3.4.3.14");
 DEFINE_OID(OID_RSA_WITH_SHA3_384,   "2.16.840.1.101.3.4.3.15");
 DEFINE_OID(OID_RSA_WITH_SHA3_512,   "2.16.840.1.101.3.4.3.16");
 DEFINE_OID(OID_RSA_WITH_SM3,        "1.2.156.10197.1.504");
+DEFINE_OID(OID_RSAES_OAEP,          "1.2.840.113549.1.1.7");
+DEFINE_OID(OID_PKCS1_MGF1,          "1.2.840.113549.1.1.8");
+DEFINE_OID(OID_PKCS1_PSPECIFIED,    "1.2.840.113549.1.1.9");
 DEFINE_OID(OID_RSA_PSS,             "1.2.840.113549.1.1.10");
 
 //-----------------------------------------------------------------------------------------
@@ -369,6 +372,9 @@ DEFINE_OID(OID_X509v3_AuthorityKeyIdentifier,       "2.5.29.35");
 DEFINE_OID(OID_X509v3_PolicyConstraints,            "2.5.29.36");
 DEFINE_OID(OID_X509v3_ExtendedKeyUsage,             "2.5.29.37");
 DEFINE_OID(OID_X509v3_FreshestCRL,                  "2.5.29.46");
+DEFINE_OID(OID_X509v3_InhibitAnyPolicy,             "2.5.29.54");
+DEFINE_OID(OID_X509v3_NoRevAvail,                   "2.5.29.56");   //  RFC 9608
+DEFINE_OID(OID_X509v3_ExpiredCertsOnCRL,            "2.5.29.60");   //  ITU-T X.509
 
 //-----------------------------------------------------------------------------------------
 //PKIX
@@ -384,10 +390,13 @@ DEFINE_OID(OID_PKIX_KpTspSigning,               "1.3.6.1.5.5.7.3.8");
 DEFINE_OID(OID_PKIX_KpOcspSigning,              "1.3.6.1.5.5.7.3.9");
 DEFINE_OID(OID_PKIX_OCSP,                       "1.3.6.1.5.5.7.48.1");
 DEFINE_OID(OID_PKIX_OcspBasic,                  "1.3.6.1.5.5.7.48.1.1");
+DEFINE_OID(OID_PKIX_RiOcspResponse,             "1.3.6.1.5.5.7.16.2");     //  RFC 5940: OCSP response in RevocationInfoChoices
 DEFINE_OID(OID_PKIX_OcspNonce,                  "1.3.6.1.5.5.7.48.1.2");
 DEFINE_OID(OID_PKIX_OcspCrl,                    "1.3.6.1.5.5.7.48.1.3");
 DEFINE_OID(OID_PKIX_OcspResponse,               "1.3.6.1.5.5.7.48.1.4");
 DEFINE_OID(OID_PKIX_OcspNoCheck,                "1.3.6.1.5.5.7.48.1.5");
+DEFINE_OID(OID_PKIX_OcspArchiveCutoff,          "1.3.6.1.5.5.7.48.1.6");   //  RFC 6960, 4.4.4
+DEFINE_OID(OID_ETSI_EXT_VALASSURED_ST_CERTS,    "0.4.0.194121.2.1");    //  ETSI EN 319 412-1, 5.2.2
 DEFINE_OID(OID_PKIX_CaIssuers,                  "1.3.6.1.5.5.7.48.2");
 DEFINE_OID(OID_PKIX_TimeStamping,               "1.3.6.1.5.5.7.48.3");
 
@@ -449,6 +458,7 @@ DEFINE_OID(OID_PKCS9_REVOCATION_VALUES,     "1.2.840.113549.1.9.16.2.24");
 DEFINE_OID(OID_PKCS9_CADES_C_TIMESTAMP,     "1.2.840.113549.1.9.16.2.25");
 DEFINE_OID(OID_PKCS9_CERT_CRL_TIMESTAMP,    "1.2.840.113549.1.9.16.2.26");
 DEFINE_OID(OID_PKCS9_SIGNING_CERTIFICATE_V2,"1.2.840.113549.1.9.16.2.47");
+DEFINE_OID(OID_PKCS9_ARCHIVE_TIMESTAMP_V2,  "1.2.840.113549.1.9.16.2.48");
 //  Note: "1.2.840.113549.1.9.16.2.48" (id-aa-ets-archiveTimestampV2) is deprecated
 //        in 'ETSI EN 319 122-1 V1.2.1 (2021-10)' - use "0.4.0.1733.2.4" (archive-time-stamp-v3).
 //        https://www.etsi.org/deliver/etsi_en/319100_319199/31912201/01.02.01_60/en_31912201v010201p.pdf
@@ -473,7 +483,14 @@ DEFINE_OID(OID_STD_DH_GOST34311_KDF,        "1.2.804.2.1.1.1.1.3.5");
 //ECDH
 DEFINE_OID(OID_DHSINGLEPASS_STD_DH_SHA1_KDF,        "1.3.133.16.840.63.0.2");
 DEFINE_OID(OID_DHSINGLEPASS_COFACTOR_DH_SHA1_KDF,   "1.3.133.16.840.63.0.3");
+DEFINE_OID(OID_DHSINGLEPASS_STD_DH_SHA224_KDF,      "1.3.132.1.11.0");
 DEFINE_OID(OID_DHSINGLEPASS_STD_DH_SHA256_KDF,      "1.3.132.1.11.1");
+DEFINE_OID(OID_DHSINGLEPASS_STD_DH_SHA384_KDF,      "1.3.132.1.11.2");
+DEFINE_OID(OID_DHSINGLEPASS_STD_DH_SHA512_KDF,      "1.3.132.1.11.3");
+DEFINE_OID(OID_DHSINGLEPASS_COFACTOR_DH_SHA224_KDF, "1.3.132.1.14.0");
+DEFINE_OID(OID_DHSINGLEPASS_COFACTOR_DH_SHA256_KDF, "1.3.132.1.14.1");
+DEFINE_OID(OID_DHSINGLEPASS_COFACTOR_DH_SHA384_KDF, "1.3.132.1.14.2");
+DEFINE_OID(OID_DHSINGLEPASS_COFACTOR_DH_SHA512_KDF, "1.3.132.1.14.3");
 //-----------------------------------------------------------------------------------------
 //JKS
 DEFINE_OID(OID_JKS_KEY_PROTECTOR,           "1.3.6.1.4.1.42.2.17.1.1");
@@ -490,6 +507,8 @@ DEFINE_OID(OID_PDS_UKRAINE_EDDR,            "1.2.804.2.1.1.1.11.1.4.11.1");
 //-----------------------------------------------------------------------------------------
 //ETSI
 DEFINE_OID(OID_ETSI_ARCHIVE_TIMESTAMP_V3,   "0.4.0.1733.2.4");
+DEFINE_OID(OID_ETSI_ATS_HASH_INDEX,         "0.4.0.1733.2.5");      //  ETSI TS 101 733, 6.4.2
+DEFINE_OID(OID_ETSI_ATS_HASH_INDEX_V3,      "0.4.0.19122.1.5");     //  ETSI EN 319 122-1, 5.5.2
 //-----------------------------------------------------------------------------------------
 
 

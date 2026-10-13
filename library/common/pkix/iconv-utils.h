@@ -37,7 +37,6 @@ extern "C" {
 #endif
 
 
-char* utf8_to_cp1251 (const char * in);
 int utf8_to_utf16be (const char * in, unsigned char ** out, size_t * out_len);
 int utf16be_to_utf8 (const unsigned char * in, size_t in_len, char ** out);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,6 +28,7 @@
 #define FILE_MARKER "uapki/api/build-cms-2pass.cpp"
 
 #include "api-json-internal.h"
+#include "cms-augment.h"
 #include "cert-validator.h"
 #include "doc-sign.h"
 #include "oid-utils.h"
@@ -199,6 +200,8 @@ static int step2_encodesd (
     case SignatureFormat::CADES_T:
     case SignatureFormat::CADES_XL:
     case SignatureFormat::CADES_A:
+    case SignatureFormat::CADES_B_LT:
+    case SignatureFormat::CADES_B_LTA:
         // without CADES_C
         break;
     case SignatureFormat::CMS_SID_KEYID:
@@ -237,9 +240,17 @@ static int step2_encodesd (
         DO(cert_validator.getCerStore()->getCertByCertId(sba_certid.get(), &shared_data.cerSigner));
     }
     if (ParsonHelper::jsonObjectHasValue(joStep2Params, "keyId", JSONString)) {
-        if (!shared_data.keyId.set(json_object_get_base64(joStep2Params, "keyId"))) return RET_UAPKI_INVALID_PARAMETER;
+        //  A key identifier is in hex in every method (KEYS, SELECT_KEY, LIST_CERTS...)
+        if (!shared_data.keyId.set(json_object_get_hex(joStep2Params, "keyId"))) return RET_UAPKI_INVALID_PARAMETER;
     }
 
+    //  CMS: the certificate to include is the one of the key, when it is not given by certId
+    if (
+        (shared_data.signatureFormat == SignatureFormat::CMS_SID_KEYID) && shared_data.includeCert &&
+        !shared_data.cerSigner && !shared_data.keyId.empty()
+    ) {
+        DO(cert_validator.getCerStore()->getCertByKeyId(shared_data.keyId.get(), &shared_data.cerSigner));
+    }
     if ((shared_data.signatureFormat != SignatureFormat::CMS_SID_KEYID) || shared_data.includeCert) {
         if (!shared_data.cerSigner) return RET_UAPKI_CERT_NOT_FOUND;
     }
@@ -285,11 +296,45 @@ static int step2_encodesd (
 
     DO(parse_docattrs_from_json(sdoc, joStep2Params, string("unsignedAttributes")));
     DO(sdoc.buildUnsignedAttributes());
+    DO(sdoc.buildSignedData());
 
     if (shared_data.signatureFormat == SignatureFormat::CADES_A) {
-        DO(sdoc.addTimestamp(Doc::Sign::TsAttr::ARCHIVE_TIMESTAMP));
+        //  archive-time-stamp-v3 with ats-hash-index-v3 in its token (EN 319 122-1, 5.5.2, 5.5.3)
+        ByteArray* ba_archived = nullptr;
+        ret = Doc::Augment::addArchiveTimeStamp(&config, cert_validator.getCerStore(), cert_validator.getCrlStore(),
+            sdoc.getEncoded(), 0, Pkcs7::AtsV3::IndexType::EN_319_122, &ba_archived);
+        (void)sdoc.augmented.set(ba_archived);
+        DO(ret);
     }
-    DO(sdoc.buildSignedData());
+    else if (
+        (shared_data.signatureFormat == SignatureFormat::CADES_B_LT) ||
+        (shared_data.signatureFormat == SignatureFormat::CADES_B_LTA)
+    ) {
+        //  As SIGN: the B-T signature validated and augmented by the code of AUGMENT_CMS. The content: the
+        //  encapsulated one, or the hash of the message-digest attribute
+        ContentHasher content_digest;
+        Doc::Augment::Params augment_params;
+        ByteArray* ba_augmented = nullptr;
+        if (shared_data.detachedData) {
+            DO(content_digest.setContent(sdoc.messageDigest.get(), false));
+        }
+        augment_params.signatureFormat = shared_data.signatureFormat;
+        augment_params.signerInfoIndex = 0;
+        augment_params.verifyOptions.onlyCrl = config.getValidationByCrl();
+        ret = Doc::Augment::augmentCms(
+            &config,
+            cert_validator.getCerStore(),
+            cert_validator.getCrlStore(),
+            sdoc.getEncoded(),
+            content_digest,
+            shared_data.detachedData,
+            augment_params,
+            &ba_augmented,
+            nullptr
+        );
+        (void)sdoc.augmented.set(ba_augmented);
+        DO(ret);
+    }
 
     DO(json_object_set_base64(joResult, "bytes", sdoc.getEncoded()));
 

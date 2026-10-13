@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -66,16 +66,27 @@ enum class DataSource : uint32_t {
 struct ResultValidationByCrl {
     CertStatus  certStatus;
     Crl::CrlItem*
-                crlItem;
+                crlItem;        //  the last one used: delta, if used, else full
+    Crl::CrlItem*
+                crlFull;        //  the full CRL
     Cert::CerItem*
                 cerIssuer;
     Crl::RevokedCertItem
                 revokedCertItem;
+    //  "Not revoked" by a CRL issued after the certificate expired is not proven (see revocationCoversCert)
+    bool        issuedAfterExpiration;
+    //  Not revoked at the time of the validation, revoked later (the CRL is newer): the entry, see tsaKeyTrust()
+    bool        hasRevokedLater;
+    Crl::RevokedCertItem
+                revokedLater;
 
     ResultValidationByCrl (void)
         : certStatus(CertStatus::UNDEFINED)
         , crlItem(nullptr)
+        , crlFull(nullptr)
         , cerIssuer(nullptr)
+        , issuedAfterExpiration(false)
+        , hasRevokedLater(false)
     {}
 
 };  //  end struct ResultValidationByCrl
@@ -93,6 +104,7 @@ struct OcspResponseInfo {
                 statusSignature;
     Cert::CerItem*
                 cerResponder;
+    std::string signAlgo;       //  the signature algorithm of the response (OID)
 
     OcspResponseInfo (void)
         : responseStatus(Ocsp::ResponseStatus::UNDEFINED)
@@ -113,12 +125,32 @@ struct ResultValidationByOcsp : public OcspResponseInfo {
     SmartBA     ocspResponse;
     //  For verify
     DataSource  dataSource;
+    //  "Good" by a response issued after the certificate expired is not proven (see revocationCoversCert)
+    bool        issuedAfterExpiration;
 
     ResultValidationByOcsp (void)
         : dataSource(DataSource::UNDEFINED)
+        , issuedAfterExpiration(false)
     {}
 
 };  //  end struct ResultValidationByOcsp
+
+class CertChainItem;
+
+//  The time-stamps of a TSA whose certificate is revoked (RFC 3161, 4): revoked for a reason that is not a compromise
+//  (affiliationChanged, superseded, cessationOfOperation...) - the ones made before the revocation stay valid, that
+//  is told by the status at their time; revoked for the compromise of a key, or with no reason given - none of
+//  them can be trusted, whenever the certificate was revoked
+enum class TsaKeyTrust {
+    OK,
+    COMPROMISED,
+    REASON_NOT_GIVEN
+};
+
+TsaKeyTrust tsaKeyTrust (
+    const CertChainItem& tsaItem
+);
+
 
 class CertChainItem {
     CertEntity  m_CertEntity;
@@ -128,6 +160,7 @@ class CertChainItem {
     std::string m_CommonName;
     Cert::CerItem*
                 m_CerIssuer;
+    bool        m_Trusted;
     bool        m_Expired;
     Cert::ValidationType
                 m_ValidationType;
@@ -159,6 +192,10 @@ public:
         Cert::CerItem* cerIssuer
     );
     void setRoot (void);
+    //  The certificate is a trust anchor itself though it is not a CA at the top of a path (a TSA or an OCSP
+    //  responder of a trusted list, a certificate given to INIT as trusted): no issuer and no revocation status are
+    //  looked for (RFC 5280, 6.1); the entity stays what it is
+    void setTrustAnchor (void);
     void setValidationType (
         const Cert::ValidationType validationType
     );
@@ -212,8 +249,15 @@ public:
     bool isSelfSigned (void) const {
         return (m_CerSubject) ? m_CerSubject->isSelfSigned() : false;
     }
+    //  Trusted at the time the chain was built for (buildCertChain); an item made apart from a chain - now
     bool isTrusted (void) const {
-        return (m_CerSubject) ? m_CerSubject->isTrusted() : false;
+        return m_Trusted;
+    }
+    void setTrustAt (const bool trusted) {
+        m_Trusted = trusted;
+    }
+    void addTrust (const bool trusted) {
+        m_Trusted = m_Trusted || trusted;
     }
 
 };  //  end class CertChainItem
@@ -329,6 +373,9 @@ class CertValidator {
     Cert::ValidationType
                 m_ValidationType;
     bool        m_CheckTrustedRoot;
+    bool        m_CaRemovesExpiredCerts;
+    uint64_t    m_RevocationMinThisUpdate;
+    uint64_t    m_StrictFreshnessTime;
 
     std::vector<CertChainItem*>
                 m_CertChain;
@@ -362,9 +409,35 @@ public:
     void setCheckTrustedRoot (
         const bool checkTrustedRoot
     );
+    //  The CAs remove the expired certificates from the revocation data (VERIFY: caRemovesExpiredCerts)
+    void setCaRemovesExpiredCerts (
+        const bool caRemovesExpiredCerts
+    );
 
     bool getCheckTrustedRoot (void) const {
         return m_CheckTrustedRoot;
+    }
+    bool getCaRemovesExpiredCerts (void) const {
+        return m_CaRemovesExpiredCerts;
+    }
+    //  The revocation data from the cache (OCSP) or the CRL store issued before this time is obtained again
+    //  (AUGMENT_CMS: revocationFreshness); 0 - no requirement
+    void setRevocationMinThisUpdate (
+        const uint64_t revocationMinThisUpdate
+    ) {
+        m_RevocationMinThisUpdate = revocationMinThisUpdate;
+    }
+    //  The strict freshness of a validation policy: the status must be issued after this time. A cached OCSP
+    //  response issued before it is asked again (it has no nextUpdate as a rule: nothing to wait for); a CRL
+    //  issued before it is used up to its nextUpdate (the same CRL would come) and downloaded again after it.
+    //  0 - no requirement
+    void setStrictFreshnessTime (
+        const uint64_t strictFreshnessTime
+    ) {
+        m_StrictFreshnessTime = strictFreshnessTime;
+    }
+    uint64_t getRevocationMinThisUpdate (void) const {
+        return m_RevocationMinThisUpdate;
     }
     LibraryConfig* getLibConfig (void) const {
         return m_LibConfig;
@@ -388,6 +461,15 @@ public:
     const std::vector<ExpectedCrlItem*>& getExpectedCrls (void) const {
         return m_ExpectedCrls;
     }
+    //  The expected CRLs added after the first count removed (an attempt that does not count)
+    void truncateExpectedCrls (
+        const size_t count
+    ) {
+        while (m_ExpectedCrls.size() > count) {
+            delete m_ExpectedCrls.back();
+            m_ExpectedCrls.pop_back();
+        }
+    }
     const std::vector<CertChainItem*>& getObtainedCerts (void) const {
         return m_ObtainedCerts;
     }
@@ -405,12 +487,15 @@ public:
 
     //  The one chain builder for signing and verifying: the item of cerItem and its issuers up to
     //  a self-signed root are added to chainItems (an item already there is reused), each link is
-    //  verified, the root is marked. A missing issuer is expected: RET_UAPKI_CERT_ISSUER_NOT_FOUND
+    //  verified, the root is marked. A missing issuer is expected: RET_UAPKI_CERT_ISSUER_NOT_FOUND.
+    //  msTrustTime - the time the trust is decided at (0 - now): the chain ends at the first certificate trusted
+    //  then, see Cert::CerItem::isTrustedAt()
     int buildCertChain (
         const CertEntity certEntity,
         Cert::CerItem* cerItem,
         std::vector<CertChainItem*>& chainItems,
-        CertChainItem** subjectItem = nullptr
+        CertChainItem** subjectItem = nullptr,
+        const uint64_t msTrustTime = 0
     );
     int addChainItem (
         std::vector<CertChainItem*>& chainItems,
@@ -582,6 +667,45 @@ int addUniqueItem (
 bool checkCertUsage (
     const CertEntity certEntity,
     const Cert::CerItem* cerItem
+);
+
+//  The constraints a certificate of a built chain breaks (the first one)
+enum class ChainConstraint : uint32_t {
+    NONE                        = 0,
+    ISSUER_NOT_CA               = 1,    //  RFC 5280, 6.1.4 (k): basicConstraints cA of an issuer
+    PATH_LENGTH                 = 2,    //  RFC 5280, 6.1.4 (l), (m): pathLenConstraint
+    SIGNER_KEY_USAGE            = 3,    //  RFC 5280, 4.2.1.3: digitalSignature or nonRepudiation
+    TSP_KEY_PURPOSE             = 4,    //  RFC 3161, 2.3: id-kp-timeStamping
+    UNKNOWN_CRITICAL_EXTENSION  = 5,    //  RFC 5280, 4.2 (the check is optional)
+    FORBIDDEN_EXTENSION         = 6     //  as EU DSS: ocsp-nocheck in a signing or TSA certificate (RFC 6960, 4.2.2.2.1),
+                                        //  ocsp-nocheck or noRevAvail in a CA certificate (RFC 9608, 2)
+};  //  end enum ChainConstraint
+
+//  One check for SIGN, VERIFY_CERT and VERIFY: the certificate of chainItem and its issuers in chain
+ChainConstraint checkChainConstraints (
+    const CertChainItem& chainItem,
+    const std::vector<CertChainItem*>& chain,
+    const bool checkCriticalExtensions
+);
+
+const char* chainConstraintToStr (
+    const ChainConstraint chainConstraint
+);
+
+//  Revocation data issued after the certificate expired. A CA may remove an expired certificate from its CRLs
+//  (RFC 5280, 3.3) and an OCSP responder may forget it: then "not revoked" says nothing (ETSI EN 319 102-1, 5.2.6,
+//  NOTE 4; 5.6.2.1, NOTE 3). By default the CAs keep the status (caRemovesExpiredCerts false: the data covers the
+//  certificate). If the data says since when the expired certificates are kept - expiredCertsOnCRL (ITU-T X.509)
+//  of a CRL, archiveCutoff (RFC 6960, 4.4.4) of an OCSP response - it is processed as for a CA that removes them,
+//  as EU DSS: the data covers the certificate if it expired not before min(thisUpdate, that date).
+//  certHash (Common PKI, 1.3.36.8.3.13) of an OCSP response is not checked: the Ukrainian QTSPs (KNEDP) do not
+//  produce it. If they do, it is to be added (a matching certHash covers the certificate, as EU DSS); until then
+//  the status is trusted without it
+bool revocationCoversCert (
+    const Cert::CerItem* cerSubject,
+    const uint64_t msThisUpdate,
+    const uint64_t msExpiredCertsSince,
+    const bool caRemovesExpiredCerts
 );
 
 const char* certEntityToStr (

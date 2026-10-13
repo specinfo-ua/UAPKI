@@ -298,6 +298,7 @@ TsTokenParser::TsTokenParser (void)
     , m_BaSerialNumber(nullptr)
     , m_GenTime(0)
     , m_AccuracyPresent(false)
+    , m_AccuracyUs(0)
     , m_Ordering(false)
     , m_BaNonce(nullptr)
 {
@@ -333,6 +334,23 @@ int TsTokenParser::parse (
     DO(asn_INTEGER2ba(&tst_info->serialNumber, &m_BaSerialNumber));
     DO(Util::genTimeFromAsn1(&tst_info->genTime, m_GenTime));
     m_AccuracyPresent = (tst_info->accuracy);
+    m_AccuracyUs = 0;
+    if (tst_info->accuracy) {
+        //  RFC 3161, 2.4.2: a missing field of the accuracy is zero
+        if (tst_info->accuracy->seconds) {
+            unsigned long seconds = 0;
+            DO(asn_INTEGER2ulong(tst_info->accuracy->seconds, &seconds));
+            //  more than a year says nothing about the order of time-stamps
+            m_AccuracyUs = (uint64_t)((seconds > 31536000ul) ? 31536000ul : seconds) * 1000000;
+        }
+        if (tst_info->accuracy->millis && (*tst_info->accuracy->millis > 0)) {
+            m_AccuracyUs += (uint64_t)(*tst_info->accuracy->millis) * 1000;
+        }
+        if (tst_info->accuracy->micros && (*tst_info->accuracy->micros > 0)) {
+            m_AccuracyUs += (uint64_t)(*tst_info->accuracy->micros);
+        }
+    }
+    m_Ordering = (tst_info->ordering && (*tst_info->ordering != 0));
     if (tst_info->nonce) {
         DO(asn_INTEGER2ba(tst_info->nonce, &m_BaNonce));
     }

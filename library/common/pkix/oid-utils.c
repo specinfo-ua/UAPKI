@@ -356,6 +356,11 @@ SignAlg signature_from_oid (const char* oid)
         return SIGN_SM2DSA;
     }
 
+    //  Before the other OIDs of PKCS #1 (1.2.840.113549.1.1.*): RSASSA-PSS is 1.2.840.113549.1.1.10
+    if (oid_is_equal(OID_RSA_PSS, oid)) {
+        return SIGN_RSA_PSS;
+    }
+
     if (oid_is_parent("1.2.840.113549.1.1", oid) ||
         oid_is_equal(OID_RSA_WITH_SHA3_224, oid) ||
         oid_is_equal(OID_RSA_WITH_SHA3_256, oid) ||
@@ -363,10 +368,6 @@ SignAlg signature_from_oid (const char* oid)
         oid_is_equal(OID_RSA_WITH_SHA3_512, oid) ||
         oid_is_equal(OID_RSA_WITH_SM3, oid)) {
         return SIGN_RSA_PKCS_1_5;
-    }
-
-    if (oid_is_equal(OID_RSA_PSS, oid)) {
-        return SIGN_RSA_PSS;
     }
 
     return SIGN_UNDEFINED;

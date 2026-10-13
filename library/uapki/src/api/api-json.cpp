@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -167,6 +167,11 @@ static const UapkiMethod uapki_methods[] = {
         call_thread_method
     },
     {
+        "AUGMENT_CMS",
+        uapki_augment_cms,
+        call_thread_method
+    },
+    {
         "BUILD_CSR_2PASS",
         uapki_build_csr_2pass,
         call_static_method
@@ -209,6 +214,18 @@ static const UapkiMethod uapki_methods[] = {
     {
         "ADD_CRL",
         uapki_add_crl,
+        call_thread_method,
+        false, true
+    },
+    {
+        "ADD_TRUST_LIST",
+        uapki_add_trust_list,
+        call_thread_method,
+        false, true
+    },
+    {
+        "LIST_TRUST_LISTS",
+        uapki_list_trust_lists,
         call_thread_method,
         false, true
     },

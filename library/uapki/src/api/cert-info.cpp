@@ -45,8 +45,16 @@ int uapki_cert_info (Context& context, JSON_Object* joParams, JSON_Object* joRes
     Cert::CerItem* parsed_ceritem = nullptr;
 
     if (sba_encoded.set(json_object_get_base64(joParams, "bytes"))) {
-        DO(Cert::parseCert(sba_encoded.get(), &parsed_ceritem));
-        DO(Cert::detailInfoToJson(joResult, parsed_ceritem));
+        //  The certificate of the cache, if it is there: it has what the library knows about its trust
+        Cert::CerItem* cached_ceritem = nullptr;
+        Cert::CerStore* cer_store = (context.config() && context.config()->isInitialized()) ? context.cerStore() : nullptr;
+        if (cer_store && (cer_store->getCertByEncoded(sba_encoded.get(), &cached_ceritem) == RET_OK)) {
+            DO(Cert::detailInfoToJson(joResult, cached_ceritem));
+        }
+        else {
+            DO(Cert::parseCert(sba_encoded.get(), &parsed_ceritem));
+            DO(Cert::detailInfoToJson(joResult, parsed_ceritem));
+        }
     }
     else {
         LibraryConfig* lib_config = context.config();

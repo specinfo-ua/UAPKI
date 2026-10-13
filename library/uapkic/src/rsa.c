@@ -1169,6 +1169,7 @@ static int rsa_verify_pkcs1_v1_5(RsaCtx *ctx, const ByteArray* H, const ByteArra
     WordArray *sign_wa = NULL;
     int ret = RET_OK;
     size_t i;
+    uint8_t aid_noparams[32];
 
     if (ctx->mode_id != RSA_MODE_VERIFY_PKCS) {
         SET_ERROR(RET_INVALID_CTX_MODE);
@@ -1189,7 +1190,24 @@ static int rsa_verify_pkcs1_v1_5(RsaCtx *ctx, const ByteArray* H, const ByteArra
     len = (int_bit_len(ctx->gfp->p) + 7) >> 3;
     DO(uint8_swap(em, len, em, len));
 
-    if ((em[0] != 0) || (em[1] != 1) || (em[len - hlen - aid_len - 1] != 0)) {
+    //  DigestInfo of the signer without the NULL parameters of the hash AlgorithmIdentifier: accepted too
+    //  (RFC 8017, B.1: "implementations MUST accept AlgorithmIdentifier values both without parameters and with
+    //  NULL parameters"). The block is still compared with an exact encoding, nothing is parsed
+    if (
+        (aid_len >= 8) && (aid_len <= sizeof(aid_noparams) + 2) && (aid[0] == 0x30) && (aid[2] == 0x30) && (aid[4] == 0x06) &&
+        ((size_t)aid[5] + 10 == aid_len) && (aid[6 + aid[5]] == 0x05) && (aid[7 + aid[5]] == 0x00) &&
+        (len >= hlen + aid_len + 11) && (em[len - hlen - aid_len - 1] != 0)
+    ) {
+        const size_t oid_end = 6 + (size_t)aid[5];
+        memcpy(aid_noparams, aid, oid_end);
+        aid_noparams[1] = (uint8_t)(aid[1] - 2);
+        aid_noparams[3] = (uint8_t)(aid[3] - 2);
+        memcpy(aid_noparams + oid_end, aid + oid_end + 2, aid_len - oid_end - 2);
+        aid = aid_noparams;
+        aid_len -= 2;
+    }
+
+    if ((len < hlen + aid_len + 11) || (em[0] != 0) || (em[1] != 1) || (em[len - hlen - aid_len - 1] != 0)) {
         SET_ERROR(RET_VERIFY_FAILED);
     }
 

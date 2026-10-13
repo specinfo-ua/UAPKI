@@ -248,6 +248,9 @@ public partial class Uapki : IDisposable
         public uint CertsCount { get; }
         public uint TrustedCertsCount { get; }
         public uint CrlsCount { get; }
+        /// <summary>Trusted lists applied from the directory of trusted lists / not accepted</summary>
+        public uint TrustListsCount { get; }
+        public uint RefusedTrustListsCount { get; }
         public List<CmProvider> Providers { get; }
 
         public UapkiLibraryInfo(Uapki uapki, string response)
@@ -259,6 +262,8 @@ public partial class Uapki : IDisposable
             CertsCount = ret.Result!.CertCache.CountCerts;
             TrustedCertsCount = ret.Result!.CertCache.CountTrustedCerts;
             CrlsCount = ret.Result!.CrlCache.CountCrls;
+            TrustListsCount = ret.Result!.TrustListCache?.CountLists ?? 0;
+            RefusedTrustListsCount = ret.Result!.TrustListCache?.CountRefusedLists ?? 0;
             Version = uapki.GetVersion();
             //  The shared memory does not load providers (PROVIDERS is not allowed there)
             Providers = uapki.IsSharedMemory ? new List<CmProvider>() : uapki.GetProviders();

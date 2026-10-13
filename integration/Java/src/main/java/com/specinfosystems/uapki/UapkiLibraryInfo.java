@@ -33,5 +33,6 @@ import java.util.List;
  * Стан ініціалізованої бібліотеки (сесії): версія, кількість сертифікатів і СВС у кешах, провайдери сховищ ключів
  * (для спільної пам'яті список провайдерів порожній)
  */
-public record UapkiLibraryInfo(String version, int certsCount, int trustedCertsCount, int crlsCount, List<CmProvider> providers) {
+public record UapkiLibraryInfo(String version, int certsCount, int trustedCertsCount, int crlsCount, int trustListsCount,
+                               int refusedTrustListsCount, List<CmProvider> providers) {
 }

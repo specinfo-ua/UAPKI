@@ -9,7 +9,9 @@ loads the shared library at runtime and provides:
 * `Library.Process` / `Library.Call` — generic access to every UAPKI method;
 * typed helpers for the most common methods: `Version`, `Init`, `Deinit`,
   `Providers`, `Open`, `CloseStorage`, `Keys`, `SelectKey`, `Sign`,
-  `SignDetached`, `Verify`, `VerifyDetached`, `Digest`, `RandomBytes`.
+  `SignDetached`, `Verify`, `VerifyDetached`, `VerifyWithOptions`,
+  `VerifyDetachedWithOptions`, `AugmentCms`, `AugmentCmsDetached`, `Digest`,
+  `RandomBytes`.
 
 Binary fields (`bytes`, certificates, …) are declared as `[]byte` in Go and
 are marshalled to/from base64 automatically, matching the UAPKI JSON API.
@@ -122,6 +124,27 @@ signatures, err := lib.SignDetached(uapki.SignParams{SignatureFormat: "CAdES-BES
     []uapki.Source{uapki.FileSource("contract.pdf")}, nil)
 
 result, err := lib.VerifyDetached(signatures[0], uapki.FileSource("contract.pdf"), "FULL")
+```
+
+`VerifyWithOptions` and `VerifyDetachedWithOptions` take all the options of the
+VERIFY method (`uapki.VerifyOptions`: `ValidationType`, `OnlyCrl`,
+`VerifySignerInfoIndex`, `CheckCriticalExtensions`, `CaRemovesExpiredCerts`); a zero field
+is not sent.
+
+```go
+result, err := lib.VerifyDetachedWithOptions(signatures[0], uapki.FileSource("contract.pdf"),
+    uapki.VerifyOptions{ValidationType: "FULL", CheckCriticalExtensions: true})
+```
+
+`AugmentCms` and `AugmentCmsDetached` augment a CAdES signature to "CAdES-T",
+"CAdES-B-LT" or "CAdES-B-LTA" (method AUGMENT_CMS). If the validation before the
+augmentation does not give TOTAL-VALID, the error NOT_ALLOWED is returned together
+with the result whose `SignatureInfos` explain why.
+
+```go
+fresh := uint32(0) // always new revocation data
+result, err := lib.AugmentCmsDetached(signature, uapki.FileSource("contract.pdf"), "CAdES-B-LTA",
+    uapki.AugmentOptions{RevocationFreshness: &fresh}, nil)
 ```
 
 `uapki.MemorySource(ptr, size)` points to data in memory, for example the

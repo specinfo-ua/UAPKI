@@ -213,6 +213,12 @@ public:
         std::vector<ByteArray*>* vbaSalts,
         std::vector<ByteArray*>& vbaWrappedKeys
     );
+    //  Decryption of a key by the selected RSA key: baAlgorithmIdentifier - the encoded key-encryption algorithm
+    int keyDecrypt (
+        const ByteArray* baAlgorithmIdentifier,
+        const ByteArray* baEncryptedKey,
+        ByteArray** baDecryptedKey
+    );
     int keyDhUnwrapKey (
         const std::string& kdfOid,
         const std::string& wrapAlgOid,

@@ -74,37 +74,13 @@ cleanup:
 
 static HashAlg hash_from_oid_dhkdf (const char* oid, bool* withCofactor)
 {
-    HashAlg rv_hash = HASH_ALG_UNDEFINED;
-    if (oid_is_equal(OID_COFACTOR_DH_DSTU7564_KDF, oid)) {
-        rv_hash = HASH_ALG_DSTU7564_256;
-        *withCofactor = true;
-    }
-    else if (oid_is_equal(OID_COFACTOR_DH_GOST34311_KDF, oid)) {
-        rv_hash = HASH_ALG_GOST34311;
-        *withCofactor = true;
-    }
-    else if (oid_is_equal(OID_DHSINGLEPASS_COFACTOR_DH_SHA1_KDF, oid)) {
-        rv_hash = HASH_ALG_SHA1;
-        *withCofactor = true;
-    }
-    else if (oid_is_equal(OID_STD_DH_DSTU7564_KDF, oid)) {
-        rv_hash = HASH_ALG_DSTU7564_256;
-        *withCofactor = false;
-    }
-    else if (oid_is_equal(OID_STD_DH_GOST34311_KDF, oid)) {
-        rv_hash = HASH_ALG_GOST34311;
-        *withCofactor = false;
-    }
-    else if (oid_is_equal(OID_DHSINGLEPASS_STD_DH_SHA1_KDF, oid)) {
-        rv_hash = HASH_ALG_SHA1;
-        *withCofactor = false;
-    }
-    else if (oid_is_equal(OID_DHSINGLEPASS_STD_DH_SHA256_KDF, oid)) {
-        rv_hash = HASH_ALG_SHA256;
-        *withCofactor = false;
-    }
+    return iso15946_hash_from_oid_dhkdf(oid, withCofactor);
+}
 
-    return rv_hash;
+static bool is_aes_wrap (const char* oidWrapAlgo)
+{
+    return oid_is_equal(OID_AES128_WRAP, oidWrapAlgo) || oid_is_equal(OID_AES192_WRAP, oidWrapAlgo)
+        || oid_is_equal(OID_AES256_WRAP, oidWrapAlgo);
 }
 
 int key_wrap (const ByteArray* baPrivateKeyInfo, bool isStaticKey,
@@ -141,7 +117,7 @@ int key_wrap (const ByteArray* baPrivateKeyInfo, bool isStaticKey,
     //  Check oid-key-wrap
     if (!oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)
     &&  !oid_is_equal(OID_GOST28147_WRAP, oidWrapAlgo)
-    &&  !oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)) {
+    &&  !is_aes_wrap(oidWrapAlgo)) {
         SET_ERROR(RET_CM_UNSUPPORTED_CIPHER_ALG);
     }
 
@@ -173,10 +149,13 @@ int key_wrap (const ByteArray* baPrivateKeyInfo, bool isStaticKey,
         if (oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)) {
             DO(key_wrap_dstu7624(ba_kek, baSessionKeys[i], &ba_wrappedkeys[i]));
         }
-        else if (oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)) {
+        else if (is_aes_wrap(oidWrapAlgo)) {
+            //  AES Key Wrap (RFC 3394) with the default initial value
             CHECK_NOT_NULL(aes = aes_alloc());
             DO(aes_init_wrap(aes, ba_kek, NULL));
             DO(aes_encrypt(aes, baSessionKeys[i], &ba_wrappedkeys[i]));
+            aes_free(aes);
+            aes = NULL;
         }
         else {
             DO(spki_get_dstu_dke(baSpkis[i], &ba_dke));
@@ -252,7 +231,7 @@ int key_unwrap (const ByteArray* baPrivateKeyInfo,
     //  Check oid-key-wrap
     if (!oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)
     &&  !oid_is_equal(OID_GOST28147_WRAP, oidWrapAlgo)
-    &&  !oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)) {
+    &&  !is_aes_wrap(oidWrapAlgo)) {
         SET_ERROR(RET_CM_UNSUPPORTED_CIPHER_ALG);
     }
 
@@ -277,10 +256,13 @@ int key_unwrap (const ByteArray* baPrivateKeyInfo,
         if (oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)) {
             DO(key_unwrap_dstu7624(ba_kek, baWrappedKeys[i], &ba_sessionkeys[i]));
         }
-        else if (oid_is_equal(OID_AES256_WRAP, oidWrapAlgo)) {
+        else if (is_aes_wrap(oidWrapAlgo)) {
+            //  AES Key Wrap (RFC 3394) with the default initial value
             CHECK_NOT_NULL(aes = aes_alloc());
             DO(aes_init_wrap(aes, ba_kek, NULL));
             DO(aes_decrypt(aes, baWrappedKeys[i], &ba_sessionkeys[i]));
+            aes_free(aes);
+            aes = NULL;
         }
         else {
             DO(private_key_get_spki(baPrivateKeyInfo, &ba_recip_spki));

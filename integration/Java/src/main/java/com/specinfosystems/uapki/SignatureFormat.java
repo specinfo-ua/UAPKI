@@ -39,7 +39,11 @@ public enum SignatureFormat {
     CADES_A("CAdES-A"),
     CADES_LTA("CAdES-A"),
     CMS("CMS"),
-    RAW("RAW");
+    RAW("RAW"),
+    /** ETSI EN 319 122-1: дані для перевірки в SignedData */
+    CADES_B_LT("CAdES-B-LT"),
+    /** ETSI EN 319 122-1: CAdES-B-LT з archive-time-stamp-v3 */
+    CADES_B_LTA("CAdES-B-LTA");
 
     private final String value;
 

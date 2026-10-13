@@ -59,12 +59,28 @@ int verifyRsaV15Sign (
     const ByteArray* baHash,
     const ByteArray* baSignValue
 );
+//  digestAlgo - the digest algorithm of a CMS SignerInfo: used when signAlgo is rsaEncryption, which does not
+//  name the hash (RFC 3370, 3.2); nullptr - signAlgo has to name the hash itself
+//  RSASSA-PSS-params (RFC 4055, 3.1) of a signature the library makes: the hash, MGF1 with the same hash,
+//  the salt of the length of the hash, the trailer field by default
+int rsaPssParamsEncode (
+    const HashAlg hashAlgo,
+    ByteArray** baEncoded
+);
+//  The hash and the salt length of RSASSA-PSS-params; UNSUPPORTED_ALG if MGF1 has another hash
+int rsaPssParamsDecode (
+    const ByteArray* baEncoded,
+    HashAlg& hashAlgo,
+    size_t& saltLength
+);
 int verifySignature (
     const char* signAlgo,
     const ByteArray* baData,
     const bool isHash,
     const ByteArray* baSignerSPKI,
-    const ByteArray* baSignValue
+    const ByteArray* baSignValue,
+    const char* digestAlgo = nullptr,
+    const ByteArray* baSignAlgoParams = nullptr
 );
 
 

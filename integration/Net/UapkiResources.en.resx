@@ -283,7 +283,13 @@
     <value>RSA-PSS</value>
   </data>
   <data name="SignatureFormat_CAdES_A" xml:space="preserve">
-    <value>With complete validation data and arcive timestamp  (CAdES-LTA)</value>
+    <value>With complete validation data and archive timestamp (CAdES-A)</value>
+  </data>
+  <data name="SignatureFormat_CAdES_B_LT" xml:space="preserve">
+    <value>With validation data in the signature (CAdES-B-LT)</value>
+  </data>
+  <data name="SignatureFormat_CAdES_B_LTA" xml:space="preserve">
+    <value>With validation data and archive timestamp (CAdES-B-LTA)</value>
   </data>
   <data name="SignatureFormat_CAdES_BES" xml:space="preserve">
     <value>Basic (CAdES-BES)</value>
@@ -295,7 +301,7 @@
     <value>With signature timestamp (CAdES-T)</value>
   </data>
   <data name="SignatureFormat_CAdES_XL" xml:space="preserve">
-    <value>With complete validation data (CAdES-LT)</value>
+    <value>With complete validation data (CAdES-XL)</value>
   </data>
   <data name="SignatureFormat_CMS" xml:space="preserve">
     <value>Basic with signer identifacation by public key ID</value>
@@ -488,6 +494,21 @@
   </data>
   <data name="Error_1074" xml:space="preserve">
     <value>TSP server response is corrupted</value>
+  </data>
+  <data name="Error_1078" xml:space="preserve">
+    <value>The trusted list does not conform to the format</value>
+  </data>
+  <data name="Error_1079" xml:space="preserve">
+    <value>Invalid signature of the trusted list</value>
+  </data>
+  <data name="Error_107A" xml:space="preserve">
+    <value>The certificate that signs the trusted list is not trusted for that</value>
+  </data>
+  <data name="Error_107B" xml:space="preserve">
+    <value>A trusted list with a greater sequence number is accepted</value>
+  </data>
+  <data name="Error_107C" xml:space="preserve">
+    <value>A certificate trusted at the initialization is not removed</value>
   </data>
   <data name="Error_2001" xml:space="preserve">
     <value>Invalid response from the cryptographic library</value>

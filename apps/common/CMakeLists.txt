@@ -9,6 +9,7 @@ add_library(uapki-apps-common STATIC
     response-signature.cpp
     ${PATH_COMMON_PKIX}/attribute-helper.cpp
     ${PATH_COMMON_PKIX}/ba-utils.c
+    ${PATH_COMMON_PKIX}/der-helper.cpp
     ${PATH_COMMON_PKIX}/dstu4145-params.c
     ${PATH_COMMON_PKIX}/ecdsa-params.c
     ${PATH_COMMON_PKIX}/extension-helper.cpp

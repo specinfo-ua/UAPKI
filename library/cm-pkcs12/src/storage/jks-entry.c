@@ -244,6 +244,9 @@ int jks_entry_read(JksBufferCtx *buffer, const uint32_t jks_ver, JksEntry **entr
             CHECK_NOT_NULL(read_entry->entry.key = asn_decode_ba_with_alloc(get_EncryptedPrivateKeyInfo_desc(), encoded));
             //  Зчитуємо ланцюжок сертифікатів
             DO(jks_buffer_read_int(buffer, &cnt_certs));
+            //  Кількість з файлу: кожен сертифікат займає щонайменше 4 байти (довжина даних), інакше
+            //  виділення під список на гігабайти, а на 32-бітних платформах - переповнення розміру
+            CHECK_PARAM(cnt_certs <= (ba_get_len(buffer->buffer) - buffer->read_off) / 4);
             if (cnt_certs > 0) {
                 CHECK_NOT_NULL(read_entry->entry_exts =  jks_entry_certs_alloc(cnt_certs));
                 for (uint32_t i = 0; i < cnt_certs; i++) {

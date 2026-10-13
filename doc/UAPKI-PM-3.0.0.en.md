@@ -17,6 +17,7 @@ The version number in the document title corresponds to the version of the uapki
 | 1       | —          | Initial version of the document (PDF)                                                                                                                               |
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
 | 3       | 2026-09-30 | Library v3.0.0: sessions API (uapki_session_create, uapki_session_free, uapki_session_process) for independent library instances in one process and shared memory (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) for certificate and CRL caches shared by sessions; error codes INVALID_SESSION, INVALID_SHARED_MEMORY; the VERSION method returns the versions of the loaded uapkic and uapkif libraries; the cmProviders field in the INIT response |
+| 4       | 2026-10-12 | Trusted lists (ETSI TS 119 612): the ADD_TRUST_LIST method, the trustListCache parameter of the INIT method, the fields trusted, trustListSigner, trustServices of the CERT_INFO method, the fields of the signature quality and of a time-stamp in the FULL-ETSI report by a trusted list. The field requireRevocationSignerStatus is removed from the validation policies: the status of the certificate of an OCSP responder is always required. The trust in a certificate of a trusted list is decided at a time (the sub-indication NO_CERTIFICATE_CHAIN_FOUND_NO_POE of the FULL-ETSI report). A repeated INIT returns, with the error ALREADY_INITIALIZED, the parameters the library was initialized with |
 
 # General information
 
@@ -80,25 +81,28 @@ Table 2. List of library methods
 | 18    | SIGN                | Sign data using the current key      | MT      |
 | 19    | BUILD_CMS_2PASS     | Generate a PKCS#7 signature from data                 | MT      |
 | 20    | MODIFY_CMS          | Modify a PKCS#7 signature                         | IND      |
-| 21    | VERIFY              | Verify signed data                          | MT      |
-| 22    | ENCRYPT             | Encrypt data                                   | MT      |
-| 23    | DECRYPT             | Decrypt data                                 | MT      |
-| 24    | ADD_CERT            | Add a certificate to the certificate cache             | MT      |
-| 25    | CERT_INFO           | Certificate information                          | MT      |
-| 26    | GET_CERT            | Get a certificate from the certificate cache           | MT      |
-| 27    | LIST_CERTS          | List of certificates in the certificate cache           | MT      |
-| 28    | REMOVE_CERT         | Remove a certificate from the certificate cache          | ST      |
-| 29    | VERIFY_CERT         | Certificate validation                              | MT      |
-| 30    | GENERATE_CERTBUNDLE | Generate a certificate bundle                      | IND      |
-| 31    | CERT_STATUS_BY_OCSP | Create an OCSP request and get an OCSP response | MT      |
-| 32    | ADD_CRL             | Add a CRL to the CRL cache                             | MT      |
-| 33    | CRL_INFO            | CRL information                                | MT      |
-| 34    | LIST_CRLS           | List of CRLs in the CRL cache                          | MT      |
-| 35    | REMOVE_CRL          | Remove outdated CRLs from the CRL cache                 | ST      |
-| 36    | RANDOM_BYTES        | Generate a pseudorandom sequence           | MT      |
-| 37    | DIGEST              | Data hashing                                    | IND      |
-| 38    | ASN1_DECODE         | Decode DER-encoded ASN.1 data              | IND      |
-| 39    | ASN1_ENCODE         | Encode data according to ASN.1 DER encoding         | IND      |
+| 21    | AUGMENT_CMS         | Augment a CAdES signature (T, B-LT, B-LTA)        | MT      |
+| 22    | VERIFY              | Verify signed data                          | MT      |
+| 23    | ENCRYPT             | Encrypt data                                   | MT      |
+| 24    | DECRYPT             | Decrypt data                                 | MT      |
+| 25    | ADD_CERT            | Add a certificate to the certificate cache             | MT      |
+| 26    | CERT_INFO           | Certificate information                          | MT      |
+| 27    | GET_CERT            | Get a certificate from the certificate cache           | MT      |
+| 28    | LIST_CERTS          | List of certificates in the certificate cache           | MT      |
+| 29    | REMOVE_CERT         | Remove a certificate from the certificate cache          | ST      |
+| 30    | VERIFY_CERT         | Certificate validation                              | MT      |
+| 31    | GENERATE_CERTBUNDLE | Generate a certificate bundle                      | IND      |
+| 32    | CERT_STATUS_BY_OCSP | Create an OCSP request and get an OCSP response | MT      |
+| 33    | ADD_CRL             | Add a CRL to the CRL cache                             | MT      |
+| 34    | CRL_INFO            | CRL information                                | MT      |
+| 35    | LIST_CRLS           | List of CRLs in the CRL cache                          | MT      |
+| 36    | REMOVE_CRL          | Remove outdated CRLs from the CRL cache                 | ST      |
+| 37    | RANDOM_BYTES        | Generate a pseudorandom sequence           | MT      |
+| 38    | DIGEST              | Data hashing                                    | IND      |
+| 39    | ASN1_DECODE         | Decode DER-encoded ASN.1 data              | IND      |
+| 40    | ASN1_ENCODE         | Encode data according to ASN.1 DER encoding         | IND      |
+| 41    | ADD_TRUST_LIST      | Add a trusted list | MT      |
+| 42    | LIST_TRUST_LISTS    | The list of the accepted trusted lists | MT      |
 
 Table 3. List of exported library functions
 
@@ -231,6 +235,8 @@ Table 4. Methods of the shared memory (uapki_session_shared_memory_process)
 | 10    | CRL_INFO        | CRL information                                                                             | MT      |
 | 11    | LIST_CRLS       | List of CRLs in the shared CRL cache                                                        | MT      |
 | 12    | REMOVE_CRL      | Remove outdated CRLs from the shared CRL cache                                              | ST      |
+| 13    | ADD_TRUST_LIST   | Add a trusted list: in effect for all sessions of the shared memory | MT      |
+| 14    | LIST_TRUST_LISTS | The list of the accepted trusted lists of the shared memory | MT      |
 
 ### Function uapki_session_shared_memory_create
 
@@ -351,6 +357,8 @@ Library parameters can be set in two ways: via parameters or via a configuration
 
 If the library parameters are not set, the default parameters will be used. To work with storages, the storage provider parameters must be set.
 
+A repeated call of the method for a library (a session, a shared memory) that is already initialized changes nothing and returns the error ALREADY_INITIALIZED; the result field of the response then has the field "parameters" (Object) — the parameters the library was initialized with: in the structure of the parameters field of the request, for a configuration file — its content with the "configFile" field, without the "proxy.credentials" field.
+
 Starting from version 2.0.16, the INIT method (by default) performs a self-test. The self-test can be canceled by setting the skipSelfTest parameter to true. The duration of the self-test depends on system performance. It is enough to run the self-test once per process: later INIT calls, including those in other sessions, can pass skipSelfTest = true.
 
 ### Structure of the parameters field in the request using a configuration file
@@ -377,6 +385,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | cmProviders     | Object<br>CMPROVIDERS_PARAMS | Storage provider parameters. Optional                 |
 | certCache       | Object<br>CERT_CACHE_PARAMS  | Certificate cache parameters. Optional.              |
 | crlCache        | Object<br>CRL_CACHE_PARAMS   | CRL cache parameters. Optional                        |
+| trustListCache  | Object<br>TRUST_LIST_CACHE_PARAMS | Trusted lists parameters. Optional |
 | offline         | Boolean                      | "Offline" operation mode. Optional                     |
 | ocsp            | Object<br>OCSP_PARAMS        | OCSP service parameters. Optional                    |
 | proxy           | Object<br>PROXY_PARAMS       | PROXY service parameters. Optional                   |
@@ -389,7 +398,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | **Field name** | **Type**  | **Description**                                                                                                                                    |
 | -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | path           | String   | Full path to the directory. Optional. If the path<br>to the directory is not set, only the<br>temporary in-memory certificate cache is used |
-| trustedCerts   | Base64[] | Array of trusted certificates. Optional                                                                                                  |
+| trustedCerts   | Base64[] | Array of trusted certificates. Optional. A certificate chain is built up to the first trusted certificate |
 
 ### Structure CRL_CACHE_PARAMS
 
@@ -398,11 +407,21 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | path           | String  | Full path to the directory. Optional. If the path<br>to the directory is not set, only the<br>temporary in-memory CRL cache is used |
 | useDeltaCrl    | Boolean | Use delta CRL. Optional,<br>default true                                                                |
 
+### Structure TRUST_LIST_CACHE_PARAMS
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| path           | String   | Full path to the directory of trusted lists. Optional. The directory<br>keeps the last accepted version of every trusted list (the<br>ADD_TRUST_LIST method); at initialization the kept lists are<br>verified and applied again. If the path is not set, trusted lists<br>are in effect until the library is deinitialized |
+| trustListSignerCerts | Base64[] | The certificates that sign trusted lists. Optional. A trusted list<br>is accepted only if it is signed by one of these certificates. Such<br>a certificate is not a trusted certificate of a certificate chain;<br>a certificate of certCache.trustedCerts is not a certificate for<br>signing trusted lists |
+
 ### Structure OCSP_PARAMS
 
 | **Field name** | **Type** | **Description**                                                                                                                                                                                                                                               |
 | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | nonceLen       | Integer | Length of the one-time random number in the OCSP<br>request. Value range: 0, 8..64. If the value<br>equals 0 or is out of range, the<br>random number in the OCSP request is not used.<br>Optional, default is 20 |
+| cacheTime      | Integer | Time (minutes) an OCSP response without nextUpdate is taken<br>from the cache: up to thisUpdate + cacheTime; a response<br>with nextUpdate is taken from the cache up to nextUpdate. A<br>response older than that is not cached.<br>Optional, default is 30 |
+| maxFreshness   | Integer | Maximum freshness (minutes) of an OCSP response without<br>nextUpdate when verifying a signature (ETSI EN 319 102-1, 5.2.5):<br>the response is used if thisUpdate > validation time - maxFreshness;<br>a response with nextUpdate - if nextUpdate > validation time.<br>It should be greater than cacheTime for the signatures of the<br>library to pass the verification. A response obtained from<br>the server is rejected if it is not fresh at the current time.<br>Optional, default is 120 |
+| responderCrlEmbedMaxSize | Integer | The largest size (bytes) of a CRL of an OCSP responder without<br>id-pkix-ocsp-nocheck embedded into a CAdES-B-LT/B-LTA signature<br>(a limit of the size of the signature). A bigger CRL is used for<br>the validation but not embedded, and such a signature is not a<br>complete B-LT (ETSI EN 319 122-1, table 1, requirement o).<br>Optional, default is 10240 |
 
 ### Structure PROXY_PARAMS
 
@@ -416,7 +435,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | **Field name** | **Type** | **Description**                                                                                                                                                                                                                                            |
 | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | certReq        | Boolean | Requirement to return the service certificate in the TSP response.<br>Optional, default is false                                                                                                                                                 |
-| forced         | Boolean | Requirement to use the TSP service URLs<br>specified in the "url" field, ignoring the addresses specified in the<br>signer's certificate. Optional,<br>default is false                                                               |
+| forced         | Boolean | Requirement to use the TSP service URLs<br>specified in the "url" field, ignoring the addresses specified in the<br>signer's certificate. Without it all the TSP services of the signer's<br>certificate are tried first (in random order), then, if they are absent,<br>do not respond or refuse, all the addresses of "url" in their order.<br>Optional, default is false                                                               |
 | nonceLen       | Integer | Length of the one-time random number in the TSP<br>request. Value range: 0, 4..32. If the value<br>equals 0 or is out of range, the<br>random number in the TSP request is not used.<br>Optional, default is 8 |
 | policyId       | OID     | Identifier of the TSP service policy. If the field<br>is absent or its value is an empty string, the TSP service<br>policy parameter in the request is not used.<br>Optional                                                                            |
 
@@ -484,6 +503,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | ---------------- | ------------------------- | -------------------------------------- |
 | certCache        | Object<br>CERT_CACHE_INFO | Information about the certificate cache state  |
 | crlCache         | Object<br>CRL_CACHE_INFO  | Information about the CRL cache state           |
+| trustListCache   | Object<br>TRUST_LIST_CACHE_INFO | Information about trusted lists. Optional — present if<br>trustListCache.path is set |
 | countCmProviders | Integer                   | Number of loaded storage providers |
 | cmProviders      | Object<br>CM_PROVIDERS_INFO | Outcome of loading the storage providers from the cmProviders.allowedProviders parameter. Absent for the shared memory of sessions |
 | offline          | Boolean                   | "Offline" operation mode                  |
@@ -498,6 +518,14 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | ----------------- | ------- | --------------------------------------------------- |
 | countTrustedCerts | Integer | Number of trusted certificates in the certificate cache |
 | countCerts        | Integer | Total number of certificates in the certificate cache |
+
+### Structure TRUST_LIST_CACHE_INFO
+
+| **Field name**    | **Type** | **Description** |
+| ----------------- | -------- | --------------- |
+| countLists        | Integer  | Number of trusted lists applied from the directory |
+| countRefusedLists | Integer  | Number of trusted lists of the directory that are not accepted |
+| countListsNextUpdatePassed | Integer | Number of the accepted trusted lists whose next update time<br>is passed (the list is to be obtained again) |
 
 ### Structure CM_PROVIDERS_INFO
 
@@ -527,6 +555,9 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | **Field name** | **Type** | **Description**                                                                                                                                     |
 | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | nonceLen       | Integer | Length of the one-time random nonce in the OCSP<br>request. If the value equals 0, the random<br>nonce in the OCSP request is not used |
+| cacheTime      | Integer | Cache time of an OCSP response without nextUpdate (minutes) |
+| maxFreshness   | Integer | Maximum freshness of an OCSP response without nextUpdate (minutes) |
+| responderCrlEmbedMaxSize | Integer | The largest size of a CRL of an OCSP responder embedded into a signature (bytes) |
 
 ### Structure PROXY_INFO
 
@@ -1554,7 +1585,7 @@ When the "ignoreCertStatus" parameter is set to true, the status of the key owne
 
 When the "checkTrustedRoot" parameter is set to true, the status check of the key owner's certificate (and of the time-stamp certificate) requires the certificate chain to end in a trusted root certificate, otherwise the error CERT_NOT_TRUSTED is returned. Default false: whether to trust is decided by the one who verifies the signature. If the status is not checked ("ignoreCertStatus"), the parameter has no effect.
 
-Signature formats are described in Appendix B. The signature format names "CAdES-LT" and "CAdES-LTA" are synonyms for "CAdES-XL" and "CAdES-A" respectively.
+Signature formats are described in Appendix B. In the formats "CAdES-B-LT" and "CAdES-B-LTA" (ETSI EN 319 122-1) the signature is made as CAdES-T with the signingTime attribute, then it is validated and augmented with the validation data (and the archive time-stamp) by the code of the AUGMENT_CMS method; the revocation data obtained when signing is used. If the validation does not give "TOTAL-VALID", the error NOT_ALLOWED is returned. For compatibility the SIGN and BUILD_CMS_2PASS methods accept the names "CAdES-LT" and "CAdES-LTA" as synonyms of "CAdES-XL" and "CAdES-A" respectively. These are not the B-LT and B-LTA levels of the baseline signatures of ETSI EN 319 122-1: those keep the validation data in SignedData and have no reference and value attributes.
 
 ### Structure of the parameters field in the request
 
@@ -1568,13 +1599,13 @@ Signature formats are described in Appendix B. The signature format names "CAdES
 
 | **Field name**   | **Type** | **Description**                                                                                                         |
 | ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
-| signatureFormat  | String  | Signature format:<br>"RAW", "CMS", "CAdES-BES", "CAdES-T", "CAdES-C",<br>"CAdES-XL" ("CAdES-LT"), "CAdES-A" ("CAdES-LTA") |
+| signatureFormat  | String  | Signature format:<br>"RAW", "CMS", "CAdES-BES", "CAdES-T", "CAdES-C",<br>"CAdES-XL", "CAdES-A", "CAdES-B-LT", "CAdES-B-LTA" |
 | signAlgo         | OID     | Signature algorithm identifier. Optional                                                                                |
-| digestAlgo       | OID     | Digest algorithm identifier. Optional                                                                                   |
+| digestAlgo       | OID     | Digest algorithm identifier. Optional.<br>For the RSASSA-PSS signature algorithm ("1.2.840.113549.1.1.10") —<br>also the hash of the signature, SHA-256 by default |
 | detachedData     | Boolean | Detached signature (data is not encapsulated).<br>Optional, default true                                                |
 | includeCert      | Boolean | Add the key owner's certificate to the signature.<br>Optional, default false                                            |
 | includeTime      | Boolean | Add the host time (untrusted) to the signature.<br>Optional, default false                                              |
-| includeContentTS | Boolean | Add a content timestamp to the signature.<br>Optional, default false                                                    |
+| includeContentTS | Boolean | Add a content timestamp to the signature<br>(for any signature format).<br>Optional, default false                      |
 | signaturePolicy  | Object  | Signature policy, contains the sigPolicyId field (OID —<br>signature policy identifier). Optional                       |
 
 ### Structure DATA_TBS_PARAMS
@@ -1627,6 +1658,7 @@ Signature formats are described in Appendix B. The signature format names "CAdES
 | contentTimeStamp   | Time    | Content timestamp value. Optional                                            |
 | signatureTimeStamp | Time    | Signature timestamp value. Optional                                          |
 | archiveTimeStamp   | Time    | Archive timestamp value. Optional                                            |
+| warnings           | String[] | Remarks on the augmentation of the signature (the formats "CAdES-B-LT"<br>and "CAdES-B-LTA"), as in the AUGMENT_CMS method. Optional |
 
 ### Request example
 
@@ -1674,13 +1706,13 @@ The method is intended for two-pass generation of a signature according to PKCS#
 
 The input and output parameters for the first pass are named step1, for the second - step2. The step1 and step2 parameters are optional, but at least one of them must be specified in the request.
 
-The method supports generation of PKCS#7 signatures of the following formats: "CMS", "CAdES-BES", "CAdES-T", "CAdES-XL" and "CAdES-A".
+The method supports generation of PKCS#7 signatures of the following formats: "CMS", "CAdES-BES", "CAdES-T", "CAdES-XL", "CAdES-A", "CAdES-B-LT" and "CAdES-B-LTA". For "CAdES-B-LT" and "CAdES-B-LTA" the signed attributes of the first pass must contain signingTime (the includeTime or signingTime parameter), otherwise the second pass returns the error ATTRIBUTE_NOT_PRESENT; on the second pass the signature is validated and augmented in the same way as by the SIGN method.
 
 On the first pass, data corresponding to the signedAttributes structure is generated. Additionally, the hash value of this data can be obtained: the digestAlgo parameter must be specified - the result will be in the digestBytes field.
 
 On the second pass, all parameters required for the final generation of the PKCS#7 signature are specified.
 
-To generate a CAdES signature, on the first pass the certId and includeSigningCert (value true) parameters must be specified, and on the second pass the certId and signatureFormat parameters with the corresponding CAdES format value. When a CAdES signature is created with a timestamp, the includeContentTS parameter (value true) must be specified on the first pass, and on the second pass the signatureFormat parameter with one of the values: "CAdES-T", "CAdES-XL" and "CAdES-A".
+To generate a CAdES signature, on the first pass the certId and includeSigningCert (value true) parameters must be specified, and on the second pass the certId and signatureFormat parameters with the corresponding CAdES format value. When a CAdES signature is created with a timestamp, the signatureFormat parameter with one of the values "CAdES-T", "CAdES-XL", "CAdES-A", "CAdES-B-LT" and "CAdES-B-LTA" must be specified on the second pass. A content timestamp is added on the first pass with the includeContentTS parameter (value true), for any signature format.
 
 ### Structure of the parameters field in the request
 
@@ -1701,7 +1733,7 @@ To generate a CAdES signature, on the first pass the certId and includeSigningCe
 | signingTime        | Time                            | Add a specified host time (untrusted).<br>Optional                                                                |
 | certId             | Base64                          | Certificate identifier in the certificate cache.<br>Optional                                                      |
 | includeSigningCert | Boolean                         | Add the signingCertificateV2 attribute (mandatory<br>for a CAdES signature).<br>Optional, defaults to false       |
-| includeContentTS   | Boolean                         | Add a content timestamp.<br>Optional, defaults to false                                                           |
+| includeContentTS   | Boolean                         | Add a content timestamp<br>(for any signature format).<br>Optional, defaults to false                             |
 | signedAttributes   | Object[],<br>ATTRIBUTE_PARAMS[] | Add an array of attributes to be signed.<br>Optional                                                              |
 
 ### Structure of STEP2_CMS_PARAMS
@@ -1709,16 +1741,16 @@ To generate a CAdES signature, on the first pass the certId and includeSigningCe
 | **Field name**     | **Type**                        | **Description**                                                                                        |
 | ------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | bytes              | Base64                          | Signed attributes (the signedAttributes field)                                                         |
-| signatureFormat    | String                          | Signature format:<br>"CMS", "CAdES-BES", "CAdES-T",<br>"CAdES-XL" ("CAdES-LT"), "CAdES-A" ("CAdES-LTA") |
+| signatureFormat    | String                          | Signature format:<br>"CMS", "CAdES-BES", "CAdES-T",<br>"CAdES-XL", "CAdES-A", "CAdES-B-LT", "CAdES-B-LTA" |
 | signAlgo           | OID                             | Signature algorithm identifier                                                                         |
 | signAlgoParams     | Base64                          | Signature algorithm parameters. Optional                                                               |
 | signBytes          | Base64                          | Signature value of the signed attributes                                                               |
 | digestAlgo         | OID                             | Hash algorithm identifier                                                                              |
 | digestAlgoParams   | Base64                          | Hash algorithm parameters (DER encoding).<br>Optional                                                  |
-| certId             | Base64                          | Certificate identifier in the certificate cache.<br>Optional, only for a CAdES signature               |
-| keyId              | Base64                          | Key identifier.<br>Optional, only for a CMS signature                                                  |
+| certId             | Base64                          | Certificate identifier in the certificate cache.<br>Mandatory for a CAdES signature; optional for a CMS<br>signature (the certificate for includeCert) |
+| keyId              | Hex                             | Key identifier (the value of the id field of the KEYS<br>method).<br>Only for a CMS signature          |
 | contentBytes       | Base64                          | Content data. Optional                                                                                 |
-| includeCert        | Boolean                         | Add the key owner's certificate. Optional                                                              |
+| includeCert        | Boolean                         | Add the key owner's certificate. For a CMS signature<br>without certId the certificate is found in the cache<br>by keyId; if it is absent - the error CERT_NOT_FOUND.<br>Optional, defaults to false |
 | unsignedAttributes | Object[],<br>ATTRIBUTE_PARAMS[] | Add an array of unsigned attributes.<br>Optional                                                       |
 | options            | Object,<br>OPTION_PARAMS        | Set of additional parameters. Optional                                                                 |
 
@@ -2013,17 +2045,95 @@ When generating a new PKCS#7 signature, the removal operations (the remove field
 }
 ```
 
+## AUGMENT_CMS method
+
+The method is intended for the augmentation of a CAdES signature (ETSI EN 319 102-1, 4.3.3-4.3.5; ETSI EN 319 122-1): CAdES-BES -> CAdES-T, CAdES-BES or CAdES-T -> CAdES-B-LT or CAdES-B-LTA, CAdES-B-LT -> CAdES-B-LTA. No key is needed.
+
+Signatures with the attributes of the CAdES-C, CAdES-XL and CAdES-A formats (certificateRefs, revocationRefs, certValues, revocationValues, CAdES-C-timestamp, time-stamped-certs-crls-references) are not augmented - the error NOT_SUPPORTED: the B-LT and B-LTA levels do not have these attributes.
+
+If the signature already has the CAdES-B-LTA format, the format "CAdES-B-LTA" adds the next archive time-stamp (re-archiving, ETSI EN 319 102-1, 4.3.5): first the validation data of the earlier time-stamps (the TSA certificates and their revocation data) is added to SignedData, then a new archive-time-stamp-v3 whose index covers the earlier archive time-stamps too. Re-archiving is done before the TSA certificate of the earlier archive time-stamp expires or before its algorithms stop being considered strong. No data is added to SignedData if the signature has an archive time-stamp without an index in its token (CAdES-A of earlier versions of the library) - the error NOT_SUPPORTED.
+
+The format "CAdES-A" is for a signature with the attributes of ETSI TS 101 733 (CAdES-C, CAdES-XL, CAdES-A): a new archive-time-stamp-v3 with ats-hash-index-v3 is added. For a signature without such attributes ("CAdES-B-LTA" is used) and for a signature with an archive-time-stamp of the earlier version (id-aa-ets-archiveTimestampV2) - the error NOT_SUPPORTED.
+
+A detached signature (the data is not encapsulated) needs the data: the "content", "file" or "ptr" and "size" field of the SIGNATURE_DATA structure, as in the VERIFY method; with "isDigest" true the "content" field contains the hash of the data by the digest algorithm of the signature. Without the data the validation gives INDETERMINATE, and the signature is not augmented.
+
+The freshness of the revocation data is set by the "options.revocationFreshness" parameter (minutes, from 0 to 120, default 120): if the signature has no revocation data yet, the OCSP responses from the cache and the CRLs from the CRL cache issued (thisUpdate) earlier than the given number of minutes before the call of the method are obtained again; 0 - always new data. An OCSP responder working by CRLs returns thisUpdate of that CRL. The data the signature already has is used as it is.
+
+### Structure of the parameters field in the request
+
+| **Field name**  | **Type**                 | **Description**                                                                                              |
+| --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| signature       | Object<br>SIGNATURE_DATA | SIGNATURE_DATA structure (as in the VERIFY method): the signature and, for a detached signature, the data     |
+| signatureFormat | String                   | The format the signature is augmented to:<br>"CAdES-T", "CAdES-B-LT", "CAdES-B-LTA", "CAdES-A"               |
+| signerInfoIndex | Integer                  | Index of the signature (SignerInfo structure), the first is 0.<br>Optional, by default all the signatures are augmented |
+| options         | Object<br>AUGMENT_OPTIONS | Validation parameters. Optional                                                                             |
+
+### Structure of AUGMENT_OPTIONS
+
+| **Field name**          | **Type** | **Description**                                                                                                               |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| revocationFreshness     | Integer | Freshness of the revocation data (minutes, 0-120).<br>Optional, defaults to 120                                                |
+| onlyCrl                 | Boolean | Use CRLs exclusively. Optional, defaults to<br>"validationByCrl" of the initialization                                         |
+| checkCriticalExtensions | Boolean | As in the VERIFY method. Optional, defaults to false                                                                           |
+| caRemovesExpiredCerts   | Boolean | As in the VERIFY method. Optional, defaults to false                                                                           |
+
+### Structure of the result field in the response
+
+| **Field name** | **Type**                     | **Description**                                                                                                           |
+| -------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| bytes          | Base64                       | The augmented signature                                                                                                   |
+| signatureInfos | Object[]<br>SIGNATURE_INFO[] | The result of the validation of the augmented signatures, as in the VERIFY method.<br>Present for the formats "CAdES-B-LT" and "CAdES-B-LTA", also on the error NOT_ALLOWED |
+| warnings       | String[]                     | Remarks on the augmentation, e.g. "THE CRL OF THE OCSP RESPONDER<br>IS NOT EMBEDDED (SIZE LIMIT)" - the CRL of an OCSP responder is bigger<br>than "ocsp.responderCrlEmbedMaxSize" of INIT and not embedded. Optional |
+
+### Example request
+
+```
+{
+  "method": "AUGMENT_CMS",
+  "parameters": {
+    "signature": {
+      "bytes": "MIIIiQYJKoZI...t7BYR9fjvW4=",
+      "file": "C:/docs/contract.pdf"
+    },
+    "signatureFormat": "CAdES-B-LTA",
+    "options": { "revocationFreshness": 0 }
+  }
+}
+```
+
+### Example response
+
+```
+{
+  "errorCode": 0,
+  "method": "AUGMENT_CMS",
+  "result": {
+    "signatureInfos": [
+      {
+        "signerCertId": "MIIBXzCCAQag...",
+        "status": "TOTAL-VALID",
+        "signatureFormat": "CAdES-T",
+        ...
+      }
+    ],
+    "bytes": "MIIUsgYJKoZI...9fjvW4=="
+  }
+}
+```
+
 ## VERIFY method
 
 The method is intended for validation of a signature in CMS/CAdES format or in the output format of cryptographic primitives ("RAW"). The description of signature formats is given in Appendix B. The "signature" field is mandatory — the signed data is stored in the "signature.bytes" field
 
 To validate a CMS/CAdES-format signature as a detached signature, the original data is additionally specified in the "signature.content" field. If the CMS/CAdES-format signature has encapsulated data, the "signature.content" field is not used.
 
-The method supports three types of validation of a CMS/CAdES-format signature (the "options.validationType" field): 1) "STRUCT" — validation of the signature structure (default), the signature data structure, the electronic signature of the signed attributes and timestamps (if present) are verified;
+The method supports four types of validation of a CMS/CAdES-format signature (the "options.validationType" field): 1) "STRUCT" — validation of the signature structure (default), the signature data structure, the electronic signature of the signed attributes and timestamps (if present) are verified;
 
 2. "CHAIN" — validation of the signature structure and the certificate chain, includes item 1 and building the certificate chain of the signer and of the timestamps (if present), by which the validity of the certificate chain can be verified;
 
 3. "FULL" — full validation of the signature, includes item 2 and validation of the validity of all certificates in the chain at the moment the signature was created.
+
+4. "FULL-ETSI" — full validation of the signature with the report of ETSI EN 319 102-1 and ETSI TS 119 102-2 and a validation policy (see the section «The validation type "FULL-ETSI"»).
 
 For the "CHAIN" and "FULL" types the certificate chain must end in a trusted root certificate (the "trustedCerts" field at initialization or certificates marked as trusted in the certificate cache). If the root certificate is not trusted, or a certificate needed to build the chain is missing (the "expectedCerts" field), the status of the signature is "INDETERMINATE".
 
@@ -2047,7 +2157,7 @@ If a certificate is missing for validation, the information for finding it is st
 
 If a CRL is missing to determine the certificate status, the information for finding it is stored in the "expectedCrls" field (an array of EXPECTED_CRL_INFO records).
 
-The "warnings" field contains warnings about the signature validation result (an array of text strings).
+The "warnings" field contains warnings about the signature validation result (an array of text strings). With the validation type "STRUCT" it always has the warning "THE CERTIFICATE CHAIN AND THE REVOCATION STATUS ARE NOT CHECKED (VALIDATION TYPE STRUCT)", with the type "CHAIN" - "THE REVOCATION STATUS OF THE CERTIFICATES IS NOT CHECKED (VALIDATION TYPE CHAIN)": the status of a signature of these types does not take into account what they do not check. If the order of the time-stamps of a signature is not kept (the content, the signature, the archive ones - each not earlier than the previous one given the accuracy and the ordering field, RFC 3161, 2.4.2), the result is INDETERMINATE with the warning "THE ORDER OF THE TIME-STAMPS IS NOT KEPT".
 
 During full signature validation, the following logic is used to determine the certificate status:
 | Signature formats        | Description                                                     |
@@ -2055,7 +2165,7 @@ During full signature validation, the following logic is used to determine the c
 | "CAdES-BES",             | The OCSP service is used first; if the online status cannot be  |
 | "CAdES-T"                | determined, the CRL is used                                     |
 | "CAdES-C",               | The CRL is used first; if the CRL cannot be obtained, the       |
-| "CAdES-XL",<br>"CAdES-A" | OCSP service is used                                            |
+| "CAdES-XL",<br>"CAdES-A",<br>"CAdES-B-LT",<br>"CAdES-B-LTA" | OCSP service is used                                            |
 
 To forbid the use of the OCSP service, the "options.onlyCrl" parameter must be set to true (default — as "validationByCrl" at initialization) or the library must be initialized with the "validationByCrl" parameter set to true. The "options.onlyCrl" parameter has higher priority than the (global) "validationByCrl".
 
@@ -2092,6 +2202,7 @@ Validating a RAW-format signature requires more parameters:
 | **Field name** | **Type** | **Description**                 |
 | -------------- | ------- | ------------------------------- |
 | signAlgo       | OID     | Signature algorithm identifier  |
+| digestAlgo     | OID     | Digest algorithm identifier for the RSASSA-PSS signature<br>algorithm ("1.2.840.113549.1.1.10").<br>Optional, SHA-256 by default |
 
 ### Structure of SIGNER_PUBKEY
 
@@ -2105,9 +2216,13 @@ Validating a RAW-format signature requires more parameters:
 
 | **Field name**        | **Type** | **Description**                                                                                                                                                   |
 | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| validationType        | String  | Signature validation type:<br>"STRUCT", "CHAIN", "FULL".<br>Optional, defaults to "STRUCT"                                                                       |
+| validationType        | String  | Signature validation type:<br>"STRUCT", "CHAIN", "FULL", "FULL-ETSI".<br>Optional, defaults to "STRUCT"                                                                       |
+| validationPolicy      | String,<br>Object<br>VALIDATION_POLICY | Validation policy for the type "FULL-ETSI": a name<br>("UkraineDefault", "EtsiStrict") or a VALIDATION_POLICY object.<br>Optional, defaults to "UkraineDefault" |
 | verifySignerInfoIndex | Integer | Verify an individual user (the first index<br>equals 0). If the index equals -1, all<br>users are verified.<br>Optional, defaults to -1                          |
+| proofOfExistenceTime | String | The type "FULL-ETSI": the time ("YYYY-MM-DD hh:mm:ss", UTC) the<br>application attests the signature with all its objects existed<br>at (a proof of existence given as an input, ETSI EN 319 102-1,<br>5.6.3). Used by the past validation. Optional |
 | onlyCrl               | Boolean | Use CRLs exclusively. Optional, defaults to<br>"validationByCrl" of the initialization                                                                           |
+| checkCriticalExtensions | Boolean | A certificate with an unknown critical extension is unusable<br>(RFC 5280, 4.2). Optional, defaults to false                                                   |
+| caRemovesExpiredCerts | Boolean | The CAs remove the expired certificates from their revocation<br>data (RFC 5280, 3.3): data issued after a certificate expired<br>does not prove it is not revoked. Optional, defaults to false<br>(the CAs keep the status of such certificates)                                       |
 
 Depending on the format of the signed data, the structure of the result field in the response differs.
 
@@ -2137,7 +2252,7 @@ Depending on the format of the signed data, the structure of the result field in
 | **Field name**      | **Type** | **Description**                                                                                                           |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
 | signerCertId        | Base64  | Identifier of the signer's certificate.<br>Optional                                                                      |
-| signatureFormat     | String  | CMS/CAdES signature format:<br>"CMS", "CAdES-BES", "CAdES-T", "CAdES-C",<br>"CAdES-XL", "CAdES-A"                        |
+| signatureFormat     | String  | CMS/CAdES signature format:<br>"CMS", "CAdES-BES", "CAdES-T", "CAdES-C",<br>"CAdES-XL", "CAdES-A", "CAdES-B-LT", "CAdES-B-LTA" |
 | status              | String  | Signed data status:<br>"UNDEFINED", "INDETERMINATE", "TOTAL-FAILED",<br>"TOTAL-VALID"                                    |
 | validSignatures     | Boolean | All cryptographic signatures related to the<br>signature format structure are valid                                      |
 | validDigests        | Boolean | All hashes related to the signature format<br>structure are valid                                                        |
@@ -2155,7 +2270,8 @@ Depending on the format of the signed data, the structure of the result field in
 | certificateRefs       | Object[]<br>CERT_REF_INFO[]       | Array of references to all certificates in the<br>certificateRefs attribute. Optional — present if<br>the signature has the corresponding attribute                                                                  |
 | certValues            | Base64[]                          | Array of identifiers of certificates present in the<br>certValues attribute (present in the signature formats<br>"CAdES-XL" and "CAdES-A"). Optional                                                                 |
 | revocationRefs        | Object[]<br>REVOCATION_REF_INFO[] | Array of references to all revocation elements in the<br>revocationRefs attribute (present in the signature formats<br>"CAdES-C", "CAdES-XL" and "CAdES-A"). Optional                                                 |
-| archiveTS             | Object<br>TIMESTAMP_INFO          | Archive timestamp. Optional — present<br>if the signed data has the corresponding attribute                                                                                                                           |
+| archiveTS             | Object<br>TIMESTAMP_INFO          | Archive timestamp (the first). Optional — present<br>if the signed data has the corresponding attribute                                                                                                               |
+| archiveTimeStamps     | Object[]<br>TIMESTAMP_INFO[]      | All the archive timestamps in the order they were added<br>(re-archiving). Optional — present if there is more than one                                                                                               |
 | signedAttributes      | Object[]<br>ATTRIBUTE_PARAMS[]    | Array of attributes stored in the<br>signedAttributes field                                                                                                                                                           |
 | unsignedAttributes    | Object[]<br>ATTRIBUTE_PARAMS[]    | Array of attributes stored in the<br>unsignedAttributes field. Optional                                                                                                                                               |
 | certificateChain      | Object[]<br>CERT_CHAIN_INFO[]     | Array of certificate chain validation results.<br>Optional — present when the signature validation<br>type is "CHAIN" or "FULL"                                                                                       |
@@ -2318,6 +2434,403 @@ Depending on the format of the signed data, the structure of the result field in
 | nextUpdate     | Time    | Creation time of the next CRL    |
 | crlNumber      | Hex     | Sequence number of the CRL issue |
 
+### The validation type "FULL-ETSI"
+
+The validation type "FULL-ETSI" performs the full validation of a signature and returns a report with the status indications of ETSI EN 319 102-1 (clause 5.1.3, tables 5 and 6) in the structure of ETSI TS 119 102-2 (the field names are those of the XML Schema of that standard, with the first letter in lower case). The structure of the result field for this type is FULL_ETSI_RESULT; it differs from the structure for the types "STRUCT", "CHAIN" and "FULL".
+
+The "errorCode" field of the response of the method is 0 when the report is produced; everything found for a signature is in its report. A non-zero code is returned when the signed data cannot be parsed, the request is not correct or an internal error occurred.
+
+A signature is to be accepted only with the status "TOTAL-PASSED". The status "INDETERMINATE" means that the available data is not enough for a conclusion; its reasons are in the "subIndications" field.
+
+The validation constraints are set by a policy (the "options.validationPolicy" field): the name of a predefined policy, or a VALIDATION_POLICY object with the values that differ from a predefined one. For the type "FULL-ETSI" the fields "options.checkCriticalExtensions" and "options.caRemovesExpiredCerts" are not used: they are defined by the policy. The field "options.onlyCrl" is in effect: the data on the status of a certificate that the signature has (CRL, OCSP) is used as it is, and if there is none or it does not meet the requirements, no request to an OCSP service is made and the status is determined by CRL.
+
+### Structure of VALIDATION_POLICY
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| basedOn | String | The predefined policy whose values are changed:<br>"UkraineDefault", "EtsiStrict".<br>Optional, defaults to "UkraineDefault" |
+| revocationFreshness | Integer | Freshness of the data on the status of a certificate, minutes:<br>the data of the signature without the next update time is<br>usable if issued not earlier than this before the best<br>signature time. 0 - the strict freshness (ETSI EN 319 102-1,<br>5.2.5), the same for every certificate and for OCSP responses<br>and CRLs: the status must be issued after the best signature<br>time. Data issued before it: if its next update time is not<br>reached - "TRY_LATER" (in "reportData" - "tryAfter", that<br>time), it is not asked again; if there is no next update time<br>(an OCSP response) - newer data is asked. Without the strict<br>freshness a CRL is usable up to its next update time. Optional |
+| tsaExtendedKeyUsage | String | Extended key usage of a time-stamping service certificate:<br>"allowAdditional" — key purposes besides id-kp-timeStamping<br>are allowed; "strict" — only id-kp-timeStamping. Optional |
+| tsaTrust | String | The time a time-stamping service must be trusted at:<br>"timeStampTime" — the time of its time-stamp (RFC 3161, section 4:<br>a time-stamp made before the service was taken out of use is valid<br>unless the key of the service is compromised); "proofOfExistence" —<br>a time proven apart from the time-stamp: of a later time-stamp that<br>covers it, and without one — the validation time (ETSI EN 319 102-1).<br>Optional |
+| pastValidation | String | The past validation (ETSI EN 319 102-1, 5.6):<br>"bestSignatureTime" - the certification path is validated at the<br>best signature time; "proofOfExistence" - a signature is accepted<br>if it is proven to have existed at the control time of the path<br>(the trust anchor sunset date, the revocation of a CA certificate,<br>the end of the reliability of an algorithm) and there are proofs of<br>existence of the certificates and revocation data of the path at<br>that time (an archive time-stamp). Optional |
+| certificatePathModel | String | The model of the path in the past validation (5.6.2.2):<br>"shell" - the revocation of any certificate of the path moves<br>the control time; "chain" - the revocation of a CA certificate<br>moves it only if the reason is a compromise or is not given.<br>Optional |
+| timeStampDelay | Integer | Time-stamp delay, minutes (0-525600): the claimed signing time<br>(signing-time) plus the delay must be after the time of the<br>signature time-stamp, else "SIG_CONSTRAINTS_FAILURE"; the same<br>if a signature with a time-stamp has no signing time<br>(ETSI EN 319 102-1, 5.5.4, step 5). 0 - no delay is specified.<br>Optional |
+| cryptographicConstraints | String | Constraints on cryptographic algorithms (ETSI EN 319 102-1,<br>5.2.8.4.1): "off" - not applied; "warning" - a violation is<br>reported and does not change the result; "fail" - a violation<br>gives "CRYPTO_CONSTRAINTS_FAILURE_NO_POE" (INDETERMINATE), and a<br>signature made after the date (by a content time-stamp) -<br>"CRYPTO_CONSTRAINTS_FAILURE" (TOTAL-FAILED). Optional |
+| cryptographicAlgorithms | Object[]<br>CRYPTO_ALGORITHM[] | Changes to the constraints of the library: a record replaces<br>the constraint of the same algorithm and key size or adds<br>a new one. Optional |
+| signerKeyUsage | String | Key usage of the signing certificate:<br>"digitalSignatureOrNonRepudiation" or "nonRepudiation".<br>Optional |
+| caRemovesExpiredCerts | Boolean | The CAs remove the expired certificates from the revocation<br>data. Optional |
+| checkCriticalExtensions | Boolean | A certificate with an unknown critical extension is unusable;<br>false — such an extension is a remark. Optional |
+
+An unknown policy name or an unknown field of the VALIDATION_POLICY object is the error INVALID_PARAMETER.
+
+The values of the predefined policies:
+
+| **Constraint** | **UkraineDefault** | **EtsiStrict** |
+| --- | --- | --- |
+| revocationFreshness | 120 | 120 |
+| tsaExtendedKeyUsage | "allowAdditional" | "strict" |
+| tsaTrust | "timeStampTime" | "proofOfExistence" |
+| pastValidation | "bestSignatureTime" | "proofOfExistence" |
+| certificatePathModel | "shell" | "shell" |
+| timeStampDelay | 0 | 0 |
+| cryptographicConstraints | "warning" | "fail" |
+| signerKeyUsage | "digitalSignatureOrNonRepudiation" | "digitalSignatureOrNonRepudiation" |
+| caRemovesExpiredCerts | false | true |
+| checkCriticalExtensions | false | true |
+
+Structure of the CRYPTO_ALGORITHM record:
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| algorithm      | String  | A hash algorithm ("SHA1", "SHA224", "SHA256", "SHA384", "SHA512",<br>"SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512", "RIPEMD128",<br>"RIPEMD160", "WHIRLPOOL", "GOST34311", "DSTU7564-256",<br>"DSTU7564-384", "DSTU7564-512") or a family of keys ("RSA", "EC") |
+| keySizeBelow   | Integer | For keys: the constraint concerns the keys shorter than this<br>number of bits. Optional |
+| reliableUntil  | String  | The date (YYYY-MM-DD) the algorithm is considered reliable until;<br>an empty string - no limit |
+
+The constraints of the library (ETSI TS 119 312; for the algorithms it lists no more - the dates of its earlier versions):
+
+| **Algorithm** | **Reliable until** |
+| ------------- | ------------------ |
+| SHA1 | 2012-08-01 |
+| RIPEMD160 | 2014-08-01 |
+| WHIRLPOOL | 2020-12-01 |
+| SHA224 | 2029-01-01 |
+| RSA, a key shorter than 1024 bits | 2010-08-01 |
+| RSA, a key shorter than 1900 bits | 2019-10-01 |
+| RSA, a key shorter than 3000 bits | 2029-01-01 |
+| EC, a key shorter than 224 bits | 2012-08-01 |
+| EC, a key shorter than 256 bits | 2021-10-01 |
+| GOST34311 | 2026-09-01, taken out of use |
+
+For an algorithm taken out of use only a certificate issued after the date does not meet the constraint; the certificates issued before meet it, and a signature or a time-stamp made after the date gives the warning "withdrawnAlgorithms". There are no constraints for the keys of DSTU 4145.
+
+### Structure of FULL_ETSI_RESULT (the result field for the validation type "FULL-ETSI")
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| content | Object<br>CONTENT_INFO | The CONTENT_INFO structure |
+| signatureValidationReports | Object[]<br>SIGNATURE_VALIDATION_REPORT[] | The report for every signature that was validated |
+| signatureValidationObjects | Object[]<br>VALIDATION_OBJECT[] | The objects used in the validation (certificates,<br>time-stamps); the reports refer to them by the "id" field |
+
+### Structure of SIGNATURE_VALIDATION_REPORT
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| signerInfoIndex | Integer | Index of the signer (the first one is 0) |
+| signatureIdentifier | Object<br>SIGNATURE_IDENTIFIER | Identification of the signature |
+| signatureValidationStatus | Object<br>VALIDATION_STATUS | Status of the signature: "mainIndication" is<br>"TOTAL-PASSED", "TOTAL-FAILED" or "INDETERMINATE" |
+| signatureValidationProcess | Object | The "signatureValidationProcessId" field — the validation<br>process of ETSI EN 319 102-1: "Basic" (5.3), "LTVM" (5.5),<br>"LTA" (5.6) |
+| validationTimeInfo | Object<br>VALIDATION_TIME_INFO | The validation time and the best signature time |
+| pastValidation | Object | The past validation (ETSI EN 319 102-1, 5.6.2): the "signature"<br>field and the "timeStamps" array (with the "id" field - the<br>identifier of the time-stamp). The fields of a record: "status" -<br>"PASSED" or "NO_POE"; "reason" - the reason if not "PASSED";<br>"controlTime" - the time the path is validated at;<br>"controlTimeReason" - why it is not the validation time<br>("TRUST_ANCHOR_SUNSET", "CERTIFICATE_REVOKED",<br>"CA_CERTIFICATE_REVOKED", "ALGORITHM_NOT_RELIABLE"); "poe" - the<br>proof of existence of the object ("poeTime", "typeOfProof",<br>"poeObject" - the time-stamp that gives it) |
+| signersDocument | Object | The "digestAlgAndValue" field (the DIGEST_ALG_AND_VALUE<br>structure) — the hash of the signed data, as signed. Optional |
+| signerInformation | Object | The "signerCertificate" field (Base64) — the identifier of the<br>signing certificate, the "signer" field (String) — the name of<br>its subject. Optional — when the certificate is identified |
+| signatureQuality | Object<br>SIGNATURE_QUALITY | Quality of the signature. Optional — present with the<br>status "TOTAL-PASSED" |
+| validationConstraintsEvaluationReport | Object<br>CONSTRAINTS_REPORT | The validation policy and the result of every constraint |
+| signatureFormat | String | Format of the CMS/CAdES signature (as in the SIGNATURE_INFO<br>structure) |
+| signAlgo | OID | Signature algorithm identifier |
+| signingTime | Time | Local signing time. Optional |
+| timeStamps | String[] | Identifiers of the time-stamps of the signature in the<br>"signatureValidationObjects" field |
+| certificates | Object[]<br>CERT_CHAIN_INFO[] | The certificates used, with the data on their status |
+| expectedCerts | Object[]<br>EXPECTED_CERT_INFO[] | The certificates missing for the validation. Optional |
+| expectedCrls | Object[]<br>EXPECTED_CRL_INFO[] | The CRLs missing for the validation. Optional |
+| signedAttributes | Object[]<br>ATTRIBUTE_PARAMS[] | Signed attributes |
+| unsignedAttributes | Object[]<br>ATTRIBUTE_PARAMS[] | Unsigned attributes. Optional |
+
+### Structure of SIGNATURE_IDENTIFIER
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| digestAlgAndValue | Object<br>DIGEST_ALG_AND_VALUE | The hash of the signed attributes |
+| signatureValue | Base64 | The signature value |
+| hashOnly | Boolean | Only the hash of the data to be signed was processed<br>(always false) |
+| docHashOnly | Boolean | The hash of the signed data was given instead of the data |
+
+### Structure of DIGEST_ALG_AND_VALUE
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| digestMethod | OID | Hash algorithm identifier |
+| digestValue | Base64 | Hash value. Optional |
+
+### Structure of VALIDATION_STATUS
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| mainIndication | String | Status. For a signature: "TOTAL-PASSED", "TOTAL-FAILED",<br>"INDETERMINATE"; for a constraint and a validation object:<br>"PASSED", "FAILED", "INDETERMINATE" |
+| subIndications | String[] | The reasons of a status that is not a success (ETSI EN 319 102-1,<br>table 6):<br>"FORMAT_FAILURE", "HASH_FAILURE", "SIG_CRYPTO_FAILURE",<br>"REVOKED", "EXPIRED", "NOT_YET_VALID",<br>"CHAIN_CONSTRAINTS_FAILURE", "CERTIFICATE_CHAIN_GENERAL_FAILURE", "NO_SIGNING_CERTIFICATE_FOUND",<br>"NO_CERTIFICATE_CHAIN_FOUND", "NO_CERTIFICATE_CHAIN_FOUND_NO_POE",<br>"REVOKED_NO_POE", "REVOKED_CA_NO_POE",<br>"OUT_OF_BOUNDS_NO_POE", "REVOCATION_OUT_OF_BOUNDS_NO_POE",<br>"TRY_LATER", "TIMESTAMP_ORDER_FAILURE",<br>"SIG_CONSTRAINTS_FAILURE", "CRYPTO_CONSTRAINTS_FAILURE",<br>"CRYPTO_CONSTRAINTS_FAILURE_NO_POE", "SIGNED_DATA_NOT_FOUND",<br>"CUSTOM".<br>Optional |
+| associatedValidationReportData | Object[]<br>VALIDATION_REPORT_DATA[] | The data of the status. Optional |
+
+### Structure of VALIDATION_REPORT_DATA
+
+An entry holds either the certificate chain (the fields "trustAnchor", "certificateChain") or the data of one reason of the status (the other fields).
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| trustAnchor | Base64 | Identifier of the trusted root certificate. Optional |
+| certificateChain | Object | The chain of the signing certificate: "signingCertificate"<br>(Base64), "intermediateCertificates" (Base64[]), "trustAnchor"<br>(Base64, optional). Optional |
+| relatedValidationObject | Base64 | Identifier of the certificate the reason is about. Optional |
+| revocationStatusInformation | Object | The revocation: "validationObjectId" (Base64) — the<br>certificate, "revocationTime" (Time), "revocationReason"<br>(String, optional): "unspecified", "keyCompromise",<br>"cACompromise", "affiliationChanged", "superseded",<br>"cessationOfOperation", "certificateHold", "removeFromCRL",<br>"privilegeWithdrawn", "aACompromise". Optional |
+| additionalValidationReportData | Object | The "reportData" field — an array of "type"/"value" pairs<br>(String): "mainIndication", "subIndication" — the status and<br>the reason the entry is about; "info" — a detail of the reason.<br>Optional |
+
+### Structure of VALIDATION_TIME_INFO
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| validationTime | Time | The validation time |
+| bestSignatureTime | Object | The best signature time: "poeTime" (Time), "typeOfProof"<br>(String, "validation"), "poeObject" (String, optional) — the<br>identifier of the time-stamp that proves it. Optional |
+
+### Structure of SIGNATURE_QUALITY
+
+If the certificate of the issuer of the signing certificate is in a trusted list (the ADD_TRUST_LIST method), the "basis" field is "trustedList": the quality is confirmed when the service issuing qualified certificates of the kind (for signatures or for seals) was provided both when the certificate was issued and at the best signature time; if it is not confirmed, the value is "AdESig" or "AdESeal". Otherwise the "basis" field is "certificate": the quality is determined by the data of the signing certificate, these are statements of its issuer.
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| signatureQualityInformation | String[] | Quality of the signature, one value (see the table below) |
+| basis | String | The basis of the conclusion: "trustedList" or "certificate" |
+| confirmedByTrustedList | Boolean | Flag indicating that the trusted list confirms what the certificate<br>states. Optional — present for "basis" equal to "trustedList" |
+| trustService | Object | The service of the trusted list: "listId", "type", "tspName",<br>"serviceName" (String) — as in the TRUST_SERVICE structure of the<br>CERT_INFO method. Optional |
+| qcStatements | String[] | Identifiers of the statements of the qcStatements extension<br>of the signing certificate |
+
+| **Value** | **Description** |
+| --- | --- |
+| "QESig", "QESeal" | The certificate is stated to be qualified (id-etsi-qcs-QcCompliance), the key is in a qualified device (id-etsi-qcs-QcSSCD) |
+| "AdESig-QC", "AdESeal-QC" | The certificate is stated to be qualified |
+| "AdESig-QC-old", "AdESeal-QC-old" | A qualified ("посилений") certificate under the former law of Ukraine on the electronic digital signature (the certificate policy 1.2.804.2.1.1.1.2.2), without the id-etsi-qcs-QcCompliance statement |
+| "AdESig", "AdESeal" | Other certificates |
+
+The values with "Seal" are for a certificate of an electronic seal: the id-etsi-qcs-QcType statement with the value id-etsi-qct-eseal, or the extended key usage 1.2.804.2.1.1.1.3.9.
+
+### Structure of CONSTRAINTS_REPORT
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| signatureValidationPolicy | Object | The validation policy: "policyName" (String) — "UkraineDefault",<br>"EtsiStrict" or "custom"; "basedOn" (String) — for "custom" |
+| validationConstraints | Object[]<br>VALIDATION_CONSTRAINT[] | The result of every constraint |
+
+### Structure of VALIDATION_CONSTRAINT
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| validationConstraintIdentifier | String | Identifier of the constraint (see the table below) |
+| validationConstraintParameter | Object | The value the policy gives to the constraint: "type"<br>("value"), "value" (String). Optional |
+| constraintStatus | Object | The "status" field: "applied" or "disabled" (not applied) |
+| level | String | "fail" — the result of the constraint defines the status of<br>the signature; "warning" — the result is a remark and does<br>not change the status of the signature. Optional — for an<br>applied constraint |
+| validationStatus | Object<br>VALIDATION_STATUS | The result of the constraint. Optional — for an applied<br>constraint |
+
+| **Identifier** | **What is checked** |
+| --- | --- |
+| formatChecking | Format of the signature |
+| identificationOfTheSigningCertificate | Identification of the signing certificate |
+| x509CertificateValidation | The chain of the signing certificate: building, validity periods, status |
+| x509ValidationOfTimeStampsAndRevocationData | The certificates of the time-stamps and of the status data |
+| cryptographicVerification | The hash of the signed data and the signature value |
+| validationMaterialReferences | The references to the certificates and to the status data match them (when the attributes are present) |
+| unknownCriticalExtensions | Unknown critical extensions of the certificates |
+| revocationFreshnessChecker | Freshness of the data on the status of a certificate |
+| caRemovesExpiredCerts | Status data issued after a certificate expired |
+| statusOfRevocationDataSigners | Status of the certificates of OCSP responders and CRL signers |
+| tsaExtendedKeyUsage | Extended key usage of a time-stamping service certificate |
+| tsaTrust | The time a time-stamping service must be trusted at |
+| signerKeyUsage | Key usage of the signing certificate |
+| cryptographicConstraints | Constraints on cryptographic algorithms: the hash algorithms<br>and key sizes of the signature, the certificates and the<br>time-stamps. In a "reportData" record - "algorithm" (the<br>algorithm, for a key with its size) and "reliableUntil" (the<br>date it was considered reliable until) |
+| withdrawnAlgorithms | Algorithms taken out of use by a decision of a regulator (not<br>for a cryptographic weakness): a signature or a time-stamp made<br>after the date. Always a warning |
+| pastValidation | The past validation of the signature (the value of "pastValidation") |
+| timeStampOrderAndDelay | Order of the time-stamps (the content, the signature, the archive<br>ones - each not earlier than the previous one given the accuracy<br>and the ordering field, RFC 3161, 2.4.2; else<br>"TIMESTAMP_ORDER_FAILURE" naming the time-stamps) and the<br>time-stamp delay (the value of "timeStampDelay") |
+| signaturePolicy | Signature policy (not applied) |
+
+### Structure of VALIDATION_OBJECT
+
+| **Field name** | **Type** | **Description** |
+| --- | --- | --- |
+| id | String | Identifier of the object in the report: for a certificate —<br>its identifier in the cache (Base64), for a time-stamp —<br>"TS-&lt;signer index&gt;-&lt;type&gt;[-&lt;number&gt;]" |
+| objectType | String | Type of the object: "certificate", "timestamp" |
+| CN, validity, selfSigned,<br>trusted, issuerCertId |  | For a certificate — as in the CERT_CHAIN_INFO structure |
+| revocationNotChecked | String | For the certificate of an OCSP responder or a CRL signer whose<br>status was not looked for - the reason: "ocspNoCheck" (the<br>id-pkix-ocsp-nocheck extension), "noRevocationAvailable" (the<br>noRevAvail or validity-assured-short-term extension),<br>"trustedList" (a service of a trusted list). Optional |
+| timeStampType | String | For a time-stamp: "CONTENT", "SIGNATURE", "ARCHIVE",<br>"ARCHIVE-V2" |
+| timeStampQualification | String | For a time-stamp whose certificate is in a trusted list: "QTSA" —<br>the qualified time-stamping service was provided at the time of the<br>time-stamp, "TSA" — otherwise. Optional |
+| poeProvisioning | Object | For a time-stamp: "poeTime" (Time) — the time of the<br>time-stamp. Optional |
+| validationReport | Object | For a time-stamp: the "signatureValidationStatus" field (the<br>VALIDATION_STATUS structure) — the result of its validation.<br>A time-stamp that does not pass the validation is not used |
+| genTime, policyId, hashAlgo,<br>hashedMessage, statusDigest,<br>statusSignature, signerCertId |  | For a time-stamp — as in the TIMESTAMP_INFO structure |
+
+### Request example for the validation type "FULL-ETSI"
+
+```
+{
+  "method": "VERIFY",
+  "parameters": {
+    "signature": {
+      "bytes": "MIIa2wYJKoZI...AAAAAAAAAAAA"
+    },
+    "options": {
+      "validationType": "FULL-ETSI",
+      "validationPolicy": {
+        "basedOn": "UkraineDefault",
+        "checkCriticalExtensions": true
+      }
+    }
+  }
+}
+```
+
+### Response example for the validation type "FULL-ETSI"
+
+```
+{
+  "errorCode": 0,
+  "method": "VERIFY",
+  "result": {
+    "content": {
+      "type": "1.2.840.113549.1.7.1"
+    },
+    "signatureValidationReports": [
+      {
+        "signerInfoIndex": 0,
+        "signatureIdentifier": {
+          "digestAlgAndValue": {
+            "digestMethod": "2.16.840.1.101.3.4.2.1",
+            "digestValue": "ns1xBg+UvlJJ...Qo5cF1c="
+          },
+          "signatureValue": "MEUCIQCEYV9s...8Xw5Aw==",
+          "hashOnly": false,
+          "docHashOnly": false
+        },
+        "signatureValidationStatus": {
+          "mainIndication": "INDETERMINATE",
+          "subIndications": [
+            "REVOKED_NO_POE"
+          ],
+          "associatedValidationReportData": [
+            {
+              "trustAnchor": "MDAwKzEUMBIG...AgEB",
+              "certificateChain": {
+                "signingCertificate": "MCwwJzEQMA4G...AgEL",
+                "intermediateCertificates": [
+                  "MDAwKzEUMBIG...AgEC"
+                ],
+                "trustAnchor": "MDAwKzEUMBIG...AgEB"
+              }
+            },
+            {
+              "relatedValidationObject": "MCwwJzEQMA4G...AgEL",
+              "revocationStatusInformation": {
+                "validationObjectId": "MCwwJzEQMA4G...AgEL",
+                "revocationTime": "2026-01-01 00:00:00",
+                "revocationReason": "keyCompromise"
+              },
+              "additionalValidationReportData": {
+                "reportData": [
+                  { "type": "mainIndication", "value": "INDETERMINATE" },
+                  { "type": "subIndication", "value": "REVOKED_NO_POE" }
+                ]
+              }
+            }
+          ]
+        },
+        "signatureValidationProcess": {
+          "signatureValidationProcessId": "LTVM"
+        },
+        "validationTimeInfo": {
+          "validationTime": "2026-10-11 14:27:04",
+          "bestSignatureTime": {
+            "poeTime": "2026-10-11 14:27:04",
+            "typeOfProof": "validation",
+            "poeObject": "TS-0-SIGNATURE"
+          }
+        },
+        "signersDocument": {
+          "digestAlgAndValue": {
+            "digestMethod": "2.16.840.1.101.3.4.2.1",
+            "digestValue": "auinVVUgn9bE...Yjbb0Ns="
+          }
+        },
+        "signerInformation": {
+          "signerCertificate": "MCwwJzEQMA4G...AgEL",
+          "signer": "Test Leaf Revoked"
+        },
+        "validationConstraintsEvaluationReport": {
+          "signatureValidationPolicy": {
+            "policyName": "custom",
+            "basedOn": "UkraineDefault"
+          },
+          "validationConstraints": [
+            {
+              "validationConstraintIdentifier": "formatChecking",
+              "constraintStatus": { "status": "applied" },
+              "level": "fail",
+              "validationStatus": { "mainIndication": "PASSED" }
+            },
+            {
+              "validationConstraintIdentifier": "x509CertificateValidation",
+              "constraintStatus": { "status": "applied" },
+              "level": "fail",
+              "validationStatus": {
+                "mainIndication": "INDETERMINATE",
+                "subIndications": [ "REVOKED_NO_POE" ],
+                "associatedValidationReportData": [ ... ]
+              }
+            },
+            {
+              "validationConstraintIdentifier": "revocationFreshnessChecker",
+              "validationConstraintParameter": { "type": "value", "value": "120" },
+              "constraintStatus": { "status": "applied" },
+              "level": "fail",
+              "validationStatus": { "mainIndication": "PASSED" }
+            },
+            {
+              "validationConstraintIdentifier": "cryptographicConstraints",
+              "constraintStatus": { "status": "disabled" }
+            },
+            ...
+          ]
+        },
+        "signatureFormat": "CAdES-T",
+        "signAlgo": "1.2.840.10045.4.3.2",
+        "timeStamps": [
+          "TS-0-SIGNATURE"
+        ],
+        "certificates": [ ... ],
+        "signedAttributes": [ ... ],
+        "unsignedAttributes": [ ... ]
+      }
+    ],
+    "signatureValidationObjects": [
+      {
+        "id": "TS-0-SIGNATURE",
+        "objectType": "timestamp",
+        "timeStampType": "SIGNATURE",
+        "poeProvisioning": {
+          "poeTime": "2026-10-11 14:27:04"
+        },
+        "validationReport": {
+          "signatureValidationStatus": {
+            "mainIndication": "PASSED"
+          }
+        },
+        "genTime": "2026-10-11 14:27:04",
+        "policyId": "1.2.3.4.1",
+        "hashAlgo": "2.16.840.1.101.3.4.2.1",
+        "hashedMessage": "Lm0QBajhkgfg...3aE1U0I=",
+        "statusDigest": "VALID",
+        "statusSignature": "VALID",
+        "signerCertId": "MCwwJzEQMA4G...AgEK"
+      },
+      {
+        "id": "MCwwJzEQMA4G...AgEL",
+        "objectType": "certificate",
+        "CN": "Test Leaf Revoked",
+        "validity": {
+          "notBefore": "2026-10-09 20:21:28",
+          "notAfter": "2026-11-08 20:21:28"
+        },
+        "selfSigned": false,
+        "trusted": false,
+        "issuerCertId": "MDAwKzEUMBIG...AgEC"
+      },
+      ...
+    ]
+  }
+}
+```
+
 ### Request example for validation of signed data in “RAW” format
 
 ```
@@ -2441,7 +2954,7 @@ In the case of external encryption, the content parameter must be absent, the da
 | **Field name**       | **Type** | **Description**                                                                                              |
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
 | bytes                | Base64  | Data to be encrypted                                                                                          |
-| encryptionAlgo       | OID     | Encryption algorithm identifier                                                                               |
+| encryptionAlgo       | OID     | Encryption algorithm identifier: DSTU 7624 CFB<br>"1.2.804.2.1.1.1.1.1.3.3.2", GOST 28147 CFB "1.2.804.2.1.1.1.1.1.1.3",<br>AES-CBC "2.16.840.1.101.3.4.1.2" (128), "…1.22" (192), "…1.42" (256).<br>Optional, the default is DSTU 7624 if the key of the first<br>recipient is DSTU 4145, otherwise AES-256-CBC |
 | encryptionAlgoParams | Base64  | Encryption parameters in DER encoding.<br>Optional, random values are used<br>by default                      |
 | dataEncryptionKey    | Base64  | Encryption key value. Optional, random<br>values are used by default                                          |
 | type                 | OID     | Data type identifier. Default is<br>"1.2.840.113549.1.7.1" (pkcs7-data)                                       |
@@ -2451,8 +2964,10 @@ In the case of external encryption, the content parameter must be absent, the da
 | **Field name** | **Type** | **Description**                                                              |
 | -------------- | ------- | ---------------------------------------------------------------------------- |
 | certId         | Base64  | Recipient certificate identifier                                              |
-| kdfAlgo        | OID     | Key derivation function algorithm identifier                                  |
+| kdfAlgo        | OID     | Key derivation function algorithm identifier (a recipient<br>with a DSTU 4145 or ECDSA key). Optional, the default is<br>"1.2.804.2.1.1.1.1.3.7" for DSTU 4145, "1.3.132.1.11.1" for ECDSA |
 | keyWrapAlgo    | OID     | Key wrap algorithm identifier.<br>Optional, depends on kdfAlgo                |
+| keyEncryptionAlgo | OID  | Key encryption algorithm identifier (a recipient with an RSA key):<br>"1.2.840.113549.1.1.7" (RSAES-OAEP) or "1.2.840.113549.1.1.1"<br>(RSAES-PKCS1-v1_5). Optional, the default is RSAES-OAEP |
+| digestAlgo     | OID     | Digest algorithm identifier for RSAES-OAEP.<br>Optional, SHA-256 by default |
 
 ### Structure ATTRIBUTE_PARAMS
 
@@ -2469,6 +2984,13 @@ In the case of external encryption, the content parameter must be absent, the da
 | 2     | "1.2.804.2.1.1.1.1.1.3.3.2" | "1.2.804.2.1.1.1.1.3.8" | "1.2.804.2.1.1.1.1.1.3.11" |
 | 3     | "1.2.804.2.1.1.1.1.1.1.3"   | "1.2.804.2.1.1.1.1.3.4" | "1.2.804.2.1.1.1.1.1.1.5"  |
 | 4     | "1.2.804.2.1.1.1.1.1.1.3"   | "1.2.804.2.1.1.1.1.3.5" | "1.2.804.2.1.1.1.1.1.1.5"  |
+| 5     | "2.16.840.1.101.3.4.1.42"   | "1.3.132.1.11.1"        | "2.16.840.1.101.3.4.1.45"  |
+
+Schemes 1–4 are for a recipient with a DSTU 4145 key, scheme 5 is for a recipient with an ECDSA key (NIST curves).
+
+For a recipient with an ECDSA key: kdfAlgo — "1.3.133.16.840.63.0.2" (SHA-1), "1.3.132.1.11.0" (SHA-224), "1.3.132.1.11.1" (SHA-256), "1.3.132.1.11.2" (SHA-384), "1.3.132.1.11.3" (SHA-512) and the corresponding cofactor schemes "1.3.133.16.840.63.0.3", "1.3.132.1.14.0" – "1.3.132.1.14.3"; keyWrapAlgo — "2.16.840.1.101.3.4.1.5" (AES-128), "2.16.840.1.101.3.4.1.25" (AES-192), "2.16.840.1.101.3.4.1.45" (AES-256, the default).
+
+The recipient certificate must have the key usage keyAgreement (DSTU 4145, ECDSA) or keyEncipherment (RSA).
 
 ### Structure of the result field in the response
 
@@ -2697,6 +3219,29 @@ The method returns an array of certificate extensions in the order in which they
 | extensions           | Object[],<br>EXTENSION_INFO[]    | Array of extensions the certificate has |
 | signatureInfo        | Object<br>SIGNATURE_INFO         | Electronic signature of the certificate |
 | selfSigned           | Boolean                          | Flag indicating the certificate is self-signed |
+| trusted              | Boolean                          | Flag indicating the certificate is trusted at this time: given at<br>initialization or a certificate of a service of a trusted list within<br>its period of trust (see the ADD_TRUST_LIST method). For<br>a certificate given by the bytes field that is not in the certificate<br>cache — false |
+| trustListSigner      | Boolean                          | Flag indicating the certificate is for verifying the signature of<br>trusted lists (trustListCache.trustListSignerCerts of the INIT method). Optional |
+| trustServices        | Object[]<br>TRUST_SERVICE[]      | The services of trusted lists this certificate is the certificate of.<br>Optional |
+
+### Structure TRUST_SERVICE
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| listId         | String   | Identifier of the trusted list |
+| type           | String   | Service type: the part of the type identifier after "/Svctype/",<br>for example "CA/QC", "TSA/QTST", "Certstatus/OCSP/QC",<br>"NationalRootCA-QC" |
+| tspName        | String   | Name of the trust service provider |
+| serviceName    | String   | Name of the service |
+| forESignatures | Boolean  | The service is for electronic signatures. Optional |
+| forESeals      | Boolean  | The service is for electronic seals. Optional |
+| statuses       | Object[]<br>TRUST_SERVICE_STATUS[] | Statuses of the service: the first is the current one, then the<br>previous ones |
+
+### Structure TRUST_SERVICE_STATUS
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| status         | String   | Service status: the last part of the status identifier, for example<br>"granted", "withdrawn", "recognisedatnationallevel" |
+| from           | String   | Time the status started (UTC) |
+| to             | String   | Time the status ended (UTC). Optional — absent for the current<br>status |
 
 ### Structure SUBJECT_PUBLICKEY_INFO
 
@@ -2964,6 +3509,8 @@ The subjectKeyIdentifiers parameter specifies which certificates to return, name
 The method removes a certificate from the certificate cache or from the opened storage.
 
 If the certificate to be removed is not specified (bytes and certId are absent), all temporary certificates are removed from the cache (those that were added by the ADD*CERT method without the \_permanent = true* flag or added indirectly in other methods).
+
+A certificate trusted at the initialization (the "certCache.trustedCerts" parameter of the INIT method) is not removed: the method returns the error CERT_TRUSTED_NOT_REMOVABLE.
 
 Output parameters: none.
 
@@ -3238,9 +3785,167 @@ The method is intended for forming an OCSP request and obtaining an OCSP respons
 }
 ```
 
+## ADD_TRUST_LIST method
+
+The method is intended for adding a trusted list (ETSI TS 119 612, an XML document with a XAdES signature). The method does not download a trusted list.
+
+A trusted list is accepted if:
+
+- it is signed by one of the certificates given in the trustListCache.trustListSignerCerts field of the INIT method;
+- its sequence number is not less than the number of the trusted list with the same identifier accepted before.
+
+The certificates of the services of the trusted list are added to the certificate cache (without saving to disk) with the information about the services; a certificate of a service becomes trusted for the period from the first time the service was provided to the end of the last period it was provided in (without a limit while the service is provided). The trust is decided at a time: for the certificate of the signer — at the best signature time, for the certificate of a time-stamping service — at the time of its time-stamp (with the validation policy value "tsaTrust" equal to "proofOfExistence" — at the time of a later valid time-stamp that covers it, and without one — at the validation time), for the VERIFY_CERT method — at the validation time; if the certificate of a trusted list was not trusted at that time, the report of the validation type "FULL-ETSI" has the sub-indication "NO_CERTIFICATE_CHAIN_FOUND_NO_POE". Breaks in the provision of the service within this period do not affect the trust and are taken into account in the signature quality only. A certificate that is trusted itself at that time (a certificate of a service of a trusted list — a time-stamping service, an OCSP responder) ends its own chain: the certificates of its issuers and its status are not needed. The time-stamps of a service whose certificate is revoked for a key compromise or with no reason given are not accepted whenever they were made; of one revoked for another reason — are accepted if made before the revocation (RFC 3161, section 4). Adding a trusted list again replaces the information received from its previous version. The information about the services is returned by the CERT_INFO method and used by the VERIFY method.
+
+For a session with a shared memory the trusted list is applied to the shared memory and is in effect for all its sessions; the certificates for signing trusted lists and the directory of trusted lists are the ones given at the initialization of the shared memory.
+
+### Structure of the parameters field in the request
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| bytes          | Base64   | Trusted list (XML document). Mutually exclusive with the text field |
+| text           | String   | Trusted list as the text of the XML document (UTF-8). Mutually<br>exclusive with the bytes field |
+
+### Structure of the result field in the response
+
+| **Field name**    | **Type** | **Description** |
+| ----------------- | -------- | --------------- |
+| listId            | String   | Identifier of the trusted list: its first distribution point<br>(DistributionPoints), or the territory and the type of the list if<br>there is none |
+| type              | String   | Type of the trusted list: the last part of the TSLType identifier |
+| territory         | String   | Scheme territory (SchemeTerritory) |
+| schemeName        | String  | Name of the scheme: in English if the list has it, else the first one. May be empty |
+| schemeOperatorName | String | Name of the scheme operator: the same. May be empty |
+| sequenceNumber    | Integer  | Sequence number of the trusted list (TSLSequenceNumber) |
+| listIssueDateTime | String   | Issue time of the trusted list (UTC). Optional |
+| nextUpdate        | String   | Time of the next update (UTC). Optional |
+| signerCertId      | Base64   | Identifier of the certificate the trusted list is signed with |
+| countProviders    | Integer  | Number of trust service providers |
+| countServices     | Integer  | Number of services |
+| countCerts        | Integer  | Number of certificates of the services |
+| countAddedCerts   | Integer  | Number of certificates that were not in the certificate cache |
+| countTrustedCerts | Integer  | Number of certificates of the trusted list that are trusted at this time |
+| countSkippedCerts | Integer  | Number of certificates the library did not parse (for example,<br>x.509 version 1); their services are not taken into account |
+| stored            | Boolean  | Flag indicating the trusted list is saved in the directory<br>trustListCache.path |
+| warnings          | String[] | Remarks on the certificate that signs the trusted list<br>(ETSI TS 119 612, clause 5.7.1). Optional |
+
+In case of an error the result field may contain: "detail" (String) — the reason of the refusal; "xmlError" (String) and "xmlErrorOffset" (Integer) — the error of parsing the XML document and its offset.
+
+| **Value of warnings** | **Description** |
+| --- | --- |
+| "SIGNER_WITHOUT_TSL_SIGNING_KEY_PURPOSE" | The certificate has no extended key usage<br>id-tsl-kp-tslSigning (0.4.0.2231.3.0) |
+| "SIGNER_WITH_OTHER_KEY_USAGE" | The key usage of the certificate has values other than<br>digitalSignature and nonRepudiation |
+| "SIGNER_COUNTRY_IS_NOT_SCHEME_TERRITORY" | The country in the name of the certificate is not the scheme territory |
+| "SIGNER_ORGANIZATION_IS_NOT_SCHEME_OPERATOR_NAME" | The organization in the name of the certificate is none of the<br>scheme operator names |
+| "SIGNER_ISSUER_IS_NOT_A_SERVICE_OF_THE_LIST" | The certificate is not self-signed and its issuer is not a service<br>of this trusted list |
+| "LIST_NEXT_UPDATE_PASSED" | The next update time of the list (NextUpdate) is passed: the list<br>is accepted, it is to be obtained again (ETSI TS 119 612, 5.3.15) |
+
+Errors of the method: TRUST_LIST_INVALID, TRUST_LIST_VERIFY_FAILED, TRUST_LIST_SIGNER_NOT_TRUSTED, TRUST_LIST_OBSOLETE (Appendix A).
+
+### Request example
+
+```
+{
+  "method": "ADD_TRUST_LIST",
+  "parameters": {
+    "bytes": "PD94bWwgdmVy...dExpc3Q+"
+  }
+}
+```
+
+### Response example
+
+```
+{
+  "errorCode": 0,
+  "method": "ADD_TRUST_LIST",
+  "result": {
+    "listId": "https://czo.gov.ua/download/tl/TL-UA-DSTU.xml",
+    "type": "CClist",
+    "territory": "UA",
+    "sequenceNumber": 196,
+    "listIssueDateTime": "2026-09-17 13:33:00",
+    "nextUpdate": "2027-03-17 13:33:00",
+    "signerCertId": "MIIBJzCB1TCB...AgEBAgEH",
+    "countProviders": 34,
+    "countServices": 416,
+    "countCerts": 416,
+    "countAddedCerts": 416,
+    "countTrustedCerts": 255,
+    "countSkippedCerts": 0,
+    "stored": true,
+    "warnings": [
+      "SIGNER_ORGANIZATION_IS_NOT_SCHEME_OPERATOR_NAME"
+    ]
+  }
+}
+```
+
+## LIST_TRUST_LISTS method
+
+The method returns the list of the accepted trusted lists: the last accepted version of every list (the ADD_TRUST_LIST method and the lists of the directory of trusted lists read at the initialization).
+
+Input parameters: none.
+
+### Structure of the result field in the response
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| trustLists     | Object[]<br>TRUST_LIST_INFO[] | The accepted trusted lists |
+
+### Structure of the TRUST_LIST_INFO record
+
+| **Field name** | **Type** | **Description** |
+| -------------- | -------- | --------------- |
+| listId            | String  | Identifier of the list |
+| type              | String  | Type of the list |
+| territory         | String  | Scheme territory |
+| schemeName        | String  | Name of the scheme: in English if the list has it, else the first one. May be empty |
+| schemeOperatorName | String | Name of the scheme operator: the same. May be empty |
+| sequenceNumber    | Integer | Sequence number of the list |
+| listIssueDateTime | String  | Issue time of the list. Optional |
+| nextUpdate        | String  | Next update time. Optional |
+| nextUpdatePassed  | Boolean | Flag: the next update time is passed |
+| signerCertId      | Base64  | Identifier of the certificate that signs the list |
+| countCerts        | Integer | Number of the certificates of the services of the list |
+| countTrustedCerts | Integer | Number of the certificates trusted by the list when it was accepted |
+| stored            | Boolean | Flag: the list is kept in the directory of trusted lists |
+
+### Request example
+
+```
+{
+  "method": "LIST_TRUST_LISTS"
+}
+```
+
+### Response example
+
+```
+{
+  "errorCode": 0,
+  "method": "LIST_TRUST_LISTS",
+  "result": {
+    "trustLists": [
+      {
+        "listId": "https://czo.gov.ua/download/tl/TL-UA-DSTU.xml",
+        "type": "CClist",
+        "territory": "UA",
+        "sequenceNumber": 196,
+        "listIssueDateTime": "2026-09-17 13:33:00",
+        "nextUpdate": "2026-12-17 13:33:00",
+        "nextUpdatePassed": false,
+        "signerCertId": "MIIBJzCB1TCB...AgEBAgEH",
+        "countCerts": 416,
+        "countTrustedCerts": 255,
+        "stored": true
+      }
+    ]
+  }
+}
+```
+
 ## ADD_CRL method
 
-The method is intended for adding a CRL (certificate revocation list) to the CRL cache. It returns the CRL identifier in the CRL cache. CRLs may be added to the CRL cache permanently (with storage on disk) or temporarily (only for the duration of the current session until DEINIT is executed or the application is restarted). If the permanent CRL cache is not initialized (the path to the corresponding directory was not specified when initializing the library), only temporary addition of CRLs is possible.
+The method is intended for adding a CRL (certificate revocation list) to the CRL cache. It returns the CRL identifier in the CRL cache. CRLs may be added to the CRL cache permanently (with storage on disk) or temporarily (only for the duration of the current session until DEINIT is executed or the application is restarted, or until REMOVE_CRL without "crlId"). The CRLs of signatures are added temporarily during VERIFY as well. If a CRL is in the cache as a temporary one, adding it again with "permanent" true stores it on disk. As soon as a newer CRL of the same issuer and segment is added, the older ones become obsolete: their files are deleted from disk at once, and from memory by the REMOVE_CRL method; an older CRL added after a newer one is not stored on disk. If the permanent CRL cache is not initialized (the path to the corresponding directory was not specified when initializing the library), only temporary addition of CRLs is possible.
 
 The CRL must conform to the x.509 standard.
 
@@ -3442,7 +4147,7 @@ The method is intended for obtaining a list of CRLs in the CRL cache.
 
 ## REMOVE_CRL method
 
-The method is intended for removing a specified CRL (optionally) and obsolete CRLs from the CRL cache. If a CRL identifier is specified in the request, the method first removes the specified CRL, and then all obsolete CRLs. Response parameters: none.
+The method is intended for removing a specified CRL (optionally) and obsolete CRLs from the CRL cache. If a CRL identifier is specified in the request, the method first removes the specified CRL, and then all obsolete CRLs. Without a CRL identifier the method removes the obsolete and the temporary CRLs (added without "permanent" true, the CRLs of signatures included). Response parameters: none.
 
 ### Structure of the parameters field in the request
 
@@ -3911,6 +4616,11 @@ Table A.1. Error codes
 | `RET_UAPKI_TSP_RESPONSE_NOT_GRANTED`       | 0x1072 | Timestamp not granted                              |
 | `RET_UAPKI_TSP_RESPONSE_NOT_EQUAL_REQUEST` | 0x1073 | TSP response does not match the request            |
 | `RET_UAPKI_TSP_RESPONSE_INVALID`                 | 0x1074 | TSP response structure is invalid                  |
+| `RET_UAPKI_TRUST_LIST_INVALID`                   | 0x1078 | The trusted list does not conform to the format    |
+| `RET_UAPKI_TRUST_LIST_VERIFY_FAILED`             | 0x1079 | Invalid signature of the trusted list              |
+| `RET_UAPKI_TRUST_LIST_SIGNER_NOT_TRUSTED`        | 0x107A | The certificate that signs the trusted list is not trusted for that |
+| `RET_UAPKI_TRUST_LIST_OBSOLETE`                  | 0x107B | A trusted list with a greater sequence number is accepted |
+| `RET_UAPKI_CERT_TRUSTED_NOT_REMOVABLE`          | 0x107C | A certificate trusted at the initialization is not removed |
 
 Table A.2. Storage error codes
 
@@ -3986,12 +4696,14 @@ Table B.1. Signature formats supported by the library
 | `CAdES-BES`              | Basic signature format with signer identification by the identifier of the<br>signer's certificate.<br>Has three mandatory signed attributes:<br>1) contentType;<br>2) messageDigest;<br>3) signingCertificateV2.                                                                                                                                                                                                                                                                          |
 | `CAdES-T`                | A signature format that is an extended variant of the CAdES-BES format with two<br>additional attributes: a timestamp on the data (contentTimestamp) and a<br>timestamp on the signature (timeStampToken).<br>Has 4 mandatory signed attributes:<br>1) contentType;<br>2) messageDigest;<br>3) signingCertificateV2;<br>4) contentTimestamp.<br>Has one mandatory unsigned attribute:<br>1) timeStampToken.                                                                                 |
 | `CAdES-C`                | A signature format that is an extended variant of the CAdES-T format with two<br>additional unsigned attributes: certificateRefs and revocationRefs.<br>The list of 4 mandatory signed attributes is the same as CAdES-T.<br>Has three mandatory unsigned attributes:<br>1) timeStampToken;<br>2) certificateRefs;<br>3) revocationRefs.<br>Only CRLs are used to check certificate status; accordingly, the<br>revocationRefs attribute contains references to the CRLs used.              |
-| `CAdES-XL`<br>`CAdES-LT` | A signature format that is an extended variant of the CAdES-C format with two<br>additional unsigned attributes: certValues and revocationValues.<br>The list of 4 mandatory signed attributes is the same as CAdES-T.<br>Has 5 mandatory unsigned attributes:<br>1) timeStampToken;<br>2) certificateRefs;<br>3) revocationRefs;<br>4) certValues;<br>5) revocationValues.                                                                                                                 |
-| `CAdES-A`<br>`CAdES-LTA` | A signature format that is an extended variant of the CAdES-XL format with one<br>additional unsigned attribute — the archive timestamp<br>archiveTimestampV3.<br>The list of 4 mandatory signed attributes is the same as CAdES-T.<br>Has 6 mandatory unsigned attributes:<br>1) timeStampToken;<br>2) certificateRefs;<br>3) revocationRefs;<br>4) certValues;<br>5) revocationValues;<br>6) archiveTimestampV3.                                                            |
+| `CAdES-XL`               | A signature format that is an extended variant of the CAdES-C format with two<br>additional unsigned attributes: certValues and revocationValues.<br>The list of 4 mandatory signed attributes is the same as CAdES-T.<br>Has 5 mandatory unsigned attributes:<br>1) timeStampToken;<br>2) certificateRefs;<br>3) revocationRefs;<br>4) certValues;<br>5) revocationValues.                                                                                                                 |
+| `CAdES-A`                | A signature format that is an extended variant of the CAdES-XL format with one<br>additional unsigned attribute — the archive timestamp<br>archiveTimestampV3 whose token has the ats-hash-index-v3 attribute<br>(ETSI EN 319 122-1, 5.5.2, 5.5.3; earlier versions of the library added<br>ats-hash-index or no index to the token).<br>The list of 4 mandatory signed attributes is the same as CAdES-T.<br>Has 6 mandatory unsigned attributes:<br>1) timeStampToken;<br>2) certificateRefs;<br>3) revocationRefs;<br>4) certValues;<br>5) revocationValues;<br>6) archiveTimestampV3.                                                            |
+| `CAdES-B-LT`             | The baseline format of the B-LT level of ETSI EN 319 122-1: CAdES-T with the signingTime attribute,<br>all the certificates used for the validation (including the trusted root) are in<br>SignedData.certificates, and the CRLs and OCSP responses (RFC 5940) are in SignedData.crls.<br>There are no certificateRefs, revocationRefs, certValues and revocationValues attributes. |
+| `CAdES-B-LTA`            | The baseline format of the B-LTA level of ETSI EN 319 122-1: CAdES-B-LT with an archive time-stamp<br>archive-time-stamp-v3 whose token has the ats-hash-index-v3 attribute (5.5.2, 5.5.3). |
 
 The CMS/CAdES family of formats allows the use of optional attributes. For example, the signingTime attribute is used among the signed attributes. Depending on the task, non-standard attributes may be used (within the CMS/CAdES standard).
 
-The signature format names "CAdES-LT" and "CAdES-LTA" are synonyms of "CAdES-XL" and "CAdES-A" respectively. They can be used only in the SIGN and BUILD_CMS_2PASS methods. If the signature format is not specified (empty string), "CAdES-BES" is used by default.
+For compatibility the SIGN and BUILD_CMS_2PASS methods accept the names "CAdES-LT" and "CAdES-LTA" as synonyms of "CAdES-XL" and "CAdES-A" respectively. These are not the B-LT and B-LTA levels of the baseline signatures of ETSI EN 319 122-1: those keep the validation data in SignedData and have no reference and value attributes. If the signature format is not specified (empty string), "CAdES-BES" is used by default.
 
 # Appendix C. Certificate extensions
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -609,6 +609,12 @@ int OcspHelper::scanSingleResponses (void)
         if (resp->nextUpdate != nullptr) {
             DO(Util::genTimeFromAsn1(resp->nextUpdate, ocsp_item.msNextUpdate));
         }
+        if (resp->singleExtensions != nullptr) {
+            SmartBA sba_archivecutoff;
+            if (Util::extnValueFromExtensions(resp->singleExtensions, OID_PKIX_OcspArchiveCutoff, nullptr, &sba_archivecutoff) == RET_OK) {
+                DO(Util::decodePkixTime(sba_archivecutoff.get(), ocsp_item.msArchiveCutoff));
+            }
+        }
     }
 
 cleanup:
@@ -623,6 +629,7 @@ int OcspHelper::verifyTbsResponseData (
     int ret = RET_OK;
     ByteArray* ba_signature = nullptr;
     char* s_signalgo = nullptr;
+    SmartBA sba_signparams;
 
     statusSign = SignatureVerifyStatus::UNDEFINED;
     if (!m_BasicOcspResp || !baSpki) return RET_UAPKI_INVALID_PARAMETER;
@@ -637,7 +644,14 @@ int OcspHelper::verifyTbsResponseData (
         DO(asn_BITSTRING2ba(&m_BasicOcspResp->signature, &ba_signature));
     }
 
-    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, baSpki, ba_signature);
+    //  The parameters of the signature algorithm: RSASSA-PSS
+    if (m_BasicOcspResp->signatureAlgorithm.parameters) {
+        (void)sba_signparams.set(ba_alloc_from_uint8(
+            m_BasicOcspResp->signatureAlgorithm.parameters->buf,
+            (size_t)m_BasicOcspResp->signatureAlgorithm.parameters->size
+        ));
+    }
+    ret = Verify::verifySignature(s_signalgo, m_BaTbsResponseData, false, baSpki, ba_signature, nullptr, sba_signparams.get());
     switch (ret) {
     case RET_OK:
         statusSign = SignatureVerifyStatus::VALID;

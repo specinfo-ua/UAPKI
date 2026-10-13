@@ -32,7 +32,19 @@ package com.specinfosystems.uapki;
  */
 public class OcspParams {
     private Integer nonceLen;
+    private Integer cacheTime;
+    private Integer maxFreshness;
+    private Integer responderCrlEmbedMaxSize;
 
     public Integer getNonceLen() { return nonceLen; }
     public OcspParams setNonceLen(Integer nonceLen) { this.nonceLen = nonceLen; return this; }
+    /** Хвилини, протягом яких відповідь без nextUpdate береться з кешу (за замовчуванням 30) */
+    public Integer getCacheTime() { return cacheTime; }
+    public OcspParams setCacheTime(Integer cacheTime) { this.cacheTime = cacheTime; return this; }
+    /** Максимальна свіжість (хвилини) відповіді без nextUpdate для VERIFY (за замовчуванням 120) */
+    public Integer getMaxFreshness() { return maxFreshness; }
+    public OcspParams setMaxFreshness(Integer maxFreshness) { this.maxFreshness = maxFreshness; return this; }
+    /** Найбільший розмір (байти) СВС OCSP-відповідача, що вкладається в CAdES-B-LT/B-LTA (за замовчуванням 10240) */
+    public Integer getResponderCrlEmbedMaxSize() { return responderCrlEmbedMaxSize; }
+    public OcspParams setResponderCrlEmbedMaxSize(Integer responderCrlEmbedMaxSize) { this.responderCrlEmbedMaxSize = responderCrlEmbedMaxSize; return this; }
 }

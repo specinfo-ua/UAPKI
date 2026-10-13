@@ -107,15 +107,6 @@ static const char* keypurposeid_by_model (
     return rv_oid;
 }   //  keypurposeid_by_model
 
-static size_t hashsize_by_signalgo (
-        const char* signAlgo
-)
-{
-    const HashAlg hash_alg = hash_from_oid(signAlgo);
-    return hash_get_size(hash_alg);
-}   //  hashsize_by_signalgo
-
-
 static CM_ERROR cm_key_get_info (
         CM_SESSION_API* session,
         CM_JSON_PCHAR* keyInfo,
@@ -208,12 +199,6 @@ static CM_ERROR cm_key_sign (
     if (!signAlgo || (count == 0) || !abaHashes || !abaSignatures) return RET_CM_INVALID_PARAMETER;
 
     const string s_signalgo = string((const char*)signAlgo);
-    const size_t expected_hsize = hashsize_by_signalgo(s_signalgo.c_str());
-    if (expected_hsize == 0) return RET_CM_UNSUPPORTED_ALG;
-    for (uint32_t i = 0; i < count; i++) {
-        if (ba_get_len((const ByteArray*)abaHashes[i]) != expected_hsize) return RET_CM_INVALID_HASH;
-    }
-
     CmCryptoki::SessionContext* ss_ctx = (CmCryptoki::SessionContext*)session->ctx;
     if (!ss_ctx) return RET_CM_NO_SESSION;
 
@@ -223,6 +208,13 @@ static CM_ERROR cm_key_sign (
 
     CryptokiStorage::KeyInfo& selected_key = storage.selectedKey();
     if (!selected_key.isPresent()) return RET_CM_KEY_NOT_SELECTED;
+
+    //  The hash of RSASSA-PSS is in the parameters of the signature algorithm
+    const size_t expected_hsize = hash_get_size(CryptokiStorage::hashAlgBySignAlgo(selected_key, s_signalgo, baSignAlgoParams));
+    if (expected_hsize == 0) return RET_CM_UNSUPPORTED_ALG;
+    for (uint32_t i = 0; i < count; i++) {
+        if (ba_get_len((const ByteArray*)abaHashes[i]) != expected_hsize) return RET_CM_INVALID_HASH;
+    }
 
     CM_BYTEARRAY** aba_signatures = (CM_BYTEARRAY**)calloc(count, sizeof(CM_BYTEARRAY*));
     if (!aba_signatures) return RET_CM_GENERAL_ERROR;
@@ -435,6 +427,30 @@ static CM_ERROR cm_key_dh_unwrap_key (
     return ret;
 }   //  cm_key_dh_unwrap_key
 
+static CM_ERROR cm_key_decrypt (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baAlgorithmIdentifier,
+        const CM_BYTEARRAY* baSource,
+        CM_BYTEARRAY** baDest
+)
+{
+    DEBUG_OUTPUT("cm_key_decrypt()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!baAlgorithmIdentifier || !baSource || !baDest) return RET_CM_INVALID_PARAMETER;
+
+    CmCryptoki::SessionContext* ss_ctx = (CmCryptoki::SessionContext*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    CryptokiStorage& storage = ss_ctx->getStorage();
+    if (!storage.isOpened()) return RET_CM_STORAGE_NOT_OPEN;
+    if (!storage.isAuthorized()) return RET_CM_NOT_AUTHORIZED;
+
+    CryptokiStorage::KeyInfo& selected_key = storage.selectedKey();
+    if (!selected_key.isPresent()) return RET_CM_KEY_NOT_SELECTED;
+
+    return storage.decrypt(selected_key, baAlgorithmIdentifier, baSource, baDest);
+}   //  cm_key_decrypt
+
 
 void CmCryptoki::SessionContext::assignKeyApi (void)
 {
@@ -452,7 +468,7 @@ void CmCryptoki::SessionContext::assignKeyApi (void)
     m_KeyApi.dh = nullptr;
     m_KeyApi.dhWrapKey = cm_key_dh_wrap_key;
     m_KeyApi.dhUnwrapKey = cm_key_dh_unwrap_key;
-    m_KeyApi.decrypt = nullptr;
+    m_KeyApi.decrypt = cm_key_decrypt;
     m_KeyApi.encrypt = nullptr;
     m_KeyApi.setInfo = nullptr;
     m_KeyApi.exportKey = nullptr;

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(cm-pkcs11 VERSION 1.0.12 LANGUAGES C CXX)
+project(cm-pkcs11 VERSION 1.1.0 LANGUAGES C CXX)
 
 message(STATUS "Project: ${PROJECT_NAME} (version: ${PROJECT_VERSION})")
 
@@ -84,6 +84,7 @@ set(COMMON_PKIX_SOURCES
     ${PATH_COMMON_PKIX}/extnreq-helper.cpp
     ${PATH_COMMON_PKIX}/iconv-utils.c
     ${PATH_COMMON_PKIX}/iso15946.c
+    ${PATH_COMMON_PKIX}/key-trans.c
     ${PATH_COMMON_PKIX}/oids.c
     ${PATH_COMMON_PKIX}/oid-utils.c
     ${PATH_COMMON_PKIX}/uapki-ns-util.cpp

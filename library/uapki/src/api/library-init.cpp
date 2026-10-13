@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,7 @@
 #include "http-helper.h"
 #include "ocsp-helper.h"
 #include "parson-helper.h"
+#include "time-util.h"
 #include "tsp-helper.h"
 #include "uapki-ns-util.h"
 
@@ -172,6 +173,13 @@ static int setup_ocsp (LibraryConfig& libConfig, JSON_Object* joParams)
     if ((ocsp_params.nonceLen < UapkiNS::Ocsp::NONCE_MINLEN) || (ocsp_params.nonceLen > UapkiNS::Ocsp::NONCE_MAXLEN)) {
         ocsp_params.nonceLen = 0;
     }
+    //  =cacheTime=, =maxFreshness= (minutes)
+    ocsp_params.cacheTime = ParsonHelper::jsonObjectGetUint32(joParams, "cacheTime", LibraryConfig::OcspParams::CACHE_TIME_DEFAULT);
+    ocsp_params.maxFreshness = ParsonHelper::jsonObjectGetUint32(joParams, "maxFreshness", LibraryConfig::OcspParams::MAX_FRESHNESS_DEFAULT);
+    //  =responderCrlEmbedMaxSize= (bytes)
+    ocsp_params.responderCrlEmbedMaxSize = ParsonHelper::jsonObjectGetUint32(
+        joParams, "responderCrlEmbedMaxSize", LibraryConfig::OcspParams::RESPONDER_CRL_EMBED_MAX_SIZE_DEFAULT
+    );
 
     libConfig.setOcsp(ocsp_params);
     return RET_OK;
@@ -232,6 +240,7 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     const string fn_config = ParsonHelper::jsonObjectGetString(joParams, "configFile");
     JSON_Object* jo_refparams = joParams;
     JSON_Object* jo_category = nullptr;
+    size_t cnt_trustlists = 0, cnt_refusedlists = 0;
     JSON_Array* ja_failed = nullptr;
     CmProvidersReport cm_report;
     size_t cnt_certs, cnt_crls, cnt_trustedcerts;
@@ -243,7 +252,14 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
         SET_ERROR(RET_UAPKI_GENERAL_ERROR);
     }
 
-    if (lib_config->isInitialized()) return RET_UAPKI_ALREADY_INITIALIZED;
+    //  A repeated INIT changes nothing: the error comes with the parameters of the INIT that was done
+    if (lib_config->isInitialized()) {
+        JSON_Value* jv_params = json_parse_string(lib_config->getInitParams().c_str());
+        if (jv_params && (json_object_set_value(joResult, "parameters", jv_params) != JSONSuccess)) {
+            json_value_free(jv_params);
+        }
+        return RET_UAPKI_ALREADY_INITIALIZED;
+    }
 
     DO(session.initCryptoLibrary(p_selftest_status));
 
@@ -258,6 +274,39 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     }
 
     DO(setup_cert_cache(session, json_object_get_object(jo_refparams, "certCache")));
+
+    //  The directory of the trusted lists: the last accepted version of every list (ADD_TRUST_LIST)
+    session.cerStore()->setTrustListPath(
+        ParsonHelper::jsonObjectGetString(json_object_get_object(jo_refparams, "trustListCache"), "path")
+    );
+    {   //  The certificates that sign trusted lists: only a list signed by one of them is accepted
+        vector<vector<uint8_t>> signer_certs;
+        JSON_Array* ja_signercerts = json_object_dotget_array(jo_refparams, "trustListCache.trustListSignerCerts");
+        for (size_t i = 0; i < json_array_get_count(ja_signercerts); i++) {
+            SmartBA sba_cert;
+            Cert::CerItem* cer_parsed = nullptr;
+            const char* s_b64 = json_array_get_string(ja_signercerts, i);
+            if (!s_b64 || !sba_cert.set(ba_alloc_from_base64(s_b64)) || (Cert::parseCert(sba_cert.get(), &cer_parsed) != RET_OK)) {
+                SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+            }
+            delete cer_parsed;
+            signer_certs.push_back(vector<uint8_t>(sba_cert.buf(), sba_cert.buf() + sba_cert.size()));
+        }
+        session.cerStore()->setTrustListSigners(signer_certs);
+        //  They are seen in the cache with their status, not trusted
+        if (!signer_certs.empty()) {
+            VectorBA vba_certs;
+            vector<Cert::CerStore::AddedCerItem> added;
+            for (const auto& it : signer_certs) {
+                vba_certs.push_back(ba_alloc_from_uint8(it.data(), it.size()));
+            }
+            DO(session.cerStore()->addCerts(Cert::NOT_TRUSTED, Cert::NOT_PERMANENT, vba_certs, added));
+            for (const auto& it : added) {
+                if (it.cerItem) it.cerItem->setTrustListSigner();
+            }
+        }
+    }
+    DO(uapki_load_trust_lists(session.cerStore(), cnt_trustlists, cnt_refusedlists));
 
     DO(setup_crl_cache(session, json_object_get_object(jo_refparams, "crlCache")));
 
@@ -281,6 +330,26 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
 
     lib_config->setValidationByCrl(ParsonHelper::jsonObjectGetBoolean(jo_refparams, "validationByCrl", false));
 
+    {   //  The parameters are remembered for a repeated INIT: the ones in effect (of the configuration file when
+        //  it is given, with its name), without the proxy credentials
+        JSON_Value* jv_params = json_value_deep_copy(json_object_get_wrapping_value(jo_refparams));
+        JSON_Object* jo_copy = json_value_get_object(jv_params);
+        //  an INIT without parameters
+        lib_config->setInitParams("{}");
+        if (jo_copy) {
+            (void)json_object_dotremove(jo_copy, "proxy.credentials");
+            if (!fn_config.empty()) {
+                (void)json_object_set_string(jo_copy, "configFile", fn_config.c_str());
+            }
+            char* s_params = json_serialize_to_string(jv_params);
+            if (s_params) {
+                lib_config->setInitParams(s_params);
+                json_free_serialized_string(s_params);
+            }
+        }
+        json_value_free(jv_params);
+    }
+
     lib_config->setInitialized(true);
 
     //  Out info subsystems
@@ -289,6 +358,18 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     (void)lib_cerstore->getCount(cnt_certs, cnt_trustedcerts);
     DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countCerts", (uint32_t)cnt_certs));
     DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "countTrustedCerts", (uint32_t)cnt_trustedcerts));
+
+    if (!lib_cerstore->getTrustListPath().empty()) {
+        DO_JSON(json_object_dotset_number(joResult, "trustListCache.countLists", (double)cnt_trustlists));
+        DO_JSON(json_object_dotset_number(joResult, "trustListCache.countRefusedLists", (double)cnt_refusedlists));
+        //  The lists whose next update is passed (ETSI TS 119 612, 5.3.15): accepted, to be obtained again
+        size_t cnt_passed = 0;
+        const uint64_t ms_now = TimeUtil::mtimeNow();
+        for (const auto& it : lib_cerstore->getAcceptedTrustLists()) {
+            cnt_passed += ((it.msNextUpdate > 0) && (it.msNextUpdate < ms_now)) ? 1 : 0;
+        }
+        DO_JSON(json_object_dotset_number(joResult, "trustListCache.countListsNextUpdatePassed", (double)cnt_passed));
+    }
 
     DO_JSON(json_object_set_value(joResult, "crlCache", json_value_init_object()));
     jo_category = json_object_get_object(joResult, "crlCache");
@@ -320,6 +401,9 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     if (jo_category) {
         const LibraryConfig::OcspParams& ocsp_params = lib_config->getOcsp();
         DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "nonceLen", (uint32_t)ocsp_params.nonceLen));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "cacheTime", ocsp_params.cacheTime));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "maxFreshness", ocsp_params.maxFreshness));
+        DO_JSON(ParsonHelper::jsonObjectSetUint32(jo_category, "responderCrlEmbedMaxSize", ocsp_params.responderCrlEmbedMaxSize));
     }
 
     DO_JSON(json_object_set_value(joResult, "proxy", json_value_init_object()));

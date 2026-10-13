@@ -283,7 +283,13 @@
     <value>RSA-PSS</value>
   </data>
   <data name="SignatureFormat_CAdES_A" xml:space="preserve">
-    <value>З повними даними для перевірки та архівною позначкою часу (CAdES-LTA)</value>
+    <value>З повними даними для перевірки та архівною позначкою часу (CAdES-A)</value>
+  </data>
+  <data name="SignatureFormat_CAdES_B_LT" xml:space="preserve">
+    <value>З даними для перевірки в підписі (CAdES-B-LT)</value>
+  </data>
+  <data name="SignatureFormat_CAdES_B_LTA" xml:space="preserve">
+    <value>З даними для перевірки та архівною позначкою часу (CAdES-B-LTA)</value>
   </data>
   <data name="SignatureFormat_CAdES_BES" xml:space="preserve">
     <value>Базовий (CAdES-BES)</value>
@@ -295,7 +301,7 @@
     <value>З позначкою часу від підпису (CAdES-T)</value>
   </data>
   <data name="SignatureFormat_CAdES_XL" xml:space="preserve">
-    <value>З повними даними для перевірки (CAdES-LT)</value>
+    <value>З повними даними для перевірки (CAdES-XL)</value>
   </data>
   <data name="SignatureFormat_CMS" xml:space="preserve">
     <value>Базовий з ідентифікацією підписника за ідентифікатором ключа</value>
@@ -488,6 +494,21 @@
   </data>
   <data name="Error_1074" xml:space="preserve">
     <value>Відповідь сервера TSP пошкоджена</value>
+  </data>
+  <data name="Error_1078" xml:space="preserve">
+    <value>Довірчий список не відповідає формату</value>
+  </data>
+  <data name="Error_1079" xml:space="preserve">
+    <value>Недійсний підпис довірчого списку</value>
+  </data>
+  <data name="Error_107A" xml:space="preserve">
+    <value>Сертифікат підпису довірчого списку не є довіреним для цього</value>
+  </data>
+  <data name="Error_107B" xml:space="preserve">
+    <value>Прийнято довірчий список з більшим порядковим номером</value>
+  </data>
+  <data name="Error_107C" xml:space="preserve">
+    <value>Сертифікат, довірений при ініціалізації, не видаляється</value>
   </data>
   <data name="Error_2001" xml:space="preserve">
     <value>Неправильна відповідь криптографічної бібліотеки</value>

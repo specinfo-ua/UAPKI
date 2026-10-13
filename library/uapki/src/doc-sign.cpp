@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,11 +28,13 @@
 #define FILE_MARKER "uapki/doc-sign.cpp"
 
 #include "doc-sign.h"
+#include "der-helper.h"
 #include "api-json-internal.h"
 #include "attribute-helper.h"
 #include "oid-utils.h"
 #include "time-util.h"
 #include "uapki-ns-util.h"
+#include <algorithm>
 
 
 #define DEBUG_OUTCON(expression)
@@ -114,6 +116,17 @@ cleanup:
 int SharedData::paramsBySignatureFormat (void)
 {
     switch (signatureFormat) {
+    case SignatureFormat::CADES_B_LTA:
+    case SignatureFormat::CADES_B_LT:
+        //  B-T with signing-time and the signing certificate (EN 319 122-1, table 1), then its validation data
+        //  (and archive-time-stamp-v3) by Augment::augmentCms
+        //  The content time-stamp is optional in every format (EN 319 122-1, table 1): includeContentTS
+        includeCert = true;
+        includeTime = true;
+        includeSignatureTS = true;
+        isCadesFormat = true;
+        sidUseKeyId = false;
+        break;
     case SignatureFormat::CADES_A:      //  CADES_A  >  CADES_XL
         UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_XL:     //  CADES_XL >  CADES_C
@@ -123,7 +136,6 @@ int SharedData::paramsBySignatureFormat (void)
         isCadesCXA = true;
         UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_T:      //  CADES_T  >  CADES_BES
-        includeContentTS = true;
         includeSignatureTS = true;
         UAPKI_FALLTHROUGH;
     case SignatureFormat::CADES_BES:
@@ -149,22 +161,9 @@ int SharedData::setupTsp (
     tsp.certReq = tspParams.certReq;
     tsp.nonceLen = tspParams.nonceLen;
     tsp.policyId = tspParams.policyId;
-    if (cerSigner) {
-        if (tspParams.forced && !tspParams.uris.empty()) {
-            tsp.uris = tspParams.uris;
-        }
-        else {
-            tsp.uris = cerSigner->getUris().tsp;
-            if (tsp.uris.empty()) {
-                tsp.uris = tspParams.uris;
-            }
-        }
-    }
-    else {
-        tsp.uris = tspParams.uris;
-    }
+    tspUris(tspParams, cerSigner, tsp.uris, tspFallbackUris);
 
-    if (tsp.uris.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
+    if (tsp.uris.empty() && tspFallbackUris.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
 
     return RET_OK;
 }
@@ -215,10 +214,8 @@ int SigningDoc::init (
         signerInfo = builder.getSignerInfo(0);
         signerInfo->setDigestAlgorithm(sharedData->aidDigest);
 
-        DO(m_ArchiveTsHelper.init(
-            (sharedData->signatureFormat == SignatureFormat::CADES_A)
-                ? &sharedData->aidDigest : nullptr
-        ));
+        //  CAdES-A: the archive time-stamp is added to the encoded signature by Augment::addArchiveTimeStamp
+        DO(m_ArchiveTsHelper.init(nullptr));
 
         if (sharedData->includeCert) {
             const ByteArray* ba_certencoded = sharedData->cerSigner->getEncoded();
@@ -376,17 +373,32 @@ int SigningDoc::buildUnsignedAttributes (void)
     SmartBA sba_certificaterefs, sba_revocationrefs;
     SmartBA sba_certvalues, sba_revocationvalues;
 
+    //  The references and values are of the signer path; the revocation ones: the signing certificate first
+    CertValidator::CertChainItem* signer_item = nullptr;
+    const vector<CertValidator::CertChainItem*> ca_certs = collectSignerCerts(&signer_item);
+    vector<CertValidator::CertChainItem*> revoc_certs;
+    if (signer_item) {
+        revoc_certs.push_back(signer_item);
+    }
+    revoc_certs.insert(revoc_certs.end(), ca_certs.begin(), ca_certs.end());
+    (void)collected_certs;
+
     switch (sharedData->signatureFormat) {
     case SignatureFormat::CADES_C:
-        DO(encodeCertificateRefs(collected_certs, &sba_certificaterefs));
-        DO(encodeRevocationRefs(collected_certs, &sba_revocationrefs));
+        if (!ca_certs.empty()) {
+            DO(encodeCertificateRefs(ca_certs, &sba_certificaterefs));
+        }
+        DO(encodeRevocationRefs(revoc_certs, &sba_revocationrefs));
         break;
     case SignatureFormat::CADES_XL:
     case SignatureFormat::CADES_A:
-        DO(encodeCertificateRefs(collected_certs, &sba_certificaterefs));
-        DO(encodeRevocationRefs(collected_certs, &sba_revocationrefs));
-        DO(encodeCertValues(collected_certs, &sba_certvalues));
-        DO(encodeRevocationValues(collected_certs, &sba_revocationvalues));
+        if (!ca_certs.empty()) {
+            DO(encodeCertificateRefs(ca_certs, &sba_certificaterefs));
+            DO(encodeCertValues(ca_certs, &sba_certvalues));
+        }
+        DO(encodeRevocationRefs(revoc_certs, &sba_revocationrefs));
+        DO(encodeRevocationValues(revoc_certs, &sba_revocationvalues));
+        DO(addTspValidationData());
         break;
     default:
         break;
@@ -489,47 +501,13 @@ int SigningDoc::getTimestamp (
 
     DO(tspHelper.encodeRequest());
 
-    if (tspUri.empty()) {
-        const vector<string> shuffled_uris = HttpHelper::randomURIs(tsp_params.uris);
-        for (auto& it : shuffled_uris) {
-            sba_resp.clear();
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url[]=") + it, tspHelper.getRequestEncoded());
-            ret = HttpHelper::post(
-                certValidator.getLibConfig()->getHttp(),
-                it,
-                HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-                tspHelper.getRequestEncoded(),
-                &sba_resp
-            );
-            DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
-            if (ret == RET_OK) {
-                tspUri = it;
-                break;
-            }
-        }
-    }
-    else {
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + sdoc.tspUri, tspHelper.getRequestEncoded());
-        ret = HttpHelper::post(
-            certValidator.getLibConfig()->getHttp(),
-            tspUri,
-            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
-            tspHelper.getRequestEncoded(),
-            &sba_resp
-        );
-        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + sdoc.tspUri, sba_resp.get());
-    }
-    if (ret != RET_OK) {
-        SET_ERROR(RET_UAPKI_TSP_NOT_RESPONDING);
-    }
-
-    DO(tspHelper.parseResponse(sba_resp.get()));
-    if (
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED) &&
-        (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED_WITHMODS)
-        ) {
-        SET_ERROR(RET_UAPKI_TSP_RESPONSE_NOT_GRANTED);
-    }
+    DO(requestTimestamp(
+        certValidator.getLibConfig()->getHttp(),
+        tsp_params.uris,
+        sharedData->tspFallbackUris,
+        tspHelper,
+        tspUri
+    ));
 
     DO(verifySignedData(
         certValidator,
@@ -556,7 +534,7 @@ int SigningDoc::importSignedAttributes (
     int ret = RET_OK;
     vector<UapkiNS::Attribute> signed_attrs;
     Attributes_t* attrs = (Attributes_t*)asn_decode_ba_with_alloc(get_Attributes_desc(), baEncoded);
-    bool present_contentts = false, present_signingcertv2 = false;
+    bool present_signingcertv2 = false;
 
     if ((!attrs) || (attrs->list.count < 2)) {
         SET_ERROR(RET_UAPKI_INVALID_ATTRIBUTE);
@@ -581,9 +559,6 @@ int SigningDoc::importSignedAttributes (
         else if (it.type == string(OID_PKCS9_SIGNING_CERTIFICATE_V2)) {
             present_signingcertv2 = true;
         }
-        else if (it.type == string(OID_PKCS9_CONTENT_TIMESTAMP)) {
-            present_contentts = true;
-        }
     }
 
     if (contentType.empty() || messageDigest.empty()) {
@@ -595,7 +570,12 @@ int SigningDoc::importSignedAttributes (
     if ((sharedData->signatureFormat >= SignatureFormat::CADES_BES) && !present_signingcertv2) {
         SET_ERROR(RET_UAPKI_ATTRIBUTE_NOT_PRESENT);
     }
-    if ((sharedData->signatureFormat >= SignatureFormat::CADES_T) && !present_contentts) {
+
+    //  B-LT, B-LTA: signing-time is mandatory (EN 319 122-1, table 1)
+    if (
+        ((sharedData->signatureFormat == SignatureFormat::CADES_B_LT) || (sharedData->signatureFormat == SignatureFormat::CADES_B_LTA)) &&
+        (signingTime == 0)
+    ) {
         SET_ERROR(RET_UAPKI_ATTRIBUTE_NOT_PRESENT);
     }
 
@@ -635,8 +615,12 @@ int SigningDoc::setupSignerIdentifier (void)
         version = 1;
     }
     else {
-        DEBUG_OUTCON(printf("sharedData->keyId, hex:"); ba_print(stdout, sharedData->keyId.get()));
-        DO(signerInfo->setSid(Pkcs7::SignerIdentifierType::SUBJECT_KEYID, sharedData->keyId.get()));
+        //  subjectKeyIdentifier of the signing certificate (RFC 5652, 5.3): for DSTU 4145 it may be the hash
+        //  DSTU 7564 of the key while the key id of the storage is the hash GOST 34.311; the key id without
+        //  a certificate
+        const ByteArray* ba_keyid = (sharedData->cerSigner) ? sharedData->cerSigner->getKeyId() : sharedData->keyId.get();
+        DEBUG_OUTCON(printf("sid keyId, hex:"); ba_print(stdout, ba_keyid));
+        DO(signerInfo->setSid(Pkcs7::SignerIdentifierType::SUBJECT_KEYID, ba_keyid));
         version = 3;
     }
     DEBUG_OUTCON(printf("SigningDoc::setupSignerIdentifier(), sba_sid, hex:"); ba_print(stdout, sba_sid.get()));
@@ -648,6 +632,7 @@ cleanup:
 
 ByteArray* SigningDoc::getEncoded (void)
 {
+    if (!augmented.empty()) return augmented.get();
     return (sharedData->signatureFormat != SignatureFormat::RAW)
         ? builder.getEncoded() : signature.get();
 }
@@ -660,6 +645,225 @@ int SigningDoc::collectExpectedItems (
     for (size_t i = 0; i < MAX_TIMESTAMPS; i++) {
         DO(certValidator.addExpectedCerts(certValidatorTs[i].getExpectedCerts()));
         DO(certValidator.addExpectedCrls(certValidatorTs[i].getExpectedCrls()));
+    }
+
+cleanup:
+    return ret;
+}
+
+vector<CertValidator::CertChainItem*> SigningDoc::collectSignerCerts (
+        CertValidator::CertChainItem** signerItem
+) const
+{
+    vector<CertValidator::CertChainItem*> rv_certs;
+    *signerItem = nullptr;
+    for (const auto it : sharedData->certValidator.getCertChain()) {
+        if (!*signerItem && (it->getSubject() == sharedData->cerSigner)) {
+            *signerItem = it;
+            continue;
+        }
+        add_unique_cert(rv_certs, it);
+    }
+    for (const auto it : sharedData->certValidator.getObtainedCerts()) {
+        if (it->getSubject() != sharedData->cerSigner) {
+            add_unique_cert(rv_certs, it);
+        }
+    }
+    return rv_certs;
+}
+
+vector<CertValidator::CertChainItem*> SigningDoc::collectTspCerts (void) const
+{
+    vector<CertValidator::CertChainItem*> rv_certs;
+    for (const auto ts_attr : { TsAttr::CONTENT_TIMESTAMP, TsAttr::TIMESTAMP_TOKEN }) {
+        const CertValidator::CertValidator& cert_validator = certValidatorTs[(uint32_t)ts_attr];
+        for (const auto it : cert_validator.getCertChain()) {
+            add_unique_cert(rv_certs, it);
+        }
+        for (const auto it : cert_validator.getObtainedCerts()) {
+            add_unique_cert(rv_certs, it);
+        }
+    }
+    return rv_certs;
+}
+
+void tspUris (
+        const LibraryConfig::TspParams& tspParams,
+        const Cert::CerItem* cerSigner,
+        vector<string>& certUris,
+        vector<string>& configUris
+)
+{
+    certUris.clear();
+    configUris.clear();
+    if (cerSigner && !(tspParams.forced && !tspParams.uris.empty())) {
+        certUris = cerSigner->getUris().tsp;
+    }
+    for (const auto& it : tspParams.uris) {
+        if (std::find(certUris.begin(), certUris.end(), it) == certUris.end()) {
+            configUris.push_back(it);
+        }
+    }
+}
+
+int requestTimestamp (
+        const HttpHelper::Params& httpParams,
+        const vector<string>& certUris,
+        const vector<string>& configUris,
+        Tsp::TspHelper& tspHelper,
+        string& tspUri
+)
+{
+    vector<string> candidates;
+    auto add = [&candidates](const string& uri) {
+        if (std::find(candidates.begin(), candidates.end(), uri) == candidates.end()) {
+            candidates.push_back(uri);
+        }
+    };
+    if (!tspUri.empty()) {
+        add(tspUri);
+    }
+    for (const auto& it : HttpHelper::randomURIs(certUris)) {
+        add(it);
+    }
+    for (const auto& it : configUris) {
+        add(it);
+    }
+    if (candidates.empty()) return RET_UAPKI_TSP_URL_NOT_PRESENT;
+
+    int rv = RET_UAPKI_TSP_NOT_RESPONDING;
+    for (const auto& it : candidates) {
+        SmartBA sba_resp;
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-request, url=") + it, tspHelper.getRequestEncoded());
+        int ret = HttpHelper::post(
+            httpParams,
+            it,
+            HttpHelper::CONTENT_TYPE_TSP_REQUEST,
+            tspHelper.getRequestEncoded(),
+            &sba_resp
+        );
+        DEBUG_OUTPUT_OUTSTREAM(string("TSP-response, url=") + it, sba_resp.get());
+        if (ret != RET_OK) continue;
+
+        //  A TSA that refuses (e.g. an unsupported hash algorithm) or answers wrongly: the next one
+        ret = tspHelper.parseResponse(sba_resp.get());
+        if (ret != RET_OK) {
+            rv = ret;
+            continue;
+        }
+        if (
+            (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED) &&
+            (tspHelper.getStatus() != Tsp::PkiStatus::GRANTED_WITHMODS)
+        ) {
+            rv = RET_UAPKI_TSP_RESPONSE_NOT_GRANTED;
+            continue;
+        }
+        tspUri = it;
+        return RET_OK;
+    }
+    return rv;
+}
+
+//  Unsigned attributes added to the (first) SignerInfo of a CMS ContentInfo, the other bytes kept as they are
+//  (the TSA signature covers TSTInfo and the signed attributes only). DER with definite lengths only
+int addUnsignedAttrsToToken (
+        const ByteArray* baToken,
+        const vector<vector<uint8_t>>& encodedAttrs,
+        ByteArray** baResult
+)
+{
+    vector<vector<uint8_t>> ci, wrap, sdata, sinfos, sinfo;
+    if (
+        !Der::children(ba_get_buf_const(baToken), ba_get_len(baToken), ci) || (ci.size() != 2) ||
+        !Der::children(ci[1].data(), ci[1].size(), wrap) || (wrap.size() != 1) ||
+        !Der::children(wrap[0].data(), wrap[0].size(), sdata) || sdata.empty() || (sdata.back()[0] != 0x31) ||
+        !Der::children(sdata.back().data(), sdata.back().size(), sinfos) || sinfos.empty() ||
+        !Der::children(sinfos[0].data(), sinfos[0].size(), sinfo) || sinfo.empty()
+    ) {
+        return RET_UAPKI_INVALID_STRUCT;
+    }
+
+    vector<uint8_t> unsigned_attrs;
+    if (sinfo.back()[0] == 0xA1) {
+        size_t lh = 0, lb = 0;
+        (void)Der::read(sinfo.back().data(), sinfo.back().size(), lh, lb);
+        unsigned_attrs.assign(sinfo.back().begin() + lh, sinfo.back().end());
+        sinfo.pop_back();
+    }
+    for (const auto& it : encodedAttrs) {
+        unsigned_attrs.insert(unsigned_attrs.end(), it.begin(), it.end());
+    }
+    sinfo.push_back(Der::wrap(0xA1, unsigned_attrs));
+
+    auto concat = [](const vector<vector<uint8_t>>& items) {
+        vector<uint8_t> rv;
+        for (const auto& it : items) rv.insert(rv.end(), it.begin(), it.end());
+        return rv;
+    };
+    sinfos[0] = Der::wrap(0x30, concat(sinfo));
+    sdata.back() = Der::wrap(0x31, concat(sinfos));
+    wrap[0] = Der::wrap(0x30, concat(sdata));
+    ci[1] = Der::wrap(ci[1][0], concat(wrap));
+    const vector<uint8_t> rv = Der::wrap(0x30, concat(ci));
+
+    *baResult = ba_alloc_from_uint8(rv.data(), rv.size());
+    return (*baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int SigningDoc::addTspValidationData (void)
+{
+    int ret = RET_OK;
+    Attribute* attr_ts = nullptr;
+    for (auto& it : m_UnsignedAttrs) {
+        if (it->type == string(OID_PKCS9_TIMESTAMP_TOKEN)) {
+            attr_ts = it;
+            break;
+        }
+    }
+    if (!attr_ts) return RET_OK;
+
+    const vector<CertValidator::CertChainItem*> tsp_certs = collectTspCerts();
+    if (tsp_certs.empty()) return RET_OK;
+
+    //  The certificates not already in the time-stamp token (TS 101 733, 6.3.3)
+    Pkcs7::SignedDataParser token_parser;
+    vector<CertValidator::CertChainItem*> cert_values;
+    DO(token_parser.parse(attr_ts->baValues));
+    for (const auto it : tsp_certs) {
+        bool present = false;
+        for (const auto& it_cert : token_parser.getCerts()) {
+            if (ba_cmp(it_cert, it->getSubject()->getEncoded()) == 0) {
+                present = true;
+                break;
+            }
+        }
+        if (!present) {
+            cert_values.push_back(it);
+        }
+    }
+
+    {
+        vector<vector<uint8_t>> encoded_attrs;
+        SmartBA sba_values, sba_revocvalues;
+        if (!cert_values.empty()) {
+            DO(encodeCertValues(cert_values, &sba_values));
+            Attribute attr(OID_PKCS9_CERT_VALUES, sba_values.pop());
+            SmartBA sba_attr;
+            DO(AttributeHelper::encodeAttribute(attr, &sba_attr));
+            encoded_attrs.push_back(vector<uint8_t>(sba_attr.buf(), sba_attr.buf() + sba_attr.size()));
+        }
+        DO(encodeRevocationValues(tsp_certs, &sba_revocvalues));
+        {
+            Attribute attr(OID_PKCS9_REVOCATION_VALUES, sba_revocvalues.pop());
+            SmartBA sba_attr;
+            DO(AttributeHelper::encodeAttribute(attr, &sba_attr));
+            encoded_attrs.push_back(vector<uint8_t>(sba_attr.buf(), sba_attr.buf() + sba_attr.size()));
+        }
+
+        ByteArray* ba_token = nullptr;
+        DO(addUnsignedAttrsToToken(attr_ts->baValues, encoded_attrs, &ba_token));
+        ba_free(attr_ts->baValues);
+        attr_ts->baValues = ba_token;
     }
 
 cleanup:

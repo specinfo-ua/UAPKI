@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -101,6 +101,11 @@ private:
         CrlItem* crlStoreItem
     );
     int loadDir (void);
+    //  The other CRLs of the scope of crlItem: the older ones are obsolete (their files deleted), crlItem is
+    //  obsolete if there is a newer one. The items stay in memory up to REMOVE_CRL (other threads may use them)
+    void markObsolete (
+        CrlItem* crlItem
+    );
     int removeObsolete (void);
     void reset (void);
 

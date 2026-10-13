@@ -34,6 +34,7 @@ public class Config {
     private CmProvidersParams cmProviders;
     private CertCacheParams certCache;
     private CrlCacheParams crlCache;
+    private TrustListCacheParams trustListCache;
     private OcspParams ocsp;
     private TspParams tsp;
     private ProxyParams proxy;
@@ -48,6 +49,9 @@ public class Config {
 
     public CrlCacheParams getCrlCache() { return crlCache; }
     public Config setCrlCache(CrlCacheParams crlCache) { this.crlCache = crlCache; return this; }
+
+    public TrustListCacheParams getTrustListCache() { return trustListCache; }
+    public Config setTrustListCache(TrustListCacheParams trustListCache) { this.trustListCache = trustListCache; return this; }
 
     public OcspParams getOcsp() { return ocsp; }
     public Config setOcsp(OcspParams ocsp) { this.ocsp = ocsp; return this; }

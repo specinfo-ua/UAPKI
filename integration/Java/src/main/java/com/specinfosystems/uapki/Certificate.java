@@ -48,6 +48,9 @@ public final class Certificate {
     private SignatureInfo signatureInfo;
     private List<Extension> extensions;
     private boolean selfSigned;
+    private boolean trusted;
+    private boolean trustListSigner;
+    private List<TrustService> trustServices;
 
     private transient String id = "";
     private transient Derived derived;
@@ -260,6 +263,12 @@ public final class Certificate {
     public SignatureInfo signatureInfo() { return signatureInfo == null ? new SignatureInfo(null, null, null) : signatureInfo; }
     public List<Extension> extensions() { return Util.list(extensions); }
     public boolean selfSigned() { return selfSigned; }
+    /** Довірений: заданий при ініціалізації або сертифікат чинної послуги довірчого списку */
+    public boolean trusted() { return trusted; }
+    /** Призначений для перевірки підпису довірчих списків (trustListCache.trustListSignerCerts методу INIT) */
+    public boolean trustListSigner() { return trustListSigner; }
+    /** Послуги довірчих списків, сертифікатом яких є цей сертифікат */
+    public List<TrustService> trustServices() { return Util.list(trustServices); }
     public Instant notBefore() { return validity().notBefore(); }
     public Instant notAfter() { return validity().notAfter(); }
 

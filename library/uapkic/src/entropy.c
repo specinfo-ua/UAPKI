@@ -46,7 +46,7 @@
 #endif
 
 #include "entropy.h"
-#include "jitterentropy-internal.h"
+#include "jitterentropy.h"
 #include "pthread-internal.h"
 #include "word-internal.h"
 #include "math-int-internal.h"
@@ -141,7 +141,7 @@ int entropy_get(ByteArray** entropy)
 {
     int ret = RET_OK;
 #ifndef __EMSCRIPTEN__
-    JitentCtx* jec = NULL;
+    struct rand_data* jec = NULL;
 #endif
     ByteArray* out = NULL;
 
@@ -152,7 +152,7 @@ int entropy_get(ByteArray** entropy)
 
     DO(jent_init(0));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, out->buf + 256, 256) != 0) {
+    if (jent_read_entropy(jec, (char*)out->buf + 256, 256) != 256) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 #else
@@ -179,11 +179,11 @@ int entropy_jitter(ByteArray* random)
 {
 #ifndef __EMSCRIPTEN__
     int ret = RET_OK;
-    JitentCtx* jec = NULL;
+    struct rand_data* jec = NULL;
 
     DO(jent_init(0));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, random->buf, random->len) != 0) {
+    if (jent_read_entropy(jec, (char*)random->buf, random->len) != (ssize_t)random->len) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 
@@ -200,7 +200,7 @@ int entropy_self_test(void)
 {
     int ret = RET_OK;
 #ifndef __EMSCRIPTEN__
-    JitentCtx* jec = NULL;
+    struct rand_data* jec = NULL;
 #endif
     uint8_t buf[256];
 
@@ -209,7 +209,7 @@ int entropy_self_test(void)
 #ifndef __EMSCRIPTEN__
     DO(jent_init(1));
     CHECK_NOT_NULL(jec = jent_entropy_collector_alloc(1, 0));
-    if (jent_read_entropy(jec, buf, sizeof(buf)) != 0) {
+    if (jent_read_entropy(jec, (char*)buf, sizeof(buf)) != (ssize_t)sizeof(buf)) {
         SET_ERROR(RET_JITTER_RNG_ERROR);
     }
 #endif

@@ -310,6 +310,13 @@ public:
         CM_BYTEARRAY*** abaSalts,
         CM_BYTEARRAY*** abaWrappedKeys
     );
+    //  Decryption of a key by an RSA key: rsaEncryption (CKM_RSA_PKCS) or id-RSAES-OAEP (CKM_RSA_PKCS_OAEP)
+    CM_ERROR decrypt (
+        const KeyInfo& keyInfo,
+        const CM_BYTEARRAY* baAlgorithmIdentifier,
+        const CM_BYTEARRAY* baSource,
+        CM_BYTEARRAY** baDest
+    );
     CM_ERROR dhUnwrapKey (
         const KeyInfo& keyInfo,
         const char* oidDhKdf,
@@ -405,6 +412,17 @@ private:
         const CM_BYTEARRAY* baWrappedKey,
         Cryptoki::Buffer& bufSessionKey
     );
+    //  ECDH with the ANSI X9.63 KDF and AES Key Wrap (RFC 5753) for a key on a NIST curve
+    CM_ERROR unwrapKeyEcdh (
+        const KeyInfo& keyInfo,
+        const bool withCofactor,
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const CM_BYTEARRAY* baSpki,
+        const CM_BYTEARRAY* baUkm,
+        const CM_BYTEARRAY* baWrappedKey,
+        Cryptoki::Buffer& bufSessionKey
+    );
     CM_ERROR unwrapKeyOnToken (
         const KeyInfo& keyInfo,
         const DeriveWrapKeyParams& dwkParams,
@@ -481,7 +499,8 @@ public:
     );
     static HashAlg hashAlgBySignAlgo (
         const KeyInfo& keyInfo,
-        const std::string& signAlgo
+        const std::string& signAlgo,
+        const CM_BYTEARRAY* baSignAlgoParams = nullptr
     );
     static CM_ERROR toCmError (
         const CK_RV ckRetValue

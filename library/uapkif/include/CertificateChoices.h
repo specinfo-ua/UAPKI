@@ -60,7 +60,7 @@ typedef struct CertificateChoices {
     union CertificateChoices_u {
         Certificate_t     certificate;
         ExtendedCertificate_t     extendedCertificate;
-        AttributeCertificateV1_t     v1AttrCert;
+        ANY_t     v1AttrCert;    /* the element [1] as it is encoded */
         AttributeCertificateV2_t     v2AttrCert;
         OtherCertificateFormat_t     other;
     } choice;

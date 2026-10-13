@@ -44,6 +44,22 @@ namespace UapkiNS {
             DECRYPT = 1
         };  //  end enum Direction
 
+        //  AES-CBC with the padding of RFC 5652, 6.3; the parameters are the IV (RFC 3565, 4.1)
+        class Aes {
+        public:
+            static const size_t SIZE_IV = 16;
+
+            //  The key length of the algorithm, bytes; 0 if the algorithm is not supported
+            static size_t keySize (const std::string& algo);
+            static int cryptData (const UapkiNS::AlgorithmIdentifier& algoId, const ByteArray* baKey,
+                                const Direction direction, const ByteArray* baDataIn, ByteArray** baDataOut);
+            static int decodeParams (const ByteArray* baEncoded, ByteArray** baIV);
+            static int encodeParams (const ByteArray* baIV, ByteArray** baEncoded);
+            static int generateKey (const size_t keyLen, ByteArray** baKey);
+            static int generateIV (ByteArray** baIV);
+
+        };  //  end class Aes
+
         class Dstu7624 {
         public:
             static const size_t SIZE_IV = 32;

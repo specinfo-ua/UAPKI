@@ -100,6 +100,75 @@ int ContentHasher::digest (
     return ret;
 }
 
+int ContentHasher::digestWithAffixes (
+        const HashAlg hashAlgo,
+        const std::vector<uint8_t>& prefix,
+        const std::vector<uint8_t>& suffix,
+        ByteArray** baHash
+) const
+{
+    if ((hashAlgo == HASH_ALG_UNDEFINED) || (m_SourceType == SourceType::UNDEFINED) || !baHash) return RET_UAPKI_INVALID_PARAMETER;
+
+    int ret = RET_OK;
+    HashCtx* hash_ctx = nullptr;
+    ByteArray* ba_data = nullptr;
+    FILE* f = nullptr;
+    ByteArray ba_prefix = { (uint8_t*)prefix.data(), prefix.size() };
+    ByteArray ba_suffix = { (uint8_t*)suffix.data(), suffix.size() };
+
+    CHECK_NOT_NULL(hash_ctx = hash_alloc(hashAlgo));
+    if (!prefix.empty()) {
+        DO(hash_update(hash_ctx, &ba_prefix));
+    }
+
+    switch (m_SourceType) {
+    case SourceType::BYTEARRAY:
+        if (ba_get_len(m_Bytes) > 0) {
+            DO(hash_update(hash_ctx, m_Bytes));
+        }
+        break;
+    case SourceType::MEMORY:
+        if (m_MemorySize > 0) {
+            ByteArray ba_local = { (uint8_t*)m_MemoryPtr, m_MemorySize };
+            DO(hash_update(hash_ctx, &ba_local));
+        }
+        break;
+    case SourceType::FILE:
+        f = fopen_utf8(m_Filename.c_str(), 0);
+        if (!f) {
+            SET_ERROR(RET_UAPKI_FILE_OPEN_ERROR);
+        }
+        CHECK_NOT_NULL(ba_data = ba_alloc_by_len(FILE_BLOCK_SIZE));
+        while (true) {
+            const size_t len = fread(ba_get_buf(ba_data), 1, FILE_BLOCK_SIZE, f);
+            if (len > 0) {
+                ByteArray ba_block = { ba_get_buf(ba_data), len };
+                DO(hash_update(hash_ctx, &ba_block));
+            }
+            if (len < FILE_BLOCK_SIZE) break;
+        }
+        if (ferror(f)) {
+            SET_ERROR(RET_UAPKI_FILE_READ_ERROR);
+        }
+        break;
+    default:
+        SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
+    }
+
+    if (!suffix.empty()) {
+        DO(hash_update(hash_ctx, &ba_suffix));
+    }
+    DO(hash_final(hash_ctx, baHash));
+
+cleanup:
+    if (f) {
+        fclose(f);
+    }
+    ba_free(ba_data);
+    hash_free(hash_ctx);
+    return ret;
+}
+
 void ContentHasher::reset (void)
 {
     if (m_AutoReleaseBytes && m_Bytes) {

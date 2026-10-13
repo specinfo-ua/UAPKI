@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,6 +33,7 @@
 #include "dstu-ns.h"
 #include "extension-helper.h"
 #include "macros-internal.h"
+#include "oid-utils.h"
 #include "oids.h"
 #include "time-util.h"
 #include "uapki-errors.h"
@@ -92,6 +93,7 @@ static int basicconstrains_from_extns (
     int pathlen_constraint = -1;
     const int ret = ExtensionHelper::getBasicConstrains(extns, critical, ca, pathlen_constraint);
     if (ret == RET_OK) {
+        certExtKeyUsage.set(ExtKeyUsageMask::CA_EXTN_PRESENT);
         if (critical) {
             certExtKeyUsage.set(ExtKeyUsageMask::CA_EXTN_CRITICAL);
         }
@@ -99,7 +101,7 @@ static int basicconstrains_from_extns (
             certExtKeyUsage.set(ExtKeyUsageMask::CA);
         };
         if (pathlen_constraint >= 0) {
-            certExtKeyUsage.setPathLenConstraint((uint32_t)pathlen_constraint);
+            certExtKeyUsage.setPathLenConstraint(pathlen_constraint);
         }
     }
     else if (ret != RET_UAPKI_EXTENSION_NOT_PRESENT) {
@@ -190,6 +192,46 @@ static int encode_issuer_and_sn (
     return RET_OK;
 }   //  encode_issuer_and_sn
 
+//  Extensions that may be critical: as X509_supported_extension() of OpenSSL, without those the library does not process
+//  (name constraints, policy constraints and mappings, inhibitAnyPolicy, proxy, RFC 3779, Netscape)
+//  The supported critical extensions of EU DSS (SupportedCriticalExtensions of its default validation policy),
+//  plus the extensions the library processes; policyMappings is not supported (as EU DSS)
+static const char* KNOWN_EXTENSIONS[] = {
+    OID_X509v3_KeyUsage,
+    OID_X509v3_CertificatePolicies,
+    OID_X509v3_SubjectAlternativeName,
+    OID_X509v3_BasicConstraints,
+    OID_X509v3_NameConstraints,         //  EU DSS
+    OID_X509v3_PolicyConstraints,       //  EU DSS
+    OID_X509v3_ExtendedKeyUsage,
+    OID_X509v3_CRLDistributionPoints,
+    OID_X509v3_InhibitAnyPolicy,        //  EU DSS
+    OID_PKIX_QcStatements,              //  EU DSS: a qualified certificate (ETSI EN 319 412-5)
+    OID_PKIX_OcspNoCheck,               //  processed by the library (no revocation check)
+    OID_X509v3_NoRevAvail,              //  processed by the library (no revocation check)
+    OID_ETSI_EXT_VALASSURED_ST_CERTS    //  processed by the library (no revocation check)
+};
+
+static bool unknown_critical_extension (
+    const Extensions_t* extns
+)
+{
+    for (int i = 0; i < extns->list.count; i++) {
+        const Extension_t* extn = extns->list.array[i];
+        if (!extn || !extn->critical || !*extn->critical) continue;
+
+        bool known = false;
+        for (const auto& it : KNOWN_EXTENSIONS) {
+            if (OID_is_equal_oid(&extn->extnID, it)) {
+                known = true;
+                break;
+            }
+        }
+        if (!known) return true;
+    }
+    return false;
+}   //  unknown_critical_extension
+
 static int extkeyusage_from_extns (
     const Extensions_t* extns,
     CertExtKeyUsage& certExtKeyUsage
@@ -271,6 +313,7 @@ CertStatusInfo::CertStatusInfo (
     , baResult(nullptr)
     , status(UapkiNS::CertStatus::UNDEFINED)
     , validTime(0)
+    , thisUpdate(0)
 {
 }
 
@@ -293,18 +336,21 @@ void CertStatusInfo::reset (void)
     baResult = nullptr;
     status = UapkiNS::CertStatus::UNDEFINED;
     validTime = 0;
+    thisUpdate = 0;
 }
 
 int CertStatusInfo::set (
         const UapkiNS::CertStatus aStatus,
         const uint64_t aValidTime,
-        const ByteArray* aResult
+        const ByteArray* aResult,
+        const uint64_t aThisUpdate
 )
 {
     reset();
     this->needUpdate = false;
     this->status = aStatus;
     this->validTime = aValidTime;
+    this->thisUpdate = aThisUpdate;
     this->baResult = ba_copy_with_alloc(aResult, 0, 0);
     return (this->baResult) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
 }
@@ -326,7 +372,13 @@ CerItem::CerItem (void)
     , m_KeyUsage(0)
     , m_PublicKeySize(0)
     , m_SelfSigned(false)
-    , m_Trusted(false)
+    , m_UnknownCriticalExtension(false)
+    , m_AuthorityKeyIdExtn(false)
+    , m_NoRevocationCheck(false)
+    , m_OcspNoCheckExtn(false)
+    , m_NoRevAvailExtn(false)
+    , m_TrustedInit(false)
+    , m_TrustListSigner(false)
     , m_VerifyStatus(VerifyStatus::UNDEFINED)
     , m_VerifyError(RET_OK)
     , m_CertStatusByCrl(ValidationType::CRL)
@@ -425,7 +477,123 @@ void CerItem::setTrusted (
         const bool trusted
 )
 {
-    m_Trusted = trusted;
+    m_TrustedInit = trusted;
+}
+
+bool CerItem::isTrusted (void) const
+{
+    return isTrustedAt(0);
+}
+
+bool CerItem::trustPeriod (
+        uint64_t& msStart,
+        uint64_t& msSunset
+) const
+{
+    //  A certificate of a trusted list is a trust anchor from the time a service of the certificate was first
+    //  provided until its sunset date (ETSI EN 319 102-1, 3.1 and 5.2.6.4: the time until when the trust anchor
+    //  is considered reliable): the end of the last period a service was provided in; msSunset is 0 while a
+    //  service is provided. The breaks between the periods are not told apart here - they tell the quality of
+    //  a signature, not the trust in the path
+    msStart = msSunset = 0;
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    if (!services) return false;
+
+    const uint64_t now = TimeUtil::mtimeNow();
+    bool was_provided = false, is_provided = false;
+    for (const auto& it : *services) {
+        for (const auto& it_period : it.periods) {
+            //  A status that starts later than now is not in effect yet
+            if (!TrustService::isActiveStatus(it_period.status) || (it_period.msFrom > now)) continue;
+            if (!was_provided || (it_period.msFrom < msStart)) {
+                msStart = it_period.msFrom;
+            }
+            was_provided = true;
+            if (it_period.msTo == 0) {
+                is_provided = true;
+            }
+            else if (it_period.msTo > msSunset) {
+                msSunset = it_period.msTo;
+            }
+        }
+    }
+    if (is_provided) {
+        msSunset = 0;
+    }
+    return was_provided;
+}
+
+bool CerItem::isTrustedAt (
+        const uint64_t msTime
+) const
+{
+    if (m_TrustedInit) return true;
+
+    uint64_t start = 0, sunset = 0;
+    if (!trustPeriod(start, sunset)) return false;
+    const uint64_t time = (msTime > 0) ? msTime : TimeUtil::mtimeNow();
+    return (time >= start) && ((sunset == 0) || (time < sunset));
+}
+
+bool CerItem::wasTrusted (void) const
+{
+    uint64_t start = 0, sunset = 0;
+    return m_TrustedInit || trustPeriod(start, sunset);
+}
+
+bool CerItem::isTrustAnchorCandidate (void) const
+{
+    if (m_TrustedInit) return true;
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    return services && !services->empty();
+}
+
+bool CerItem::hasActiveTrustService (
+        const char* typeMark,
+        const uint64_t msTime
+) const
+{
+    const std::shared_ptr<const TrustServices> services = getTrustServices();
+    if (!services) return false;
+    for (const auto& it : *services) {
+        if (it.type.find(typeMark) == std::string::npos) continue;
+        const TrustService::Period* period = it.periodAt(msTime);
+        if (period && TrustService::isActiveStatus(period->status)) return true;
+    }
+    return false;
+}
+
+void CerItem::setTrustServices (
+        const std::shared_ptr<const TrustServices>& trustServices
+)
+{
+    //  The trust by a list is decided at a time (isTrustedAt): by the status of the services then
+    std::atomic_store(&m_TrustServices, trustServices);
+    //  A certificate of a trusted list is not a temporary one (see CerStore::removeMarkedCerts)
+    if (trustServices) {
+        m_MarkedToRemove = false;
+    }
+}
+
+const TrustService::Period* TrustService::periodAt (const uint64_t msTime) const
+{
+    for (const auto& it : periods) {
+        if ((msTime >= it.msFrom) && ((it.msTo == 0) || (msTime < it.msTo))) return &it;
+    }
+    return nullptr;
+}
+
+bool TrustService::isActiveStatus (const std::string& status)
+{
+    //  ETSI TS 119 612, 5.5.4 (granted, recognisedatnationallevel) and the statuses used before eIDAS
+    return (status == "granted") || (status == "recognisedatnationallevel") || (status == "undersupervision") ||
+        (status == "supervisionincessation") || (status == "accredited") || (status == "setbynationallaw");
+}
+
+bool TrustService::isCa (void) const
+{
+    //  "CA/QC", "CA/PKC", "National-CA/QC", "MR-CA/QC", "NationalRootCA-QC"
+    return (type.find("CA/") != std::string::npos) || (type.find("RootCA") != std::string::npos);
 }
 
 void CerItem::setUniqueKeyId (
@@ -443,6 +611,13 @@ int CerItem::verify (
     lock_guard<mutex> lock(m_Mutex);
 
     if (!cerIssuer) return RET_OK;
+    //  A trust anchor is not verified by a signature (RFC 5280, 6.1): the certificate is trusted itself
+    if ((cerIssuer == this) && !m_SelfSigned && isTrustAnchorCandidate()) {
+        m_VerifyIssuer.clear();
+        m_VerifyError = RET_OK;
+        m_VerifyStatus.store(VerifyStatus::VALID);
+        return RET_OK;
+    }
     std::string issuerKey((const char*)ba_get_buf_const(cerIssuer->getSpki()),
                           ba_get_len(cerIssuer->getSpki()));
     issuerKey.push_back(cerIssuer->keyUsageByBit(KeyUsage_keyCertSign) ? 1 : 0);
@@ -484,7 +659,7 @@ int CerItem::verifySignatureBy (
 ) const
 {
     int ret = RET_OK;
-    SmartBA sba_signvalue, sba_tbs;
+    SmartBA sba_signparams, sba_signvalue, sba_tbs;
     string s_signalgo;
 
     X509Tbs_t* x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), m_Encoded);
@@ -506,12 +681,18 @@ int CerItem::verifySignatureBy (
         DO(asn_BITSTRING2ba(&m_Cert->signature, &sba_signvalue));
     }
 
+    //  The parameters of the signature algorithm: RSASSA-PSS
+    if (m_Cert->signatureAlgorithm.parameters) {
+        (void)sba_signparams.set(ba_alloc_from_uint8(m_Cert->signatureAlgorithm.parameters->buf, (size_t)m_Cert->signatureAlgorithm.parameters->size));
+    }
     ret = Verify::verifySignature(
         s_signalgo.c_str(),
         sba_tbs.get(),
         false,
         baIssuerSpki,
-        sba_signvalue.get()
+        sba_signvalue.get(),
+        nullptr,
+        sba_signparams.get()
     );
 
 cleanup:
@@ -789,6 +970,7 @@ int parseCert (
     CertExtKeyUsage cert_extkeyusage;
     CerItem::Uris uris;
     bool is_dstu, is_selfsigned;
+    bool has_authoritykeyid = false;
     size_t sn_shift = 0;
 
     DO(asn_INTEGER2ba(&tbs.serialNumber, &sba_serialnum));
@@ -843,6 +1025,7 @@ int parseCert (
     DO(extkeyusage_from_extns(extns, cert_extkeyusage));
     //  Required attribute authorityKeyIdentifier
     ret = ExtensionHelper::getAuthorityKeyId(extns, &sba_authoritykeyid);
+    has_authoritykeyid = (ret == RET_OK);
     if (ret == RET_UAPKI_EXTENSION_NOT_PRESENT) {
         if (!sba_authoritykeyid.set(ba_alloc_from_uint8(sba_keyid.buf(), sba_keyid.size()))) {
             SET_ERROR(RET_UAPKI_GENERAL_ERROR);
@@ -872,6 +1055,7 @@ int parseCert (
     cer_item->m_Encoded = sba_encoded.pop();
     cer_item->m_Cert = cert;
     cer_item->m_AuthorityKeyId = sba_authoritykeyid.pop();
+    cer_item->m_AuthorityKeyIdExtn = has_authoritykeyid;
     cer_item->m_CertId = sba_certid.pop();
     cer_item->m_KeyAlgo = s_keyalgo;
     cer_item->m_SerialNumber = sba_serialnum.pop();
@@ -886,6 +1070,19 @@ int parseCert (
     cer_item->m_CertExtKeyUsage = cert_extkeyusage;
     cer_item->m_PublicKeySize = publickey_size(sba_pubkey.size(), is_dstu);
     cer_item->m_SelfSigned = is_selfsigned;
+    cer_item->m_UnknownCriticalExtension = unknown_critical_extension(extns);
+    for (const char* oid_extn : { OID_PKIX_OcspNoCheck, OID_ETSI_EXT_VALASSURED_ST_CERTS, OID_X509v3_NoRevAvail }) {
+        SmartBA sba_tmpvalue;
+        if (Util::extnValueFromExtensions(extns, oid_extn, nullptr, &sba_tmpvalue) == RET_OK) {
+            cer_item->m_NoRevocationCheck = true;
+            if (oid_is_equal(oid_extn, OID_PKIX_OcspNoCheck)) {
+                cer_item->m_OcspNoCheckExtn = true;
+            }
+            else if (oid_is_equal(oid_extn, OID_X509v3_NoRevAvail)) {
+                cer_item->m_NoRevAvailExtn = true;
+            }
+        }
+    }
     cer_item->m_Uris = uris;
 
     cert = nullptr;

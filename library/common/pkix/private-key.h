@@ -50,6 +50,9 @@ int private_key_sign_single(const ByteArray* key, const char* signAlgo, const By
         const ByteArray* hash, ByteArray** signature);
 int private_key_sign(const ByteArray* key, const ByteArray** hashes, size_t hashes_count,
         const char* signAlgo, const ByteArray* signAlgoParams, ByteArray*** signatures);
+//  Decryption of a key by an RSA private key: baAlgorithmIdentifier - rsaEncryption or id-RSAES-OAEP with its parameters
+int private_key_decrypt(const ByteArray* key, const ByteArray* baAlgorithmIdentifier,
+        const ByteArray* baEncryptedKey, ByteArray** baDecryptedKey);
 int private_key_ecdh(const bool withCofactor, const ByteArray* baSenderKey,
         const ByteArray* baRecipientSpki, ByteArray** baCommonSecret);
 

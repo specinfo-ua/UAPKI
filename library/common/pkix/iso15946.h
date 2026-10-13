@@ -52,6 +52,18 @@ int iso15946_encode_sharedinfo (
     ByteArray** baEncoded
 );
 
+//  The hash of a key agreement scheme with a KDF: the national ones and dhSinglePass-(std|cofactor)DH-sha*kdf-scheme
+//  (RFC 5753, 7.1.4); HASH_ALG_UNDEFINED if the scheme is not supported
+HashAlg iso15946_hash_from_oid_dhkdf (
+    const char* oid,
+    bool* withCofactor
+);
+
+//  The length of the key-encryption key of a key wrap algorithm, bytes; 0 if it is not supported
+size_t iso15946_kek_size (
+    const char* oidWrapAlgo
+);
+
 int iso15946_generate_secretc (
     const HashAlg hashAlgo,
     const char* oidWrapAlgo,

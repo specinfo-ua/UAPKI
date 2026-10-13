@@ -51,6 +51,20 @@ endif ()
 set(PATH_PRJ ${CMAKE_CURRENT_SOURCE_DIR})
 
 aux_source_directory(${PATH_PRJ}/src UAPKIC_SOURCES)
+
+#  The CPU Jitter RNG (jitterentropy-library 3.6.3, src/jitterentropy*): its sources must not be optimized - the
+#  measured code would be removed; the internal timer (a thread) is for the platforms with POSIX threads
+file(GLOB JITTER_SOURCES ${PATH_PRJ}/src/jitterentropy-*.c)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    list(REMOVE_ITEM UAPKIC_SOURCES ${JITTER_SOURCES})
+elseif(MSVC)
+    set_source_files_properties(${JITTER_SOURCES} PROPERTIES COMPILE_OPTIONS "/Od")
+else()
+    set_source_files_properties(${JITTER_SOURCES} PROPERTIES COMPILE_OPTIONS "-O0;-fwrapv")
+    if(UNIX AND (NOT CMAKE_SYSTEM_NAME STREQUAL "Android"))
+        set_source_files_properties(${JITTER_SOURCES} PROPERTIES COMPILE_DEFINITIONS "JENT_CONF_ENABLE_INTERNAL_TIMER")
+    endif()
+endif()
 if(WIN32)
     set(RESOURCE_RC resource.rc)
 else()

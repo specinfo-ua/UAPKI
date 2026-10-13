@@ -151,10 +151,17 @@ int uapki_session_select_key (Context& context, JSON_Object* joParams, JSON_Obje
             ret = cer_store->getCertByCertId(sba_certid.get(), &cer_selectedkey);
         }
         else {
-            //  The certificate from the storage itself: one key may have certificates of several CAs
+            //  The certificate from the storage itself: one key may have certificates of several CAs.
+            //  A DSTU 4145 key: the subjectKeyIdentifier of its certificate is the hash GOST 34.311 (keyId)
+            //  or DSTU 7564-256 (keyId2) of the public key, as the CA made it
             ret = RET_UAPKI_CERT_NOT_FOUND;
             for (const auto& it : added_ceritems) {
-                if ((it.errorCode == RET_OK) && it.cerItem && it.cerItem->equalKeyId(sba_keyid.get())) {
+                if (
+                    (it.errorCode == RET_OK) && it.cerItem && (
+                        it.cerItem->equalKeyId(sba_keyid.get()) ||
+                        (!sba_keyid2.empty() && it.cerItem->equalKeyId(sba_keyid2.get()))
+                    )
+                ) {
                     if (!cer_selectedkey || (it.cerItem->getNotBefore() > cer_selectedkey->getNotBefore())) {
                         cer_selectedkey = it.cerItem;
                     }
@@ -163,6 +170,9 @@ int uapki_session_select_key (Context& context, JSON_Object* joParams, JSON_Obje
             }
             if (ret != RET_OK) {
                 ret = cer_store->getCertByKeyId(sba_keyid.get(), &cer_selectedkey);
+            }
+            if ((ret == RET_UAPKI_CERT_NOT_FOUND) && !sba_keyid2.empty()) {
+                ret = cer_store->getCertByKeyId(sba_keyid2.get(), &cer_selectedkey);
             }
         }
         if (ret == RET_OK) {

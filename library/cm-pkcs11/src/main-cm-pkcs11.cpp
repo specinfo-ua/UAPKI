@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include "byte-array.h"
 #include "cm-api.h"

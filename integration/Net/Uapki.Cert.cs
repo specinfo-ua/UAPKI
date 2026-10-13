@@ -304,7 +304,6 @@ public partial class Uapki
                                         else
                                             QualifiedStatementInfo = statement.StatementInfo;
                                     }
-                                    else if (statement.StatementId == "1.2.804.2.1.1.1.2.2") IsOldQualified = true;
                                     else OtherStatements.Add(statement.StatementId);
                                 }
                                 break;
@@ -326,7 +325,12 @@ public partial class Uapki
 
                                 CertificatePolicies = new();
                                 foreach (var policy in extension.Decoded!.Value.CertificatePolicies!)
+                                {
                                     CertificatePolicies.Add(policy.PolicyIdentifier);
+                                    //  The certificate policy of the certificates issued in Ukraine as qualified before
+                                    //  the statements of ETSI EN 319 412-5 were used
+                                    if (policy.PolicyIdentifier == "1.2.804.2.1.1.1.2.2") IsOldQualified = true;
+                                }
                                 break;
 
                             case "2.5.29.31":
@@ -404,6 +408,18 @@ public partial class Uapki
         [JsonPropertyName("selfSigned")]
         public bool SelfSigned { get; init; }
 
+        /// <summary>Trusted: given at initialization or a certificate of a provided service of a trusted list</summary>
+        [JsonPropertyName("trusted")]
+        public bool Trusted { get; init; }
+
+        /// <summary>The certificate verifies the signature of trusted lists (INIT, trustListCache.trustListSignerCerts)</summary>
+        [JsonPropertyName("trustListSigner")]
+        public bool TrustListSigner { get; init; }
+
+        /// <summary>The services of trusted lists this certificate is the certificate of</summary>
+        [JsonPropertyName("trustServices")]
+        public List<TrustService>? TrustServices { get; init; }
+
         private List<Extension> _extensions { get; init; } = new List<Extension>();
 
         [JsonIgnore]
@@ -475,6 +491,23 @@ public partial class Uapki
         public int ErrorCode { get; init; }
         public string? Method { get; init; }
         public Certificate? Result { get; init; }
+    }
+
+    /// <summary>
+    /// The information about an encoded certificate; when the certificate is in the certificate cache, with what the
+    /// library knows about its trust (Trusted, TrustListSigner, TrustServices)
+    /// </summary>
+    public Certificate GetCertInfo(byte[] cert)
+    {
+        CheckInit();
+
+        string cert_info_cmd = Request("CERT_INFO", p => p.WriteBase64String("bytes", cert));
+
+        var ret = JsonSerializer.Deserialize(Process(cert_info_cmd), jsonCtx.CertInfoResult) ?? throw new UapkiException(0x2001);
+        if (ret.ErrorCode != 0)
+            throw new UapkiException(ret.ErrorCode);
+
+        return ret.Result ?? throw new UapkiException(0x1005);
     }
 
     public Certificate GetCertInfo(string certId)

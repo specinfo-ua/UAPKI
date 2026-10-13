@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -70,6 +70,7 @@ namespace Ocsp {
             uint64_t    msNextUpdate;
             uint64_t    msRevocationTime;
             CrlReason   revocationReason;
+            uint64_t    msArchiveCutoff;    //  RFC 6960, 4.4.4 (singleExtensions), 0 if absent
 
             SingleResponseInfo (void)
                 : certStatus(CertStatus::UNDEFINED)
@@ -77,6 +78,7 @@ namespace Ocsp {
                 , msNextUpdate(0)
                 , msRevocationTime(0)
                 , revocationReason(CrlReason::UNDEFINED)
+                , msArchiveCutoff(0)
             {}
 
         };  //  end struct SingleResponseInfo

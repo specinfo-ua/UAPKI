@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,6 +29,7 @@
 #define UAPKI_CER_ITEM_H
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include "uapkic.h"
 #include "uapkif.h"
@@ -56,6 +57,7 @@ enum class ExtKeyUsageMask : uint32_t {
     CA_PATHLEN          = 0x0004, // pathLen is present
     CA                  = 0x0008,
     CA_EXTN_CRITICAL    = 0x0010, // BasicConstrains-extension with critical flag
+    CA_EXTN_PRESENT     = 0x0200, // BasicConstrains-extension is present
     OCSP                = 0x0020,
     OCSP_NO_CHECK       = 0x0040,
     TSP                 = 0x0080,
@@ -90,6 +92,7 @@ struct CertStatusInfo {
     std::atomic<UapkiNS::CertStatus>
                 status;
     std::atomic<uint64_t> validTime;
+    std::atomic<uint64_t> thisUpdate;  //  of the cached data (OCSP), 0 if unknown
 
     CertStatusInfo (
         const ValidationType validationType
@@ -103,17 +106,54 @@ struct CertStatusInfo {
     int set (
         const UapkiNS::CertStatus status,
         const uint64_t validTime,
-        const ByteArray* baResult
+        const ByteArray* baResult,
+        const uint64_t thisUpdate = 0
     );
 
 };  //  end struct CertStatusInfo
 
 
+//  What a trusted list says about a certificate (a service digital identity of ETSI TS 119 612): the type of
+//  the service and the periods of its status, the current one first
+struct TrustService {
+    struct Period {
+        std::string status;         //  the last segment of the status URI: "granted", "withdrawn"...
+        uint64_t    msFrom;         //  the starting time of the status
+        uint64_t    msTo;           //  the time the next status started; 0 - the current status
+        Period (void) : msFrom(0), msTo(0) {}
+    };
+
+    std::string listId;             //  the trusted list the service comes from
+    std::string type;               //  the service type after ".../Svctype/": "CA/QC", "TSA/QTST", "Certstatus/OCSP"...
+    std::string tspName;
+    std::string serviceName;
+    bool        forESignatures;     //  additional service information of a CA/QC service
+    bool        forESeals;
+    std::vector<Period>
+                periods;
+
+    TrustService (void) : forESignatures(false), forESeals(false) {}
+
+    //  The status at the time; nullptr if the service did not exist then
+    const Period* periodAt (const uint64_t msTime) const;
+    //  The status of a service that is provided ("granted", "recognisedatnationallevel"...), not ended
+    static bool isActiveStatus (const std::string& status);
+    //  A service that issues certificates: its certificate is a trust anchor
+    bool isCa (void) const;
+};
+
+typedef std::vector<TrustService> TrustServices;
+
+
 struct CertExtKeyUsage {
     uint32_t value;
+    int         pathLenConstraint;  //  basicConstraints.pathLenConstraint, -1 if absent
 
     CertExtKeyUsage (void)
-        : value(0) {}
+        : value(0), pathLenConstraint(-1) {}
+    bool isCaExtnPresent (void) const {
+        return (value & (uint32_t)ExtKeyUsageMask::CA_EXTN_PRESENT) > 0;
+    }
     bool isCaExtnCritical (void) const {
         return (value & (uint32_t)ExtKeyUsageMask::CA_EXTN_CRITICAL) > 0;
     }
@@ -139,17 +179,18 @@ struct CertExtKeyUsage {
         if ((value & (uint32_t)ExtKeyUsageMask::CA_PATHLEN) == 0) {
             return -1;
         }
-        return (int)(value & (uint32_t)ExtKeyUsageMask::CA_PATHLEN_MASK);
+        return pathLenConstraint;
     }
     void reset (void) {
         value = 0;
+        pathLenConstraint = -1;
     }
     void set (const ExtKeyUsageMask ekuMask) {
         value |= (uint32_t)ekuMask;
     }
-    void setPathLenConstraint (uint32_t pathLenConstraint) {
-        if (pathLenConstraint > 3) pathLenConstraint = 3;
-        value |= (uint32_t)ExtKeyUsageMask::CA_PATHLEN | pathLenConstraint;
+    void setPathLenConstraint (const int iPathLenConstraint) {
+        value |= (uint32_t)ExtKeyUsageMask::CA_PATHLEN;
+        pathLenConstraint = iPathLenConstraint;
     }
 };  //  end struct CertExtKeyUsage
 
@@ -205,8 +246,20 @@ private:
     size_t      m_PublicKeySize;
     std::atomic_bool
                 m_SelfSigned;
+    bool        m_UnknownCriticalExtension;
+    bool        m_AuthorityKeyIdExtn;
+    bool        m_NoRevocationCheck;
+    bool        m_OcspNoCheckExtn;
+    bool        m_NoRevAvailExtn;
+    //  Trusted by the configuration of the library (INIT); the trust by a trusted list is in m_TrustServices
     std::atomic_bool
-                m_Trusted;
+                m_TrustedInit;
+    //  A certificate that signs trusted lists (INIT, trustListCache.trustListSignerCerts): a status of its own, it does
+    //  not make the certificate trusted in a certification path
+    std::atomic_bool
+                m_TrustListSigner;
+    std::shared_ptr<const TrustServices>
+                m_TrustServices;
     Uris        m_Uris;
     std::atomic<VerifyStatus>
                 m_VerifyStatus;
@@ -305,14 +358,73 @@ public:
     }
 
 public:
+    //  The certificate is a service of a trusted list provided at the time; typeMark - a part of the type of the
+    //  service ("OCSP", "CRL", "TSA/", "CA/")
+    bool hasActiveTrustService (
+        const char* typeMark,
+        const uint64_t msTime
+    ) const;
+    bool isTrustListSigner (void) const {
+        return m_TrustListSigner;
+    }
+    void setTrustListSigner (void) {
+        m_TrustListSigner = true;
+        m_MarkedToRemove = false;
+    }
     bool isMarkedToRemove (void) const {
         return m_MarkedToRemove;
     }
     bool isSelfSigned (void) const {
         return m_SelfSigned;
     }
-    bool isTrusted (void) const {
-        return m_Trusted;
+    //  A critical extension the library does not process (RFC 5280, 4.2: such a certificate must be rejected)
+    bool hasUnknownCriticalExtension (void) const {
+        return m_UnknownCriticalExtension;
+    }
+    //  The revocation status is not checked (as EU DSS): id-pkix-ocsp-nocheck (RFC 6960, 4.2.2.2.1),
+    //  id-etsi-ext-valassured-ST-certs (ETSI EN 319 412-1, 5.2), noRevAvail (RFC 9608)
+    bool isNoRevocationCheck (void) const {
+        return m_NoRevocationCheck;
+    }
+    //  The certificate has the authorityKeyIdentifier extension with a key identifier. Without it getAuthorityKeyId()
+    //  is the key identifier of the certificate itself, and the issuer is found by its name (CerStore::getIssuerCert)
+    bool hasAuthorityKeyIdExtension (void) const {
+        return m_AuthorityKeyIdExtn;
+    }
+    bool hasOcspNoCheckExtension (void) const {
+        return m_OcspNoCheckExtn;
+    }
+    bool hasNoRevAvailExtension (void) const {
+        return m_NoRevAvailExtn;
+    }
+    //  Trust. A certificate given to INIT as trusted is trusted always. A certificate of a trusted list is
+    //  trusted conditionally: at a time from the first provision of a service of the certificate to its sunset
+    //  date - the end of the last period a service was provided in (ETSI EN 319 102-1: the trust anchor sunset
+    //  date); what the list says is kept whatever the status is now, so a signature made in that period is
+    //  validated with it.
+    //  isTrusted() - trusted now
+    bool isTrusted (void) const;
+    //  Trusted at the time (milliseconds; 0 - now)
+    bool isTrustedAt (
+        const uint64_t msTime
+    ) const;
+    //  May be a trust anchor at some time: trusted by INIT or a certificate of a service of a trusted list
+    bool isTrustAnchorCandidate (void) const;
+    //  Was a trust anchor at some time: trusted by INIT or a certificate of a service that was provided
+    bool wasTrusted (void) const;
+    //  The period a certificate of a trusted list is a trust anchor in: from the first time a service of it was
+    //  provided to the sunset date (0 - none, a service is provided now); false - no service was ever provided
+    bool trustPeriod (
+        uint64_t& msStart,
+        uint64_t& msSunset
+    ) const;
+    //  Trusted by the configuration of the library (the trusted certificates of INIT), not by a trusted list
+    bool isTrustedInit (void) const {
+        return m_TrustedInit;
+    }
+    //  The services of trusted lists the certificate is the identity of; nullptr if none
+    std::shared_ptr<const TrustServices> getTrustServices (void) const {
+        return std::atomic_load(&m_TrustServices);
     }
     bool isUniqueKeyId (void) const {
         return m_UniqueKeyId;
@@ -349,6 +461,10 @@ public:
     );
     void setTrusted (
         const bool trusted
+    );
+    //  The services of the trusted lists (nullptr - none); trusted by a list while any of them is provided
+    void setTrustServices (
+        const std::shared_ptr<const TrustServices>& trustServices
     );
     void setUniqueKeyId (
         const bool uniqueKeyId

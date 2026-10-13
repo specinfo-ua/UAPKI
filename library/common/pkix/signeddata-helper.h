@@ -228,11 +228,29 @@ namespace Pkcs7 {
         VectorBA    m_Certs;
         VectorBA    m_Crls;
         size_t      m_CountSignerInfos;
+        //  The octets of the SignedData as they are in the input
+        std::vector<uint8_t>
+                    m_RawSignedData;
 
     public:
         class SignerInfo {
             const SignerInfo_t*
                         m_SignerInfo;
+            //  The octets as they are in the input: eContentType of the SignedData, the fields of this
+            //  SignerInfo except unsignedAttrs. Empty if they are not obtained
+            std::vector<uint8_t>
+                        m_RawContentType;
+            std::vector<uint8_t>
+                        m_RawFields;
+            //  Also as they are in the input: encapContentInfo, the certificates and crls elements of the
+            //  SignedData (with their tags), each Attribute of unsignedAttrs in its order
+            std::vector<uint8_t>
+                        m_RawEncapContentInfo;
+            std::vector<uint8_t>
+                        m_RawCertsCrls;
+            std::vector<std::vector<uint8_t>>
+                        m_RawUnsignedAttrs;
+            bool        m_RawContentIsPresent;
             uint32_t    m_Version;
             SignerIdentifierType
                         m_SidType;
@@ -262,6 +280,42 @@ namespace Pkcs7 {
         public:
             const SignerInfo_t* getAsn1Data (void) const {
                 return m_SignerInfo;
+            }
+            const std::vector<uint8_t>& getRawContentType (void) const {
+                return m_RawContentType;
+            }
+            const std::vector<uint8_t>& getRawFields (void) const {
+                return m_RawFields;
+            }
+            const std::vector<uint8_t>& getRawEncapContentInfo (void) const {
+                return m_RawEncapContentInfo;
+            }
+            const std::vector<uint8_t>& getRawCertsCrls (void) const {
+                return m_RawCertsCrls;
+            }
+            const std::vector<std::vector<uint8_t>>& getRawUnsignedAttrs (void) const {
+                return m_RawUnsignedAttrs;
+            }
+            bool rawContentIsPresent (void) const {
+                return m_RawContentIsPresent;
+            }
+            void setRaw (
+                const std::vector<uint8_t>& rawContentType,
+                const std::vector<uint8_t>& rawFields
+            ) {
+                m_RawContentType = rawContentType;
+                m_RawFields = rawFields;
+            }
+            void setRawSignedData (
+                const std::vector<uint8_t>& rawEncapContentInfo,
+                const bool contentIsPresent,
+                const std::vector<uint8_t>& rawCertsCrls,
+                const std::vector<std::vector<uint8_t>>& rawUnsignedAttrs
+            ) {
+                m_RawEncapContentInfo = rawEncapContentInfo;
+                m_RawContentIsPresent = contentIsPresent;
+                m_RawCertsCrls = rawCertsCrls;
+                m_RawUnsignedAttrs = rawUnsignedAttrs;
             }
             uint32_t getVersion (void) const {
                 return m_Version;

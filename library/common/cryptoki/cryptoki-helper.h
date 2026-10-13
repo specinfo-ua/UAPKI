@@ -486,6 +486,12 @@ public:
         const CK_ATTRIBUTE_TYPE attrType,
         const std::string& text
     );
+    CK_RV decrypt (
+        const CK_OBJECT_HANDLE hObject,
+        const CK_MECHANISM_PTR pMechParam,
+        const Buffer& encryptedData,
+        Buffer& data
+    );
     CK_RV signHash (
         const CK_OBJECT_HANDLE hObject,
         const CK_MECHANISM_PTR pMechParam,

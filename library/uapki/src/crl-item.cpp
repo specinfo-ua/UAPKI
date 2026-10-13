@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -232,6 +232,7 @@ CrlItem::CrlItem (
     , m_Issuer(nullptr)
     , m_ThisUpdate(0)
     , m_NextUpdate(0)
+    , m_ExpiredCertsOnCrl(0)
     , m_AuthorityKeyId(nullptr)
     , m_CrlNumber(nullptr)
     , m_DeltaCrl(nullptr)
@@ -239,6 +240,7 @@ CrlItem::CrlItem (
     , m_VerifyError(RET_OK)
     , m_CrlIdentifier(nullptr)
     , m_Actuality(Actuality::UNDEFINED)
+    , m_MarkedToRemove(false)
 {}
 
 CrlItem::~CrlItem (void)
@@ -338,7 +340,7 @@ int CrlItem::verify (
     Cert::VerifyStatus status = Cert::VerifyStatus::FAILED;
 
     int ret = RET_OK;
-    SmartBA sba_signvalue, sba_tbs;
+    SmartBA sba_signparams, sba_signvalue, sba_tbs;
     string s_signalgo;
 
     X509Tbs_t* x509_tbs = (X509Tbs_t*)asn_decode_ba_with_alloc(get_X509Tbs_desc(), m_Encoded);
@@ -360,12 +362,18 @@ int CrlItem::verify (
         DO(asn_BITSTRING2ba(&x509_tbs->signValue, &sba_signvalue));
     }
 
+    //  The parameters of the signature algorithm: RSASSA-PSS
+    if (x509_tbs->signAlgo.parameters) {
+        (void)sba_signparams.set(ba_alloc_from_uint8(x509_tbs->signAlgo.parameters->buf, (size_t)x509_tbs->signAlgo.parameters->size));
+    }
     ret = Verify::verifySignature(
         s_signalgo.c_str(),
         sba_tbs.get(),
         false,
         cerCrlSigner->getSpki(),
-        sba_signvalue.get()
+        sba_signvalue.get(),
+        nullptr,
+        sba_signparams.get()
     );
     switch (ret) {
     case RET_OK:
@@ -773,7 +781,7 @@ int parseCrl (
     SmartBA sba_issuer;
     CrlItem* crl_item = nullptr;
     Type crl_type = Type::UNDEFINED;
-    uint64_t this_update = 0, next_update = 0;
+    uint64_t this_update = 0, next_update = 0, expired_certs_oncrl = 0;
     vector<RevokedCertOffset> revcert_offsets;
     CrlItem::Uris uris;
     CrlItem::IssuingDistributionPoint idp;
@@ -851,6 +859,16 @@ int parseCrl (
             SET_ERROR(RET_UAPKI_INVALID_STRUCT);
         }
     }
+    {   //  Parsed once here, not for each certificate checked
+        SmartBA sba_expiredcerts;
+        ret = Util::extnValueFromExtensions(extns, OID_X509v3_ExpiredCertsOnCRL, nullptr, &sba_expiredcerts);
+        if (ret == RET_OK) {
+            DO(Util::decodePkixTime(sba_expiredcerts.get(), expired_certs_oncrl));
+        }
+        else if (ret != RET_UAPKI_EXTENSION_NOT_PRESENT) {
+            SET_ERROR(RET_UAPKI_INVALID_STRUCT);
+        }
+    }
     ret = RET_OK;
 
     crl_item = new CrlItem(crl_type);
@@ -861,7 +879,9 @@ int parseCrl (
         crl_item->m_CrlId = sba_crlid.pop();
         crl_item->m_Issuer = sba_issuer.pop();
         crl_item->m_ThisUpdate = this_update;
+        (void)Util::oidFromAsn1(&tbs->signature.algorithm, crl_item->m_SignAlgo);
         crl_item->m_NextUpdate = next_update;
+        crl_item->m_ExpiredCertsOnCrl = expired_certs_oncrl;
         crl_item->m_RevokedCertOffsets = revcert_offsets;
         crl_item->m_AuthorityKeyId = sba_authoritykeyid.pop();
         crl_item->m_CrlNumber = sba_crlnumber.pop();

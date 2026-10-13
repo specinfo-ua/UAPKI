@@ -66,6 +66,7 @@ set(PATH_COMMON_JSON ${PATH_PRJ}/../common/json)
 set(PATH_COMMON_LOADERS ${PATH_PRJ}/../common/loaders)
 set(PATH_COMMON_MACROS ${PATH_PRJ}/../common/macros)
 set(PATH_COMMON_PKIX ${PATH_PRJ}/../common/pkix)
+set(PATH_COMMON_XML ${PATH_PRJ}/../common/xml)
 
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../out)
 
@@ -73,6 +74,7 @@ aux_source_directory(${PATH_PRJ}/src/api UAPKI_API_SOURCES)
 aux_source_directory(${PATH_PRJ}/src UAPKI_SOURCES)
 aux_source_directory(${PATH_COMMON_PKIX} COMMON_SOURCES)
 aux_source_directory(${PATH_COMMON_JSON} JSON_SOURCES)
+aux_source_directory(${PATH_COMMON_XML} XML_SOURCES)
 if(WIN32)
     set(RESOURCE_RC resource.rc)
 else()
@@ -86,6 +88,7 @@ add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
     ${COMMON_SOURCES}
     ${PATH_COMMON_LOADERS}/cm-loader.cpp
     ${JSON_SOURCES}
+    ${XML_SOURCES}
     ${RESOURCE_RC}
 )
 
@@ -131,6 +134,7 @@ target_include_directories(uapki ${UAPKI_INTERNAL_INCLUDES_MODE}
     ${PATH_COMMON_JSON}
     ${PATH_COMMON_MACROS}
     ${PATH_COMMON_PKIX}
+    ${PATH_COMMON_XML}
     ${PATH_PRJ}
     ${PATH_PRJ}/src
     ${PATH_PRJ}/src/api

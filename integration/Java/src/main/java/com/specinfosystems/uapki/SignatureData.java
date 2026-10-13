@@ -53,6 +53,8 @@ public record SignatureData(
         @SerializedName("contentTS") TimeStampInfo contentTs,
         @SerializedName("signatureTS") TimeStampInfo signatureTs,
         @SerializedName("archiveTS") TimeStampInfo archiveTs,
+        //  Усі архівні позначки часу (повторне архівування), якщо їх більше однієї; archiveTs - перша
+        List<TimeStampInfo> archiveTimeStamps,
         String statusCertificateRefs,
         List<CertRefInfo> certificateRefs,
         List<String> certValues,

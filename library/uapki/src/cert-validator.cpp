@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -62,6 +62,7 @@ CertChainItem::CertChainItem (
     , m_CerSubject(iCerSubject)
     , m_DataSource(DataSource::UNDEFINED)
     , m_CerIssuer(nullptr)
+    , m_Trusted(iCerSubject ? iCerSubject->isTrusted() : false)
     , m_Expired(true)
     , m_ValidationType(Cert::ValidationType::UNDEFINED)
 {
@@ -118,6 +119,62 @@ void CertChainItem::setRoot (void)
     m_CertEntity = CertEntity::ROOT;
     m_CerIssuer = m_CerSubject;
     m_ValidationType = Cert::ValidationType::NONE;
+    (void)m_CerSubject->verify(m_CerIssuer);
+}
+
+TsaKeyTrust tsaKeyTrust (
+        const CertChainItem& tsaItem
+)
+{
+    bool is_revoked = false;
+    CrlReason reason = CrlReason::UNDEFINED;
+    switch (tsaItem.getValidationType()) {
+    case Cert::ValidationType::CRL: {
+        const ResultValidationByCrl& by_crl = tsaItem.getResultValidationByCrl();
+        if (by_crl.certStatus == CertStatus::REVOKED) {
+            is_revoked = true;
+            reason = by_crl.revokedCertItem.crlReason;
+        }
+        else if (by_crl.hasRevokedLater) {
+            is_revoked = true;
+            reason = by_crl.revokedLater.crlReason;
+        }
+        break;
+    }
+    case Cert::ValidationType::OCSP: {
+        const ResultValidationByOcsp& by_ocsp = tsaItem.getResultValidationByOcsp();
+        if (
+            (by_ocsp.statusSignature == SignatureVerifyStatus::VALID) &&
+            (by_ocsp.singleResponseInfo.certStatus == CertStatus::REVOKED)
+        ) {
+            is_revoked = true;
+            reason = by_ocsp.singleResponseInfo.revocationReason;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    if (!is_revoked) return TsaKeyTrust::OK;
+
+    switch (reason) {
+    case CrlReason::KEY_COMPROMISE:
+    case CrlReason::CA_COMPROMISE:
+    case CrlReason::AA_COMPROMISE:
+        return TsaKeyTrust::COMPROMISED;
+    case CrlReason::UNDEFINED:
+    case CrlReason::UNSPECIFIED:
+        return TsaKeyTrust::REASON_NOT_GIVEN;
+    default:
+        return TsaKeyTrust::OK;
+    }
+}
+
+void CertChainItem::setTrustAnchor (void)
+{
+    m_CerIssuer = m_CerSubject;
+    m_ValidationType = Cert::ValidationType::NONE;
+    m_Trusted = true;
     (void)m_CerSubject->verify(m_CerIssuer);
 }
 
@@ -254,6 +311,9 @@ CertValidator::CertValidator (void)
     , m_CrlStore(nullptr)
     , m_ValidationType(Cert::ValidationType::UNDEFINED)
     , m_CheckTrustedRoot(false)
+    , m_CaRemovesExpiredCerts(false)
+    , m_RevocationMinThisUpdate(0)
+    , m_StrictFreshnessTime(0)
 {
 }
 
@@ -283,6 +343,9 @@ bool CertValidator::init (
     m_CrlStore = iCertValidator.getCrlStore();
     m_ValidationType = iCertValidator.getValidationType();
     m_CheckTrustedRoot = iCertValidator.getCheckTrustedRoot();
+    m_CaRemovesExpiredCerts = iCertValidator.getCaRemovesExpiredCerts();
+    m_RevocationMinThisUpdate = iCertValidator.getRevocationMinThisUpdate();
+    m_StrictFreshnessTime = iCertValidator.m_StrictFreshnessTime;
 
     return (m_LibConfig && m_CerStore && m_CrlStore);
 }
@@ -297,6 +360,9 @@ bool CertValidator::init (
         m_CrlStore = iCertValidator->getCrlStore();
         m_ValidationType = iCertValidator->getValidationType();
         m_CheckTrustedRoot = iCertValidator->getCheckTrustedRoot();
+        m_CaRemovesExpiredCerts = iCertValidator->getCaRemovesExpiredCerts();
+        m_RevocationMinThisUpdate = iCertValidator->getRevocationMinThisUpdate();
+        m_StrictFreshnessTime = iCertValidator->m_StrictFreshnessTime;
     }
 
     return (m_LibConfig && m_CerStore && m_CrlStore);
@@ -329,6 +395,13 @@ void CertValidator::setCheckTrustedRoot (
     m_CheckTrustedRoot = checkTrustedRoot;
 }
 
+void CertValidator::setCaRemovesExpiredCerts (
+        const bool caRemovesExpiredCerts
+)
+{
+    m_CaRemovesExpiredCerts = caRemovesExpiredCerts;
+}
+
 int CertValidator::addChainItem (
         vector<CertChainItem*>& chainItems,
         const CertEntity certEntity,
@@ -348,6 +421,15 @@ int CertValidator::addChainItem (
     CertChainItem* new_item = new CertChainItem(certEntity, cerItem);
     *chainItem = new_item;
     if (!new_item) return RET_UAPKI_GENERAL_ERROR;
+    //  No revocation status is looked for (the chain above it is checked as usual, EN 319 412-1 5.2.1 NOTE 2).
+    //  id-pkix-ocsp-nocheck is for OCSP responders (RFC 6960, 4.2.2.2.1): in a TSA certificate it is forbidden
+    //  (checkChainConstraints) and does not hide a revocation - the status is checked as usual
+    if (
+        cerItem->isNoRevocationCheck() &&
+        !((certEntity == CertEntity::TSP) && cerItem->hasOcspNoCheckExtension())
+    ) {
+        new_item->setValidationType(Cert::ValidationType::NONE);
+    }
 
     isNewItem = true;
     chainItems.push_back(new_item);
@@ -358,12 +440,14 @@ int CertValidator::buildCertChain (
         const CertEntity certEntity,
         Cert::CerItem* cerItem,
         vector<CertChainItem*>& chainItems,
-        CertChainItem** subjectItem
+        CertChainItem** subjectItem,
+        const uint64_t msTrustTime
 )
 {
     if (!cerItem) return RET_UAPKI_INVALID_PARAMETER;
 
     int ret = RET_OK;
+    const uint64_t trust_time = (msTrustTime > 0) ? msTrustTime : TimeUtil::mtimeNow();
     const ByteArray* ba_authkeyid_notfound = nullptr;
     vector<Cert::CerItem*> chain_certs;
     CertChainItem* added_cci = nullptr;
@@ -374,8 +458,16 @@ int CertValidator::buildCertChain (
     if (subjectItem) {
         *subjectItem = added_cci;
     }
+    if (is_newitem) {
+        added_cci->setTrustAt(cerItem->isTrustedAt(trust_time));
+    }
+    //  The certificate is trusted itself at the time: it is the trust anchor of its path, its issuers are not needed
+    if (!cerItem->isSelfSigned() && cerItem->isTrustedAt(trust_time)) {
+        added_cci->setTrustAnchor();
+        return RET_OK;
+    }
 
-    //  Issuers by the authority key id, up to a self-signed certificate. Each link verifies the signature
+    //  Issuers by the authority key id, up to a trusted or a self-signed certificate. Each link verifies the signature
     //  of its issuer; whether the root is trusted is decided by the caller (checkTrustedRoot, VERIFY)
     const int ret_chain = m_CerStore->getChainCerts(cerItem, chain_certs, &ba_authkeyid_notfound);
     if ((ret_chain != RET_OK) && (ret_chain != RET_UAPKI_CERT_ISSUER_NOT_FOUND)) return ret_chain;
@@ -384,6 +476,19 @@ int CertValidator::buildCertChain (
         added_cci->setIssuer(it);
         ret = addChainItem(chainItems, CertEntity::INTERMEDIATE, it, &added_cci, is_newitem);
         if (ret != RET_OK) return ret;
+        //  The chain ends at the first certificate trusted at the time: the trust anchor (RFC 5280, 6.1), whether
+        //  it is self-signed or not. What is above it is not a part of the path
+        const bool is_trusted = it->isTrustedAt(trust_time);
+        if (is_newitem) {
+            added_cci->setTrustAt(is_trusted);
+        }
+        else {
+            added_cci->addTrust(is_trusted);
+        }
+        if (is_trusted) {
+            added_cci->setRoot();
+            return RET_OK;
+        }
     }
 
     if (ret_chain == RET_OK) {
@@ -393,7 +498,9 @@ int CertValidator::buildCertChain (
         return RET_OK;
     }
 
-    //  The issuer of the last certificate is missing: it stays unverified, the issuer is expected
+    //  The issuer of the last certificate is missing: it stays unverified, the issuer is expected. A certificate
+    //  without the key identifier in authorityKeyIdentifier does not name its issuer by a key identifier
+    if (!ba_authkeyid_notfound) return RET_UAPKI_CERT_ISSUER_NOT_FOUND;
     ret = addExpectedCertByKeyId(CertEntity::INTERMEDIATE, ba_authkeyid_notfound);
     return (ret == RET_OK) ? RET_UAPKI_CERT_ISSUER_NOT_FOUND : ret;
 }
@@ -419,7 +526,7 @@ int CertValidator::getStatus (
     CertChainItem* root = nullptr;
 
     //  Build a chain of certs: [cerItem, its issuer, ..., root]
-    ret = buildCertChain(certEntity, cerItem, chain);
+    ret = buildCertChain(certEntity, cerItem, chain, nullptr, validateTime);
     for (const auto it : chain) {
         //  The items are owned by m_CertChain
         m_CertChain.push_back(it);
@@ -445,9 +552,9 @@ int CertValidator::getStatus (
         DO(it->getSubject()->checkValidity(validateTime));
     }
 
-    //  check status in chain-certs (the root has no status)
+    //  check status in chain-certs (the root has no status, nor a certificate without revocation check)
     for (const auto it : chain) {
-        if (it == root) continue;
+        if ((it == root) || it->getSubject()->isNoRevocationCheck()) continue;
         if (m_ValidationType == Cert::ValidationType::OCSP) {
             //  The responder is checked in validateByOcsp(): authorized for the issuer (RFC 6960)
             DO(validateByOcsp(
@@ -472,6 +579,11 @@ int CertValidator::getStatus (
     if (!checkCertUsage(certEntity, cerItem)) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
+    for (const auto it : chain) {
+        if (checkChainConstraints(*it, chain, false) != ChainConstraint::NONE) {
+            SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
+        }
+    }
     if (!root->getSubject()->getCertExtKeyUsage().isCa()) {
         SET_ERROR(RET_UAPKI_INVALID_KEY_USAGE);
     }
@@ -481,7 +593,7 @@ int CertValidator::getStatus (
         if (findItemByCertId(chain, it_obtcert)) continue;
         if (
             (m_ValidationType == Cert::ValidationType::OCSP) &&
-            !it_obtcert->getCertExtKeyUsage().isOcspNoCheck() &&
+            !it_obtcert->isNoRevocationCheck() &&
             !it_obtcert->getUris().ocsp.empty()
         ) {
             Cert::CerItem* cer_issuer = nullptr;
@@ -567,6 +679,8 @@ int CertValidator::validateByCrl (
 
     int ret = RET_OK;
     Crl::CrlItem* crl_item = nullptr;
+    Crl::CrlItem* crl_full = nullptr;
+    CertStatus cert_status = CertStatus::UNDEFINED;
     vector<const Crl::RevokedCertItem*> revoked_items;
     JSON_Object* joDelta = nullptr;
     JSON_Object* joFull = nullptr;
@@ -590,6 +704,9 @@ int CertValidator::validateByCrl (
     DEBUG_OUTCON(printf("validateByCrl(), ba_crlnumber: "); ba_print(stdout, ba_crlnumber));
     DO(crl_item->revokedCerts(cerSubject, revoked_items));
     resultValidation.crlItem = crl_item;
+    resultValidation.issuedAfterExpiration = false;
+    crl_full = crl_item;
+    resultValidation.crlFull = crl_full;
 
     if (
         m_CrlStore->useDeltaCrl() &&
@@ -623,6 +740,33 @@ int CertValidator::validateByCrl (
         resultValidation.certStatus,
         resultValidation.revokedCertItem
     );
+    cert_status = resultValidation.certStatus;
+    //  Good at the time, revoked later: the entry is kept (the time-stamps of a TSA, see tsaKeyTrust())
+    resultValidation.hasRevokedLater = false;
+    if (resultValidation.certStatus == CertStatus::GOOD) {
+        for (const auto& it : revoked_items) {
+            if ((it->crlReason == CrlReason::REMOVE_FROM_CRL) || (it->revocationDate <= validateTime)) continue;
+            //  the entry of a compromise, or without a reason, is the one that matters
+            const bool is_bad = (it->crlReason == CrlReason::UNDEFINED) || (it->crlReason == CrlReason::UNSPECIFIED) ||
+                (it->crlReason == CrlReason::KEY_COMPROMISE) || (it->crlReason == CrlReason::CA_COMPROMISE) ||
+                (it->crlReason == CrlReason::AA_COMPROMISE);
+            if (!resultValidation.hasRevokedLater || is_bad) {
+                resultValidation.revokedLater = *it;
+                resultValidation.hasRevokedLater = true;
+            }
+            if (is_bad) break;
+        }
+    }
+    //  Not in a CRL (full or delta) issued after the certificate expired: not proven not revoked
+    if (
+        (resultValidation.certStatus == CertStatus::GOOD) && (
+            !revocationCoversCert(cerSubject, crl_full->getThisUpdate(), crl_full->getExpiredCertsOnCrl(), m_CaRemovesExpiredCerts) ||
+            !revocationCoversCert(cerSubject, crl_item->getThisUpdate(), crl_item->getExpiredCertsOnCrl(), m_CaRemovesExpiredCerts)
+        )
+    ) {
+        resultValidation.certStatus = CertStatus::UNDEFINED;
+        resultValidation.issuedAfterExpiration = true;
+    }
 
     if (joResult) {
         DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(resultValidation.certStatus)));
@@ -637,7 +781,7 @@ int CertValidator::validateByCrl (
 
     if (needUpdateCert) {
         cerSubject->getCertStatusByCrl().set(
-            resultValidation.certStatus,
+            cert_status,
             crl_item->getNextUpdate(),
             crl_item->getCrlId()
         );
@@ -686,7 +830,17 @@ int CertValidator::validateByOcsp (
         SET_ERROR(RET_UAPKI_OFFLINE_MODE);
     }
 
-    if (certstatusinfo_by_ocsp.isExpired(TimeUtil::mtimeNow())) {
+    //  A cached response issued before the required time is obtained again (AUGMENT_CMS: revocationFreshness)
+    if (
+        !certstatusinfo_by_ocsp.isExpired(TimeUtil::mtimeNow()) &&
+        (
+            ((m_RevocationMinThisUpdate > 0) && (certstatusinfo_by_ocsp.thisUpdate < m_RevocationMinThisUpdate)) ||
+            ((m_StrictFreshnessTime > 0) && (certstatusinfo_by_ocsp.thisUpdate < m_StrictFreshnessTime))
+        )
+    ) {
+        certstatusinfo_by_ocsp.needUpdate = true;
+    }
+    if (certstatusinfo_by_ocsp.needUpdate) {
         vector<string> shuffled_uris;
 
         if (cerSubject->getUris().ocsp.empty()) {
@@ -709,7 +863,10 @@ int CertValidator::validateByOcsp (
         DO(ocsp_helper.encodeRequest());
         (void)sba_ocsprequest.set(ocsp_helper.getRequestEncoded(true));
 
+        //  All the OCSP responders of the certificate: the next one if a responder does not respond, refuses
+        //  (responseStatus not successful) or answers not an OCSP response
         shuffled_uris = HttpHelper::randomURIs(cerSubject->getUris().ocsp);
+        int err_last = RET_UAPKI_OCSP_NOT_RESPONDING;
         for (auto& it : shuffled_uris) {
             sba_ocspresponse.clear();
             ret = HttpHelper::post(
@@ -719,10 +876,26 @@ int CertValidator::validateByOcsp (
                 sba_ocsprequest.get(),
                 &sba_ocspresponse
             );
-            if (ret == RET_OK) {
-                DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), sba_ocspresponse.size()));
+            if (ret != RET_OK) {
+                err_last = ret;
+                continue;
+            }
+            DEBUG_OUTCON(printf("validateByOcsp(), url: '%s', size: %zu\n", it.c_str(), sba_ocspresponse.size()));
+            Ocsp::OcspHelper ocsp_probe;
+            if (ocsp_probe.parseResponse(sba_ocspresponse.get()) != RET_OK) {
+                err_last = RET_UAPKI_OCSP_RESPONSE_INVALID;
+            }
+            else if (ocsp_probe.getResponseStatus() != Ocsp::ResponseStatus::SUCCESSFUL) {
+                err_last = RET_UAPKI_OCSP_RESPONSE_NOT_SUCCESSFUL;
+            }
+            else {
+                ret = RET_OK;
                 break;
             }
+            ret = err_last;
+        }
+        if (ret != RET_OK) {
+            ret = err_last;
         }
         if (ret != RET_OK) {
             SET_ERROR(ret);
@@ -755,12 +928,38 @@ int CertValidator::validateByOcsp (
                 SET_ERROR(RET_UAPKI_GENERAL_ERROR);
             }
 
-            if (certstatusinfo_by_ocsp.needUpdate) {
+            const uint64_t time_now = TimeUtil::mtimeNow();
+            const Ocsp::OcspHelper::SingleResponseInfo& single_resp = resultValidation.singleResponseInfo;
+            //  A response from the server that is not fresh now (no later nextUpdate, thisUpdate older than
+            //  maxFreshness) is rejected
+            if (certstatusinfo_by_ocsp.needUpdate && !ocsp_params.isFresh(single_resp.msThisUpdate, single_resp.msNextUpdate, time_now)) {
+                SET_ERROR(RET_UAPKI_OCSP_RESPONSE_INVALID);
+            }
+            //  Cached only while it may be used from the cache (a response older than cacheTime is not cached)
+            if (
+                certstatusinfo_by_ocsp.needUpdate &&
+                (ocsp_params.cacheValidTime(single_resp.msThisUpdate, single_resp.msNextUpdate) > time_now)
+            ) {
                 DO(certstatusinfo_by_ocsp.set(
                     resultValidation.singleResponseInfo.certStatus,
-                    resultValidation.singleResponseInfo.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,
-                    sba_ocspresponse.get()
+                    ocsp_params.cacheValidTime(
+                        resultValidation.singleResponseInfo.msThisUpdate,
+                        resultValidation.singleResponseInfo.msNextUpdate
+                    ),
+                    sba_ocspresponse.get(),
+                    resultValidation.singleResponseInfo.msThisUpdate
                 ));
+            }
+            //  "Good" by a response issued after the certificate expired: not proven (the cache keeps the response)
+            resultValidation.issuedAfterExpiration = (
+                (single_resp.certStatus == CertStatus::GOOD) &&
+                !revocationCoversCert(cerSubject, single_resp.msThisUpdate, single_resp.msArchiveCutoff, m_CaRemovesExpiredCerts)
+            );
+            if (resultValidation.issuedAfterExpiration) {
+                resultValidation.singleResponseInfo.certStatus = CertStatus::UNDEFINED;
+                if (joResult) {
+                    DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(CertStatus::UNDEFINED)));
+                }
             }
         }
         else {
@@ -1009,6 +1208,20 @@ int CertValidator::getCrl (
                 err_crl = RET_UAPKI_CRL_EXPIRED;
                 crl_item = nullptr;
             }
+            //  Issued before the required time: downloaded again (AUGMENT_CMS: revocationFreshness)
+            else if ((m_RevocationMinThisUpdate > 0) && (crl_item->getThisUpdate() < m_RevocationMinThisUpdate)) {
+                err_crl = RET_UAPKI_CRL_EXPIRED;
+                crl_item = nullptr;
+            }
+            //  The strict freshness: issued before the required time and its nextUpdate is reached - a newer one
+            //  is issued by now (a CRL of the signature is not expired at the time the signature is validated for)
+            else if (
+                (m_StrictFreshnessTime > 0) && (crl_item->getThisUpdate() < m_StrictFreshnessTime) &&
+                (crl_item->getNextUpdate() <= TimeUtil::mtimeNow())
+            ) {
+                err_crl = RET_UAPKI_CRL_EXPIRED;
+                crl_item = nullptr;
+            }
         }
         else {
             err_crl = RET_UAPKI_CRL_NOT_FOUND;
@@ -1025,39 +1238,52 @@ int CertValidator::getCrl (
                 SET_ERROR(RET_UAPKI_CRL_URL_NOT_PRESENT);
             }
 
+            //  All the distribution points of the certificate: the next one if a point does not respond, gives
+            //  not a CRL of the issuer of this certificate or an expired one
             const vector<string> shuffled_uris = HttpHelper::randomURIs(uris_crl);
+            int err_last = RET_UAPKI_CRL_NOT_DOWNLOADED;
             DEBUG_OUTCON(printf("CertValidator::getCrl(is full=%d), download CRL", is_full));
             for (auto& it : shuffled_uris) {
                 sba_crl.clear();
+                crl_item = nullptr;
                 DEBUG_OUTCON(printf("CertValidator::getCrl(), HttpHelper::get('%s')\n", it.c_str()));
                 ret = HttpHelper::get(m_LibConfig->getHttp(), it, &sba_crl);
-                if (ret == RET_OK) {
-                    DEBUG_OUTCON(printf("CertValidator::getCrl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+                if (ret != RET_OK) {
+                    err_last = RET_UAPKI_CRL_NOT_DOWNLOADED;
+                    continue;
+                }
+                DEBUG_OUTCON(printf("CertValidator::getCrl(), url: '%s', size: %zu\n", it.c_str(), sba_crl.size()));
+
+                //  The same way into the cache as ADD_CRL, plus: signed by the issuer of this certificate
+                bool is_unique;
+                ret = addCrlToStore(
+                    crlStore,
+                    cerStore,
+                    sba_crl.get(),
+                    true,
+                    cerSubject,
+                    is_unique,
+                    &crl_item
+                );
+                if (ret != RET_OK) {
+                    err_last = ret;
+                }
+                else if (!crl_item) {
+                    err_last = RET_UAPKI_CRL_NOT_FOUND;
+                }
+                else if (crl_item->getNextUpdate() < validateTime) {
+                    DEBUG_OUTCON(puts("CertValidator::getCrl(), the CRL is expired: the next distribution point"));
+                    err_last = RET_UAPKI_CRL_EXPIRED;
+                }
+                else {
+                    ret = RET_OK;
                     break;
                 }
+                crl_item = nullptr;
+                ret = err_last;
             }
             if (ret != RET_OK) {
-                SET_ERROR(RET_UAPKI_CRL_NOT_DOWNLOADED);
-            }
-
-            //  The same way into the cache as ADD_CRL, plus: signed by the issuer of this certificate
-            bool is_unique;
-            DO(addCrlToStore(
-                crlStore,
-                cerStore,
-                sba_crl.get(),
-                true,
-                cerSubject,
-                is_unique,
-                &crl_item
-            ));
-            if (!crl_item) {
-                SET_ERROR(RET_UAPKI_CRL_NOT_FOUND);
-            }
-
-            if (crl_item->getNextUpdate() < validateTime) {
-                DEBUG_OUTCON(puts("CertValidator::getCrl(), need get newest CRL. Again... stop it!"));
-                SET_ERROR(RET_UAPKI_CRL_EXPIRED);
+                SET_ERROR(err_last);
             }
         }
     }   //  end lock_guard
@@ -1146,10 +1372,17 @@ static const Cert::CerItem* path_root (
     vector<Cert::CerItem*> chain;
     if (cerStore.getChainCerts(cerItem, chain) != RET_OK) return nullptr;
 
+    //  The path ends at the first trusted certificate, as in buildCertChain(). The certificate itself is the
+    //  anchor of its path only when it is a trusted CA (a signer of CRLs of its own certificates); a trusted
+    //  end-entity certificate (a TSA or an OCSP responder of a trusted list) has the path of its issuer
+    //  Whether a CRL signer has the path of the certificate does not depend on the time: a certificate that may be
+    //  a trust anchor (of INIT or of a trusted list, whatever its service is now) ends the path
+    if (cerItem->isTrustAnchorCandidate() && cerItem->getCertExtKeyUsage().isCa()) return cerItem;
     const Cert::CerItem* cer_subject = cerItem;
     for (const auto it : chain) {
         if (cer_subject->verifySignatureBy(it->getSpki()) != RET_OK) return nullptr;
         cer_subject = it;
+        if (cer_subject->isTrustAnchorCandidate()) return cer_subject;
     }
     if (!cer_subject->isSelfSigned() || (cer_subject->verifySignatureBy(cer_subject->getSpki()) != RET_OK)) return nullptr;
     return cer_subject;
@@ -1298,6 +1531,7 @@ int CertValidator::processResponseData (
     DO(ocspHelper.scanSingleResponses());
     resultValidation.singleResponseInfo = ocspHelper.getSingleResponseInfo(idx_certid);
     resultValidation.msProducedAt = ocspHelper.getProducedAt();
+    (void)ocspHelper.getSignatureAlgorithm(resultValidation.signAlgo);
 
     if (joResult) {
         auto& res_singlerespinfo = resultValidation.singleResponseInfo;
@@ -1337,6 +1571,8 @@ int CertValidator::verifyResponseData (
 
     resultValidation.statusSignature = SignatureVerifyStatus::UNDEFINED;
     resultValidation.cerResponder = nullptr;
+    //  The result may be filled again (the status is looked for once more)
+    resultValidation.baResponderId.clear();
     DO(ocspHelper.getResponderId(resultValidation.responderIdType, &resultValidation.baResponderId));
     if (joResult) {
         DO(responderIdToJson(joResult, resultValidation.responderIdType, resultValidation.baResponderId.get()));
@@ -1436,7 +1672,9 @@ int CertValidator::verifySignatureSignerInfo (
             signerInfo.getSignedAttrsEncoded(),
             false,
             (*cerSigner)->getSpki(),
-            signerInfo.getSignature()
+            signerInfo.getSignature(),
+            signerInfo.getDigestAlgorithm().algorithm.c_str(),
+            signerInfo.getSignatureAlgorithm().baParameters
         );
     }
 
@@ -1478,6 +1716,148 @@ int addUniqueItem (
     chainItems.push_back(entity);
 
     return RET_OK;
+}
+
+ChainConstraint checkChainConstraints (
+        const CertChainItem& chainItem,
+        const vector<CertChainItem*>& chain,
+        const bool checkCriticalExtensions
+)
+{
+    const Cert::CerItem* cer_subject = chainItem.getSubject();
+    if (!cer_subject) return ChainConstraint::NONE;
+
+    //  A trust anchor is not a part of the path (RFC 5280, 6.1)
+    if (
+        checkCriticalExtensions &&
+        cer_subject->hasUnknownCriticalExtension() &&
+        !((chainItem.getCertEntity() == CertEntity::ROOT) && chainItem.isTrusted())
+    ) {
+        return ChainConstraint::UNKNOWN_CRITICAL_EXTENSION;
+    }
+
+    switch (chainItem.getCertEntity()) {
+    case CertEntity::SIGNER:
+        if (cer_subject->hasOcspNoCheckExtension()) {
+            return ChainConstraint::FORBIDDEN_EXTENSION;
+        }
+        //  Without keyUsage the key is not restricted
+        if (
+            (cer_subject->getKeyUsage() != 0) &&
+            !cer_subject->keyUsageByBit(KeyUsage_digitalSignature) &&
+            !cer_subject->keyUsageByBit(KeyUsage_nonRepudiation)
+        ) {
+            return ChainConstraint::SIGNER_KEY_USAGE;
+        }
+        break;
+    case CertEntity::TSP:
+        if (cer_subject->hasOcspNoCheckExtension()) {
+            return ChainConstraint::FORBIDDEN_EXTENSION;
+        }
+        if (!cer_subject->getCertExtKeyUsage().isTsp()) {
+            return ChainConstraint::TSP_KEY_PURPOSE;
+        }
+        break;
+    default:
+        break;
+    }
+
+    //  The issuers above an end entity: CA, and not more intermediate certificates below than pathLenConstraint
+    switch (chainItem.getCertEntity()) {
+    case CertEntity::UNDEFINED:     //  VERIFY_CERT: the certificate itself
+    case CertEntity::SIGNER:
+    case CertEntity::TSP:
+    case CertEntity::OCSP:
+    case CertEntity::CRL:
+        break;
+    default:
+        return ChainConstraint::NONE;
+    }
+    size_t cnt_intermediates = 0;
+    const Cert::CerItem* cer_current = cer_subject;
+    for (size_t guard = 0; guard < chain.size(); guard++) {
+        const CertChainItem* item_current = nullptr;
+        for (const auto& it : chain) {
+            if (it->getSubject() == cer_current) {
+                item_current = it;
+                break;
+            }
+        }
+        if (!item_current) break;
+
+        const Cert::CerItem* cer_issuer = item_current->getIssuer();
+        if (!cer_issuer || (cer_issuer == cer_current)) break;  //  the issuer is missing or the root
+
+        //  As OpenSSL check_ca(): an intermediate CA has basicConstraints cA, a root without basicConstraints
+        //  is accepted with keyCertSign (legacy); keyCertSign itself is checked with the signature (CerItem::verify)
+        //  A CA certificate (not a trust anchor) without ocsp-nocheck and noRevAvail
+        if (
+            (cer_issuer->hasOcspNoCheckExtension() || cer_issuer->hasNoRevAvailExtension()) &&
+            !cer_issuer->isTrustAnchorCandidate()
+        ) {
+            return ChainConstraint::FORBIDDEN_EXTENSION;
+        }
+        if (!cer_issuer->getCertExtKeyUsage().isCa()) {
+            const bool legacy_root = cer_issuer->isSelfSigned() &&
+                !cer_issuer->getCertExtKeyUsage().isCaExtnPresent() &&
+                cer_issuer->keyUsageByBit(KeyUsage_keyCertSign);
+            if (!legacy_root) return ChainConstraint::ISSUER_NOT_CA;
+        }
+        const int path_len = cer_issuer->getCertExtKeyUsage().pathLen();
+        if ((path_len >= 0) && (cnt_intermediates > (size_t)path_len)) return ChainConstraint::PATH_LENGTH;
+
+        //  A self-issued certificate (key rollover) does not count, RFC 5280, 6.1.4 (l)
+        if (ba_cmp(cer_issuer->getSubject(), cer_issuer->getIssuer()) != 0) {
+            cnt_intermediates++;
+        }
+        cer_current = cer_issuer;
+    }
+
+    return ChainConstraint::NONE;
+}
+
+bool revocationCoversCert (
+        const Cert::CerItem* cerSubject,
+        const uint64_t msThisUpdate,
+        const uint64_t msExpiredCertsSince,
+        const bool caRemovesExpiredCerts
+)
+{
+    if (!cerSubject) return false;
+
+    uint64_t known_since = msThisUpdate;
+    if (msExpiredCertsSince > 0) {
+        //  A date not before thisUpdate says nothing more (as EU DSS)
+        if (msExpiredCertsSince < known_since) {
+            known_since = msExpiredCertsSince;
+        }
+    }
+    else if (!caRemovesExpiredCerts) {
+        return true;
+    }
+    return (cerSubject->getNotAfter() >= known_since);
+}
+
+const char* chainConstraintToStr (
+        const ChainConstraint chainConstraint
+)
+{
+    switch (chainConstraint) {
+    case ChainConstraint::ISSUER_NOT_CA:
+        return "THE ISSUER CERTIFICATE IS NOT A CA CERTIFICATE";
+    case ChainConstraint::PATH_LENGTH:
+        return "THE PATH LENGTH CONSTRAINT OF A CA CERTIFICATE IS EXCEEDED";
+    case ChainConstraint::SIGNER_KEY_USAGE:
+        return "THE KEY USAGE OF THE SIGNER CERTIFICATE DOES NOT ALLOW SIGNING";
+    case ChainConstraint::TSP_KEY_PURPOSE:
+        return "THE TSA CERTIFICATE HAS NO TIME-STAMPING KEY PURPOSE";
+    case ChainConstraint::UNKNOWN_CRITICAL_EXTENSION:
+        return "THE CERTIFICATE HAS AN UNSUPPORTED CRITICAL EXTENSION";
+    case ChainConstraint::FORBIDDEN_EXTENSION:
+        return "THE CERTIFICATE HAS A FORBIDDEN EXTENSION (OCSP-NOCHECK OR NOREVAVAIL)";
+    default:
+        return "";
+    }
 }
 
 bool checkCertUsage (
@@ -1633,7 +2013,10 @@ int expectedCrlItemToJson (
 {
     int ret = RET_OK;
 
-    DO(json_object_set_hex(joResult, "authorityKeyId", expectedCrlItem.getAuthorityKeyId()));
+    //  The issuer may have no key identifier (a certificate without authorityKeyIdentifier)
+    if (expectedCrlItem.getAuthorityKeyId()) {
+        DO(json_object_set_hex(joResult, "authorityKeyId", expectedCrlItem.getAuthorityKeyId()));
+    }
     if (expectedCrlItem.getName()) {
         DO_JSON(json_object_set_value(joResult, "issuer", json_value_init_object()));
         DO(nameToJson(json_object_get_object(joResult, "issuer"), expectedCrlItem.getName()));

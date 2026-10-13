@@ -39,7 +39,11 @@ public partial class Uapki
         CAdES_A,
         CAdES_LTA,
         CMS,
-        RAW
+        RAW,
+        /// <summary>ETSI EN 319 122-1: the validation data in SignedData</summary>
+        CAdES_B_LT,
+        /// <summary>ETSI EN 319 122-1: CAdES-B-LT with archive-time-stamp-v3</summary>
+        CAdES_B_LTA
     }
 
     public enum KeyUsage

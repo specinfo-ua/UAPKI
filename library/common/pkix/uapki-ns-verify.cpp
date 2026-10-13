@@ -28,6 +28,7 @@
 #define FILE_MARKER "common/pkix/uapki-ns-verify.cpp"
 
 #include "uapki-ns-verify.h"
+#include "der-helper.h"
 #include "dstu4145-params.h"
 #include "ecdsa-params.h"
 #include "macros-internal.h"
@@ -387,7 +388,8 @@ int Verify::parseSpki (
     CHECK_NOT_NULL(spki = (SubjectPublicKeyInfo_t*)asn_decode_ba_with_alloc(get_SubjectPublicKeyInfo_desc(), baSignerSPKI));
 
     DO(asn_oid_to_text(&spki->algorithm.algorithm, &s_oid));
-    if (spki->algorithm.parameters == NULL) {
+    //  The parameters of an id-RSASSA-PSS key may be absent (RFC 4056, 2.1)
+    if ((spki->algorithm.parameters == NULL) && !oid_is_equal(OID_RSA_PSS, s_oid)) {
         SET_ERROR(RET_UAPKI_INVALID_STRUCT);
     }
 
@@ -403,6 +405,10 @@ int Verify::parseSpki (
         DO(parse_rsa_spki(spki, baPubkey, baPubkeyRsaE));
         *keyAlgo = SIGN_RSA_PKCS_1_5;
     }
+    else if (oid_is_equal(OID_RSA_PSS, s_oid)) {
+        DO(parse_rsa_spki(spki, baPubkey, baPubkeyRsaE));
+        *keyAlgo = SIGN_RSA_PSS;
+    }
     else {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
@@ -413,12 +419,271 @@ cleanup:
     return ret;
 }
 
+//  RSASSA-PSS-params (RFC 4055, 3.1): the hash, the hash of MGF1, the salt length, the trailer field
+struct RsaPssParams {
+    HashAlg hashAlgo;
+    HashAlg mgfHashAlgo;
+    size_t  saltLength;
+    size_t  trailerField;
+
+    RsaPssParams (void)
+        : hashAlgo(HASH_ALG_SHA1), mgfHashAlgo(HASH_ALG_SHA1), saltLength(20), trailerField(1)
+    {}
+};
+
+static bool der_oid_to_text (
+        const uint8_t* buf,
+        const size_t len,
+        std::string& oid
+)
+{
+    if (!buf || (len == 0)) return false;
+    oid = std::to_string(buf[0] / 40) + "." + std::to_string(buf[0] % 40);
+    uint64_t arc = 0;
+    for (size_t i = 1; i < len; i++) {
+        if (arc >> 56) return false;
+        arc = (arc << 7) | (buf[i] & 0x7F);
+        if (!(buf[i] & 0x80)) {
+            oid += "." + std::to_string(arc);
+            arc = 0;
+        }
+    }
+    return ((buf[len - 1] & 0x80) == 0);
+}
+
+//  The hash of AlgorithmIdentifier ::= SEQUENCE { algorithm OID, parameters ANY OPTIONAL }
+static bool der_algid_to_hash (
+        const uint8_t* buf,
+        const size_t len,
+        HashAlg& hashAlgo,
+        const uint8_t** params = nullptr,
+        size_t* paramsLen = nullptr
+)
+{
+    uint32_t tag = 0;
+    size_t hlen = 0, vlen = 0;
+    std::string s_oid;
+    if (!Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > len)) return false;
+    const uint8_t* body = buf + hlen;
+    const size_t len_body = vlen;
+    if (!Util::decodeAsn1Header(body, len_body, tag, hlen, vlen) || (tag != 0x06) || (hlen + vlen > len_body)) return false;
+    if (!der_oid_to_text(body + hlen, vlen, s_oid)) return false;
+    hashAlgo = hash_from_oid(s_oid.c_str());
+    if (params && paramsLen) {
+        *params = body + hlen + vlen;
+        *paramsLen = len_body - hlen - vlen;
+        //  For the mask generation function the OID is checked by the caller
+        hashAlgo = oid_is_equal(OID_PKCS1_MGF1, s_oid.c_str()) ? HASH_ALG_SHA1 : HASH_ALG_UNDEFINED;
+    }
+    return true;
+}
+
+static int parse_rsa_pss_params (
+        const uint8_t* buf,
+        const size_t len,
+        RsaPssParams& pssParams
+)
+{
+    uint32_t tag = 0;
+    size_t hlen = 0, vlen = 0;
+    if (!buf || !Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > len)) {
+        return RET_UAPKI_INVALID_STRUCT;
+    }
+
+    const uint8_t* p = buf + hlen;
+    size_t left = vlen;
+    while (left > 0) {
+        if (!Util::decodeAsn1Header(p, left, tag, hlen, vlen) || (hlen + vlen > left)) return RET_UAPKI_INVALID_STRUCT;
+        const uint8_t* value = p + hlen;
+        switch (tag) {
+        case 0xA0:
+            if (!der_algid_to_hash(value, vlen, pssParams.hashAlgo)) return RET_UAPKI_INVALID_STRUCT;
+            if (pssParams.hashAlgo == HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+            break;
+        case 0xA1: {
+            //  MaskGenAlgorithm: id-mgf1 with the AlgorithmIdentifier of its hash
+            HashAlg is_mgf1 = HASH_ALG_UNDEFINED;
+            const uint8_t* mgf_params = nullptr;
+            size_t len_mgfparams = 0;
+            if (!der_algid_to_hash(value, vlen, is_mgf1, &mgf_params, &len_mgfparams)) return RET_UAPKI_INVALID_STRUCT;
+            if (is_mgf1 == HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+            if (!der_algid_to_hash(mgf_params, len_mgfparams, pssParams.mgfHashAlgo)) return RET_UAPKI_INVALID_STRUCT;
+            if (pssParams.mgfHashAlgo == HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
+            break;
+        }
+        case 0xA2:
+        case 0xA3: {
+            uint32_t tag_int = 0;
+            size_t hlen_int = 0, vlen_int = 0;
+            if (
+                !Util::decodeAsn1Header(value, vlen, tag_int, hlen_int, vlen_int) || (tag_int != 0x02) ||
+                (vlen_int == 0) || (vlen_int > 4) || (hlen_int + vlen_int > vlen) || (value[hlen_int] & 0x80)
+            ) return RET_UAPKI_INVALID_STRUCT;
+            size_t number = 0;
+            for (size_t i = 0; i < vlen_int; i++) {
+                number = (number << 8) | value[hlen_int + i];
+            }
+            ((tag == 0xA2) ? pssParams.saltLength : pssParams.trailerField) = number;
+            break;
+        }
+        default:
+            return RET_UAPKI_INVALID_STRUCT;
+        }
+        p += hlen + vlen;
+        left -= hlen + vlen;
+    }
+    return RET_OK;
+}
+
+//  The parameters of an id-RSASSA-PSS public key, if present (RFC 4055, 3.1; RFC 4056, 2.1): the algorithm of
+//  SubjectPublicKeyInfo ::= SEQUENCE { algorithm AlgorithmIdentifier, subjectPublicKey BIT STRING }
+static int rsa_pss_key_params (
+        const ByteArray* baSpki,
+        bool& isPresent,
+        RsaPssParams& pssParams
+)
+{
+    const uint8_t* buf = ba_get_buf_const(baSpki);
+    const size_t len = ba_get_len(baSpki);
+    uint32_t tag = 0;
+    size_t hlen = 0, vlen = 0;
+
+    isPresent = false;
+    if (!buf || !Util::decodeAsn1Header(buf, len, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > len)) return RET_UAPKI_INVALID_STRUCT;
+    const uint8_t* p = buf + hlen;
+    size_t left = vlen;
+    if (!Util::decodeAsn1Header(p, left, tag, hlen, vlen) || (tag != 0x30) || (hlen + vlen > left)) return RET_UAPKI_INVALID_STRUCT;
+    p += hlen;
+    left = vlen;
+    if (!Util::decodeAsn1Header(p, left, tag, hlen, vlen) || (tag != 0x06) || (hlen + vlen > left)) return RET_UAPKI_INVALID_STRUCT;
+    p += hlen + vlen;
+    left -= hlen + vlen;
+    if (left == 0) return RET_OK;
+
+    isPresent = true;
+    return parse_rsa_pss_params(p, left, pssParams);
+}
+
+static int verify_rsa_pss_sign (
+        const RsaPssParams& pssParams,
+        const ByteArray* baPubkeyN,
+        const ByteArray* baPubkeyE,
+        const ByteArray* baHash,
+        const ByteArray* baSignValue
+)
+{
+    int ret = RET_OK;
+    RsaCtx* rsa_ctx = nullptr;
+
+    CHECK_NOT_NULL(rsa_ctx = rsa_alloc());
+    DO(rsa_init_verify_pss(rsa_ctx, pssParams.hashAlgo, pssParams.saltLength, baPubkeyN, baPubkeyE));
+    ret = rsa_verify(rsa_ctx, baHash, baSignValue);
+
+cleanup:
+    rsa_free(rsa_ctx);
+    return ret;
+}
+
+static bool der_oid_from_text (
+        const char* oid,
+        std::vector<uint8_t>& encoded
+)
+{
+    std::vector<uint64_t> arcs;
+    if (!oid) return false;
+    for (const char* p = oid; *p; ) {
+        if ((*p < '0') || (*p > '9')) return false;
+        uint64_t arc = 0;
+        while ((*p >= '0') && (*p <= '9')) {
+            arc = arc * 10 + (uint64_t)(*p++ - '0');
+        }
+        arcs.push_back(arc);
+        if (*p == '.') p++;
+    }
+    if ((arcs.size() < 2) || (arcs[0] > 2) || ((arcs[0] < 2) && (arcs[1] > 39))) return false;
+
+    std::vector<uint8_t> body;
+    arcs[1] += arcs[0] * 40;
+    for (size_t i = 1; i < arcs.size(); i++) {
+        uint8_t septets[10];
+        size_t cnt = 0;
+        uint64_t arc = arcs[i];
+        do {
+            septets[cnt++] = (uint8_t)(arc & 0x7F);
+            arc >>= 7;
+        } while (arc);
+        while (cnt > 0) {
+            cnt--;
+            body.push_back((uint8_t)(septets[cnt] | (cnt ? 0x80 : 0x00)));
+        }
+    }
+    encoded = Der::wrap(0x06, body);
+    return true;
+}
+
+int Verify::rsaPssParamsEncode (
+        const HashAlg hashAlgo,
+        ByteArray** baEncoded
+)
+{
+    if (!baEncoded) return RET_UAPKI_INVALID_PARAMETER;
+
+    const size_t salt_len = hash_get_size(hashAlgo);
+    std::vector<uint8_t> oid_hash, oid_mgf1, body;
+    if ((salt_len == 0) || (salt_len > 0x7F) || !der_oid_from_text(hash_to_oid(hashAlgo), oid_hash) || !der_oid_from_text(OID_PKCS1_MGF1, oid_mgf1)) {
+        return RET_UAPKI_UNSUPPORTED_ALG;
+    }
+
+    //  DER: a component equal to its DEFAULT is absent (sha1, mgf1SHA1, 20)
+    if (hashAlgo != HASH_ALG_SHA1) {
+        std::vector<uint8_t> aid_hash = oid_hash;
+        aid_hash.push_back(0x05);
+        aid_hash.push_back(0x00);
+        aid_hash = Der::wrap(0x30, aid_hash);
+
+        std::vector<uint8_t> aid_mgf = oid_mgf1;
+        aid_mgf.insert(aid_mgf.end(), aid_hash.begin(), aid_hash.end());
+        aid_mgf = Der::wrap(0x30, aid_mgf);
+
+        const std::vector<uint8_t> field_hash = Der::wrap(0xA0, aid_hash);
+        const std::vector<uint8_t> field_mgf = Der::wrap(0xA1, aid_mgf);
+        body.insert(body.end(), field_hash.begin(), field_hash.end());
+        body.insert(body.end(), field_mgf.begin(), field_mgf.end());
+    }
+    if (salt_len != 20) {
+        const std::vector<uint8_t> field_salt = Der::wrap(0xA2, Der::wrap(0x02, std::vector<uint8_t>(1, (uint8_t)salt_len)));
+        body.insert(body.end(), field_salt.begin(), field_salt.end());
+    }
+
+    const std::vector<uint8_t> encoded = Der::wrap(0x30, body);
+    *baEncoded = ba_alloc_from_uint8(encoded.data(), encoded.size());
+    return (*baEncoded) ? RET_OK : RET_UAPKI_GENERAL_ERROR;
+}
+
+int Verify::rsaPssParamsDecode (
+        const ByteArray* baEncoded,
+        HashAlg& hashAlgo,
+        size_t& saltLength
+)
+{
+    RsaPssParams pss_params;
+    const int ret = parse_rsa_pss_params(ba_get_buf_const(baEncoded), ba_get_len(baEncoded), pss_params);
+    if (ret != RET_OK) return ret;
+    if ((pss_params.mgfHashAlgo != pss_params.hashAlgo) || (pss_params.trailerField != 1)) return RET_UAPKI_UNSUPPORTED_ALG;
+
+    hashAlgo = pss_params.hashAlgo;
+    saltLength = pss_params.saltLength;
+    return RET_OK;
+}
+
 int Verify::verifySignature (
         const char* signAlgo,
         const ByteArray* baData,
         const bool isHash,
         const ByteArray* baSignerSPKI,
-        const ByteArray* baSignValue
+        const ByteArray* baSignValue,
+        const char* digestAlgo,
+        const ByteArray* baSignAlgoParams
 )
 {
     int ret = RET_OK;
@@ -430,6 +695,7 @@ int Verify::verifySignature (
     EcParamsId ec_paramsid = EC_PARAMS_ID_UNDEFINED;
     std::string spki_key;
     std::shared_ptr<EcVerifyKey> ec_key;
+    RsaPssParams pss_params;
 
     CHECK_PARAM(signAlgo != NULL);
     CHECK_PARAM(baData != NULL);
@@ -438,6 +704,26 @@ int Verify::verifySignature (
 
     hash_algo = hash_from_oid(signAlgo);
     sign_algo = signature_from_oid(signAlgo);
+    //  rsaEncryption in SignerInfo.signatureAlgorithm: RSASSA-PKCS1-v1_5 with the digest algorithm of the SignerInfo
+    //  (RFC 3370, 3.2)
+    if ((hash_algo == HASH_ALG_UNDEFINED) && digestAlgo && oid_is_equal(OID_RSA, signAlgo)) {
+        hash_algo = hash_from_oid(digestAlgo);
+        sign_algo = SIGN_RSA_PKCS_1_5;
+    }
+    //  RSASSA-PSS: the hash, the mask generation function and the salt length are in the parameters of the
+    //  signature algorithm, which are required (RFC 4055, 3.1; RFC 4056, 2.2, 3). The library has MGF1 with
+    //  the hash of the signature only
+    if (oid_is_equal(OID_RSA_PSS, signAlgo)) {
+        if (!baSignAlgoParams) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        DO(parse_rsa_pss_params(ba_get_buf_const(baSignAlgoParams), ba_get_len(baSignAlgoParams), pss_params));
+        if ((pss_params.mgfHashAlgo != pss_params.hashAlgo) || (pss_params.trailerField != 1)) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        hash_algo = pss_params.hashAlgo;
+        sign_algo = SIGN_RSA_PSS;
+    }
     if ((hash_algo == HASH_ALG_UNDEFINED) || (sign_algo == SIGN_UNDEFINED)) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
@@ -464,7 +750,8 @@ int Verify::verifySignature (
     }
 
     DO(parseSpki(baSignerSPKI, &key_algo, &ec_paramsid, &sba_pubkey, &sba_pubkey_rsae));
-    if (key_algo != sign_algo) {
+    //  An rsaEncryption key signs by both schemes, an id-RSASSA-PSS key - by RSASSA-PSS only (RFC 4055, 1.2)
+    if ((key_algo != sign_algo) && !((sign_algo == SIGN_RSA_PSS) && (key_algo == SIGN_RSA_PKCS_1_5))) {
         SET_ERROR(RET_UAPKI_INVALID_PARAMETER);
     }
     switch (sign_algo) {
@@ -478,6 +765,24 @@ int Verify::verifySignature (
         break;
     case SIGN_RSA_PKCS_1_5:
         DO(verifyRsaV15Sign(hash_algo, sba_pubkey.get(), sba_pubkey_rsae.get(), ref_ba, baSignValue));
+        break;
+    case SIGN_RSA_PSS:
+        if (key_algo == SIGN_RSA_PSS) {
+            //  The parameters of the key restrict the signature (RFC 4056, 3): the same hash and mask generation
+            //  function, the salt not shorter, the same trailer field
+            bool is_present = false;
+            RsaPssParams key_params;
+            DO(rsa_pss_key_params(baSignerSPKI, is_present, key_params));
+            if (
+                is_present && (
+                    (key_params.hashAlgo != pss_params.hashAlgo) || (key_params.mgfHashAlgo != pss_params.mgfHashAlgo) ||
+                    (pss_params.saltLength < key_params.saltLength) || (key_params.trailerField != pss_params.trailerField)
+                )
+            ) {
+                SET_ERROR(RET_VERIFY_FAILED);
+            }
+        }
+        DO(verify_rsa_pss_sign(pss_params, sba_pubkey.get(), sba_pubkey_rsae.get(), ref_ba, baSignValue));
         break;
     default:
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -66,6 +66,7 @@ int uapki_key_init_usage (UapkiNS::Context& context, JSON_Object* joParams, JSON
 int uapki_sign (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 int uapki_verify_signature (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 int uapki_modify_cms (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_augment_cms (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_build_cms_2pass (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 int uapki_build_csr_2pass (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
@@ -78,6 +79,9 @@ int uapki_remove_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Ob
 int uapki_verify_cert (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 
 int uapki_add_crl (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_add_trust_list (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_list_trust_lists (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
+int uapki_load_trust_lists (UapkiNS::Cert::CerStore* cerStore, size_t& countLoaded, size_t& countRefused);
 int uapki_crl_info (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 int uapki_list_crls (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);
 int uapki_remove_crl (UapkiNS::Context& context, JSON_Object* joParams, JSON_Object* joResult);

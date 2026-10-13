@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -151,11 +151,19 @@ int uapki_cert_status_by_ocsp (Context& context, JSON_Object* joParams, JSON_Obj
                 else {
                     ret = cer_store.getCertByIssuerAndSN(sba_issuerbytes.get(), sba_serialnumber.get(), &cer_subject);
                 }
-                if ((ret == RET_OK) && cer_subject) {
+                const uint64_t valid_time = context.config()->getOcsp().cacheValidTime(
+                    result_validation.singleResponseInfo.msThisUpdate,
+                    result_validation.singleResponseInfo.msNextUpdate
+                );
+                //  Cached only while it may be used from the cache
+                if ((ret == RET_OK) && cer_subject && (valid_time > TimeUtil::mtimeNow())) {
                     lock_guard<mutex> lock2(cer_subject->getStatusMutex());
                     DO(cer_subject->getCertStatusByOcsp().set(
                         result_validation.singleResponseInfo.certStatus,
-                        result_validation.singleResponseInfo.msThisUpdate + Ocsp::OFFSET_EXPIRE_DEFAULT,
+                        context.config()->getOcsp().cacheValidTime(
+                            result_validation.singleResponseInfo.msThisUpdate,
+                            result_validation.singleResponseInfo.msNextUpdate
+                        ),
                         sba_resp.get()
                     ));
                 }

@@ -35,7 +35,6 @@
 #include "jks-buffer.h"
 #include "jks-entry.h"
 #include "jks-utils.h"
-#include "iconv-utils.h"
 #include "macros-internal.h"
 #include "oids.h"
 #include "oid-utils.h"
@@ -160,16 +159,7 @@ int FileStorage::decode (
     if (ret == RET_OK) {
         //nothing
     }
-    else if (ret == RET_CM_UNSUPPORTED_MAC) {
-        return ret;
-    }
-    else if (ret == RET_CM_INVALID_MAC) {
-        char* pass_cp1251 = utf8_to_cp1251(aPassword);
-        ret = decodePkcs12(pass_cp1251);
-        if (ret == RET_OK) {
-            setOpen(pass_cp1251);
-        }
-        free(pass_cp1251);
+    else if ((ret == RET_CM_UNSUPPORTED_MAC) || (ret == RET_CM_INVALID_MAC)) {
         return ret;
     }
     else {

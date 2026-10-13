@@ -32,6 +32,7 @@
 #include "oid-utils.h"
 #include "parson-helper.h"
 #include "uapki-errors.h"
+#include "uapki-ns-verify.h"
 #include <stdio.h>
 
 
@@ -627,7 +628,10 @@ int CmStorageProxy::keySignData (
         hash_alg = hash_from_oid(signAlgo.c_str());
     }
     else {
-        //TODO: later impl SIGN_RSA_PSS, see pkcs12 - DO(hash_from_rsa_pss(baSignAlgoParams, &hash_alg));
+        //  RSASSA-PSS: the hash is in the parameters of the signature algorithm (RFC 4055, 3.1)
+        size_t salt_len = 0;
+        const int ret_params = UapkiNS::Verify::rsaPssParamsDecode(baSignAlgoParams, hash_alg, salt_len);
+        if (ret_params != RET_OK) return ret_params;
     }
     if (hash_alg == HASH_ALG_UNDEFINED) return RET_UAPKI_UNSUPPORTED_ALG;
 
@@ -851,6 +855,33 @@ int CmStorageProxy::keyDhWrapKey (
         vbaWrappedKeys.clear();
     }
 
+    return ret;
+}
+
+int CmStorageProxy::keyDecrypt (
+        const ByteArray* baAlgorithmIdentifier,
+        const ByteArray* baEncryptedKey,
+        ByteArray** baDecryptedKey
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    if (!isOpenedStorage()) return RET_UAPKI_STORAGE_NOT_OPEN;
+    if (!m_SelectedKey) return RET_UAPKI_KEY_NOT_SELECTED;
+    if (!m_SelectedKey->decrypt) return RET_UAPKI_NOT_SUPPORTED;
+    if (!baAlgorithmIdentifier || !baEncryptedKey || !baDecryptedKey) return RET_UAPKI_INVALID_PARAMETER;
+
+    CM_BYTEARRAY* cmba_decrypted = nullptr;
+    const int ret = (int)m_SelectedKey->decrypt(
+        m_Session,
+        (const CM_BYTEARRAY*)baAlgorithmIdentifier,
+        (const CM_BYTEARRAY*)baEncryptedKey,
+        &cmba_decrypted
+    );
+    if (ret == RET_OK) {
+        *baDecryptedKey = ba_copy_with_alloc((const ByteArray*)cmba_decrypted, 0, 0);
+        cmbaFree(cmba_decrypted);
+    }
     return ret;
 }
 

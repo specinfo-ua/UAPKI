@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, The UAPKI Project Authors.
+ * Copyright (c) 2026, The UAPKI Project Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,8 +29,10 @@
 
 #include "api-json-internal.h"
 #include "cert-validator.h"
+#include "cms-augment.h"
 #include "doc-sign.h"
 #include "oid-utils.h"
+#include "uapki-ns-verify.h"
 #include "parson-helper.h"
 #include "store-json.h"
 #include "time-util.h"
@@ -224,6 +226,13 @@ static int resultdoc_to_json (
     if (sDoc.signatureTimeStamp > 0) {
         DO_JSON(json_object_set_string(joResultDoc, "signatureTimeStamp", TimeUtil::mtimeToFtime(sDoc.signatureTimeStamp).c_str()));
     }
+    if (!sDoc.warnings.empty()) {
+        DO_JSON(json_object_set_value(joResultDoc, "warnings", json_value_init_array()));
+        JSON_Array* ja_warns = json_object_get_array(joResultDoc, "warnings");
+        for (const auto& it : sDoc.warnings) {
+            DO_JSON(json_array_append_string(ja_warns, it.c_str()));
+        }
+    }
     if (sDoc.archiveTimeStamp > 0) {
         DO_JSON(json_object_set_string(joResultDoc, "archiveTimeStamp", TimeUtil::mtimeToFtime(sDoc.archiveTimeStamp).c_str()));
     }
@@ -278,7 +287,23 @@ int uapki_sign (
 
     DO(get_info_signalgo_and_keyid(*storage, shared_data));
 
-    shared_data.hashSignature = hash_from_oid(shared_data.aidSignature.algorithm.c_str());
+    if (oid_is_equal(OID_RSA_PSS, shared_data.aidSignature.algorithm.c_str())) {
+        //  RSASSA-PSS does not name the hash: it is "digestAlgo" (SHA-256 by default), the same for the data and
+        //  for the signature (RFC 4056, 3). The parameters of the signature algorithm: this hash, MGF1 with it,
+        //  the salt of its length (RFC 4055, 3.1). The modulus of the key is not less than 2 * hash length + 2 bytes
+        shared_data.hashSignature = shared_data.aidDigest.algorithm.empty()
+            ? HashAlg::HASH_ALG_SHA256 : hash_from_oid(shared_data.aidDigest.algorithm.c_str());
+        if (shared_data.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        shared_data.aidDigest.algorithm = string(hash_to_oid(shared_data.hashSignature));
+        ba_free(shared_data.aidSignature.baParameters);
+        shared_data.aidSignature.baParameters = nullptr;
+        DO(Verify::rsaPssParamsEncode(shared_data.hashSignature, &shared_data.aidSignature.baParameters));
+    }
+    else {
+        shared_data.hashSignature = hash_from_oid(shared_data.aidSignature.algorithm.c_str());
+    }
     if (shared_data.hashSignature == HashAlg::HASH_ALG_UNDEFINED) {
         SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
     }
@@ -300,7 +325,12 @@ int uapki_sign (
             DO(cer_store.getCertByCertId(storage->getPairedCertId(), &shared_data.cerSigner));
         }
         else {
-            DO(cer_store.getCertByKeyId(storage->getSelectedKeyId(), &shared_data.cerSigner));
+            //  DSTU 4145: the certificate by keyId (GOST 34.311) or keyId2 (DSTU 7564-256), see SELECT_KEY
+            ret = cer_store.getCertByKeyId(storage->getSelectedKeyId(), &shared_data.cerSigner);
+            if ((ret == RET_UAPKI_CERT_NOT_FOUND) && storage->getSelectedKeyId2()) {
+                ret = cer_store.getCertByKeyId(storage->getSelectedKeyId2(), &shared_data.cerSigner);
+            }
+            DO(ret);
         }
         DO(json_object_set_base64(joResult, "signerCertId", shared_data.cerSigner->getCertId()));
         if (!shared_data.cerSigner->keyUsageByBit(KeyUsage_digitalSignature)) {
@@ -364,7 +394,7 @@ int uapki_sign (
 
         DO(storage->keySign(
             shared_data.aidSignature.algorithm,
-            nullptr,
+            shared_data.aidSignature.baParameters,
             refba_hashes,
             vba_signatures
         ));
@@ -379,10 +409,46 @@ int uapki_sign (
             }
 
             DO(sdoc.buildUnsignedAttributes());
-            if (shared_data.signatureFormat == SignatureFormat::CADES_A) {
-                DO(sdoc.addTimestamp(Doc::Sign::TsAttr::ARCHIVE_TIMESTAMP));
-            }
             DO(sdoc.buildSignedData());
+            if (shared_data.signatureFormat == SignatureFormat::CADES_A) {
+                //  archive-time-stamp-v3 with ats-hash-index-v3 in its token (EN 319 122-1, 5.5.2, 5.5.3)
+                ByteArray* ba_archived = nullptr;
+                ret = Doc::Augment::addArchiveTimeStamp(&config, &cer_store, cert_validator.getCrlStore(),
+                    sdoc.getEncoded(), 0, Pkcs7::AtsV3::IndexType::EN_319_122, &ba_archived);
+                (void)sdoc.augmented.set(ba_archived);
+                DO(ret);
+            }
+            if (
+                (shared_data.signatureFormat == SignatureFormat::CADES_B_LT) ||
+                (shared_data.signatureFormat == SignatureFormat::CADES_B_LTA)
+            ) {
+                //  The B-T signature validated and augmented by the code of AUGMENT_CMS; the revocation data
+                //  obtained when signing is used (cache). The content: the encapsulated one, or its hash
+                ContentHasher content_digest;
+                Doc::Augment::Params augment_params;
+                ByteArray* ba_augmented = nullptr;
+                if (shared_data.detachedData) {
+                    DO(content_digest.setContent(sdoc.messageDigest.get(), false));
+                }
+                augment_params.signatureFormat = shared_data.signatureFormat;
+                augment_params.signerInfoIndex = 0;
+                augment_params.verifyOptions.onlyCrl = config.getValidationByCrl();
+                augment_params.verifyOptions.checkCriticalExtensions = false;
+                ret = Doc::Augment::augmentCms(
+                    &config,
+                    &cer_store,
+                    cert_validator.getCrlStore(),
+                    sdoc.getEncoded(),
+                    content_digest,
+                    shared_data.detachedData,
+                    augment_params,
+                    &ba_augmented,
+                    nullptr,
+                    &sdoc.warnings
+                );
+                (void)sdoc.augmented.set(ba_augmented);
+                DO(ret);
+            }
         }
     }
     else {
@@ -394,7 +460,7 @@ int uapki_sign (
 
         DO(storage->keySign(
             shared_data.aidSignature.algorithm,
-            nullptr,
+            shared_data.aidSignature.baParameters,
             refba_hashes,
             vba_signatures
         ));

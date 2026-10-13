@@ -122,6 +122,113 @@ static ByteArray *iso15946_get_not_zero(const ByteArray *zx)
     return NULL;
 }
 
+HashAlg iso15946_hash_from_oid_dhkdf (
+        const char* oid,
+        bool* withCofactor
+)
+{
+    const struct { const char* oid; HashAlg hash; bool cofactor; } KDFS[] = {
+        { OID_COFACTOR_DH_DSTU7564_KDF,             HASH_ALG_DSTU7564_256, true  },
+        { OID_COFACTOR_DH_GOST34311_KDF,            HASH_ALG_GOST34311,    true  },
+        { OID_STD_DH_DSTU7564_KDF,                  HASH_ALG_DSTU7564_256, false },
+        { OID_STD_DH_GOST34311_KDF,                 HASH_ALG_GOST34311,    false },
+        //  RFC 5753, 7.1.4
+        { OID_DHSINGLEPASS_STD_DH_SHA1_KDF,         HASH_ALG_SHA1,         false },
+        { OID_DHSINGLEPASS_STD_DH_SHA224_KDF,       HASH_ALG_SHA224,       false },
+        { OID_DHSINGLEPASS_STD_DH_SHA256_KDF,       HASH_ALG_SHA256,       false },
+        { OID_DHSINGLEPASS_STD_DH_SHA384_KDF,       HASH_ALG_SHA384,       false },
+        { OID_DHSINGLEPASS_STD_DH_SHA512_KDF,       HASH_ALG_SHA512,       false },
+        { OID_DHSINGLEPASS_COFACTOR_DH_SHA1_KDF,    HASH_ALG_SHA1,         true  },
+        { OID_DHSINGLEPASS_COFACTOR_DH_SHA224_KDF,  HASH_ALG_SHA224,       true  },
+        { OID_DHSINGLEPASS_COFACTOR_DH_SHA256_KDF,  HASH_ALG_SHA256,       true  },
+        { OID_DHSINGLEPASS_COFACTOR_DH_SHA384_KDF,  HASH_ALG_SHA384,       true  },
+        { OID_DHSINGLEPASS_COFACTOR_DH_SHA512_KDF,  HASH_ALG_SHA512,       true  }
+    };
+    size_t i;
+
+    if (oid) {
+        for (i = 0; i < sizeof(KDFS) / sizeof(KDFS[0]); i++) {
+            if (oid_is_equal(KDFS[i].oid, oid)) {
+                if (withCofactor) {
+                    *withCofactor = KDFS[i].cofactor;
+                }
+                return KDFS[i].hash;
+            }
+        }
+    }
+    return HASH_ALG_UNDEFINED;
+}
+
+size_t iso15946_kek_size (
+        const char* oidWrapAlgo
+)
+{
+    if (!oidWrapAlgo) return 0;
+    if (oid_is_equal(OID_AES128_WRAP, oidWrapAlgo)) return 16;
+    if (oid_is_equal(OID_AES192_WRAP, oidWrapAlgo)) return 24;
+    if (oid_is_equal(OID_AES256_WRAP, oidWrapAlgo) || oid_is_equal(OID_DSTU7624_WRAP, oidWrapAlgo)
+        || oid_is_equal(OID_GOST28147_WRAP, oidWrapAlgo)) return 32;
+    return 0;
+}
+
+//  ANSI X9.63 KDF (SEC 1, 3.6.1) over ECC-CMS-SharedInfo (RFC 5753, 7.2): K = Hash(Z || counter || SharedInfo) || ...
+static int x963_kdf (
+        const HashAlg hashAlgo,
+        const char* oidWrapAlgo,
+        const ByteArray* baEntityInfo,
+        const ByteArray* baZx,
+        ByteArray** baSecret
+)
+{
+    int ret = RET_OK;
+    HashCtx* ctx = NULL;
+    ByteArray* ba_sharedinfo = NULL;
+    ByteArray* ba_counter = NULL;
+    ByteArray* ba_block = NULL;
+    ByteArray* ba_secret = NULL;
+    const size_t kek_size = iso15946_kek_size(oidWrapAlgo);
+    const size_t hash_size = hash_get_size(hashAlgo);
+    size_t offset = 0;
+    uint8_t counter[4] = { 0, 0, 0, 0 };
+
+    if ((kek_size == 0) || (hash_size == 0)) {
+        SET_ERROR(RET_INVALID_PARAM);
+    }
+
+    DO(iso15946_encode_sharedinfo(oidWrapAlgo, baEntityInfo, (int)(kek_size * 8), &ba_sharedinfo));
+    CHECK_NOT_NULL(ba_secret = ba_alloc_by_len(kek_size));
+
+    while (offset < kek_size) {
+        const size_t len = (kek_size - offset < hash_size) ? (kek_size - offset) : hash_size;
+        counter[3]++;
+        CHECK_NOT_NULL(ba_counter = ba_alloc_from_uint8(counter, sizeof(counter)));
+        CHECK_NOT_NULL(ctx = hash_alloc(hashAlgo));
+        DO(hash_update(ctx, baZx));
+        DO(hash_update(ctx, ba_counter));
+        DO(hash_update(ctx, ba_sharedinfo));
+        DO(hash_final(ctx, &ba_block));
+        memcpy(ba_get_buf(ba_secret) + offset, ba_get_buf_const(ba_block), len);
+        offset += len;
+        ba_free(ba_counter);
+        ba_counter = NULL;
+        ba_free_private(ba_block);
+        ba_block = NULL;
+        hash_free(ctx);
+        ctx = NULL;
+    }
+
+    *baSecret = ba_secret;
+    ba_secret = NULL;
+
+cleanup:
+    hash_free(ctx);
+    ba_free(ba_sharedinfo);
+    ba_free(ba_counter);
+    ba_free_private(ba_block);
+    ba_free_private(ba_secret);
+    return ret;
+}
+
 int iso15946_generate_secretc (
         const HashAlg hashAlgo,
         const char* oidWrapAlgo,
@@ -135,6 +242,10 @@ int iso15946_generate_secretc (
     ByteArray* ba_sharedinfo = NULL;
     ByteArray* ba_hashdata = NULL;
     uint8_t COUNTER[4] = { 0, 0, 0, 1 };
+
+    if ((hashAlgo != HASH_ALG_DSTU7564_256) && (hashAlgo != HASH_ALG_GOST34311)) {
+        return x963_kdf(hashAlgo, oidWrapAlgo, baEntityInfo, baZx, baSecret);
+    }
 
     //DEBUG_OUTCON( printf("iso15946_generate_secretc(), baZx: ");ba_print(stdout, baZx); )
     //DEBUG_OUTCON( printf("iso15946_generate_secretc(), baEntityInfo: ");ba_print(stdout, baEntityInfo); )

@@ -120,6 +120,7 @@ namespace Tsp {
         ByteArray*  m_BaSerialNumber;
         uint64_t    m_GenTime;
         bool        m_AccuracyPresent;
+        uint64_t    m_AccuracyUs;       //  microseconds; 0 if the accuracy is absent
         bool        m_Ordering;
         ByteArray*  m_BaNonce;
 
@@ -142,6 +143,9 @@ namespace Tsp {
 
         bool accuracyIsPresent (void) const {
             return m_AccuracyPresent;
+        }
+        uint64_t getAccuracyUs (void) const {
+            return m_AccuracyUs;
         }
         uint64_t getGenTime (void) const {
             return m_GenTime;

@@ -61,6 +61,131 @@ using namespace std;
 using namespace UapkiNS;
 
 
+//  =validationPolicy= (FULL-ETSI): the name of a policy, or an object with the values that differ from the
+//  policy "basedOn". A name or a field the library does not know is an error: a policy is not applied in part
+static int parse_validation_policy (
+        JSON_Object* joParams,
+        Doc::Verify::ValidationPolicy& policy
+)
+{
+    if (!ParsonHelper::jsonObjectHasValue(joParams, "validationPolicy")) return RET_OK;
+
+    if (ParsonHelper::jsonObjectHasValue(joParams, "validationPolicy", JSONString)) {
+        const string s_name = ParsonHelper::jsonObjectGetString(joParams, "validationPolicy");
+        return policy.setNamed(s_name) ? RET_OK : RET_UAPKI_INVALID_PARAMETER;
+    }
+
+    JSON_Object* jo_policy = json_object_get_object(joParams, "validationPolicy");
+    if (!jo_policy) return RET_UAPKI_INVALID_PARAMETER;
+
+    //  The named policy first: the other fields change its values, whatever their order in the object
+    policy.basedOn = ParsonHelper::jsonObjectHasValue(jo_policy, "basedOn", JSONString)
+        ? ParsonHelper::jsonObjectGetString(jo_policy, "basedOn") : string(Doc::Verify::ValidationPolicy::NAME_UKRAINE_DEFAULT);
+    {
+        const string s_basedon = policy.basedOn;
+        if (!policy.setNamed(s_basedon)) return RET_UAPKI_INVALID_PARAMETER;
+        policy.basedOn = s_basedon;
+    }
+    policy.name = Doc::Verify::ValidationPolicy::NAME_CUSTOM;
+    for (size_t i = 0; i < json_object_get_count(jo_policy); i++) {
+        const string s_key = json_object_get_name(jo_policy, i);
+        const JSON_Value* jv = json_object_get_value_at(jo_policy, i);
+        const JSON_Value_Type type = json_value_get_type(jv);
+        const string s_value = (type == JSONString) ? string(json_value_get_string(jv)) : string();
+        if (s_key == "basedOn") {
+            if (type != JSONString) return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "revocationFreshness") {
+            const double value = (type == JSONNumber) ? json_value_get_number(jv) : -1;
+            if ((value < 0) || (value > 525600) || (value != (double)(uint32_t)value)) return RET_UAPKI_INVALID_PARAMETER;
+            //  0 - the strict freshness: the data is issued after the best signature time
+            policy.revocationFreshnessStrict = (value == 0);
+            if (value > 0) policy.revocationFreshness = (uint32_t)value;
+        }
+        else if (s_key == "tsaExtendedKeyUsage") {
+            if (s_value == "allowAdditional") policy.tsaAdditionalKeyPurposes = true;
+            else if (s_value == "strict") policy.tsaAdditionalKeyPurposes = false;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "cryptographicConstraints") {
+            if (s_value == "off") policy.cryptoLevel = Doc::Verify::CryptoLevel::OFF;
+            else if (s_value == "warning") policy.cryptoLevel = Doc::Verify::CryptoLevel::WARNING;
+            else if (s_value == "fail") policy.cryptoLevel = Doc::Verify::CryptoLevel::FAIL;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "cryptographicAlgorithms") {
+            //  [{"algorithm", "keySizeBelow" (a key), "reliableUntil": "YYYY-MM-DD", or "" - no end date}]: replaces the constraint
+            //  of the same algorithm and key size, or adds one
+            if (type != JSONArray) return RET_UAPKI_INVALID_PARAMETER;
+            const JSON_Array* ja_rules = json_value_get_array(jv);
+            for (size_t j = 0; j < json_array_get_count(ja_rules); j++) {
+                JSON_Object* jo_rule = json_array_get_object(ja_rules, j);
+                if (!jo_rule) return RET_UAPKI_INVALID_PARAMETER;
+                Doc::Verify::CryptoRule rule{ ParsonHelper::jsonObjectGetString(jo_rule, "algorithm"), 0, 0, false };
+                if (rule.algorithm.empty()) return RET_UAPKI_INVALID_PARAMETER;
+                if (json_object_has_value(jo_rule, "keySizeBelow")) {
+                    const double size = ParsonHelper::jsonObjectHasValue(jo_rule, "keySizeBelow", JSONNumber) ? json_object_get_number(jo_rule, "keySizeBelow") : -1;
+                    if ((size < 1) || (size > 65536) || (size != (double)(uint32_t)size)) return RET_UAPKI_INVALID_PARAMETER;
+                    rule.keySizeBelow = (uint32_t)size;
+                }
+                if (ParsonHelper::jsonObjectHasValue(jo_rule, "reliableUntil", JSONString)) {
+                    const string s_date = json_object_get_string(jo_rule, "reliableUntil");
+                    if (!s_date.empty() && ((s_date.length() != 10) || (TimeUtil::ftimeToMtime(s_date + " 00:00:00", rule.msEnd) != RET_OK))) {
+                        return RET_UAPKI_INVALID_PARAMETER;
+                    }
+                }
+                else {
+                    return RET_UAPKI_INVALID_PARAMETER;
+                }
+                bool replaced = false;
+                for (auto& it : policy.cryptoRules) {
+                    if ((it.algorithm == rule.algorithm) && (it.keySizeBelow == rule.keySizeBelow)) {
+                        it.msEnd = rule.msEnd;
+                        replaced = true;
+                    }
+                }
+                if (!replaced) policy.cryptoRules.push_back(rule);
+            }
+        }
+        else if (s_key == "timeStampDelay") {
+            const double value = (type == JSONNumber) ? json_value_get_number(jv) : -1;
+            if ((value < 0) || (value > 525600) || (value != (double)(uint32_t)value)) return RET_UAPKI_INVALID_PARAMETER;
+            policy.timeStampDelay = (uint32_t)value;
+        }
+        else if (s_key == "certificatePathModel") {
+            if (s_value == "shell") policy.chainModel = false;
+            else if (s_value == "chain") policy.chainModel = true;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "pastValidation") {
+            if (s_value == "bestSignatureTime") policy.pastValidationByPoe = false;
+            else if (s_value == "proofOfExistence") policy.pastValidationByPoe = true;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "tsaTrust") {
+            if (s_value == "timeStampTime") policy.tsaTrustByProofOfExistence = false;
+            else if (s_value == "proofOfExistence") policy.tsaTrustByProofOfExistence = true;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if (s_key == "signerKeyUsage") {
+            if (s_value == "digitalSignatureOrNonRepudiation") policy.signerNonRepudiation = false;
+            else if (s_value == "nonRepudiation") policy.signerNonRepudiation = true;
+            else return RET_UAPKI_INVALID_PARAMETER;
+        }
+        else if ((s_key == "caRemovesExpiredCerts") || (s_key == "checkCriticalExtensions")) {
+            if (type != JSONBoolean) return RET_UAPKI_INVALID_PARAMETER;
+            const bool value = (json_value_get_boolean(jv) != 0);
+            if (s_key == "caRemovesExpiredCerts") policy.caRemovesExpiredCerts = value;
+            else policy.checkCriticalExtensions = value;
+        }
+        else {
+            return RET_UAPKI_INVALID_PARAMETER;
+        }
+    }
+
+    return RET_OK;
+}   //  parse_validation_policy
+
 static int parse_verify_options (
         JSON_Object* joParams,
         Doc::Verify::VerifyOptions& verifyOptions
@@ -73,9 +198,29 @@ static int parse_verify_options (
         if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::UNDEFINED) return RET_UAPKI_INVALID_PARAMETER;
         //  By default as in the library config (INIT: validationByCrl)
         verifyOptions.onlyCrl = ParsonHelper::jsonObjectGetBoolean(joParams, "onlyCrl", verifyOptions.onlyCrl);
+        //  FULL-ETSI: the time the caller attests the signature existed at
+        if (ParsonHelper::jsonObjectHasValue(joParams, "proofOfExistenceTime")) {
+            const string s_time = ParsonHelper::jsonObjectGetString(joParams, "proofOfExistenceTime");
+            if (s_time.empty() || (TimeUtil::ftimeToMtime(s_time, verifyOptions.msProvidedPoe) != RET_OK) || (verifyOptions.msProvidedPoe == 0)) {
+                return RET_UAPKI_INVALID_PARAMETER;
+            }
+        }
         verifyOptions.verifySignerInfoIndex = ParsonHelper::jsonObjectGetInt32(joParams, "verifySignerInfoIndex", -1);
+        //  FULL-ETSI: an unknown critical extension makes a certificate unusable (RFC 5280, 4.2), unless switched off
+        verifyOptions.checkCriticalExtensions = ParsonHelper::jsonObjectGetBoolean(joParams, "checkCriticalExtensions",
+            verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL_ETSI);
+        verifyOptions.caRemovesExpiredCerts = ParsonHelper::jsonObjectGetBoolean(joParams, "caRemovesExpiredCerts", false);
         if (verifyOptions.verifySignerInfoIndex < 0) {
             verifyOptions.verifySignerInfoIndex = -1;
+        }
+        if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL_ETSI) {
+            //  The constraints are the ones of the validation policy. onlyCrl stays an option of the request: the
+            //  revocation data of the signature is used as it is (CRL, OCSP); when it is absent or does not meet the
+            //  requirements, the request to an OCSP responder is skipped and the status is looked for by CRL
+            const int ret = parse_validation_policy(joParams, verifyOptions.policy);
+            if (ret != RET_OK) return ret;
+            verifyOptions.checkCriticalExtensions = verifyOptions.policy.checkCriticalExtensions;
+            verifyOptions.caRemovesExpiredCerts = verifyOptions.policy.caRemovesExpiredCerts;
         }
     }
 
@@ -91,8 +236,11 @@ static int result_attr_timestamp_to_json (
     int ret = RET_OK;
 
     if (attrTS.isPresent()) {
-        json_object_set_value(joResult, attrName, json_value_init_object());
-        JSON_Object* jo_attr = json_object_get_object(joResult, attrName);
+        JSON_Object* jo_attr = joResult;
+        if (attrName) {
+            json_object_set_value(joResult, attrName, json_value_init_object());
+            jo_attr = json_object_get_object(joResult, attrName);
+        }
         DO_JSON(json_object_set_string(jo_attr, "genTime", TimeUtil::mtimeToFtime(attrTS.msGenTime).c_str()));
         DO_JSON(json_object_set_string(jo_attr, "policyId", attrTS.policy.c_str()));
         DO_JSON(json_object_set_string(jo_attr, "hashAlgo", attrTS.hashAlgo.c_str()));
@@ -317,10 +465,13 @@ static int result_certificaterefs_to_json (
             JSON_Object* jo_certref = json_array_get_object(ja_certrefs, i);
             DO_JSON(json_object_set_value(jo_certref, "certHash", json_value_init_object()));
             DO(result_otherhash_to_json(json_object_get_object(jo_certref, "certHash"), cert_ref));
-            DO_JSON(json_object_set_value(jo_certref, "issuer", json_value_init_object()));
-            DO(Cert::issuerFromGeneralNames(cert_ref.issuerSerial.baIssuer, &sba_issuer));
-            DO(nameToJson(json_object_get_object(jo_certref, "issuer"), sba_issuer.get()));
-            DO(json_object_set_hex(jo_certref, "serialNumber", cert_ref.issuerSerial.baSerialNumber));
+            //  issuerSerial of OtherCertID is optional (ETSI TS 101 733, 6.2.1)
+            if (cert_ref.issuerSerial.baIssuer && cert_ref.issuerSerial.baSerialNumber) {
+                DO_JSON(json_object_set_value(jo_certref, "issuer", json_value_init_object()));
+                DO(Cert::issuerFromGeneralNames(cert_ref.issuerSerial.baIssuer, &sba_issuer));
+                DO(nameToJson(json_object_get_object(jo_certref, "issuer"), sba_issuer.get()));
+                DO(json_object_set_hex(jo_certref, "serialNumber", cert_ref.issuerSerial.baSerialNumber));
+            }
             DO_JSON(json_object_set_string(jo_certref, "status",
                 verifyStatusToStr((i < cadesXlInfo.statusesCertRefs.size()) ? cadesXlInfo.statusesCertRefs[i] : VerifyStatus::UNDEFINED)));
         }
@@ -421,7 +572,14 @@ static int result_verifyinfo_to_json (
 )
 {
     int ret = RET_OK;
-    const vector<string> warns = verifyInfo.getWarningMessages();
+    vector<string> warns = verifyInfo.getWarningMessages();
+    //  The status of the validation types that do not check everything says what was not checked
+    if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::STRUCT) {
+        warns.push_back("THE CERTIFICATE CHAIN AND THE REVOCATION STATUS ARE NOT CHECKED (VALIDATION TYPE STRUCT)");
+    }
+    else if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+        warns.push_back("THE REVOCATION STATUS OF THE CERTIFICATES IS NOT CHECKED (VALIDATION TYPE CHAIN)");
+    }
 
     if (verifyInfo.getSignerCertId()) {
         DO(json_object_set_base64(joSignInfo, "signerCertId", verifyInfo.getSignerCertId()));
@@ -456,6 +614,19 @@ static int result_verifyinfo_to_json (
     }
     DO(result_revocationrefs_to_json(joSignInfo, verifyInfo.getRevocationRefs()));
     DO(result_attr_timestamp_to_json(joSignInfo, "archiveTS", verifyInfo.getArchiveTS()));
+    if (!verifyInfo.getArchiveTSsNext().empty()) {
+        //  All the archive time-stamps (re-archiving), archiveTS is the first one
+        DO_JSON(json_object_set_value(joSignInfo, "archiveTimeStamps", json_value_init_array()));
+        JSON_Array* ja_archivets = json_object_get_array(joSignInfo, "archiveTimeStamps");
+        DO_JSON(json_array_append_value(ja_archivets, json_value_init_object()));
+        DO(result_attr_timestamp_to_json(json_array_get_object(ja_archivets, 0), nullptr, verifyInfo.getArchiveTS()));
+        for (const auto& it : verifyInfo.getArchiveTSsNext()) {
+            DO_JSON(json_array_append_value(ja_archivets, json_value_init_object()));
+            DO(result_attr_timestamp_to_json(
+                json_array_get_object(ja_archivets, json_array_get_count(ja_archivets) - 1), nullptr, *it
+            ));
+        }
+    }
 
     DO(result_attributes_to_json(joSignInfo, "signedAttributes", verifyInfo.getSignerInfo().getSignedAttrs()));
     DO(result_attributes_to_json(joSignInfo, "unsignedAttributes", verifyInfo.getSignerInfo().getUnsignedAttrs()));
@@ -590,6 +761,48 @@ cleanup:
     return ret;
 }   //  validate_by_ocsp
 
+//  The status of the signers of the OCSP responses and CRLs without id-pkix-ocsp-nocheck (and of the CA certificates
+//  of their chains), after the status of the other certificates (RFC 6960, 4.2.2.2.1; as EU DSS): by OCSP if the
+//  certificate has its OCSP responder and the response is not signed by the certificate itself (it proves nothing
+//  about itself), else by CRL - of any size (the CRL cache keeps it up to nextUpdate). A responder (a CRL signer)
+//  that is a service of a trusted list provided at the time needs no status of its own, as with
+//  id-pkix-ocsp-nocheck: nothing is requested for it. Not determined - the result is INDETERMINATE
+//  (validateStatusCerts()), the CRL that would determine it is among the expected ones
+static void validate_status_signers (
+        Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo,
+        const bool onlyCrl
+)
+{
+    const uint64_t status_time = (verifiedSignerInfo.getBestSignatureTime() > 0)
+        ? verifiedSignerInfo.getBestSignatureTime() : TimeUtil::mtimeNow();
+    for (auto& it : verifiedSignerInfo.getCertChainItems()) {
+        if (
+            it->isExpired() ||
+            (it->getCertEntity() == CertValidator::CertEntity::ROOT) ||
+            (it->getValidationType() != Cert::ValidationType::UNDEFINED)
+        ) continue;
+
+        if (
+            ((it->getCertEntity() == CertValidator::CertEntity::OCSP) && it->getSubject()->hasActiveTrustService("OCSP", status_time)) ||
+            ((it->getCertEntity() == CertValidator::CertEntity::CRL) && it->getSubject()->hasActiveTrustService("CRL", status_time))
+        ) {
+            it->setValidationType(Cert::ValidationType::NONE);
+            continue;
+        }
+
+        if (!onlyCrl && !it->getSubject()->getUris().ocsp.empty() && it->getIssuer()) {
+            if (
+                (validate_by_ocsp(verifiedSignerInfo, *it) == RET_OK) &&
+                (it->getResultValidationByOcsp().cerResponder != it->getSubject())
+            ) continue;
+            it->setValidationType(Cert::ValidationType::UNDEFINED);
+        }
+        if (validate_by_crl(verifiedSignerInfo, *it) != RET_OK) {
+            it->setValidationType(Cert::ValidationType::UNDEFINED);
+        }
+    }
+}
+
 static int validate_certs (
         Doc::Verify::VerifySignedDoc& verifySignedDoc,
         Doc::Verify::VerifiedSignerInfo& verifiedSignerInfo
@@ -598,6 +811,10 @@ static int validate_certs (
     int ret = RET_OK;
     const Doc::Verify::VerifyOptions& verify_options = verifySignedDoc.verifyOptions;
     const uint64_t bestsign_time = verifiedSignerInfo.getBestSignatureTime();
+    //  The strict freshness of the policy: the status is issued after the best signature time
+    if (verify_options.policy.revocationFreshnessStrict) {
+        verifiedSignerInfo.setStrictFreshnessTime(bestsign_time);
+    }
 
     if (verify_options.validationType == Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
         verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
@@ -605,10 +822,10 @@ static int validate_certs (
             it->setValidationType(Cert::ValidationType::NONE);
         }
     }
-    else if (verify_options.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL) {
+    else if (verify_options.validationType >= Doc::Verify::VerifyOptions::ValidationType::FULL) {
         //  By the revocation data the signature has: values (XL, baseline LT/LTA), references (C)
         SignatureFormat sign_format = verifiedSignerInfo.getSignatureFormat();
-        if (verifiedSignerInfo.getCadesXlInfo().isPresentCadesXL()) {
+        if (verifiedSignerInfo.hasRevocationValues()) {
             sign_format = SignatureFormat::CADES_XL;
         }
         else if (verifiedSignerInfo.getCadesXlInfo().isPresentCadesC()) {
@@ -640,6 +857,7 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         case SignatureFormat::CADES_C:
             verifiedSignerInfo.validateValidityTimeCerts(bestsign_time);
@@ -656,6 +874,7 @@ static int validate_certs (
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
             DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         case SignatureFormat::CADES_XL:
         case SignatureFormat::CADES_A:
@@ -673,6 +892,8 @@ static int validate_certs (
                 }
             }
             DO(verifiedSignerInfo.addOcspCertsToChain(bestsign_time));
+            DO(verifiedSignerInfo.addCrlCertsToChain(bestsign_time));
+            validate_status_signers(verifiedSignerInfo, verify_options.onlyCrl);
             break;
         default:
             break;
@@ -682,6 +903,154 @@ static int validate_certs (
 cleanup:
     return ret;
 }   //  validate_certs
+
+//  One SignerInfo: an error stops its verification only, see VerifiedSignerInfo::setNotProcessed()
+static int verify_signer_info (
+        Doc::Verify::VerifySignedDoc& verifySdoc,
+        Doc::Verify::VerifiedSignerInfo& verified_sinfo,
+        const size_t idx
+)
+{
+    int ret = RET_OK;
+
+    {
+        DO(verifySdoc.sdataParser.parseSignerInfo(idx, verified_sinfo.getSignerInfo()));
+        if (!verifySdoc.sdataParser.isContainDigestAlgorithm(verified_sinfo.getSignerInfo().getDigestAlgorithm())) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+
+        DO(verified_sinfo.parseAttributes());
+        if (
+            (verifySdoc.verifyOptions.verifySignerInfoIndex < 0) ||
+            (verifySdoc.verifyOptions.verifySignerInfoIndex == (int)idx)
+        ) {
+            DO(verified_sinfo.verifySignedAttribute(verifySdoc.addedCerts));
+            DO(verified_sinfo.verifyMessageDigest(*verifySdoc.refContentHasher));
+            DO(verified_sinfo.verifySigningCertificateV2());
+            DO(verified_sinfo.setSignedDataRevocation(verifySdoc.sdataParser.getCrls()));
+
+            verified_sinfo.determineSignFormat();
+            DO(verified_sinfo.tspCertToStore());
+            DO(verified_sinfo.certValuesToStore());
+            DO(verified_sinfo.crlValuesToStore());
+            DO(verified_sinfo.verifyContentTimeStamp(*verifySdoc.refContentHasher));
+            DO(verified_sinfo.verifySignatureTimeStamp());
+            DO(verified_sinfo.verifyCertificateRefs());
+            DO(verified_sinfo.verifyArchiveTimeStamp(verifySdoc.addedCerts, verifySdoc.sdataParser.getCerts(), verifySdoc.sdataParser.getCrls(), *verifySdoc.refContentHasher));
+
+            //  AUGMENT_CMS: the revocation data obtained for a signature without them is fresh enough
+            if ((verifySdoc.verifyOptions.revocationMinThisUpdate > 0) && !verified_sinfo.hasRevocationValues()) {
+                verified_sinfo.setRevocationMinThisUpdate(verifySdoc.verifyOptions.revocationMinThisUpdate);
+            }
+            verified_sinfo.validateSignFormat(verifySdoc.validateTime, verifySdoc.refContentHasher->isPresent());
+            if (verifySdoc.verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+                DO(verified_sinfo.buildCertChain());
+            }
+            DO(validate_certs(verifySdoc, verified_sinfo));
+            DO(verified_sinfo.verifyRevocationRefs());
+            verified_sinfo.validateStatusCerts(verifySdoc.verifyOptions.checkCriticalExtensions);
+        }
+    }
+
+cleanup:
+    return ret;
+}   //  verify_signer_info
+
+int Doc::Verify::verifySignedDocument (
+        Doc::Verify::VerifySignedDoc& verifySdoc,
+        const ByteArray* baSignature,
+        ContentHasher& contentHasher,
+        const bool isDigest
+)
+{
+    int ret = RET_OK;
+
+    if (!verifySdoc.isInitialized()) return RET_UAPKI_GENERAL_ERROR;
+
+    DO(verifySdoc.parse(baSignature));
+    DO(verifySdoc.getContent(contentHasher));
+    DO(verifySdoc.addCertsToStore());
+
+    //  For each signer_info
+    verifySdoc.verifiedSignerInfos.resize(verifySdoc.sdataParser.getCountSignerInfos());
+    for (size_t idx = 0; idx < verifySdoc.sdataParser.getCountSignerInfos(); idx++) {
+        Doc::Verify::VerifiedSignerInfo& verified_sinfo = verifySdoc.verifiedSignerInfos[idx];
+
+        DO(verified_sinfo.init(
+            verifySdoc.libConfig,
+            verifySdoc.cerStore,
+            verifySdoc.crlStore,
+            isDigest
+        ));
+        verified_sinfo.setCaRemovesExpiredCerts(verifySdoc.verifyOptions.caRemovesExpiredCerts);
+        if (verifySdoc.verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL_ETSI) {
+            verified_sinfo.setRevocationFreshness(verifySdoc.verifyOptions.policy.revocationFreshness);
+            verified_sinfo.setTsaTrustByProofOfExistence(verifySdoc.verifyOptions.policy.tsaTrustByProofOfExistence);
+            verified_sinfo.setRevocationFreshnessStrict(verifySdoc.verifyOptions.policy.revocationFreshnessStrict);
+        }
+        ret = verify_signer_info(verifySdoc, verified_sinfo, idx);
+        if ((ret == RET_MEMORY_ALLOC_ERROR) || (ret == RET_UAPKI_GENERAL_ERROR)) {
+            goto cleanup;
+        }
+        if (ret != RET_OK) {
+            //  A report for every signature: this one is not verified completely, the others are
+            verified_sinfo.setNotProcessed(ret);
+            ret = RET_OK;
+        }
+    }
+
+    verifySdoc.detectCertSources();
+    if (verifySdoc.verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::FULL) {
+        for (size_t idx = 0; idx < verifySdoc.verifiedSignerInfos.size(); idx++) {
+            if (
+                (verifySdoc.verifyOptions.verifySignerInfoIndex < 0) ||
+                (verifySdoc.verifyOptions.verifySignerInfoIndex == (int)idx)
+            ) {
+                verifySdoc.verifiedSignerInfos[idx].lowerSignFormatByValidationData();
+            }
+        }
+    }
+
+cleanup:
+    return ret;
+}   //  verifySignedDocument
+
+int UapkiNS::Doc::Verify::verifiedSignerInfoToJson (
+        JSON_Object* joSignInfo,
+        Doc::Verify::VerifiedSignerInfo& verifyInfo,
+        const Doc::Verify::VerifyOptions& verifyOptions
+)
+{
+    return result_verifyinfo_to_json(joSignInfo, verifyInfo, verifyOptions);
+}
+
+int UapkiNS::Doc::Verify::attrTimeStampToJson (
+        JSON_Object* joResult,
+        const char* attrName,
+        const Doc::Verify::AttrTimeStamp& attrTS
+)
+{
+    return result_attr_timestamp_to_json(joResult, attrName, attrTS);
+}
+
+int UapkiNS::Doc::Verify::attributesToJson (
+        JSON_Object* joResult,
+        const char* key,
+        const vector<UapkiNS::Attribute>& attrs
+)
+{
+    return result_attributes_to_json(joResult, key, attrs);
+}
+
+int UapkiNS::Doc::Verify::certChainItemToJson (
+        JSON_Object* joResult,
+        const Doc::Verify::CertChainItem& certChainItem,
+        const Doc::Verify::VerifyOptions& verifyOptions,
+        const uint64_t bestSignatureTime
+)
+{
+    return result_certchainitem_to_json(joResult, certChainItem, verifyOptions, bestSignatureTime);
+}
 
 static int verify_p7s (
         Context& context,
@@ -701,60 +1070,16 @@ static int verify_p7s (
         verifyOptions
     );
 
-    if (!verify_sdoc.isInitialized()) {
-        SET_ERROR(RET_UAPKI_GENERAL_ERROR);
+    DO(Doc::Verify::verifySignedDocument(verify_sdoc, baSignature, contentHasher, isDigest));
+
+    if (verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL_ETSI) {
+        //  What was met for a signature is in its report; the error of the method is what stops the whole verification
+        DO(Doc::Verify::etsiReportToJson(joResult, verify_sdoc, returnContent));
     }
-
-    DO(verify_sdoc.parse(baSignature));
-    DO(verify_sdoc.getContent(contentHasher));
-    DO(verify_sdoc.addCertsToStore());
-
-    //  For each signer_info
-    verify_sdoc.verifiedSignerInfos.resize(verify_sdoc.sdataParser.getCountSignerInfos());
-    for (size_t idx = 0; idx < verify_sdoc.sdataParser.getCountSignerInfos(); idx++) {
-        Doc::Verify::VerifiedSignerInfo& verified_sinfo = verify_sdoc.verifiedSignerInfos[idx];
-
-        DO(verified_sinfo.init(
-            verify_sdoc.libConfig,
-            verify_sdoc.cerStore,
-            verify_sdoc.crlStore,
-            isDigest
-        ));
-        DO(verify_sdoc.sdataParser.parseSignerInfo(idx, verified_sinfo.getSignerInfo()));
-        if (!verify_sdoc.sdataParser.isContainDigestAlgorithm(verified_sinfo.getSignerInfo().getDigestAlgorithm())) {
-            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
-        }
-
-        DO(verified_sinfo.parseAttributes());
-        if (
-            (verifyOptions.verifySignerInfoIndex < 0) ||
-            (verifyOptions.verifySignerInfoIndex == (int)idx)
-        ) {
-            DO(verified_sinfo.verifySignedAttribute(verify_sdoc.addedCerts));
-            DO(verified_sinfo.verifyMessageDigest(*verify_sdoc.refContentHasher));
-            DO(verified_sinfo.verifySigningCertificateV2());
-
-            verified_sinfo.determineSignFormat();
-            DO(verified_sinfo.tspCertToStore());
-            DO(verified_sinfo.certValuesToStore());
-            DO(verified_sinfo.verifyContentTimeStamp(*verify_sdoc.refContentHasher));
-            DO(verified_sinfo.verifySignatureTimeStamp());
-            DO(verified_sinfo.verifyCertificateRefs());
-            DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.sdataParser.getCrls()));
-
-            verified_sinfo.validateSignFormat(verify_sdoc.validateTime, verify_sdoc.refContentHasher->isPresent());
-            if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
-                DO(verified_sinfo.buildCertChain());
-            }
-            DO(validate_certs(verify_sdoc, verified_sinfo));
-            verified_sinfo.validateStatusCerts();
-        }
+    else {
+        DO(result_to_json(joResult, verify_sdoc, returnContent));
+        ret = verify_sdoc.getLastError();
     }
-
-    verify_sdoc.detectCertSources();
-
-    DO(result_to_json(joResult, verify_sdoc, returnContent));
-    ret = verify_sdoc.getLastError();
 
 cleanup:
     return ret;
@@ -773,7 +1098,8 @@ static int verify_raw (
     int ret = RET_OK;
     Cert::CerItem* cer_item = nullptr;
     Cert::CerItem* cer_parsed = nullptr;
-    SmartBA sba_pubdata;
+    SmartBA sba_pubdata, sba_signparams;
+    HashAlg hash_signalgo = HashAlg::HASH_ALG_UNDEFINED;
     SignatureVerifyStatus status_sign = SignatureVerifyStatus::UNDEFINED;
     const ByteArray* content = contentHasher.getContentBytes();
     bool is_hash = isDigest;
@@ -801,8 +1127,21 @@ static int verify_raw (
         }
     }
 
+    if (oid_is_equal(OID_RSA_PSS, s_signalgo.c_str())) {
+        //  RSASSA-PSS does not name the hash: "digestAlgo" (SHA-256 by default), as in the SIGN method
+        const string s_digestalgo = ParsonHelper::jsonObjectGetString(joSignParams, "digestAlgo");
+        hash_signalgo = s_digestalgo.empty() ? HashAlg::HASH_ALG_SHA256 : hash_from_oid(s_digestalgo.c_str());
+        if (hash_signalgo == HashAlg::HASH_ALG_UNDEFINED) {
+            SET_ERROR(RET_UAPKI_UNSUPPORTED_ALG);
+        }
+        DO(Verify::rsaPssParamsEncode(hash_signalgo, &sba_signparams));
+    }
+    else {
+        hash_signalgo = hash_from_oid(s_signalgo.c_str());
+    }
+
     if (!content && !isDigest) {
-        DO(contentHasher.digest(hash_from_oid(s_signalgo.c_str())));
+        DO(contentHasher.digest(hash_signalgo));
         content = contentHasher.getHashValue();
         is_hash = true;
     }
@@ -812,7 +1151,9 @@ static int verify_raw (
         content,
         is_hash,
         (cer_item) ? cer_item->getSpki() : sba_pubdata.get(),
-        baSignature
+        baSignature,
+        nullptr,
+        sba_signparams.get()
     );
     switch (ret) {
     case RET_OK:

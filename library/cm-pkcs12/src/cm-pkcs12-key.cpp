@@ -395,10 +395,51 @@ static CM_ERROR cm_key_dh_unwrap_key (
         (ByteArray***)abaSessionKeys
     );
     if (ret != RET_OK) {
-        ret = (ret == RET_INVALID_MAC) ? RET_CM_INVALID_WRAPPED_KEY : RET_CM_GENERAL_ERROR;
+        switch (ret) {
+        case RET_INVALID_MAC:
+            ret = RET_CM_INVALID_WRAPPED_KEY;
+            break;
+        case RET_CM_UNSUPPORTED_KEY_DERIVATION_FUNC_ALG:
+        case RET_CM_UNSUPPORTED_CIPHER_ALG:
+        case RET_CM_UNSUPPORTED_ELLIPTIC_CURVE:
+        case RET_CM_INVALID_PARAM_DH:
+            break;
+        default:
+            ret = RET_CM_GENERAL_ERROR;
+        }
     }
     return ret;
 }   //  cm_key_dh_unwrap_key
+
+static CM_ERROR cm_key_decrypt (
+        CM_SESSION_API* session,
+        const CM_BYTEARRAY* baAlgorithmIdentifier,
+        const CM_BYTEARRAY* baSource,
+        CM_BYTEARRAY** baDest
+)
+{
+    DEBUG_OUTPUT("cm_key_decrypt()");
+    if (!session) return RET_CM_NO_SESSION;
+    if (!baAlgorithmIdentifier || !baSource || !baDest) return RET_CM_INVALID_PARAMETER;
+
+    SessionPkcs12Context* ss_ctx = (SessionPkcs12Context*)session->ctx;
+    if (!ss_ctx) return RET_CM_NO_SESSION;
+
+    FileStorage& storage = ss_ctx->fileStorage;
+    if (!storage.isOpen()) return RET_CM_NOT_AUTHORIZED;
+
+    StoreBag* selected_key = storage.selectedKey();
+    if (!selected_key) return RET_CM_KEY_NOT_SELECTED;
+
+    const int ret = private_key_decrypt(
+        selected_key->bagValue(),
+        (const ByteArray*)baAlgorithmIdentifier,
+        (const ByteArray*)baSource,
+        (ByteArray**)baDest
+    );
+    if ((ret == RET_OK) || (ret == RET_CM_UNSUPPORTED_ALG) || (ret == RET_CM_INVALID_PARAMETER)) return ret;
+    return RET_CM_INVALID_WRAPPED_KEY;
+}   //  cm_key_decrypt
 
 
 void CmPkcs12::assignKeyFunc (
@@ -419,7 +460,7 @@ void CmPkcs12::assignKeyFunc (
     key.dh              = nullptr;
     key.dhWrapKey       = cm_key_dh_wrap_key;
     key.dhUnwrapKey     = cm_key_dh_unwrap_key;
-    key.decrypt         = nullptr;
+    key.decrypt         = cm_key_decrypt;
     key.encrypt         = nullptr;
     key.setInfo         = nullptr;
     key.exportKey       = nullptr;

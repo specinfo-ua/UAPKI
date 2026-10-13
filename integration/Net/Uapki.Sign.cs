@@ -105,6 +105,8 @@ public partial class Uapki
             SignatureFormat.CAdES_LT => "CAdES-XL",
             SignatureFormat.CAdES_A => "CAdES-A",
             SignatureFormat.CAdES_LTA => "CAdES-A",
+            SignatureFormat.CAdES_B_LT => "CAdES-B-LT",
+            SignatureFormat.CAdES_B_LTA => "CAdES-B-LTA",
             SignatureFormat.CMS => "CMS",
             SignatureFormat.RAW => "RAW",
             _ => "CAdES-T",
