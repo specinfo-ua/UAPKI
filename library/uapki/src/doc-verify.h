@@ -215,6 +215,8 @@ class VerifiedSignerInfo : public CertValidator::CertValidator {
     bool        m_RevocationNotFresh;   //  An embedded OCSP response not fresh for the best signature time
     bool        m_ExpiredSignerCert;    //  The certificate of the signer is expired, the signing before it is not proven
     bool        m_ExpiredChainCert;     //  Another certificate of the chain is expired
+    bool        m_CertRefsNotDecoded;   //  complete-certificate-references not decoded: not used
+    bool        m_RevocationRefsNotDecoded; //  complete-revocation-references not decoded: not used
     bool        m_StatusSignerUnknown;  //  The status of an OCSP responder (a CRL signer) is not determined
     bool        m_TsaKeyCompromised;    //  See CertValidator::tsaKeyTrust()
     bool        m_TsaRevokedNoReason;

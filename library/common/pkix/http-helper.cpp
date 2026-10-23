@@ -116,6 +116,19 @@ static bool curl_set_url_and_proxy (
     CURLcode rv_ccode = curl_easy_setopt(curl, CURLOPT_URL, uri.c_str());
     if (rv_ccode != CURLE_OK) return false;
 
+    //  Redirects are followed (a CA moves its CRLs from http:// to https://), only to http and https and not
+    //  endlessly; a POST (OCSP, TSP) stays a POST after 301/302/303
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+    if (curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https") != CURLE_OK) {
+        //  A libcurl built without TLS knows no https: redirects within http only
+        curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http");
+    }
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, (long)CURL_REDIR_POST_ALL);
+    //  https (Schannel on Windows): a revoked server certificate is refused, but revocation data that cannot be
+    //  obtained (offline, a closed network) does not fail the connection
+    curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_REVOKE_BEST_EFFORT);
+
     if (!http_helper.proxyUrl.empty()) {
         rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, http_helper.proxyUrl.c_str());
         if (rv_ccode != CURLE_OK) return false;

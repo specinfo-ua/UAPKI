@@ -162,6 +162,11 @@ public:
         const ByteArray* baSubject,
         CerItem** cerItem
     );
+    //  All certificates with the subject name
+    void getCertsBySubject (
+        const ByteArray* baSubject,
+        std::vector<CerItem*>& cerItems
+    );
     int getChainCerts (
         const CerItem* cerSubject,
         std::vector<CerItem*>& chainCerts

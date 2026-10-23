@@ -473,6 +473,8 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
     , m_RevocationNotFresh(false)
     , m_ExpiredSignerCert(false)
     , m_ExpiredChainCert(false)
+    , m_CertRefsNotDecoded(false)
+    , m_RevocationRefsNotDecoded(false)
     , m_StatusSignerUnknown(false)
     , m_TsaKeyCompromised(false)
     , m_TsaRevokedNoReason(false)
@@ -800,6 +802,12 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
     }
     if (m_ExpiredChainCert) {
         rv_warns.push_back("A CERTIFICATE OF THE CHAIN IS EXPIRED");
+    }
+    if (m_CertRefsNotDecoded) {
+        rv_warns.push_back("THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED");
+    }
+    if (m_RevocationRefsNotDecoded) {
+        rv_warns.push_back("THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED");
     }
     if (m_StatusSignerUnknown) {
         rv_warns.push_back("THE STATUS OF THE OCSP RESPONDER IS NOT DETERMINED");
@@ -1553,11 +1561,13 @@ int VerifiedSignerInfo::parseUnsignedAttrs (
         if (it.type == string(OID_PKCS9_TIMESTAMP_TOKEN)) {
             DO(m_SignatureTS.parse(it.baValues));
         }
+        //  The references are unsigned validation material (ETSI EN 319 102-1, 5.1.3): not decoded - not used,
+        //  and the signature is verified without them
         else if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) {
-            DO(m_CadesXlInfo.parseCertificateRefs(it.baValues));
+            m_CertRefsNotDecoded = (m_CadesXlInfo.parseCertificateRefs(it.baValues) != RET_OK);
         }
         else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) {
-            DO(m_CadesXlInfo.parseRevocationRefs(it.baValues));
+            m_RevocationRefsNotDecoded = (m_CadesXlInfo.parseRevocationRefs(it.baValues) != RET_OK);
         }
         else if (it.type == string(OID_PKCS9_CERT_VALUES)) {
             DO(m_CadesXlInfo.parseCertValues(it.baValues));

@@ -28,6 +28,7 @@
 #define FILE_MARKER "uapki/cert-validator.cpp"
 
 #include "cert-validator.h"
+#include <algorithm>
 #include "ba-utils.h"
 #include "macros-internal.h"
 #include "oid-utils.h"
@@ -1399,7 +1400,38 @@ int CertValidator::verifyResponseData (
         DO(responderIdToJson(joResult, resultValidation.responderIdType, resultValidation.baResponderId.get()));
     }
     if (resultValidation.responderIdType == Ocsp::ResponderIdType::BY_NAME) {
-        ret = m_CerStore->getCertBySubject(resultValidation.baResponderId.get(), &resultValidation.cerResponder);
+        //  The name may belong to several certificates: a responder certificate is issued again with the same subject
+        //  and a new key. The responder is the one whose key verifies the response - first those valid when it was
+        //  produced, the latest of them first; none verifies it - the first of them (the signature is INVALID)
+        vector<Cert::CerItem*> cer_responders;
+        m_CerStore->getCertsBySubject(resultValidation.baResponderId.get(), cer_responders);
+        ret = cer_responders.empty() ? RET_UAPKI_CERT_NOT_FOUND : RET_OK;
+        if (ret == RET_OK) {
+            const uint64_t ms_produced = resultValidation.msProducedAt;
+            const auto valid_when_produced = [ms_produced](const Cert::CerItem* cerItem) {
+                return (cerItem->getNotBefore() <= ms_produced) && (ms_produced <= cerItem->getNotAfter());
+            };
+            std::stable_sort(cer_responders.begin(), cer_responders.end(),
+                [&valid_when_produced](const Cert::CerItem* a, const Cert::CerItem* b) {
+                    const bool a_valid = valid_when_produced(a), b_valid = valid_when_produced(b);
+                    if (a_valid != b_valid) return a_valid;
+                    return a->getNotBefore() > b->getNotBefore();
+                }
+            );
+            resultValidation.cerResponder = cer_responders[0];
+            if (cer_responders.size() > 1) {
+                for (const auto& it : cer_responders) {
+                    SignatureVerifyStatus status_candidate = SignatureVerifyStatus::UNDEFINED;
+                    if (
+                        (ocspHelper.verifyTbsResponseData(it, status_candidate) == RET_OK) &&
+                        (status_candidate == SignatureVerifyStatus::VALID)
+                    ) {
+                        resultValidation.cerResponder = it;
+                        break;
+                    }
+                }
+            }
+        }
     }
     else {
         //  responder_idtype == OcspHelper::ResponderIdType::BY_KEY

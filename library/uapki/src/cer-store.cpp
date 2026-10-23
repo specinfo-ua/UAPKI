@@ -363,6 +363,20 @@ int CerStore::getCertBySubject (
     return ret;
 }
 
+void CerStore::getCertsBySubject (
+        const ByteArray* baSubject,
+        vector<CerItem*>& cerItems
+)
+{
+    lock_guard<mutex> lock(m_Mutex);
+
+    for (const auto& it : m_Items) {
+        if (ba_cmp(baSubject, it->getSubject()) == 0) {
+            cerItems.push_back(it);
+        }
+    }
+}
+
 int CerStore::getChainCerts (
         const CerItem* cerSubject,
         vector<CerItem*>& chainCerts
