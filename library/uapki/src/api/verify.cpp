@@ -942,13 +942,19 @@ static int verify_signer_info (
             if ((verifySdoc.verifyOptions.revocationMinThisUpdate > 0) && !verified_sinfo.hasRevocationValues()) {
                 verified_sinfo.setRevocationMinThisUpdate(verifySdoc.verifyOptions.revocationMinThisUpdate);
             }
-            verified_sinfo.validateSignFormat(verifySdoc.validateTime, verifySdoc.refContentHasher->isPresent());
-            if (verifySdoc.verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
-                DO(verified_sinfo.buildCertChain());
+            verified_sinfo.validateSignFormat(verifySdoc.validateTime);
+            //  The cryptographic verification failed: it is not a signature of this content (or the value is wrong),
+            //  TOTAL-FAILED whatever the certificates (ETSI EN 319 102-1, 5.3.4 5); the steps may be done in any
+            //  order giving the same result, NOTE 1). Their chain and status are not looked for - no requests
+            //  to the OCSP responders and the distribution points of CRLs for a signature already failed
+            if (!verified_sinfo.isCryptoFailed()) {
+                if (verifySdoc.verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+                    DO(verified_sinfo.buildCertChain());
+                }
+                DO(validate_certs(verifySdoc, verified_sinfo));
+                DO(verified_sinfo.verifyRevocationRefs());
+                verified_sinfo.validateStatusCerts(verifySdoc.verifyOptions.checkCriticalExtensions);
             }
-            DO(validate_certs(verifySdoc, verified_sinfo));
-            DO(verified_sinfo.verifyRevocationRefs());
-            verified_sinfo.validateStatusCerts(verifySdoc.verifyOptions.checkCriticalExtensions);
         }
     }
 

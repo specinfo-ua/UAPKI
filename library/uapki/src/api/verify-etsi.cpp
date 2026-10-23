@@ -1478,9 +1478,11 @@ int signature_report_to_json (
     }
 
     //  5.2.6 X.509 certificate validation: the path of the signing certificate, then the certificates of the
-    //  time-stamps and of the revocation data used
+    //  time-stamps and of the revocation data used. The cryptographic verification failed - the certificates are
+    //  not validated (the result is TOTAL-FAILED whatever they are, 5.3.4 5)): the constraints are not applied
+    const bool x509_applied = !verify_info.isCryptoFailed();
     {
-        ConstraintReport report(CONSTRAINT_X509), report_data(CONSTRAINT_X509_VALIDATION_DATA);
+        ConstraintReport report(CONSTRAINT_X509, x509_applied), report_data(CONSTRAINT_X509_VALIDATION_DATA, x509_applied);
         for (const auto& it : verify_info.getCertChainItems()) {
             //  The TSA of a time-stamp that is not valid: the time-stamp is not used, nor is its certificate
             if ((it->getCertEntity() == CertValidator::CertEntity::TSP) && !verify_info.isTsaOfValidTimeStamp(it->getSubject())) continue;

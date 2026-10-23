@@ -1419,21 +1419,18 @@ bool VerifiedSignerInfo::isTsaOfValidTimeStamp (
 }
 
 void VerifiedSignerInfo::validateSignFormat (
-        const uint64_t validateTime,
-        const bool contentIsPresent
+        const uint64_t validateTime
 )
 {
     CollectVerifyStatus collect_digests, collect_signatures;
 
     //  Check mandatory elements
-    const bool sign_is_valid = collect_signatures.set(getStatusSignature());
-    const bool digest_is_valid = collect_digests.set(getStatusMessageDigest());
-    //  The signingTime attribute is a claim of the signer, not a proof of time
-    if (sign_is_valid) {
-        if ((contentIsPresent && digest_is_valid) || !contentIsPresent) {
-            m_BestSignatureTime = validateTime;
-        }
-    }
+    (void)collect_signatures.set(getStatusSignature());
+    (void)collect_digests.set(getStatusMessageDigest());
+    //  The best signature time starts at the validation time - the current one or the one given (ETSI EN 319 102-1,
+    //  5.5.4 1)) - whatever the result of the cryptographic checks; only time-stamps make it earlier. The signingTime
+    //  attribute is a claim of the signer, not a proof of time
+    m_BestSignatureTime = validateTime;
 
     //  Check attribute EssCert
     if (getStatusEssCert() != DataVerifyStatus::NOT_PRESENT) {
@@ -1528,7 +1525,10 @@ void VerifiedSignerInfo::validateSignFormat (
 
     m_IsValidSignatures = collect_signatures.isValid();
     m_IsValidDigests = collect_digests.isValid();
-    if (m_IsValidSignatures && m_IsValidDigests) {
+    if (isCryptoFailed()) {
+        m_ValidationStatus = ValidationStatus::TOTAL_FAILED;
+    }
+    else if (m_IsValidSignatures && m_IsValidDigests) {
         m_ValidationStatus = ValidationStatus::TOTAL_VALID;
     }
     else if (collect_signatures.isDeterminate() || collect_digests.isDeterminate()) {
@@ -2298,8 +2298,14 @@ int VerifiedSignerInfo::verifyAttrTimestamp (
         attrTS.statusSignature = SignatureVerifyStatus::INVALID;
         break;
     case RET_UAPKI_CERT_NOT_FOUND:
-        m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         attrTS.statusSignature = SignatureVerifyStatus::INDETERMINATE;
+        //  The message imprint does not match: the token is not used whatever its signature (ETSI EN 319 102-1,
+        //  5.5.4 4) a)), so the certificate of its TSA is not looked for and its absence is no error
+        if (attrTS.statusDigest == DigestVerifyStatus::INVALID) {
+            ret = RET_OK;
+            break;
+        }
+        m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         DO(addExpectedCertBySID(CertEntity::TSP, signer_info.getSidEncoded()));
         ret = RET_UAPKI_CERT_NOT_FOUND;
         break;

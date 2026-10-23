@@ -2091,6 +2091,19 @@ static bool test_verify_archive_timestamp_v2 (
             expect(request_verify(sig_detached), "FAILED", "INDETERMINATE", "detached, without the content");
             expect(request_verify(sig_detached, "content", sig_detached), "INVALID", "TOTAL-FAILED", "detached, another content");
 
+            //  Another content: TOTAL-FAILED whatever the certificates, so their chain is not built (EN 319 102-1,
+            //  5.3.4 5)); the best signature time is still the validation time (5.5.4 1)), not 0 (1970)
+            if (checker.check(api.call(request_verify(sig_detached, "content", sig_detached), resp) && (resp.result != nullptr), "VERIFY, another content: no report")) {
+                JSON_Object* jo_signinfo = json_array_get_object(json_object_get_array(resp.result, "signatureInfos"), 0);
+                const string s_besttime = ParsonHelper::jsonObjectGetString(jo_signinfo, "bestSignatureTime");
+                checker.check(!s_besttime.empty() && (s_besttime.compare(0, 4, "1970") != 0),
+                    "another content: the best signature time is " + s_besttime);
+                checker.check(json_array_get_count(json_object_get_array(jo_signinfo, "certificateChain")) == 0,
+                    "another content: the chain of the certificates is built");
+                checker.check(json_array_get_count(json_object_get_array(jo_signinfo, "expectedCerts")) == 0,
+                    "another content: certificates of the chain are looked for");
+            }
+
             (void)api.call(request_method("DEINIT"));
             loader.sessionFree(session);
         }
@@ -2208,6 +2221,9 @@ static bool test_verify_full_etsi (
             if (jo_report) {
                 checker.check(constraint_status(jo_report, "cryptographicVerification") == "FAILED",
                     "detached, another content: cryptographicVerification is " + constraint_status(jo_report, "cryptographicVerification"));
+                //  The certificates are not validated for a signature that failed the cryptographic verification
+                checker.check(constraint_status(jo_report, "x509CertificateValidation").empty(),
+                    "detached, another content: x509CertificateValidation is " + constraint_status(jo_report, "x509CertificateValidation"));
             }
             (void)expect(request(sig_detached, string(), nullptr, false), "INDETERMINATE", "SIGNED_DATA_NOT_FOUND", "UkraineDefault", "detached, without the content");
 

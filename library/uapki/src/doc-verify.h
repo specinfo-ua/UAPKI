@@ -465,8 +465,7 @@ public:
         const int errorCode
     );
     void validateSignFormat (
-        const uint64_t validateTime,
-        const bool contentIsPresent
+        const uint64_t validateTime
     );
     void validateStatusCerts (
         const bool checkCriticalExtensions
@@ -571,6 +570,12 @@ public:
     }
     SignatureVerifyStatus getStatusSignature (void) const {
         return m_StatusSignature;
+    }
+    //  The cryptographic verification failed (ETSI EN 319 102-1, 5.2.7.4 2), 4): the hash of the content does not
+    //  match the message-digest attribute, or the signature value is wrong. The result is TOTAL-FAILED whatever
+    //  the certificates (5.3.4 5)); not proven (no content, no signing certificate) - it is not
+    bool isCryptoFailed (void) const {
+        return (m_StatusMessageDigest == DigestVerifyStatus::INVALID) || (m_StatusSignature == SignatureVerifyStatus::INVALID);
     }
     //  FULL-ETSI: the freshness of the revocation data of the signature by the validation policy, minutes
     void setRevocationFreshnessStrict (const bool strict) {
