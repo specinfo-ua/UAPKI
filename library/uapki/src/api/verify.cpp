@@ -784,11 +784,17 @@ static int verify_p7s (
             DO(verified_sinfo.verifyArchiveTimeStamp(verify_sdoc.addedCerts, verify_sdoc.sdataParser.getCerts(), verify_sdoc.sdataParser.getCrls()));
 
             verified_sinfo.validateSignFormat(verify_sdoc.validateTime, verify_sdoc.refContentHasher->isPresent());
-            if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
-                DO(verified_sinfo.buildCertChain());
+            //  The cryptographic verification failed: it is not a signature of this content (or the value is wrong),
+            //  TOTAL-FAILED whatever the certificates (ETSI EN 319 102-1, 5.3.4 5); the steps may be done in any
+            //  order giving the same result, NOTE 1). Their chain and status are not looked for - no requests
+            //  to the OCSP responders and the distribution points of CRLs for a signature already failed
+            if (!verified_sinfo.isCryptoFailed()) {
+                if (verifyOptions.validationType >= Doc::Verify::VerifyOptions::ValidationType::CHAIN) {
+                    DO(verified_sinfo.buildCertChain());
+                }
+                DO(validate_certs(verify_sdoc, verified_sinfo));
+                verified_sinfo.validateStatusCerts();
             }
-            DO(validate_certs(verify_sdoc, verified_sinfo));
-            verified_sinfo.validateStatusCerts();
         }
     }
 
