@@ -103,6 +103,13 @@ public partial class Uapki
         public uint CountCerts { get; init; }
         public uint CountTrustedCerts { get; init; }
         public bool Stored { get; init; }
+
+        /// <summary>ListIssueDateTime, UTC; null - absent</summary>
+        [JsonIgnore]
+        public DateTime? ListIssueTime => string.IsNullOrEmpty(ListIssueDateTime) ? null : ConvertUtcTimeToDateTime(ListIssueDateTime);
+        /// <summary>NextUpdate, UTC; null - absent (a closed list)</summary>
+        [JsonIgnore]
+        public DateTime? NextUpdateTime => string.IsNullOrEmpty(NextUpdate) ? null : ConvertUtcTimeToDateTime(NextUpdate);
     }
 
     public class TrustListsInfo

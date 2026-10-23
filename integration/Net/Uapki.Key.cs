@@ -88,7 +88,29 @@ public partial class Uapki
         }
 
         [JsonIgnore]
-        public string DateTimeDisplay { get { return DateTime != null ? ((DateTime)DateTime).ToString("yyyy-MM-dd hh:mm") : ""; } }
+        public string DateTimeDisplay { get { return DateTime != null ? ((DateTime)DateTime).ToString("yyyy-MM-dd HH:mm") + " UTC" : ""; } }
+
+        /// <summary>
+        /// The time a key without a certificate was generated, UTC: from its label "SIG:yyyy-MM-dd HH:mm" or
+        /// "KEP:yyyy-MM-dd HH:mm"; null - another label or no label
+        /// </summary>
+        [JsonIgnore]
+        public DateTime? GeneratedTime
+        {
+            get
+            {
+                if (Label is null || !(Label.StartsWith("SIG:") || Label.StartsWith("KEP:")))
+                    return null;
+                try
+                {
+                    return ConvertUtcTimeToDateTime(Label.Substring(4));
+                }
+                catch (FormatException)
+                {
+                    return null;
+                }
+            }
+        }
 
         [JsonIgnore]
         public string Name 
@@ -104,10 +126,8 @@ public partial class Uapki
                     var name = "Сертифікат відсутній";
                     if (Label is not null)
                     {
-                        if (Label.StartsWith("SIG:"))
-                            return name + "\nЗгенеровано: " + ConvertUtcTimeToDateTime(Label.Substring(4)).ToString("yyyy-MM-dd hh:mm");
-                        if (Label.StartsWith("KEP:"))
-                            return name + "\nЗгенеровано: " + ConvertUtcTimeToDateTime(Label.Substring(4)).ToString("yyyy-MM-dd hh:mm");
+                        if (GeneratedTime is DateTime generated)
+                            return name + "\nЗгенеровано: " + generated.ToString("yyyy-MM-dd HH:mm") + " UTC";
                         // Almaz
                         if (Label.StartsWith("SIGN-")) 
                             return name + "\nКонтекст: " + Label.Substring(5);
