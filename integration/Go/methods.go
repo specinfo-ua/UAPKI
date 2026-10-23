@@ -74,6 +74,9 @@ type Config struct {
 	Tsp          *TspConfig         `json:"tsp,omitempty"`
 	Offline      bool               `json:"offline,omitempty"`
 	SkipSelfTest bool               `json:"skipSelfTest,omitempty"`
+	// TimeStampOrderTolerance - the accuracy (seconds) of a time-stamp token without the accuracy field
+	// when the order of the time-stamps of a signature is checked (RFC 3161, 2.4.2); 0 by default
+	TimeStampOrderTolerance uint32 `json:"timeStampOrderTolerance,omitempty"`
 }
 
 // Init initializes the library. cfg may be nil to use defaults.

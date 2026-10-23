@@ -989,6 +989,7 @@ int Doc::Verify::verifySignedDocument (
             isDigest
         ));
         verified_sinfo.setCaRemovesExpiredCerts(verifySdoc.verifyOptions.caRemovesExpiredCerts);
+        verified_sinfo.setTimeStampOrderTolerance(verifySdoc.libConfig->getTimeStampOrderTolerance());
         if (verifySdoc.verifyOptions.validationType == Doc::Verify::VerifyOptions::ValidationType::FULL_ETSI) {
             verified_sinfo.setRevocationFreshness(verifySdoc.verifyOptions.policy.revocationFreshness);
             verified_sinfo.setTsaTrustByProofOfExistence(verifySdoc.verifyOptions.policy.tsaTrustByProofOfExistence);

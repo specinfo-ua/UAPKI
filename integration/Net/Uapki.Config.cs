@@ -123,5 +123,8 @@ public partial class Uapki
         public ProxyParams? Proxy { get; set; }
         public bool? Offline { get; set; }
         public bool? ValidationByCrl { get; set; }
+        /// <summary>The accuracy (seconds) of a time-stamp token without the accuracy field when the order of the
+        /// time-stamps of a signature is checked (RFC 3161, 2.4.2); null - 0</summary>
+        public uint? TimeStampOrderTolerance { get; set; }
     }
 }

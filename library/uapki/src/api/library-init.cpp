@@ -329,6 +329,8 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     }
 
     lib_config->setValidationByCrl(ParsonHelper::jsonObjectGetBoolean(jo_refparams, "validationByCrl", false));
+    //  =timeStampOrderTolerance= (seconds): the accuracy of a time-stamp token without the accuracy field
+    lib_config->setTimeStampOrderTolerance(ParsonHelper::jsonObjectGetUint32(jo_refparams, "timeStampOrderTolerance", 0));
 
     {   //  The parameters are remembered for a repeated INIT: the ones in effect (of the configuration file when
         //  it is given, with its name), without the proxy credentials
@@ -426,6 +428,7 @@ int uapki_init (Context& context, JSON_Object* joParams, JSON_Object* joResult)
     }
 
     DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "validationByCrl", lib_config->getValidationByCrl()));
+    DO_JSON(ParsonHelper::jsonObjectSetUint32(joResult, "timeStampOrderTolerance", lib_config->getTimeStampOrderTolerance()));
 
 cleanup:
     if (ret != RET_OK) {

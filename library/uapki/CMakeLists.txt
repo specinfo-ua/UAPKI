@@ -108,7 +108,7 @@ if(WIN32)
         message(FATAL_ERROR "Unsupported Windows platform for prebuilt libcurl: '${CMAKE_GENERATOR_PLATFORM}'. Expected ARM64, x64/AMD64, or Win32/x86.")
     endif()
 
-    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Wldap32 Crypt32 Normaliz Bcrypt Iphlpapi)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32 Crypt32 Secur32 Normaliz Bcrypt Iphlpapi)
     set(CURL_FOUND TRUE)
 endif()
 

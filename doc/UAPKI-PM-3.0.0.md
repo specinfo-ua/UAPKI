@@ -18,6 +18,7 @@
 | 2       | 2026-07-16 | Конвертація в Markdown. Звірка з кодом бібліотеки v2.0.16: задокументовано відсутні поля запитів/відповідей та коди помилок, виправлено назви й типи полів, доповнено додатки Б, В, Г. Додано англійську версію документа |
 | 3       | 2026-09-30 | Бібліотека v3.0.0: API сесій (uapki_session_create, uapki_session_free, uapki_session_process) для незалежних екземплярів бібліотеки в одному процесі та спільна пам'ять (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) для кешів сертифікатів і СВС, спільних для сесій; коди помилок INVALID_SESSION, INVALID_SHARED_MEMORY; метод VERSION повертає версії завантажених бібліотек uapkic і uapkif; поле cmProviders у відповіді INIT |
 | 4       | 2026-10-12 | Довірчі списки (ETSI TS 119 612): метод ADD_TRUST_LIST, параметр trustListCache методу INIT, поля trusted, trustListSigner, trustServices методу CERT_INFO, поля якості підпису та позначки часу у звіті FULL-ETSI за довірчим списком. З політик валідації вилучено поле requireRevocationSignerStatus: статус сертифіката OCSP-відповідача вимагається завжди. Довіра до сертифіката довірчого списку визначається на час (причина NO_CERTIFICATE_CHAIN_FOUND_NO_POE звіту FULL-ETSI). Повторний INIT повертає з помилкою ALREADY_INITIALIZED параметри, з якими бібліотеку ініціалізовано |
+| 5       | 2026-10-24 | Перевірка підпису: відповідач OCSP, вказаний іменем, - той сертифікат з цим іменем, ключем якого підпис відповіді перевіряється (сертифікат відповідача перевипускають з тим самим іменем); нерозбірні посилання certificateRefs / revocationRefs не зупиняють перевірку підпису, а лише не використовуються (зауваження "THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED", "THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED"); параметр timeStampOrderTolerance методу INIT - точність позначки часу без поля accuracy під час перевірки порядку позначок. HTTP: перенаправлення виконуються (до 5, лише http і https); libcurl для Windows - 8.21.0 з TLS (Schannel). Довірчі списки рекомендовано для перевірки підписів (див. "Довірчі списки і швидкість перевірки") |
 
 # Загальні відомості
 
@@ -392,6 +393,7 @@ uapki_session_shared_memory_free(memory);
 | skipSelfTest    | Boolean                      | Пропустити самотестування. Опціональний                 |
 | tsp             | Object<br>TSP_PARAMS         | Параметри TSP-сервісу. Опціональний                     |
 | validationByCrl | Boolean                      | Перевірка статусів сертифікатів за СВС.<br>Опціональний |
+| timeStampOrderTolerance | Integer | Точність (секунди) позначки часу без поля accuracy під час перевірки<br>порядку позначок часу підпису (RFC 3161, 2.4.2). Опціональний,<br>за замовчанням 0 |
 
 ### Структура CERT_CACHE_PARAMS
 
@@ -511,6 +513,7 @@ uapki_session_shared_memory_free(memory);
 | proxy            | Object<br>PROXY_INFO      | Інформація про параметри PROXY-сервісу |
 | tsp              | Object<br>TSP_INFO        | Інформація про параметри TSP-сервісу   |
 | validationByCrl  | Boolean                   | Перевірка статусів сертифікатів за СВС |
+| timeStampOrderTolerance | Integer | Точність (секунди) позначки часу без поля accuracy |
 
 ### Структура CERT_CACHE_INFO
 
@@ -2158,6 +2161,12 @@ PKCS12-провайдер при вдалому відкритті файлу д
 Якщо для визначення статусу сертифікату не вистачає СВС, то інформація для його пошуку зберігаються в полі "expectedCrls" (масив записів EXPECTED_CRL_INFO).
 
 Поле "warnings" містить зауваження до результату валідації підпису (масив текстових рядків). З типом валідації "STRUCT" воно завжди має зауваження "THE CERTIFICATE CHAIN AND THE REVOCATION STATUS ARE NOT CHECKED (VALIDATION TYPE STRUCT)", з типом "CHAIN" — "THE REVOCATION STATUS OF THE CERTIFICATES IS NOT CHECKED (VALIDATION TYPE CHAIN)": статус підпису цих типів не враховує того, що вони не перевіряють. Якщо порядок позначок часу підпису не дотримано (позначка вмісту, підпису, архівні — кожна не раніше попередньої з урахуванням точності та поля ordering, RFC 3161, 2.4.2), результат — INDETERMINATE із зауваженням "THE ORDER OF THE TIME-STAMPS IS NOT KEPT".
+
+Порядок позначок часу перевіряється з урахуванням їхньої точності (поле accuracy). Для позначки без цього поля точністю вважається значення параметра "timeStampOrderTolerance" методу INIT (секунди, за замовчанням 0): "the accuracy may be available through other means" (RFC 3161, 2.4.2), "unless stated differently by the signature validation constraints" (ETSI EN 319 102-1, 5.5.4 4) e)). Нерозбірні непідписані атрибути complete-certificate-references і complete-revocation-references не використовуються, підпис перевіряється без них, у "warnings" - зауваження "THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED" або "THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED" (такі є, наприклад, у підписах ІІТ 2019-2020 років, де IssuerSerial.issuer записано як Name замість GeneralNames).
+
+### Довірчі списки і швидкість перевірки
+
+Довірчі списки (параметр "trustListCache" методу INIT, метод ADD_TRUST_LIST) не обов'язкові, але рекомендовані для перевірки підписів. OCSP-відповідачі, які є службами довірчого списку (для українських надавачів - TL-UA-DSTU, тип служби National-Certstatus/OCSP), не потребують перевірки власного статусу: бібліотека не запитує його і не завантажує для цього СВС надавачів. Без довірчих списків статус сертифіката відповідача визначається за OCSP або за СВС (RFC 6960, 4.2.2.2.1); СВС надавача може мати десятки мегабайтів, а для старих ключів надавачів - бути вже недоступною, і тоді результат - INDETERMINATE із зауваженням "THE STATUS OF THE OCSP RESPONDER IS NOT DETERMINED".
 
 Під час повної валідації підпису для визначення статусу сертифікату використовується наступна логіка:
 | Формат підписів          | Опис                                                            |

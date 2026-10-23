@@ -484,6 +484,7 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
     , m_NotProcessed(false)
     , m_RevocationFreshness(0)
     , m_TsaTrustByPoe(false)
+    , m_TimeStampOrderToleranceUs(0)
     , m_RevocationFreshnessStrict(false)
     , m_CerSigner(nullptr)
     , m_ValidationStatus(ValidationStatus::UNDEFINED)
@@ -1361,8 +1362,11 @@ vector<string> VerifiedSignerInfo::getTimeStampOrderFailures (void) const
 {
     //  A time-stamp is later than the ones over the data it covers: the content time-stamp, the signature
     //  time-stamp, the archive time-stamps one after another. RFC 3161, 2.4.2: the order of two tokens is known
-    //  when the difference of their times is greater than the sum of their accuracies (an absent accuracy is
-    //  taken as zero); two tokens of one TSA with the ordering field set are ordered by the times alone
+    //  when the difference of their times is greater than the sum of their accuracies; a token without the accuracy
+    //  field is taken with the accuracy of INIT timeStampOrderTolerance (0 by default: as zero accuracy) - "the accuracy
+    //  may be available through other means" (RFC 3161, 2.4.2), "unless stated differently by the signature validation
+    //  constraints" (ETSI EN 319 102-1, 5.5.4 4) e)); two tokens of one TSA with the ordering field set are ordered
+    //  by the times alone
     struct Stamp {
         const AttrTimeStamp* ts;
         const char* name;
@@ -1384,7 +1388,10 @@ vector<string> VerifiedSignerInfo::getTimeStampOrderFailures (void) const
             const bool ordered_by_tsa = (first.cerSigner != nullptr) && (first.cerSigner == second.cerSigner)
                 && first.tsTokenParser.getOrdering() && second.tsTokenParser.getOrdering();
             const uint64_t us_diff = (first.msGenTime - second.msGenTime) * 1000;
-            if (ordered_by_tsa || (us_diff > first.tsTokenParser.getAccuracyUs() + second.tsTokenParser.getAccuracyUs())) {
+            const auto accuracy_us = [this](const AttrTimeStamp& ts) -> uint64_t {
+                return ts.tsTokenParser.accuracyIsPresent() ? ts.tsTokenParser.getAccuracyUs() : m_TimeStampOrderToleranceUs;
+            };
+            if (ordered_by_tsa || (us_diff > accuracy_us(first) + accuracy_us(second))) {
                 const string s_failure = string(stamps[j].name) + ((stamps[i].name == stamps[j].name) ? "_BEFORE_PREVIOUS_" : "_BEFORE_") + stamps[i].name;
                 if (std::find(rv.begin(), rv.end(), s_failure) == rv.end()) rv.push_back(s_failure);
             }
@@ -2206,11 +2213,18 @@ int VerifiedSignerInfo::parseUnsignedAttrs (
                 m_ChainWarnings.push_back("THE SIGNATURE TIME-STAMP IS NOT VALID AND IS NOT USED");
             }
         }
+        //  The references are unsigned validation material (ETSI EN 319 102-1, 5.1.3): not decoded - not used,
+        //  as a signature time-stamp that is not valid, and the signature is verified without them
         else if (it.type == string(OID_PKCS9_CERTIFICATE_REFS)) {
-            DO(m_CadesXlInfo.parseCertificateRefs(it.baValues));
+            if (m_CadesXlInfo.parseCertificateRefs(it.baValues) != RET_OK) {
+                m_ChainWarnings.push_back("THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED");
+            }
         }
         else if (it.type == string(OID_PKCS9_REVOCATION_REFS)) {
-            DO(m_CadesXlInfo.parseRevocationRefs(it.baValues));
+            if (m_CadesXlInfo.parseRevocationRefs(it.baValues) != RET_OK) {
+                m_CadesXlInfo.statusRevocationRefs = DataVerifyStatus::FAILED;
+                m_ChainWarnings.push_back("THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED");
+            }
         }
         else if (it.type == string(OID_PKCS9_CERT_VALUES)) {
             DO(m_CadesXlInfo.parseCertValues(it.baValues));

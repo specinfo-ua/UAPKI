@@ -18,6 +18,7 @@ The version number in the document title corresponds to the version of the uapki
 | 2       | 2026-07-16 | Conversion to Markdown. Verification against the library code v2.0.16: documented missing request/response fields and error codes, corrected field names and types, extended Appendices B, C, D. English version of the document added |
 | 3       | 2026-09-30 | Library v3.0.0: sessions API (uapki_session_create, uapki_session_free, uapki_session_process) for independent library instances in one process and shared memory (uapki_session_shared_memory_create, uapki_session_shared_memory_free, uapki_session_shared_memory_process) for certificate and CRL caches shared by sessions; error codes INVALID_SESSION, INVALID_SHARED_MEMORY; the VERSION method returns the versions of the loaded uapkic and uapkif libraries; the cmProviders field in the INIT response |
 | 4       | 2026-10-12 | Trusted lists (ETSI TS 119 612): the ADD_TRUST_LIST method, the trustListCache parameter of the INIT method, the fields trusted, trustListSigner, trustServices of the CERT_INFO method, the fields of the signature quality and of a time-stamp in the FULL-ETSI report by a trusted list. The field requireRevocationSignerStatus is removed from the validation policies: the status of the certificate of an OCSP responder is always required. The trust in a certificate of a trusted list is decided at a time (the sub-indication NO_CERTIFICATE_CHAIN_FOUND_NO_POE of the FULL-ETSI report). A repeated INIT returns, with the error ALREADY_INITIALIZED, the parameters the library was initialized with |
+| 5       | 2026-10-24 | Signature validation: an OCSP responder given by name is the certificate with this name whose key verifies the signature of the response (the certificate of a responder is issued again with the same name); certificateRefs / revocationRefs that cannot be decoded do not stop the validation of the signature, they are not used (warnings "THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED", "THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED"); the timeStampOrderTolerance parameter of the INIT method - the accuracy of a time-stamp token without the accuracy field when the order of the time-stamps is checked. HTTP: redirects are followed (up to 5, http and https only); libcurl for Windows - 8.21.0 with TLS (Schannel). Trusted lists are recommended for signature validation (see "Trusted lists and the speed of validation") |
 
 # General information
 
@@ -392,6 +393,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | skipSelfTest    | Boolean                      | Skip the self-test. Optional                 |
 | tsp             | Object<br>TSP_PARAMS         | TSP service parameters. Optional                     |
 | validationByCrl | Boolean                      | Certificate status verification by CRL.<br>Optional |
+| timeStampOrderTolerance | Integer | The accuracy (seconds) of a time-stamp token without the accuracy<br>field when the order of the time-stamps of a signature is checked<br>(RFC 3161, 2.4.2). Optional, default 0 |
 
 ### Structure CERT_CACHE_PARAMS
 
@@ -511,6 +513,7 @@ Starting from version 2.0.16, the INIT method (by default) performs a self-test.
 | proxy            | Object<br>PROXY_INFO      | Information about the PROXY service parameters |
 | tsp              | Object<br>TSP_INFO        | Information about the TSP service parameters   |
 | validationByCrl  | Boolean                   | Certificate status verification by CRL |
+| timeStampOrderTolerance | Integer | The accuracy (seconds) of a time-stamp token without the accuracy field |
 
 ### Structure CERT_CACHE_INFO
 
@@ -2158,6 +2161,12 @@ If a certificate is missing for validation, the information for finding it is st
 If a CRL is missing to determine the certificate status, the information for finding it is stored in the "expectedCrls" field (an array of EXPECTED_CRL_INFO records).
 
 The "warnings" field contains warnings about the signature validation result (an array of text strings). With the validation type "STRUCT" it always has the warning "THE CERTIFICATE CHAIN AND THE REVOCATION STATUS ARE NOT CHECKED (VALIDATION TYPE STRUCT)", with the type "CHAIN" - "THE REVOCATION STATUS OF THE CERTIFICATES IS NOT CHECKED (VALIDATION TYPE CHAIN)": the status of a signature of these types does not take into account what they do not check. If the order of the time-stamps of a signature is not kept (the content, the signature, the archive ones - each not earlier than the previous one given the accuracy and the ordering field, RFC 3161, 2.4.2), the result is INDETERMINATE with the warning "THE ORDER OF THE TIME-STAMPS IS NOT KEPT".
+
+The order of the time-stamps is checked with their accuracy (the accuracy field). A token without this field is taken with the accuracy of the "timeStampOrderTolerance" parameter of the INIT method (seconds, default 0): "the accuracy may be available through other means" (RFC 3161, 2.4.2), "unless stated differently by the signature validation constraints" (ETSI EN 319 102-1, 5.5.4 4) e)). The unsigned attributes complete-certificate-references and complete-revocation-references that cannot be decoded are not used, the signature is validated without them, with the warning "THE CERTIFICATE REFERENCES ARE NOT DECODED AND ARE NOT USED" or "THE REVOCATION REFERENCES ARE NOT DECODED AND ARE NOT USED" in "warnings" (such are, for example, in the IIT signatures of 2019-2020, where IssuerSerial.issuer is a Name instead of GeneralNames).
+
+### Trusted lists and the speed of validation
+
+Trusted lists (the "trustListCache" parameter of the INIT method, the ADD_TRUST_LIST method) are not mandatory, but recommended for signature validation. OCSP responders that are services of a trusted list (for Ukrainian providers - TL-UA-DSTU, the service type National-Certstatus/OCSP) need no status of their own: the library does not look for it and does not download the CRLs of the providers for it. Without trusted lists the status of the certificate of a responder is determined by OCSP or by CRL (RFC 6960, 4.2.2.2.1); the CRL of a provider may be of tens of megabytes, and for old keys of a provider no longer available, and then the result is INDETERMINATE with the warning "THE STATUS OF THE OCSP RESPONDER IS NOT DETERMINED".
 
 During full signature validation, the following logic is used to determine the certificate status:
 | Signature formats        | Description                                                     |

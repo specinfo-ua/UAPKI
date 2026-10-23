@@ -119,10 +119,14 @@ private:
     TspParams
             m_TspParams;
     bool    m_ValidationByCrl;
+    //  Seconds: the accuracy of a time-stamp token without the accuracy field when the order of the time-stamps
+    //  is checked (RFC 3161, 2.4.2; ETSI EN 319 102-1, 5.5.4 4) e)); 0 - as a token with zero accuracy
+    uint32_t
+            m_TimeStampOrderTolerance;
 
 public:
     LibraryConfig (void)
-        : m_IsInitialized(false), m_ValidationByCrl(false)
+        : m_IsInitialized(false), m_ValidationByCrl(false), m_TimeStampOrderTolerance(0)
     {
     }
 
@@ -144,6 +148,9 @@ public:
     }
     bool getValidationByCrl (void) const {
         return m_ValidationByCrl;
+    }
+    uint32_t getTimeStampOrderTolerance (void) const {
+        return m_TimeStampOrderTolerance;
     }
     bool isInitialized (void) const {
         return m_IsInitialized;
@@ -182,6 +189,9 @@ public:
     }
     void setValidationByCrl (bool validationByCrl) {
         m_ValidationByCrl = validationByCrl;
+    }
+    void setTimeStampOrderTolerance (uint32_t seconds) {
+        m_TimeStampOrderTolerance = seconds;
     }
 
 };  //  end class LibraryConfig

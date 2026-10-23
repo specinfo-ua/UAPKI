@@ -322,6 +322,7 @@ class VerifiedSignerInfo : public CertValidator::CertValidator {
     bool        m_NotProcessed;     //  the verification of this signature stopped with m_LastError
     uint32_t    m_RevocationFreshness;  //  minutes; 0 - as the library is configured (INIT: ocsp.maxFreshness)
     bool        m_TsaTrustByPoe;        //  see ValidationPolicy::tsaTrustByProofOfExistence
+    uint64_t    m_TimeStampOrderToleranceUs;    //  the accuracy of a time-stamp token without it (INIT: timeStampOrderTolerance)
     bool        m_RevocationFreshnessStrict;    //  see ValidationPolicy::revocationFreshnessStrict
     Pkcs7::SignedDataParser::SignerInfo
                 m_SignerInfo;
@@ -589,6 +590,9 @@ public:
     ) const;
     void setTsaTrustByProofOfExistence (const bool byProofOfExistence) {
         m_TsaTrustByPoe = byProofOfExistence;
+    }
+    void setTimeStampOrderTolerance (const uint32_t seconds) {
+        m_TimeStampOrderToleranceUs = (uint64_t)seconds * 1000000;
     }
     void setRevocationFreshness (const uint32_t minutes) {
         m_RevocationFreshness = minutes;

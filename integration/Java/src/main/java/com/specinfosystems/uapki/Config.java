@@ -40,6 +40,8 @@ public class Config {
     private ProxyParams proxy;
     private Boolean offline;
     private Boolean validationByCrl;
+    /** Точність (секунди) позначки часу без поля accuracy під час перевірки порядку позначок (RFC 3161, 2.4.2) */
+    private Integer timeStampOrderTolerance;
 
     public CmProvidersParams getCmProviders() { return cmProviders; }
     public Config setCmProviders(CmProvidersParams cmProviders) { this.cmProviders = cmProviders; return this; }
@@ -67,4 +69,7 @@ public class Config {
 
     public Boolean getValidationByCrl() { return validationByCrl; }
     public Config setValidationByCrl(Boolean validationByCrl) { this.validationByCrl = validationByCrl; return this; }
+
+    public Integer getTimeStampOrderTolerance() { return timeStampOrderTolerance; }
+    public Config setTimeStampOrderTolerance(Integer timeStampOrderTolerance) { this.timeStampOrderTolerance = timeStampOrderTolerance; return this; }
 }

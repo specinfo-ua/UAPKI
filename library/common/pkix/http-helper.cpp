@@ -103,6 +103,7 @@ static size_t cb_curlwrite (
 //  libcurl install SIGALRM handlers in a multithreaded process
 static const long CURL_CONNECT_TIMEOUT_MS = 10000;
 static const long CURL_TOTAL_TIMEOUT_MS = 60000;
+static const long CURL_MAX_REDIRECTS = 5;
 
 static bool curl_set_url_and_proxy (
         CURL* curl,
@@ -116,6 +117,18 @@ static bool curl_set_url_and_proxy (
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, CURL_CONNECT_TIMEOUT_MS);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, CURL_TOTAL_TIMEOUT_MS);
+    //  Redirects are followed (a CA moves its CRLs from http:// to https://), only to http and https and not
+    //  endlessly; a POST (OCSP, TSP) stays a POST after 301/302/303
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, CURL_MAX_REDIRECTS);
+    if (curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https") != CURLE_OK) {
+        //  A libcurl built without TLS knows no https: redirects within http only
+        curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http");
+    }
+    curl_easy_setopt(curl, CURLOPT_POSTREDIR, (long)CURL_REDIR_POST_ALL);
+    //  https (Schannel on Windows): a revoked server certificate is refused, but revocation data that cannot be
+    //  obtained (offline, a closed network) does not fail the connection
+    curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_REVOKE_BEST_EFFORT);
 
     if (!params.proxyUrl.empty()) {
         rv_ccode = curl_easy_setopt(curl, CURLOPT_PROXY, params.proxyUrl.c_str());
