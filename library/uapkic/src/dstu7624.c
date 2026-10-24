@@ -2651,9 +2651,9 @@ static void half_ctr_crypt(Dstu7624Ctx *ctx, const uint64_t *iv, uint8_t *data_b
         kalyna_xor(&data_buf[i], gamma8, part_len, &data_buf[i]);
     }
 
-    memset(gamma, 0, sizeof(gamma));
-    memset(gamma8, 0, sizeof(gamma8));
-    memset(counter, 0, sizeof(counter));
+    secure_zero(gamma, sizeof(gamma));
+    secure_zero(gamma8, sizeof(gamma8));
+    secure_zero(counter, sizeof(counter));
 }
 
 /* Записує довжину (в байтах) у поле завдовжки nb байтів, формат little endian. */
@@ -2770,8 +2770,8 @@ static int ccm_calc_mac(Dstu7624Ctx *ctx, const uint8_t *a_data_buf, size_t a_da
 
 cleanup:
 
-    memset(block, 0, sizeof(block));
-    memset(B, 0, sizeof(B));
+    secure_zero(block, sizeof(block));
+    secure_zero(B, sizeof(B));
 
     return ret;
 }
@@ -2881,7 +2881,7 @@ static int dstu7624_encrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, co
 cleanup:
 
     if (data_buf != NULL) {
-        memset(data_buf, 0, p_data_len + q);
+        secure_zero(data_buf, p_data_len + q);
     }
     free(data_buf);
     ba_free(h_tmp);
@@ -2935,7 +2935,7 @@ static int dstu7624_decrypt_ccm(Dstu7624Ctx *ctx, const ByteArray *auth_data, co
 cleanup:
 
     if (data_buf != NULL) {
-        memset(data_buf, 0, data_len);
+        secure_zero(data_buf, data_len);
     }
     free(data_buf);
 
