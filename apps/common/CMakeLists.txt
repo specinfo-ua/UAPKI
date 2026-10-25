@@ -41,9 +41,12 @@ target_include_directories(uapki-apps-common PUBLIC
 
 target_link_libraries(uapki-apps-common PUBLIC uapkic uapkif)
 
+#  The headers of libcurl are always the ones of the project, as in the library (BEFORE: ahead of the include
+#  directory that CURL::libcurl brings)
+set(CURL_BASE_DIR "${UAPKI_LIBRARY_DIR}/common/curl")
+target_include_directories(uapki-apps-common BEFORE PRIVATE "${CURL_BASE_DIR}/include")
+
 if(WIN32)
-    set(CURL_BASE_DIR "${UAPKI_LIBRARY_DIR}/common/curl")
-    target_include_directories(uapki-apps-common PRIVATE "${CURL_BASE_DIR}/include")
     if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
         target_link_libraries(uapki-apps-common PUBLIC "${CURL_BASE_DIR}/builds/windows_arm64/libcurl.lib")
     elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32" OR CMAKE_GENERATOR_PLATFORM STREQUAL "x86")
