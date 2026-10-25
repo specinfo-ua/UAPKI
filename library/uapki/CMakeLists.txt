@@ -92,12 +92,13 @@ add_library(${PROJECT_NAME} ${UAPKI_LIBS_TYPE}
     ${RESOURCE_RC}
 )
 
+#  The headers of libcurl are always the ones of the project (the version of the prebuilt libraries), also where
+#  the system libcurl.so.4 is linked: an option the system headers do not know does not break the build, and
+#  an older libcurl at run time answers it with CURLE_UNKNOWN_OPTION
+set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
+target_include_directories(${PROJECT_NAME} BEFORE PRIVATE "${CURL_BASE_DIR}/include")
+
 if(WIN32)
-    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
-    set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
-
-    target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
-
     if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
         target_link_libraries(${PROJECT_NAME} PRIVATE "${CURL_BASE_DIR}/builds/windows_arm64/libcurl.lib")
     elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "AMD64")
@@ -113,11 +114,6 @@ if(WIN32)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(CURL_BASE_DIR "${CMAKE_SOURCE_DIR}/common/curl")
-    set(CURL_INCLUDE_DIR "${CURL_BASE_DIR}/include")
-
-    target_include_directories(${PROJECT_NAME} PRIVATE "${CURL_INCLUDE_DIR}")
-
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "${CURL_BASE_DIR}/builds/ios/libcurl.a"
         "${CURL_BASE_DIR}/builds/ios/libssl.a"
