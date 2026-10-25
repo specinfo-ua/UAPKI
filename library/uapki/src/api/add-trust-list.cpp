@@ -423,6 +423,29 @@ string first_name (const Xml::Node* names)
     return rv;
 }
 
+//  The registration identifier of a TSP among the names of TSPTradeName (ETSI TS 119 612, 5.4.2): the identity
+//  type ("VAT", "NTR" for a legal person; "PAS", "IDC", "PNO", "TAX", "TIN" for a natural one), the country code,
+//  "-" and the identifier: "NTRUA-36865753"
+string tsp_identifier (const Xml::Node* tradeNames)
+{
+    string text;
+    if (!tradeNames) return string();
+    for (const auto& it : tradeNames->childElements(NS_TSL, "Name")) {
+        if (!it->textContent(text)) continue;
+        const string s = trimmed(text);
+        if ((s.size() < 7) || (s[5] != '-')) continue;
+        bool is_id = true;
+        for (size_t i = 0; i < 5; i++) {
+            is_id &= (s[i] >= 'A') && (s[i] <= 'Z');
+        }
+        const string type = s.substr(0, 3);
+        is_id &= (type == "VAT") || (type == "NTR") || (type == "PAS") || (type == "IDC") || (type == "PNO") ||
+            (type == "TAX") || (type == "TIN");
+        if (is_id) return s;
+    }
+    return string();
+}
+
 struct ListedService {
     SmartBA     certificate;
     Cert::TrustService
@@ -461,6 +484,7 @@ int read_services (
         countProviders++;
         const Xml::Node* tsp_info = it_tsp->child(NS_TSL, "TSPInformation");
         const string tsp_name = first_name(tsp_info ? tsp_info->child(NS_TSL, "TSPName") : nullptr);
+        const string tsp_id = tsp_identifier(tsp_info ? tsp_info->child(NS_TSL, "TSPTradeName") : nullptr);
         const Xml::Node* tsp_services = it_tsp->child(NS_TSL, "TSPServices");
         if (!tsp_services) continue;
 
@@ -477,6 +501,7 @@ int read_services (
             const size_t pos = s_type.find(SVCTYPE_MARK);
             service.type = (pos == string::npos) ? s_type : s_type.substr(pos + strlen(SVCTYPE_MARK));
             service.tspName = tsp_name;
+            service.tspId = tsp_id;
             service.serviceName = first_name(info->child(NS_TSL, "ServiceName"));
             if (!add_period(info, "ServiceStatus", "StatusStartingTime", service)) {
                 return refused(RET_UAPKI_TRUST_LIST_INVALID, "the status of the service '" + service.serviceName + "'");

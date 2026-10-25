@@ -105,6 +105,8 @@ struct OcspResponseInfo {
     Cert::CerItem*
                 cerResponder;
     std::string signAlgo;       //  the signature algorithm of the response (OID)
+    //  The responder is authorized by a trusted list (RFC 6960, 4.2.2.2, 1), not by the key of the CA
+    bool        responderByTrustList;
 
     OcspResponseInfo (void)
         : responseStatus(Ocsp::ResponseStatus::UNDEFINED)
@@ -112,6 +114,7 @@ struct OcspResponseInfo {
         , msProducedAt(0)
         , statusSignature(SignatureVerifyStatus::UNDEFINED)
         , cerResponder(nullptr)
+        , responderByTrustList(false)
     {}
 
 };  //  end struct OcspResponseInfo
@@ -638,11 +641,20 @@ public:
         const ByteArray* baSpki,
         ByteArray** baPublicKey
     );
-    //  RFC 6960, 4.2.2.2: the issuer itself or a certificate issued by it with id-kp-OCSPSigning
+    //  RFC 6960, 4.2.2.2: a responder of a trusted list for the CA (byTrustList is set), the issuer itself or
+    //  a certificate issued by it with id-kp-OCSPSigning
     int authorizeOcspResponder (
         Cert::CerItem* cerResponder,
         Cert::CerItem* cerIssuer,
-        const uint64_t producedAt
+        const uint64_t producedAt,
+        bool& byTrustList
+    );
+    //  The responder is an OCSP service of a trusted list, provided at the time, of the trust service provider
+    //  whose CA service the issuer is (or the first of its issuers that is a CA service), in the same list
+    bool responderListedForCa (
+        const Cert::CerItem* cerResponder,
+        Cert::CerItem* cerIssuer,
+        const uint64_t msTime
     );
     int verifySignatureSignerInfo (
         const CertEntity certEntity,

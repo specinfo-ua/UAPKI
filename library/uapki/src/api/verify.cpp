@@ -341,6 +341,9 @@ static int result_certchainitem_valbyocsp_to_json (
     if (resultValByOcsp.cerResponder) {
         DO(json_object_set_base64(joResult, "signerCertId", resultValByOcsp.cerResponder->getCertId()));
     }
+    if (resultValByOcsp.responderByTrustList) {
+        DO_JSON(ParsonHelper::jsonObjectSetBoolean(joResult, "responderByTrustList", true));
+    }
 
     DO_JSON(json_object_set_string(joResult, "status", Crl::certStatusToStr(singleresp_info.certStatus)));
 

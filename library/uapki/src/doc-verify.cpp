@@ -1605,6 +1605,14 @@ void VerifiedSignerInfo::validateStatusCerts (
                     m_ChainWarnings.push_back(s_warn);
                 }
             }
+            //  The OCSP responder is not certified by the key of the CA: it is taken as a service of a trusted list
+            //  of the same TSP (RFC 6960, 4.2.2.2, 1) - the result stands, the warning tells how
+            if ((it->getValidationType() == Cert::ValidationType::OCSP) && it->getResultValidationByOcsp().responderByTrustList) {
+                const string s_warn = "THE OCSP RESPONDER IS AUTHORIZED BY A TRUSTED LIST, NOT BY THE KEY OF THE CA";
+                if (std::find(m_ChainWarnings.begin(), m_ChainWarnings.end(), s_warn) == m_ChainWarnings.end()) {
+                    m_ChainWarnings.push_back(s_warn);
+                }
+            }
             //  A chain proves nothing unless it ends in a trusted root
             if ((it->getCertEntity() == CertEntity::ROOT) && !it->isTrusted()) {
                 validation_status.setIndeterminate();

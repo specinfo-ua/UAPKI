@@ -596,6 +596,13 @@ bool TrustService::isCa (void) const
     return (type.find("CA/") != std::string::npos) || (type.find("RootCA") != std::string::npos);
 }
 
+bool TrustService::sameProvider (const TrustService& other) const
+{
+    if (listId != other.listId) return false;
+    if (!tspId.empty() && !other.tspId.empty()) return (tspId == other.tspId);
+    return !tspName.empty() && (tspName == other.tspName);
+}
+
 void CerItem::setUniqueKeyId (
     const bool uniqueKeyId
 )
