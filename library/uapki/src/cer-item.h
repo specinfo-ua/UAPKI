@@ -123,6 +123,9 @@ struct TrustService {
     std::string listId;             //  the trusted list the service comes from
     std::string type;               //  the service type after ".../Svctype/": "CA/QC", "TSA/QTST", "Certstatus/OCSP"...
     std::string tspName;
+    //  The registration identifier of the TSP from its trade name (ETSI TS 119 612, 5.4.2): "NTRUA-36865753",
+    //  "VATBE-0123456789"; empty if the list gives none
+    std::string tspId;
     std::string serviceName;
     bool        forESignatures;     //  additional service information of a CA/QC service
     bool        forESeals;
@@ -137,6 +140,9 @@ struct TrustService {
     static bool isActiveStatus (const std::string& status);
     //  A service that issues certificates: its certificate is a trust anchor
     bool isCa (void) const;
+    //  A service of the same TSP in the same list: by the registration identifier, by the name if one of
+    //  the services has no identifier
+    bool sameProvider (const TrustService& other) const;
 };
 
 typedef std::vector<TrustService> TrustServices;

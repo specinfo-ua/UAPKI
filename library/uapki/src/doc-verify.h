@@ -220,6 +220,7 @@ class VerifiedSignerInfo : public CertValidator::CertValidator {
     bool        m_StatusSignerUnknown;  //  The status of an OCSP responder (a CRL signer) is not determined
     bool        m_TsaKeyCompromised;    //  See CertValidator::tsaKeyTrust()
     bool        m_TsaRevokedNoReason;
+    bool        m_SignerCertNotFound;   //  The certificate of the signer is not in the signature nor in the cache
     std::vector<CertChainItem*>
                 m_CertChainItems;
     ListAddedCerts

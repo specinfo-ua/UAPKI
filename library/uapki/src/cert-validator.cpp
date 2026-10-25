@@ -1448,9 +1448,15 @@ int CertValidator::verifyResponseData (
     DO(ret);
 
     ret = ocspHelper.verifyTbsResponseData(resultValidation.cerResponder, status_sign);
+    resultValidation.responderByTrustList = false;
     if ((ret == RET_OK) && cerIssuer) {
         //  A valid signature counts only from a responder authorized for certificates of this issuer
-        ret = authorizeOcspResponder(resultValidation.cerResponder, cerIssuer, resultValidation.msProducedAt);
+        ret = authorizeOcspResponder(
+            resultValidation.cerResponder,
+            cerIssuer,
+            resultValidation.msProducedAt,
+            resultValidation.responderByTrustList
+        );
         if (ret != RET_OK) {
             status_sign = SignatureVerifyStatus::INVALID;
         }
@@ -1473,9 +1479,11 @@ cleanup:
 int CertValidator::authorizeOcspResponder (
         Cert::CerItem* cerResponder,
         Cert::CerItem* cerIssuer,
-        const uint64_t producedAt
+        const uint64_t producedAt,
+        bool& byTrustList
 )
 {
+    byTrustList = false;
     if (!cerResponder || !cerIssuer) return RET_UAPKI_INVALID_PARAMETER;
 
     //  RFC 6960, 4.2.2.2: the issuer of the certificate itself, or its delegate with the extended key
@@ -1485,6 +1493,19 @@ int CertValidator::authorizeOcspResponder (
         cerResponder->equalCertId(cerIssuer->getCertId()) ||
         (ba_cmp(cerResponder->getSpki(), cerIssuer->getSpki()) == 0)
     ) {
+        return RET_OK;
+    }
+
+    //  RFC 6960, 4.2.2.2, 1: "Matches a local configuration of OCSP signing authority for the certificate in
+    //  question" - a trusted list. A responder with no path to the key of the CA is listed as a service of its
+    //  own (ETSI TS 119 612, 5.5.1.1: such services "shall be listed separately"); the list does not tell
+    //  the CA it answers for, so the set of CAs it is trusted for is the CA services of the same TSP
+    if (responderListedForCa(cerResponder, cerIssuer, producedAt)) {
+        if (producedAt > 0) {
+            const int ret = cerResponder->checkValidity(producedAt);
+            if (ret != RET_OK) return ret;
+        }
+        byTrustList = true;
         return RET_OK;
     }
 
@@ -1501,6 +1522,75 @@ int CertValidator::authorizeOcspResponder (
     }
 
     return RET_OK;
+}
+
+//  The CA services of trusted lists a certificate chains to: of the certificate itself, else of the first of its
+//  issuers that has them (an issuing CA under a listed root)
+static std::shared_ptr<const Cert::TrustServices> listed_ca_services (
+        Cert::CerStore* cerStore,
+        Cert::CerItem* cerItem
+)
+{
+    static const size_t MAX_DEPTH = 8;
+    Cert::CerItem* cer_current = cerItem;
+    for (size_t depth = 0; cer_current && (depth < MAX_DEPTH); depth++) {
+        const std::shared_ptr<const Cert::TrustServices> services = cer_current->getTrustServices();
+        if (services) {
+            for (const auto& it : *services) {
+                if (it.isCa()) return services;
+            }
+        }
+        Cert::CerItem* cer_next = nullptr;
+        bool is_selfsigned = false;
+        if ((cerStore->getIssuerCert(cer_current, &cer_next, is_selfsigned) != RET_OK) || is_selfsigned) break;
+        cer_current = cer_next;
+    }
+    return std::shared_ptr<const Cert::TrustServices>();
+}
+
+bool CertValidator::responderListedForCa (
+        const Cert::CerItem* cerResponder,
+        Cert::CerItem* cerIssuer,
+        const uint64_t msTime
+)
+{
+    const std::shared_ptr<const Cert::TrustServices> responder_services = cerResponder->getTrustServices();
+    if (!responder_services) return false;
+
+    //  The CA of the certificate in question as a service of a trusted list
+    const std::shared_ptr<const Cert::TrustServices> ca_services = listed_ca_services(m_CerStore, cerIssuer);
+    if (!ca_services) return false;
+
+    //  The issuer of the responder certificate is a CA service of the same TSP: a responder in the list but
+    //  certified by somebody else is not taken
+    Cert::CerItem* cer_respissuer = nullptr;
+    bool is_selfsigned = false;
+    if (
+        (m_CerStore->getIssuerCert(const_cast<Cert::CerItem*>(cerResponder), &cer_respissuer, is_selfsigned) != RET_OK) ||
+        is_selfsigned || !cer_respissuer
+    ) {
+        return false;
+    }
+    const std::shared_ptr<const Cert::TrustServices> respissuer_services = cer_respissuer->getTrustServices();
+    if (!respissuer_services) return false;
+
+    const uint64_t ms_time = (msTime > 0) ? msTime : TimeUtil::mtimeNow();
+    for (const auto& it_resp : *responder_services) {
+        //  "Certstatus/OCSP", "Certstatus/OCSP/QC", "National-Certstatus/OCSP": provided at the time
+        if (it_resp.type.find("Certstatus/OCSP") == string::npos) continue;
+        const Cert::TrustService::Period* period = it_resp.periodAt(ms_time);
+        if (!period || !Cert::TrustService::isActiveStatus(period->status)) continue;
+
+        bool for_ca = false, certified_by_tsp = false;
+        for (const auto& it_ca : *ca_services) {
+            for_ca |= it_ca.isCa() && it_ca.sameProvider(it_resp);
+        }
+        for (const auto& it_issuer : *respissuer_services) {
+            certified_by_tsp |= it_issuer.isCa() && it_issuer.sameProvider(it_resp);
+        }
+        if (for_ca && certified_by_tsp) return true;
+    }
+    return false;
 }
 
 int CertValidator::verifySignatureSignerInfo (

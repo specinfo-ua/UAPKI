@@ -219,6 +219,9 @@ int trustToJson (
             DO_JSON(json_object_set_string(jo_service, "listId", it.listId.c_str()));
             DO_JSON(json_object_set_string(jo_service, "type", it.type.c_str()));
             DO_JSON(json_object_set_string(jo_service, "tspName", it.tspName.c_str()));
+            if (!it.tspId.empty()) {
+                DO_JSON(json_object_set_string(jo_service, "tspId", it.tspId.c_str()));
+            }
             DO_JSON(json_object_set_string(jo_service, "serviceName", it.serviceName.c_str()));
             if (it.forESignatures) {
                 DO_JSON(ParsonHelper::jsonObjectSetBoolean(jo_service, "forESignatures", true));

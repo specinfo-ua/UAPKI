@@ -478,6 +478,7 @@ VerifiedSignerInfo::VerifiedSignerInfo (void)
     , m_StatusSignerUnknown(false)
     , m_TsaKeyCompromised(false)
     , m_TsaRevokedNoReason(false)
+    , m_SignerCertNotFound(false)
 {}
 
 VerifiedSignerInfo::~VerifiedSignerInfo (void)
@@ -788,6 +789,9 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
 {
     vector<string> rv_warns;
 
+    if (m_SignerCertNotFound) {
+        rv_warns.push_back("THE CERTIFICATE OF THE SIGNER IS NOT FOUND");
+    }
     if (m_SignatureFormat <= SignatureFormat::CADES_BES) {
         if (m_SigningTime == 0) {
             rv_warns.push_back("THE SIGNING TIME IS NOT PRESENT");
@@ -817,6 +821,14 @@ vector<string> VerifiedSignerInfo::getWarningMessages (void) const
     }
     if (m_TsaRevokedNoReason) {
         rv_warns.push_back("THE TSA CERTIFICATE IS REVOKED WITH NO REASON GIVEN");
+    }
+    //  The OCSP responder is not certified by the key of the CA: it is taken as a service of a trusted list of
+    //  the same TSP (RFC 6960, 4.2.2.2, 1) - the result stands, the warning tells how
+    for (const auto& it : m_CertChainItems) {
+        if ((it->getValidationType() == Cert::ValidationType::OCSP) && it->getResultValidationByOcsp().responderByTrustList) {
+            rv_warns.push_back("THE OCSP RESPONDER IS AUTHORIZED BY A TRUSTED LIST, NOT BY THE KEY OF THE CA");
+            break;
+        }
     }
 
     if (m_SignatureFormat >= SignatureFormat::CADES_C) {
@@ -1435,6 +1447,8 @@ int VerifiedSignerInfo::verifySignedAttribute (
     case RET_UAPKI_CERT_NOT_FOUND:
         m_LastError = RET_UAPKI_CERT_NOT_FOUND;
         m_StatusSignature = SignatureVerifyStatus::INDETERMINATE;
+        //  ETSI EN 319 102-1, 5.2.3: INDETERMINATE, NO_SIGNING_CERTIFICATE_FOUND
+        m_SignerCertNotFound = true;
         DO(addExpectedCertBySID(CertEntity::SIGNER, m_SignerInfo.getSidEncoded()));
         break;
     default:
